@@ -1,0 +1,29 @@
+{
+  "name": "front-hotel-agent",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AI Receptionist Agent for Hotel Allergen Management",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:web": "pnpm --filter @front-hotel-agent/web dev",
+    "dev:api": "pnpm --filter @front-hotel-agent/api dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @front-hotel-agent/web build",
+    "build:api": "pnpm --filter @front-hotel-agent/api build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "keywords": [
+    "hotel",
+    "allergen",
+    "menu",
+    "sveltekit",
+    "nestjs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

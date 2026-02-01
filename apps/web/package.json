@@ -1,0 +1,32 @@
+{
+  "name": "@front-hotel-agent/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^6.0.0",
+    "@sveltejs/kit": "^2.21.0",
+    "@sveltejs/vite-plugin-svelte": "^5.1.0",
+    "@types/node": "^22.15.21",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.28.0",
+    "eslint-plugin-svelte": "^3.9.0",
+    "postcss": "^8.5.4",
+    "svelte": "^5.34.7",
+    "svelte-check": "^4.2.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  },
+  "type": "module"
+}
