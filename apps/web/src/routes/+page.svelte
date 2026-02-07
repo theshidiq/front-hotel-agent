@@ -17,6 +17,12 @@
 	let scanResult: { product: Product } | null = $state(null);
 	let scanError: string | null = $state(null);
 
+	// Camera State
+	let showCamera = $state(false);
+	let videoEl: HTMLVideoElement | null = $state(null);
+	let cameraStream: MediaStream | null = $state(null);
+	let cameraError: string | null = $state(null);
+
 	// Manual Add State
 	let allergens: Allergen[] = $state([]);
 	let isCreating = $state(false);
@@ -774,6 +780,63 @@
 		scanError = null;
 	}
 
+	async function openCamera() {
+		cameraError = null;
+		showCamera = true;
+		try {
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: { facingMode: 'environment' }
+			});
+			cameraStream = stream;
+			if (videoEl) {
+				videoEl.srcObject = stream;
+			}
+		} catch (err: any) {
+			cameraError = err.name === 'NotAllowedError'
+				? 'Camera permission denied. Please allow camera access.'
+				: 'Could not access camera: ' + (err.message || 'Unknown error');
+			showCamera = false;
+		}
+	}
+
+	function capturePhoto() {
+		if (!videoEl) return;
+		const canvas = document.createElement('canvas');
+		canvas.width = videoEl.videoWidth;
+		canvas.height = videoEl.videoHeight;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		ctx.drawImage(videoEl, 0, 0);
+		canvas.toBlob((blob) => {
+			if (blob) {
+				const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+				handleFile(file);
+			}
+			closeCamera();
+		}, 'image/jpeg', 0.9);
+	}
+
+	function closeCamera() {
+		if (cameraStream) {
+			cameraStream.getTracks().forEach(track => track.stop());
+			cameraStream = null;
+		}
+		showCamera = false;
+		cameraError = null;
+	}
+
+	// Wire up camera stream to video element when both are ready
+	$effect(() => {
+		if (videoEl && cameraStream) {
+			videoEl.srcObject = cameraStream;
+		}
+		return () => {
+			if (cameraStream) {
+				cameraStream.getTracks().forEach(track => track.stop());
+			}
+		};
+	});
+
 	async function startScan() {
 		if (!selectedFile) return;
 		isScanning = true;
@@ -859,7 +922,29 @@
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 					<!-- Upload Area -->
 					<div>
-						{#if !previewUrl}
+						{#if showCamera}
+							<div>
+								<video bind:this={videoEl} autoplay playsinline muted class="w-full rounded-lg bg-black"></video>
+								{#if cameraError}
+									<p class="mt-2 text-red-600 text-sm">{cameraError}</p>
+								{/if}
+								<div class="mt-3 flex gap-2">
+									<button
+										onclick={capturePhoto}
+										class="flex-1 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
+										Capture
+									</button>
+									<button onclick={closeCamera} class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+										Cancel
+									</button>
+								</div>
+							</div>
+						{:else if !previewUrl}
 							<div
 								class="border-2 border-dashed rounded-lg p-6 text-center transition-colors {dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300'}"
 								ondragover={handleDragOver}
@@ -875,10 +960,9 @@
 										Choose File
 										<input type="file" accept="image/*" class="hidden" onchange={handleFileInput} />
 									</label>
-									<label class="cursor-pointer px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+									<button onclick={openCamera} class="px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
 										Camera
-										<input type="file" accept="image/*" capture="environment" class="hidden" onchange={handleFileInput} />
-									</label>
+									</button>
 								</div>
 							</div>
 						{:else}
