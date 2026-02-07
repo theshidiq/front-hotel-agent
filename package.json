@@ -4,9 +4,9 @@
   "private": true,
   "description": "AI Receptionist Agent for Hotel Allergen Management",
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "pnpm run dev:api & pnpm run dev:web",
     "dev:web": "pnpm --filter @front-hotel-agent/web dev",
-    "dev:api": "pnpm --filter @front-hotel-agent/api dev",
+    "dev:api": "pnpm --filter @front-hotel-agent/api start:dev",
     "build": "pnpm -r build",
     "build:web": "pnpm --filter @front-hotel-agent/web build",
     "build:api": "pnpm --filter @front-hotel-agent/api build",
