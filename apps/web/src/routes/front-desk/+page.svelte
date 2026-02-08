@@ -617,6 +617,23 @@
 					</span>
 				{/if}
 			</button>
+			<p class="px-3 py-2 mt-4 text-xs font-medium text-slate-500 uppercase tracking-wider">食材管理</p>
+
+			<a
+				href="/"
+				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800"
+			>
+				<span class="material-symbols-rounded text-lg">inventory_2</span>
+				商品管理
+			</a>
+
+			<a
+				href="/"
+				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800"
+			>
+				<span class="material-symbols-rounded text-lg">restaurant_menu</span>
+				メニュー管理
+			</a>
 		</nav>
 	</aside>
 

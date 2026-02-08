@@ -23,6 +23,9 @@
 	let cameraStream: MediaStream | null = $state(null);
 	let cameraError: string | null = $state(null);
 
+	// Image Lightbox
+	let expandedImageUrl: string | null = $state(null);
+
 	// Manual Add State
 	let allergens: Allergen[] = $state([]);
 	let isCreating = $state(false);
@@ -519,6 +522,95 @@
 		)
 	);
 
+	// Allergen Report Table - compute rows grouped by menu
+	const allergenColors: Record<string, string> = {
+		'牛肉': 'bg-red-500', '豚肉': 'bg-red-400', '鶏肉': 'bg-red-300',
+		'小麦': 'bg-amber-500', '大麦': 'bg-amber-400', 'ライ麦': 'bg-amber-400', 'オーツ麦': 'bg-amber-400',
+		'卵': 'bg-orange-500',
+		'乳': 'bg-blue-500', 'チーズ': 'bg-blue-400',
+		'えび': 'bg-pink-500', 'かに': 'bg-cyan-500',
+		'大豆': 'bg-violet-500',
+		'ごま': 'bg-yellow-600',
+		'落花生': 'bg-amber-700', 'くるみ': 'bg-amber-600', 'カシューナッツ': 'bg-amber-600', 'アーモンド': 'bg-amber-600',
+		'そば': 'bg-stone-500',
+		'さば': 'bg-teal-500', 'さけ': 'bg-teal-400', 'いくら': 'bg-teal-400', 'あわび': 'bg-teal-400', 'いか': 'bg-teal-400',
+	};
+
+	function getAllergenColor(name: string): string {
+		return allergenColors[name] || 'bg-gray-500';
+	}
+
+	type AllergenTableRow = { menuName: string; allergenName: string; productNames: string; isFirstInMenu: boolean };
+
+	const allergenTableData = $derived.by(() => {
+		const rows: AllergenTableRow[] = [];
+		for (const menu of menus) {
+			const allergenProductMap = new Map<string, string[]>();
+			for (const product of menu.products || []) {
+				for (const allergen of product.allergens || []) {
+					if (!allergenProductMap.has(allergen.name)) {
+						allergenProductMap.set(allergen.name, []);
+					}
+					const list = allergenProductMap.get(allergen.name)!;
+					if (!list.includes(product.name)) {
+						list.push(product.name);
+					}
+				}
+			}
+			let isFirst = true;
+			for (const [allergenName, productNames] of allergenProductMap) {
+				rows.push({
+					menuName: isFirst ? menu.name : '',
+					allergenName,
+					productNames: productNames.join(', '),
+					isFirstInMenu: isFirst,
+				});
+				isFirst = false;
+			}
+		}
+		return rows;
+	});
+
+	const allergenTableLeft = $derived.by(() => {
+		const midpoint = Math.ceil(menus.length / 2);
+		const leftMenuNames = new Set(menus.slice(0, midpoint).map(m => m.name));
+		const result: AllergenTableRow[] = [];
+		let currentMenu = '';
+		for (const row of allergenTableData) {
+			if (row.isFirstInMenu) currentMenu = row.menuName;
+			if (leftMenuNames.has(currentMenu)) result.push(row);
+		}
+		return result;
+	});
+
+	const allergenTableRight = $derived(
+		allergenTableData.filter(r => !allergenTableLeft.includes(r))
+	);
+
+	let showAllergenReport = $state(false);
+	let isExporting = $state(false);
+
+	async function exportAllergenXlsx() {
+		isExporting = true;
+		try {
+			const { utils, writeFile } = await import('xlsx');
+			const wsData: string[][] = [['メニュー', 'アレルギー', '商品/食材']];
+			for (const row of allergenTableData) {
+				wsData.push([row.menuName, row.allergenName, row.productNames]);
+			}
+			const ws = utils.aoa_to_sheet(wsData);
+			ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 40 }];
+			const wb = utils.book_new();
+			utils.book_append_sheet(wb, ws, 'Allergen Report');
+			const today = new Date().toISOString().split('T')[0];
+			writeFile(wb, `allergen-report-${today}.xlsx`);
+		} catch (e) {
+			console.error('Export failed:', e);
+		} finally {
+			isExporting = false;
+		}
+	}
+
 	function resetNewMenu() {
 		newMenu = {
 			name: '',
@@ -866,34 +958,75 @@
 </script>
 
 <svelte:head>
-	<title>Hotel Front Agent - Allergen Scanner</title>
+	<title>Hotel Front Agent - Allergen Management</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+		rel="stylesheet"
+	/>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+		rel="stylesheet"
+	/>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50">
-	<!-- Header -->
-	<header class="bg-slate-900 text-white py-4">
-		<div class="max-w-4xl mx-auto px-4">
-			<h1 class="text-xl font-bold">Hotel Front Agent</h1>
-			<p class="text-slate-400 text-sm">Allergen Management System</p>
+<div class="flex h-screen bg-gray-100 font-['Noto_Sans_JP',sans-serif]">
+	<!-- Sidebar -->
+	<aside class="w-60 bg-slate-900 border-r border-slate-700 flex flex-col">
+		<div class="p-6 border-b border-slate-700">
+			<h1 class="text-2xl font-bold text-white">湖南荘</h1>
+			<p class="text-xs text-slate-400 mt-0.5">Konan-so Ryokan</p>
 		</div>
-	</header>
 
-	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
-		<!-- Main Tab Navigation -->
-		<div class="flex bg-white rounded-xl shadow-sm border border-gray-200 p-1">
+		<nav class="flex-1 p-3">
+			<p class="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">フロント</p>
+
+			<a
+				href="/front-desk"
+				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800"
+			>
+				<span class="material-symbols-rounded text-lg">calendar_today</span>
+				予約管理
+			</a>
+
+			<p class="px-3 py-2 mt-4 text-xs font-medium text-slate-500 uppercase tracking-wider">食材管理</p>
+
 			<button
 				onclick={() => mainTab = 'products'}
-				class="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors {mainTab === 'products' ? 'bg-slate-900 text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors {mainTab === 'products'
+					? 'bg-blue-600 text-white'
+					: 'text-slate-300 hover:bg-slate-800'}"
 			>
-				Products ({products.length})
+				<span class="material-symbols-rounded text-lg">inventory_2</span>
+				商品管理
+				<span class="ml-auto text-xs opacity-70">{products.length}</span>
 			</button>
+
 			<button
 				onclick={() => mainTab = 'menu'}
-				class="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors {mainTab === 'menu' ? 'bg-slate-900 text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}"
+				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors {mainTab === 'menu'
+					? 'bg-blue-600 text-white'
+					: 'text-slate-300 hover:bg-slate-800'}"
 			>
-				Menu ({menus.length})
+				<span class="material-symbols-rounded text-lg">restaurant_menu</span>
+				メニュー管理
+				<span class="ml-auto text-xs opacity-70">{menus.length}</span>
 			</button>
-		</div>
+		</nav>
+	</aside>
+
+	<!-- Main Content -->
+	<div class="flex-1 flex flex-col overflow-hidden">
+		<header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shrink-0">
+			<div class="flex items-center gap-3">
+				<h2 class="text-lg font-bold text-gray-900">{mainTab === 'products' ? '商品管理' : 'メニュー管理'}</h2>
+				<span class="text-sm text-gray-500">Allergen Management System</span>
+			</div>
+		</header>
+
+		<main class="flex-1 overflow-y-auto p-6 space-y-6">
+			<div class="max-w-5xl mx-auto space-y-6">
 
 		{#if mainTab === 'products'}
 		<!-- Add Product Section -->
@@ -1323,7 +1456,9 @@
 							>
 								<div class="flex items-center gap-3 flex-1 min-w-0">
 									{#if product.image_url}
-										<img src={product.image_url} alt={product.name} class="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+										<button onclick={(e) => { e.stopPropagation(); expandedImageUrl = product.image_url; }} class="flex-shrink-0">
+											<img src={product.image_url} alt={product.name} class="w-12 h-12 object-cover rounded-lg cursor-zoom-in" />
+										</button>
 									{:else}
 										<div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
 											<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1333,7 +1468,6 @@
 									{/if}
 									<div class="min-w-0">
 										<p class="font-medium text-gray-900 truncate">{product.name}</p>
-										<p class="text-xs text-gray-500">{product.brand || 'Unknown'} - {product.category || 'Uncategorized'}</p>
 									</div>
 								</div>
 								<div class="flex items-center gap-3 flex-shrink-0">
@@ -1918,6 +2052,89 @@
 			{/if}
 		</section>
 
+		<!-- Allergen Report Table -->
+		{#if menus.length > 0}
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+			<div class="flex items-center justify-between mb-3">
+				<div class="flex items-center gap-3">
+					<h2 class="text-lg font-semibold text-gray-900">アレルゲン一覧表</h2>
+					<span class="text-sm text-gray-500">Allergen Report</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<button
+						onclick={() => showAllergenReport = !showAllergenReport}
+						class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors {showAllergenReport ? 'bg-slate-900 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}"
+					>
+						{showAllergenReport ? 'Hide Table' : 'Show Table'}
+					</button>
+					{#if showAllergenReport}
+						<button
+							onclick={exportAllergenXlsx}
+							disabled={isExporting}
+							class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+						>
+							<span class="material-symbols-rounded text-base">download</span>
+							{isExporting ? 'Exporting...' : 'Export .xlsx'}
+						</button>
+					{/if}
+				</div>
+			</div>
+
+			{#if showAllergenReport}
+				{#if allergenTableData.length === 0}
+					<p class="text-center text-gray-400 py-6 text-sm">No allergens found in any menu. Link products with allergens to see the report.</p>
+				{:else}
+					<div class="flex gap-5">
+						<!-- Left Table -->
+						<div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+							<div class="bg-slate-800 text-white text-xs font-semibold flex">
+								<div class="w-[140px] px-3 py-2.5">メニュー</div>
+								<div class="w-[110px] px-2 py-2.5">アレルギー</div>
+								<div class="flex-1 px-2 py-2.5">商品/食材</div>
+							</div>
+							{#each allergenTableLeft as row, i}
+								<div class="flex text-sm border-t {row.isFirstInMenu && i > 0 ? 'border-t-2 border-t-blue-300' : 'border-gray-100'} {i % 2 === 0 ? 'bg-green-50/50' : 'bg-white'}">
+									<div class="w-[140px] px-3 py-2 font-semibold text-gray-900 text-xs">{row.menuName}</div>
+									<div class="w-[110px] px-2 py-2">
+										<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(row.allergenName)}">{row.allergenName}</span>
+									</div>
+									<div class="flex-1 px-2 py-2 text-gray-600 text-xs">{row.productNames}</div>
+								</div>
+							{/each}
+							{#if allergenTableLeft.length === 0}
+								<div class="px-3 py-4 text-center text-gray-400 text-xs">No data</div>
+							{/if}
+						</div>
+
+						<!-- Right Table -->
+						{#if allergenTableRight.length > 0}
+						<div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+							<div class="bg-slate-800 text-white text-xs font-semibold flex">
+								<div class="w-[140px] px-3 py-2.5">メニュー</div>
+								<div class="w-[110px] px-2 py-2.5">アレルギー</div>
+								<div class="flex-1 px-2 py-2.5">商品/食材</div>
+							</div>
+							{#each allergenTableRight as row, i}
+								<div class="flex text-sm border-t {row.isFirstInMenu && i > 0 ? 'border-t-2 border-t-blue-300' : 'border-gray-100'} {i % 2 === 0 ? 'bg-green-50/50' : 'bg-white'}">
+									<div class="w-[140px] px-3 py-2 font-semibold text-gray-900 text-xs">{row.menuName}</div>
+									<div class="w-[110px] px-2 py-2">
+										<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(row.allergenName)}">{row.allergenName}</span>
+									</div>
+									<div class="flex-1 px-2 py-2 text-gray-600 text-xs">{row.productNames}</div>
+								</div>
+							{/each}
+						</div>
+						{/if}
+					</div>
+
+					<p class="text-[10px] text-gray-400 mt-3">
+						Generated: {new Date().toISOString().split('T')[0]} | {menus.length} menus, {allergenTableData.length} allergen entries
+					</p>
+				{/if}
+			{/if}
+		</section>
+		{/if}
+
 		<!-- Menu List Section -->
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
 			<div class="flex items-center justify-between mb-4">
@@ -2290,12 +2507,33 @@
 												<!-- Allergens -->
 												<div>
 													<h4 class="text-sm font-medium text-gray-700 mb-2">Allergens (Derived from Products)</h4>
-													{#if menu.allergens && menu.allergens.length > 0}
-														<div class="flex flex-wrap gap-1.5">
-															{#each menu.allergens as allergen}
-																<span class="px-2.5 py-1 bg-red-100 text-red-700 rounded-md text-sm">{allergen.name}</span>
-															{/each}
-														</div>
+													{#if menu.products && menu.products.length > 0}
+														{@const allergenProductMap = (() => {
+															const map = new Map<string, { name: string; products: string[] }>();
+															for (const product of menu.products) {
+																for (const allergen of product.allergens || []) {
+																	if (!map.has(allergen.id)) {
+																		map.set(allergen.id, { name: allergen.name, products: [] });
+																	}
+																	const entry = map.get(allergen.id)!;
+																	if (!entry.products.includes(product.name)) {
+																		entry.products.push(product.name);
+																	}
+																}
+															}
+															return Array.from(map.values());
+														})()}
+														{#if allergenProductMap.length > 0}
+															<div class="flex flex-wrap gap-1.5">
+																{#each allergenProductMap as item}
+																	<span class="px-2.5 py-1 bg-red-100 text-red-700 rounded-md text-sm" title={item.products.join(', ')}>
+																		{item.name} ({item.products.join(', ')})
+																	</span>
+																{/each}
+															</div>
+														{:else}
+															<p class="text-gray-400 text-sm">No allergens detected</p>
+														{/if}
 													{:else}
 														<p class="text-gray-400 text-sm">No allergens detected</p>
 													{/if}
@@ -2313,7 +2551,9 @@
 			{/if}
 		</section>
 		{/if}
+		</div>
 	</main>
+	</div>
 
 	<!-- Delete Menu Confirmation Modal -->
 	{#if showDeleteMenuModal}
@@ -2785,6 +3025,21 @@
 					</button>
 				</div>
 			</div>
+		</div>
+	{/if}
+
+	{#if expandedImageUrl}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+			onclick={() => expandedImageUrl = null}
+			role="dialog"
+		>
+			<button onclick={() => expandedImageUrl = null} class="absolute top-4 right-4 p-2 bg-white/20 text-white rounded-full hover:bg-white/40">
+				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+			<img src={expandedImageUrl} alt="Expanded" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" onclick={(e) => e.stopPropagation()} />
 		</div>
 	{/if}
 </div>
