@@ -14,7 +14,7 @@
 	let selectedFile: File | null = $state(null);
 	let previewUrl: string | null = $state(null);
 	let isScanning = $state(false);
-	let scanResult: { product: Product } | null = $state(null);
+	let scanResult: { product: Product; existing_product?: { id: string; name: string; brand: string | null; image_url: string | null } } | null = $state(null);
 	let scanError: string | null = $state(null);
 
 	// Camera State
@@ -943,7 +943,7 @@
 			// 2. Call scan API
 			const result = await scanProduct(imageUrl);
 
-			scanResult = { product: result.product };
+			scanResult = { product: result.product, existing_product: result.existing_product };
 
 			// 3. Refresh products list
 			await loadProducts();
@@ -951,6 +951,17 @@
 			scanError = e.message || 'Scan failed';
 		} finally {
 			isScanning = false;
+		}
+	}
+
+	async function deleteDuplicate() {
+		if (!scanResult?.product?.id) return;
+		try {
+			await deleteProduct(scanResult.product.id);
+			await loadProducts();
+			clearSelection();
+		} catch (e: any) {
+			scanError = e.message || 'Failed to delete duplicate';
 		}
 	}
 
@@ -1144,12 +1155,22 @@
 						</div>
 					{:else if scanResult}
 						<div class="space-y-3">
-							<div class="flex items-center gap-2">
-								<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-								</svg>
-								<span class="text-green-600 text-sm font-medium">Product saved!</span>
-							</div>
+							{#if scanResult.existing_product}
+								<div class="flex items-center gap-2 p-2 bg-amber-50 rounded-lg">
+									<svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+									</svg>
+									<span class="text-amber-700 text-sm font-medium">Product already exists!</span>
+								</div>
+								<p class="text-xs text-gray-500">A product with this name already exists in your database.</p>
+							{:else}
+								<div class="flex items-center gap-2">
+									<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+									</svg>
+									<span class="text-green-600 text-sm font-medium">Product saved!</span>
+								</div>
+							{/if}
 							<div>
 								<h3 class="font-semibold text-gray-900">{scanResult.product.name}</h3>
 								<p class="text-gray-500 text-sm">{scanResult.product.brand || 'Unknown brand'}</p>
@@ -1210,9 +1231,20 @@
 									</div>
 								</div>
 							{/if}
-							<button onclick={scanAnother} class="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
-								Scan Another
-							</button>
+							{#if scanResult.existing_product}
+								<div class="flex gap-2">
+									<button onclick={deleteDuplicate} class="flex-1 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
+										Delete Duplicate
+									</button>
+									<button onclick={scanAnother} class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">
+										Keep Both
+									</button>
+								</div>
+							{:else}
+								<button onclick={scanAnother} class="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+									Scan Another
+								</button>
+							{/if}
 						</div>
 					{:else}
 						<div class="flex flex-col items-center justify-center h-full py-8 text-center text-gray-400">

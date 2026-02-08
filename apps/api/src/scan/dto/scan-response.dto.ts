@@ -52,4 +52,12 @@ export class ScanResultResponse {
       source: string;
     }[];
   };
+
+  @ApiProperty({ required: false })
+  existing_product?: {
+    id: string;
+    name: string;
+    brand: string | null;
+    image_url: string | null;
+  };
 }

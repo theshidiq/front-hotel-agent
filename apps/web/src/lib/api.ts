@@ -31,6 +31,12 @@ export interface ScanResult {
 		image_url: string;
 	};
 	product: Product;
+	existing_product?: {
+		id: string;
+		name: string;
+		brand: string | null;
+		image_url: string | null;
+	};
 }
 
 export async function scanProduct(imageUrl: string): Promise<ScanResult> {

@@ -80,14 +80,32 @@ export class ScanService {
 
       this.logger.log(`Created product: ${product.id}`);
 
-      // 6. Link allergens (from Qwen labels + ingredient text scanning)
+      // 6. Check for existing product with same name (duplicate detection)
+      let existingProduct = null;
+      const productName = product.name?.trim();
+      if (productName && productName !== 'Unknown Product') {
+        const { data: duplicates } = await supabase
+          .from('products')
+          .select('id, name, brand, image_url')
+          .eq('restaurant_id', restaurantId)
+          .ilike('name', productName)
+          .neq('id', product.id)
+          .limit(1);
+
+        if (duplicates && duplicates.length > 0) {
+          existingProduct = duplicates[0];
+          this.logger.log(`Duplicate product found: ${existingProduct.id} (${existingProduct.name})`);
+        }
+      }
+
+      // 7. Link allergens (from Qwen labels + ingredient text scanning)
       const allergenLinks = await this.linkAllergens(
         product.id,
         extractedData.allergens,
         extractedData.ingredients_raw,
       );
 
-      // 7. Update scan session with product_id and completed status
+      // 8. Update scan session with product_id and completed status
       const { data: updatedSession } = await supabase
         .from('scan_sessions')
         .update({
@@ -104,6 +122,7 @@ export class ScanService {
           ...product,
           allergens: allergenLinks,
         },
+        ...(existingProduct && { existing_product: existingProduct }),
       };
     } catch (error) {
       // Update scan session with failed status
