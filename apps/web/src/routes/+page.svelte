@@ -2679,7 +2679,7 @@
 								bind:value={newProductCategoryName}
 								placeholder="e.g., Dairy, Sauce"
 								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-								onkeydown={(e) => e.key === 'Enter' && addProductCategory()}
+								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addProductCategory()}
 							/>
 							<button
 								onclick={addProductCategory}
@@ -2758,7 +2758,7 @@
 								bind:value={newAllergenName}
 								placeholder="e.g., Sesame, Celery"
 								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-								onkeydown={(e) => e.key === 'Enter' && addAllergenItem()}
+								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addAllergenItem()}
 							/>
 							<select bind:value={newAllergenCategory} class="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
 								<option value="grain">Grain</option>
@@ -2855,7 +2855,7 @@
 								bind:value={newCategoryName}
 								placeholder="e.g., Breakfast, Kids Menu"
 								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-								onkeydown={(e) => e.key === 'Enter' && addCategory()}
+								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addCategory()}
 							/>
 							<button
 								onclick={addCategory}
