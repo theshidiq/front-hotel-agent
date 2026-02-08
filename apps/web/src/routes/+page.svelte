@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { uploadImage } from '$lib/supabase';
+	import { uploadImage, compressImage } from '$lib/supabase';
 	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData } from '$lib/api';
 
 	// Main Tab (Products vs Menu)
@@ -185,7 +185,7 @@
 		createSuccess = false;
 	}
 
-	function handleManualImageInput(e: Event) {
+	async function handleManualImageInput(e: Event) {
 		const input = e.target as HTMLInputElement;
 		if (input.files && input.files.length > 0) {
 			const file = input.files[0];
@@ -193,9 +193,10 @@
 				createError = 'Please select an image file';
 				return;
 			}
-			manualImageFile = file;
+			const compressed = await compressImage(file);
+			manualImageFile = compressed;
 			if (manualImagePreview) URL.revokeObjectURL(manualImagePreview);
-			manualImagePreview = URL.createObjectURL(file);
+			manualImagePreview = URL.createObjectURL(compressed);
 			createError = null;
 		}
 	}
@@ -853,13 +854,14 @@
 		if (input.files && input.files.length > 0) handleFile(input.files[0]);
 	}
 
-	function handleFile(file: File) {
+	async function handleFile(file: File) {
 		if (!file.type.startsWith('image/')) {
 			scanError = 'Please select an image file';
 			return;
 		}
-		selectedFile = file;
-		previewUrl = URL.createObjectURL(file);
+		const compressed = await compressImage(file);
+		selectedFile = compressed;
+		previewUrl = URL.createObjectURL(compressed);
 		scanError = null;
 		scanResult = null;
 	}
@@ -905,7 +907,7 @@
 				handleFile(file);
 			}
 			closeCamera();
-		}, 'image/jpeg', 0.9);
+		}, 'image/jpeg', 1.0);
 	}
 
 	function closeCamera() {
