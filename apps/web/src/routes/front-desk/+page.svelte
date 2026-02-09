@@ -17,10 +17,31 @@
 		type CheckInData,
 	} from '$lib/api';
 	import { onMount } from 'svelte';
+	import Sidebar from '$lib/components/Sidebar.svelte';
 
 	// Navigation
 	type NavItem = 'reservations' | 'rooms' | 'notifications';
 	let activeNav = $state<NavItem>('reservations');
+
+	// Sidebar
+	let sidebarCollapsed = $state(false);
+	const sidebarSections = $derived([
+		{
+			label: 'フロント',
+			items: [
+				{ icon: 'calendar_today', label: '予約管理', active: activeNav === 'reservations', onclick: () => activeNav = 'reservations' },
+				{ icon: 'door_open', label: '客室状況', active: activeNav === 'rooms', onclick: () => activeNav = 'rooms' },
+				{ icon: 'notifications', label: '通知', badge: alerts.length > 0 ? alerts.length : undefined, badgeVariant: 'alert' as const, active: activeNav === 'notifications', onclick: () => activeNav = 'notifications' },
+			]
+		},
+		{
+			label: '食材管理',
+			items: [
+				{ icon: 'inventory_2', label: '商品管理', href: '/', active: false },
+				{ icon: 'restaurant_menu', label: 'メニュー管理', href: '/', active: false },
+			]
+		}
+	]);
 
 	// State
 	let reservations = $state<Reservation[]>([]);
@@ -570,72 +591,7 @@
 </svelte:head>
 
 <div class="flex h-screen bg-gray-100 font-['Noto_Sans_JP',sans-serif]">
-	<!-- Sidebar -->
-	<aside class="w-60 bg-slate-900 border-r border-slate-700 flex flex-col">
-		<div class="p-6 border-b border-slate-700">
-			<h1 class="text-2xl font-bold text-white">湖南荘</h1>
-			<p class="text-xs text-slate-400 mt-0.5">Konan-so Ryokan</p>
-		</div>
-
-		<nav class="flex-1 p-3">
-			<p class="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">フロント</p>
-
-			<button
-				onclick={() => (activeNav = 'reservations')}
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors {activeNav ===
-				'reservations'
-					? 'bg-blue-600 text-white'
-					: 'text-slate-300 hover:bg-slate-800'}"
-			>
-				<span class="material-symbols-rounded text-lg">calendar_today</span>
-				予約管理
-			</button>
-
-			<button
-				onclick={() => (activeNav = 'rooms')}
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors {activeNav ===
-				'rooms'
-					? 'bg-blue-600 text-white'
-					: 'text-slate-300 hover:bg-slate-800'}"
-			>
-				<span class="material-symbols-rounded text-lg">door_open</span>
-				客室状況
-			</button>
-
-			<button
-				onclick={() => (activeNav = 'notifications')}
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors {activeNav ===
-				'notifications'
-					? 'bg-blue-600 text-white'
-					: 'text-slate-300 hover:bg-slate-800'}"
-			>
-				<span class="material-symbols-rounded text-lg">notifications</span>
-				通知
-				{#if alerts.length > 0}
-					<span class="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-						{alerts.length}
-					</span>
-				{/if}
-			</button>
-			<p class="px-3 py-2 mt-4 text-xs font-medium text-slate-500 uppercase tracking-wider">食材管理</p>
-
-			<a
-				href="/"
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800"
-			>
-				<span class="material-symbols-rounded text-lg">inventory_2</span>
-				商品管理
-			</a>
-
-			<a
-				href="/"
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800"
-			>
-				<span class="material-symbols-rounded text-lg">restaurant_menu</span>
-				メニュー管理
-			</a>
-		</nav>
-	</aside>
+	<Sidebar sections={sidebarSections} bind:collapsed={sidebarCollapsed} />
 
 	<!-- Main Content -->
 	<div class="flex-1 flex flex-col overflow-hidden">

@@ -3,11 +3,16 @@
 	import { uploadImage, compressImage } from '$lib/supabase';
 	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, deleteMenuGroup, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
+	import Sidebar from '$lib/components/Sidebar.svelte';
 
 	// Main Tab (Products vs Menu)
 	let mainTab: 'products' | 'menu' = $state('products');
 
+	// Sidebar
+	let sidebarCollapsed = $state(false);
+
 	// Add Product Mode
+	let showAddProduct = $state(false);
 	let addMode: 'scan' | 'manual' = $state('scan');
 
 	// Scanner State
@@ -332,6 +337,23 @@
 
 	// Menu State (declared early so derived blocks below can reference it)
 	let menus: Menu[] = $state([]);
+
+	// Sidebar sections (must be after products & menus declarations)
+	const sidebarSections = $derived([
+		{
+			label: 'フロント',
+			items: [
+				{ icon: 'calendar_today', label: '予約管理', href: '/front-desk', active: false },
+			]
+		},
+		{
+			label: '食材管理',
+			items: [
+				{ icon: 'inventory_2', label: '商品管理', badge: products.length, active: mainTab === 'products', onclick: () => mainTab = 'products' },
+				{ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' },
+			]
+		}
+	]);
 
 	// Menu Group filter for products
 	let selectedProductMenuGroup: string = $state('all');
@@ -1094,49 +1116,7 @@
 </svelte:head>
 
 <div class="flex h-screen bg-gray-100 font-['Noto_Sans_JP',sans-serif]">
-	<!-- Sidebar -->
-	<aside class="w-60 bg-slate-900 border-r border-slate-700 flex flex-col">
-		<div class="p-6 border-b border-slate-700">
-			<h1 class="text-2xl font-bold text-white">湖南荘</h1>
-			<p class="text-xs text-slate-400 mt-0.5">Konan-so Ryokan</p>
-		</div>
-
-		<nav class="flex-1 p-3">
-			<p class="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">フロント</p>
-
-			<a
-				href="/front-desk"
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800"
-			>
-				<span class="material-symbols-rounded text-lg">calendar_today</span>
-				予約管理
-			</a>
-
-			<p class="px-3 py-2 mt-4 text-xs font-medium text-slate-500 uppercase tracking-wider">食材管理</p>
-
-			<button
-				onclick={() => mainTab = 'products'}
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors {mainTab === 'products'
-					? 'bg-blue-600 text-white'
-					: 'text-slate-300 hover:bg-slate-800'}"
-			>
-				<span class="material-symbols-rounded text-lg">inventory_2</span>
-				商品管理
-				<span class="ml-auto text-xs opacity-70">{products.length}</span>
-			</button>
-
-			<button
-				onclick={() => mainTab = 'menu'}
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors {mainTab === 'menu'
-					? 'bg-blue-600 text-white'
-					: 'text-slate-300 hover:bg-slate-800'}"
-			>
-				<span class="material-symbols-rounded text-lg">restaurant_menu</span>
-				メニュー管理
-				<span class="ml-auto text-xs opacity-70">{menus.length}</span>
-			</button>
-		</nav>
-	</aside>
+	<Sidebar sections={sidebarSections} bind:collapsed={sidebarCollapsed} />
 
 	<!-- Main Content -->
 	<div class="flex-1 flex flex-col overflow-hidden">
@@ -1145,14 +1125,25 @@
 				<h2 class="text-lg font-bold text-gray-900">{mainTab === 'products' ? '商品管理' : 'メニュー管理'}</h2>
 				<span class="text-sm text-gray-500">Allergen Management System</span>
 			</div>
+			{#if mainTab === 'products'}
+				<button
+					onclick={() => showAddProduct = !showAddProduct}
+					class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+					</svg>
+					Add Product
+				</button>
+			{/if}
 		</header>
 
 		<main class="flex-1 overflow-y-auto p-6 space-y-6">
 			<div class="max-w-5xl lg:max-w-7xl mx-auto space-y-6">
 
 		{#if mainTab === 'products'}
-		<!-- Add Product Section -->
-		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+		<!-- Add Product Section (always visible on mobile, toggle on desktop) -->
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 {showAddProduct ? '' : 'md:hidden'}">
 			<!-- Tab Header -->
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-lg font-semibold text-gray-900">Add Product</h2>
@@ -1569,7 +1560,7 @@
 		</section>
 
 		<!-- Products Section -->
-		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 overflow-visible">
 			<div class="flex items-center justify-between mb-3">
 				<h2 class="text-lg font-semibold text-gray-900">Products ({filteredProducts.length}{selectedProductMenuGroup !== 'all' ? ` / ${products.length}` : ''})</h2>
 				<input
@@ -1610,7 +1601,7 @@
 					<svg class="w-6 h-6 text-gray-400 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
 				</div>
 			{:else if filteredProducts.length > 0}
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3 {expandedProductId ? 'pb-[70vh]' : ''}">
 					{#each filteredProducts as product}
 						<div class="relative bg-gray-50 rounded-lg overflow-visible border border-gray-200">
 							<!-- Product Header (clickable) -->
@@ -1656,7 +1647,7 @@
 
 							<!-- Expanded Details (floating overlay) -->
 							{#if expandedProductId === product.id}
-							<div class="absolute left-0 right-0 top-full z-20 px-4 pb-4 border border-gray-200 rounded-b-lg bg-white shadow-lg max-h-[70vh] overflow-y-auto">
+							<div class="absolute left-0 right-0 top-full z-20 px-4 pb-4 border border-gray-200 rounded-b-lg bg-white max-h-[70vh] overflow-y-auto">
 									<!-- Edit/View Toggle Buttons -->
 									<div class="flex justify-end gap-2 pt-3 mb-3">
 										{#if editingProductId === product.id}
@@ -2300,7 +2291,7 @@
 		{/if}
 
 		<!-- Menu List Section -->
-		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 overflow-visible">
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-lg font-semibold text-gray-900">Menu Items ({menus.length})</h2>
 				<input
@@ -2316,9 +2307,9 @@
 					<svg class="w-6 h-6 text-gray-400 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
 				</div>
 			{:else if filteredMenus.length > 0}
-				<div class="space-y-3">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3 {expandedMenuId ? 'pb-[70vh]' : ''}">
 					{#each filteredMenus as menu}
-						<div class="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
+						<div class="relative bg-gray-50 rounded-lg overflow-visible border border-gray-200">
 							<!-- Menu Header (clickable) -->
 							<button
 								onclick={() => toggleMenu(menu.id)}
@@ -2349,12 +2340,9 @@
 									</span>
 									<!-- Allergen Tags -->
 									<div class="flex gap-1 flex-wrap justify-end">
-										{#each (menu.allergens || []).slice(0, 3) as allergen}
+										{#each menu.allergens || [] as allergen}
 											<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">{allergen.name}</span>
 										{/each}
-										{#if (menu.allergens || []).length > 3}
-											<span class="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-xs">+{menu.allergens.length - 3}</span>
-										{/if}
 									</div>
 									<svg class="w-5 h-5 text-gray-400 transition-transform {expandedMenuId === menu.id ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -2362,9 +2350,9 @@
 								</div>
 							</button>
 
-							<!-- Expanded Details -->
+							<!-- Expanded Details (floating overlay) -->
 							{#if expandedMenuId === menu.id}
-								<div class="px-4 pb-4 border-t border-gray-200 bg-white">
+								<div class="absolute left-0 right-0 top-full z-20 px-4 pb-4 border border-gray-200 rounded-b-lg bg-white max-h-[70vh] overflow-y-auto">
 									<!-- Edit/View Toggle Buttons -->
 									<div class="flex justify-end gap-2 pt-3 mb-3">
 										{#if editingMenuId === menu.id}
@@ -2626,9 +2614,7 @@
 										</div>
 									{:else}
 										<!-- View Mode -->
-										<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-											<!-- Left Column -->
-											<div class="space-y-4">
+										<div class="space-y-4">
 												<!-- Description -->
 												{#if menu.description}
 													<div>
@@ -2688,10 +2674,7 @@
 														<p class="text-gray-400 text-sm">No products linked</p>
 													{/if}
 												</div>
-											</div>
 
-											<!-- Right Column -->
-											<div class="space-y-4">
 												<!-- Allergens -->
 												<div>
 													<h4 class="text-sm font-medium text-gray-700 mb-2">Allergens (Derived from Products)</h4>
@@ -2726,7 +2709,6 @@
 														<p class="text-gray-400 text-sm">No allergens detected</p>
 													{/if}
 												</div>
-											</div>
 										</div>
 									{/if}
 								</div>
