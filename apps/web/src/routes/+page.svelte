@@ -330,6 +330,9 @@
 		}
 	}
 
+	// Menu State (declared early so derived blocks below can reference it)
+	let menus: Menu[] = $state([]);
+
 	// Menu Group filter for products
 	let selectedProductMenuGroup: string = $state('all');
 
@@ -363,8 +366,6 @@
 		})
 	);
 
-	// Menu State
-	let menus: Menu[] = $state([]);
 	let menuSearchQuery = $state('');
 	let isLoadingMenus = $state(true);
 	let expandedMenuId: string | null = $state(null);
@@ -1147,7 +1148,7 @@
 		</header>
 
 		<main class="flex-1 overflow-y-auto p-6 space-y-6">
-			<div class="max-w-5xl mx-auto space-y-6">
+			<div class="max-w-5xl lg:max-w-7xl mx-auto space-y-6">
 
 		{#if mainTab === 'products'}
 		<!-- Add Product Section -->
@@ -1609,62 +1610,53 @@
 					<svg class="w-6 h-6 text-gray-400 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
 				</div>
 			{:else if filteredProducts.length > 0}
-				<div class="space-y-3">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 					{#each filteredProducts as product}
-						<div class="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
+						<div class="relative bg-gray-50 rounded-lg overflow-visible border border-gray-200">
 							<!-- Product Header (clickable) -->
 							<button
 								onclick={() => toggleProduct(product.id)}
-								class="w-full p-4 flex items-center justify-between hover:bg-gray-100 transition-colors text-left"
+								class="w-full p-3 flex items-center gap-3 hover:bg-gray-100 transition-colors text-left"
 							>
-								<div class="flex items-center gap-3 flex-1 min-w-0">
-									{#if product.image_url}
-										<button onclick={(e) => { e.stopPropagation(); expandedImageUrl = product.image_url; }} class="flex-shrink-0">
-											<img src={product.image_url} alt={product.name} class="w-12 h-12 object-cover rounded-lg cursor-zoom-in" />
-										</button>
-									{:else}
-										<div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-											<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-											</svg>
-										</div>
-									{/if}
-									<div class="min-w-0">
-										<p class="font-medium text-gray-900 truncate">{product.name}</p>
+								{#if product.image_url}
+									<button onclick={(e) => { e.stopPropagation(); expandedImageUrl = product.image_url; }} class="flex-shrink-0">
+										<img src={product.image_url} alt={product.name} class="w-10 h-10 object-cover rounded-lg cursor-zoom-in" />
+									</button>
+								{:else}
+									<div class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+										<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+										</svg>
 									</div>
-								</div>
-								<div class="flex items-center gap-3 flex-shrink-0">
-									<div class="flex gap-1 flex-wrap justify-end">
-										{#each (product.allergens || []).slice(0, 3) as allergen}
-											<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">{allergen.name}</span>
+								{/if}
+								<div class="flex-1 min-w-0">
+									<p class="font-medium text-gray-900 text-sm truncate">{product.name}</p>
+									<div class="flex items-center gap-1 mt-0.5 flex-wrap">
+										{#each product.allergens || [] as allergen}
+											<span class="px-1.5 py-0 bg-red-100 text-red-700 rounded text-[10px] leading-4">{allergen.name}</span>
 										{/each}
-										{#if (product.allergens || []).length > 3}
-											<span class="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-xs">+{product.allergens.length - 3}</span>
-										{/if}
-									</div>
-									<div class="flex gap-1">
 										{#if product.is_vegetarian}
-											<span class="w-5 h-5 bg-green-100 text-green-700 rounded text-xs flex items-center justify-center" title="Vegetarian">V</span>
+											<span class="w-4 h-4 bg-green-100 text-green-700 rounded text-[10px] flex items-center justify-center" title="Vegetarian">V</span>
 										{/if}
 										{#if product.is_vegan}
-											<span class="w-5 h-5 bg-green-100 text-green-700 rounded text-xs flex items-center justify-center" title="Vegan">VG</span>
+											<span class="w-4 h-4 bg-green-100 text-green-700 rounded text-[10px] flex items-center justify-center" title="Vegan">VG</span>
 										{/if}
 										{#if product.is_halal}
-											<span class="w-5 h-5 bg-emerald-100 text-emerald-700 rounded text-xs flex items-center justify-center" title="Halal">H</span>
+											<span class="w-4 h-4 bg-emerald-100 text-emerald-700 rounded text-[10px] flex items-center justify-center" title="Halal">H</span>
 										{/if}
 										{#if product.is_gluten_free}
-											<span class="w-5 h-5 bg-amber-100 text-amber-700 rounded text-xs flex items-center justify-center" title="Gluten-Free">GF</span>
+											<span class="w-4 h-4 bg-amber-100 text-amber-700 rounded text-[10px] flex items-center justify-center" title="Gluten-Free">GF</span>
 										{/if}
 									</div>
-									<svg class="w-5 h-5 text-gray-400 transition-transform {expandedProductId === product.id ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-									</svg>
 								</div>
+								<svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform {expandedProductId === product.id ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+								</svg>
 							</button>
 
-							<!-- Expanded Details -->
+							<!-- Expanded Details (floating overlay) -->
 							{#if expandedProductId === product.id}
-								<div class="px-4 pb-4 border-t border-gray-200 bg-white">
+							<div class="absolute left-0 right-0 top-full z-20 px-4 pb-4 border border-gray-200 rounded-b-lg bg-white shadow-lg max-h-[70vh] overflow-y-auto">
 									<!-- Edit/View Toggle Buttons -->
 									<div class="flex justify-end gap-2 pt-3 mb-3">
 										{#if editingProductId === product.id}
@@ -1834,9 +1826,7 @@
 										</div>
 									{:else}
 										<!-- View Mode -->
-										<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-											<!-- Left Column -->
-											<div class="space-y-4">
+										<div class="space-y-4">
 												<!-- Allergens -->
 												<div>
 													<h4 class="text-sm font-medium text-gray-700 mb-2">Allergens</h4>
@@ -1898,10 +1888,7 @@
 														</div>
 													</div>
 												{/if}
-											</div>
 
-											<!-- Right Column -->
-											<div class="space-y-4">
 												<!-- Ingredients -->
 												{#if product.ingredients_raw}
 													<div>
@@ -1925,10 +1912,9 @@
 														<p class="text-sm text-gray-600 bg-amber-50 rounded-lg p-3">{product.preparation_instructions}</p>
 													</div>
 												{/if}
-											</div>
 										</div>
 									{/if}
-								</div>
+							</div>
 							{/if}
 						</div>
 					{/each}
