@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { uploadImage, compressImage } from '$lib/supabase';
 	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, deleteMenuGroup, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup } from '$lib/api';
+	import CustomSelect from '$lib/components/CustomSelect.svelte';
 
 	// Main Tab (Products vs Menu)
 	let mainTab: 'products' | 'menu' = $state('products');
@@ -329,11 +330,37 @@
 		}
 	}
 
+	// Menu Group filter for products
+	let selectedProductMenuGroup: string = $state('all');
+
+	// Derive which products belong to which menu groups (via menus)
+	const productMenuGroupMap = $derived.by(() => {
+		const map = new Map<string, Set<string>>();
+		for (const menu of menus) {
+			if (menu.menu_group_id) {
+				for (const product of menu.products) {
+					if (!map.has(product.id)) {
+						map.set(product.id, new Set());
+					}
+					map.get(product.id)!.add(menu.menu_group_id);
+				}
+			}
+		}
+		return map;
+	});
+
+	const linkedProductIds = $derived(new Set(productMenuGroupMap.keys()));
+
 	const filteredProducts = $derived(
-		products.filter(p =>
-			p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			(p.brand?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-		)
+		products.filter(p => {
+			const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				(p.brand?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+			if (!matchesSearch) return false;
+			if (selectedProductMenuGroup === 'all') return true;
+			if (selectedProductMenuGroup === 'unlinked') return !linkedProductIds.has(p.id);
+			const groups = productMenuGroupMap.get(p.id);
+			return groups ? groups.has(selectedProductMenuGroup) : false;
+		})
 	);
 
 	// Menu State
@@ -1420,15 +1447,11 @@
 												<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 											</button>
 										</div>
-										<select
+										<CustomSelect
 											bind:value={newProduct.category}
-											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-										>
-											<option value="">Select...</option>
-											{#each productCategories as cat}
-												<option value={cat.value}>{cat.label}</option>
-											{/each}
-										</select>
+											options={productCategories.map(c => ({ value: c.value, label: c.label }))}
+											placeholder="Select..."
+										/>
 									</div>
 								</div>
 
@@ -1546,8 +1569,8 @@
 
 		<!-- Products Section -->
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-			<div class="flex items-center justify-between mb-4">
-				<h2 class="text-lg font-semibold text-gray-900">Products ({products.length})</h2>
+			<div class="flex items-center justify-between mb-3">
+				<h2 class="text-lg font-semibold text-gray-900">Products ({filteredProducts.length}{selectedProductMenuGroup !== 'all' ? ` / ${products.length}` : ''})</h2>
 				<input
 					type="text"
 					placeholder="Search..."
@@ -1555,6 +1578,31 @@
 					class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
 				/>
 			</div>
+
+			{#if menuGroups.length > 0}
+				<div class="flex flex-wrap gap-1.5 mb-4">
+					<button
+						onclick={() => selectedProductMenuGroup = 'all'}
+						class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+					>
+						All
+					</button>
+					{#each menuGroups as group}
+						<button
+							onclick={() => selectedProductMenuGroup = group.id}
+							class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === group.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+						>
+							{group.name}
+						</button>
+					{/each}
+					<button
+						onclick={() => selectedProductMenuGroup = 'unlinked'}
+						class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === 'unlinked' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+					>
+						Unlinked
+					</button>
+				</div>
+			{/if}
 
 			{#if isLoading}
 				<div class="flex justify-center py-8">
@@ -1692,15 +1740,11 @@
 																<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 															</button>
 														</div>
-														<select
+														<CustomSelect
 															bind:value={editForm.category}
-															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-														>
-															<option value="">Select...</option>
-															{#each productCategories as cat}
-																<option value={cat.value}>{cat.label}</option>
-															{/each}
-														</select>
+															options={productCategories.map(c => ({ value: c.value, label: c.label }))}
+															placeholder="Select..."
+														/>
 													</div>
 												</div>
 
@@ -1979,15 +2023,12 @@
 								<div>
 									<label class="block text-sm font-medium text-gray-700 mb-1">Menu Group</label>
 									<div class="flex gap-2">
-										<select
+										<CustomSelect
 											bind:value={newMenu.menu_group_id}
-											class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-										>
-											<option value="">Select...</option>
-											{#each menuGroups as group}
-												<option value={group.id}>{group.name}</option>
-											{/each}
-										</select>
+											options={menuGroups.map(g => ({ value: g.id, label: g.name }))}
+											placeholder="Select..."
+											class="flex-1"
+										/>
 										<button
 											type="button"
 											onclick={openManageMenuGroups}
@@ -2004,15 +2045,12 @@
 								<div>
 									<label class="block text-sm font-medium text-gray-700 mb-1">Course</label>
 									<div class="flex gap-2">
-										<select
+										<CustomSelect
 											bind:value={newMenu.category}
-											class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-										>
-											<option value="">Select...</option>
-											{#each menuCategories as category}
-												<option value={category.value}>{category.label}</option>
-											{/each}
-										</select>
+											options={menuCategories.map(c => ({ value: c.value, label: c.label }))}
+											placeholder="Select..."
+											class="flex-1"
+										/>
 										<button
 											type="button"
 											onclick={openAddCategoryModal}
@@ -2421,15 +2459,12 @@
 													<div>
 														<label class="block text-sm font-medium text-gray-700 mb-1">Menu Group</label>
 														<div class="flex gap-2">
-															<select
+															<CustomSelect
 																bind:value={menuEditForm.menu_group_id}
-																class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-															>
-																<option value="">Select...</option>
-																{#each menuGroups as group}
-																	<option value={group.id}>{group.name}</option>
-																{/each}
-															</select>
+																options={menuGroups.map(g => ({ value: g.id, label: g.name }))}
+																placeholder="Select..."
+																class="flex-1"
+															/>
 															<button
 																type="button"
 																onclick={openManageMenuGroups}
@@ -2446,15 +2481,12 @@
 													<div>
 														<label class="block text-sm font-medium text-gray-700 mb-1">Course</label>
 														<div class="flex gap-2">
-															<select
+															<CustomSelect
 																bind:value={menuEditForm.category}
-																class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-															>
-																<option value="">Select...</option>
-																{#each menuCategories as category}
-																	<option value={category.value}>{category.label}</option>
-																{/each}
-															</select>
+																options={menuCategories.map(c => ({ value: c.value, label: c.label }))}
+																placeholder="Select..."
+																class="flex-1"
+															/>
 															<button
 																type="button"
 																onclick={openAddCategoryModal}
@@ -2896,17 +2928,20 @@
 								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
 								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addAllergenItem()}
 							/>
-							<select bind:value={newAllergenCategory} class="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
-								<option value="grain">Grain</option>
-								<option value="egg">Egg</option>
-								<option value="dairy">Dairy</option>
-								<option value="meat">Meat</option>
-								<option value="fish">Fish</option>
-								<option value="shellfish">Shellfish</option>
-								<option value="nut">Nut</option>
-								<option value="legume">Legume</option>
-								<option value="other">Other</option>
-							</select>
+							<CustomSelect
+								bind:value={newAllergenCategory}
+								options={[
+									{ value: 'grain', label: 'Grain' },
+									{ value: 'egg', label: 'Egg' },
+									{ value: 'dairy', label: 'Dairy' },
+									{ value: 'meat', label: 'Meat' },
+									{ value: 'fish', label: 'Fish' },
+									{ value: 'shellfish', label: 'Shellfish' },
+									{ value: 'nut', label: 'Nut' },
+									{ value: 'legume', label: 'Legume' },
+									{ value: 'other', label: 'Other' },
+								]}
+							/>
 							<button
 								onclick={addAllergenItem}
 								disabled={!newAllergenName.trim() || isAddingAllergen}
