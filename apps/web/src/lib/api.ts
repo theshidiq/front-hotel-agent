@@ -170,6 +170,97 @@ export async function deleteAllergen(id: string): Promise<void> {
 	}
 }
 
+// Category Types
+export interface Category {
+	id: string;
+	restaurant_id: string;
+	type: 'product' | 'menu';
+	name: string;
+	value: string;
+	created_at: string;
+}
+
+export async function getCategories(type: 'product' | 'menu'): Promise<Category[]> {
+	const response = await fetch(`${API_URL}/categories?type=${type}`);
+
+	if (!response.ok) {
+		throw new Error('Failed to fetch categories');
+	}
+
+	return response.json();
+}
+
+export async function createCategoryApi(name: string, type: 'product' | 'menu'): Promise<Category> {
+	const response = await fetch(`${API_URL}/categories`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ name, type }),
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create category failed');
+	}
+
+	return response.json();
+}
+
+export async function deleteCategoryApi(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/categories/${id}`, {
+		method: 'DELETE',
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete category failed');
+	}
+}
+
+// Menu Group Types
+export interface MenuGroup {
+	id: string;
+	restaurant_id: string;
+	name: string;
+	sort_order: number;
+	created_at: string;
+}
+
+export async function getMenuGroups(): Promise<MenuGroup[]> {
+	const response = await fetch(`${API_URL}/menu-groups`);
+
+	if (!response.ok) {
+		throw new Error('Failed to fetch menu groups');
+	}
+
+	return response.json();
+}
+
+export async function createMenuGroup(name: string): Promise<MenuGroup> {
+	const response = await fetch(`${API_URL}/menu-groups`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ name }),
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create menu group failed');
+	}
+
+	return response.json();
+}
+
+export async function deleteMenuGroup(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/menu-groups/${id}`, {
+		method: 'DELETE',
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete menu group failed');
+	}
+}
+
 // Menu Types
 export interface MenuProduct {
 	id: string;
@@ -186,6 +277,7 @@ export interface Menu {
 	description: string | null;
 	price: number | null;
 	category: string | null;
+	menu_group_id: string | null;
 	image_url: string | null;
 	is_available: boolean;
 	products: MenuProduct[];
@@ -199,6 +291,7 @@ export interface CreateMenuData {
 	description?: string | null;
 	price?: number | null;
 	category?: string | null;
+	menu_group_id?: string | null;
 	image_url?: string | null;
 	is_available?: boolean;
 	product_ids?: string[];

@@ -6,6 +6,7 @@ import {
   IsArray,
   IsNumber,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -40,6 +41,12 @@ export class CreateMenuDto {
   @IsString()
   @IsOptional()
   category?: string;
+
+  @ApiPropertyOptional({ description: 'Menu group ID (e.g., Day 1 Dinner, Kids Menu)', nullable: true })
+  @ValidateIf((o) => o.menu_group_id !== null)
+  @IsString()
+  @IsOptional()
+  menu_group_id?: string | null;
 
   @ApiPropertyOptional({ description: 'Menu item image URL' })
   @IsUrl()

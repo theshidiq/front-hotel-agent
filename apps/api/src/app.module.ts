@@ -12,6 +12,8 @@ import { MenusModule } from './menus/menus.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { GuestAlertsModule } from './guest-alerts/guest-alerts.module';
+import { CategoriesModule } from './categories/categories.module';
+import { MenuGroupsModule } from './menu-groups/menu-groups.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { GuestAlertsModule } from './guest-alerts/guest-alerts.module';
     RoomsModule,
     ReservationsModule,
     GuestAlertsModule,
+    CategoriesModule,
+    MenuGroupsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

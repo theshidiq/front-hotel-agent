@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { uploadImage, compressImage } from '$lib/supabase';
-	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData } from '$lib/api';
+	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, deleteMenuGroup, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup } from '$lib/api';
 
 	// Main Tab (Products vs Menu)
 	let mainTab: 'products' | 'menu' = $state('products');
@@ -41,22 +41,13 @@
 	);
 
 	// Product Categories (managed like menu categories)
-	const initialProductCategories = [
-		{ value: 'frozen', label: 'Frozen' },
-		{ value: 'fresh', label: 'Fresh' },
-		{ value: 'beverage', label: 'Beverage' },
-		{ value: 'condiment', label: 'Condiment' },
-		{ value: 'snack', label: 'Snack' },
-		{ value: 'prepared', label: 'Prepared' },
-		{ value: 'ingredient', label: 'Ingredient' },
-		{ value: 'other', label: 'Other' },
-	];
-	let productCategories: { value: string; label: string }[] = $state([...initialProductCategories]);
+	let productCategories: { value: string; label: string; id: string }[] = $state([]);
 
 	// Manage Product Categories Modal
 	let showManageProductCategories = $state(false);
 	let newProductCategoryName = $state('');
 	let addProductCategoryError: string | null = $state(null);
+	let isAddingProductCategory = $state(false);
 
 	function openManageProductCategories() {
 		newProductCategoryName = '';
@@ -70,7 +61,7 @@
 		addProductCategoryError = null;
 	}
 
-	function addProductCategory() {
+	async function addProductCategory() {
 		const trimmedName = newProductCategoryName.trim();
 		if (!trimmedName) {
 			addProductCategoryError = 'Category name is required';
@@ -81,13 +72,26 @@
 			addProductCategoryError = 'Category already exists';
 			return;
 		}
-		productCategories = [...productCategories, { value, label: trimmedName }];
-		newProductCategoryName = '';
-		addProductCategoryError = null;
+		try {
+			isAddingProductCategory = true;
+			const created = await createCategoryApi(trimmedName, 'product');
+			productCategories = [...productCategories, { value: created.value, label: created.name, id: created.id }];
+			newProductCategoryName = '';
+			addProductCategoryError = null;
+		} catch (e: any) {
+			addProductCategoryError = e.message || 'Failed to add category';
+		} finally {
+			isAddingProductCategory = false;
+		}
 	}
 
-	function deleteProductCategory(value: string) {
-		productCategories = productCategories.filter(c => c.value !== value);
+	async function deleteProductCategory(id: string) {
+		try {
+			await deleteCategoryApi(id);
+			productCategories = productCategories.filter(c => c.id !== id);
+		} catch (e: any) {
+			console.error('Failed to delete product category:', e);
+		}
 	}
 
 	// Manage Allergens Modal
@@ -348,21 +352,13 @@
 	let isDeletingMenu = $state(false);
 
 	// Menu Categories
-	const initialCategories = [
-		{ value: 'appetizer', label: 'Appetizer' },
-		{ value: 'main', label: 'Main Course' },
-		{ value: 'dessert', label: 'Dessert' },
-		{ value: 'beverage', label: 'Beverage' },
-		{ value: 'side', label: 'Side Dish' },
-		{ value: 'special', label: 'Special' },
-		{ value: 'other', label: 'Other' },
-	];
-	let menuCategories: { value: string; label: string }[] = $state([...initialCategories]);
+	let menuCategories: { value: string; label: string; id: string }[] = $state([]);
 
 	// Add Category Modal State
 	let showAddCategoryModal = $state(false);
 	let newCategoryName = $state('');
 	let addCategoryError: string | null = $state(null);
+	let isAddingMenuCategory = $state(false);
 
 	function openAddCategoryModal() {
 		newCategoryName = '';
@@ -376,7 +372,7 @@
 		addCategoryError = null;
 	}
 
-	function addCategory() {
+	async function addCategory() {
 		const trimmedName = newCategoryName.trim();
 		if (!trimmedName) {
 			addCategoryError = 'Category name is required';
@@ -391,20 +387,85 @@
 			return;
 		}
 
-		menuCategories = [...menuCategories, { value, label: trimmedName }];
-		newMenu.category = value; // Auto-select the new category
-		newCategoryName = '';
-		addCategoryError = null;
+		try {
+			isAddingMenuCategory = true;
+			const created = await createCategoryApi(trimmedName, 'menu');
+			menuCategories = [...menuCategories, { value: created.value, label: created.name, id: created.id }];
+			newMenu.category = created.value; // Auto-select the new category
+			newCategoryName = '';
+			addCategoryError = null;
+		} catch (e: any) {
+			addCategoryError = e.message || 'Failed to add category';
+		} finally {
+			isAddingMenuCategory = false;
+		}
 	}
 
-	function deleteCategory(value: string) {
-		menuCategories = menuCategories.filter(c => c.value !== value);
-		// Clear selection if the deleted category was selected
-		if (newMenu.category === value) {
-			newMenu.category = '';
+	async function deleteCategory(id: string) {
+		const cat = menuCategories.find(c => c.id === id);
+		try {
+			await deleteCategoryApi(id);
+			menuCategories = menuCategories.filter(c => c.id !== id);
+			// Clear selection if the deleted category was selected
+			if (cat && newMenu.category === cat.value) {
+				newMenu.category = '';
+			}
+			if (cat && menuEditForm.category === cat.value) {
+				menuEditForm.category = '';
+			}
+		} catch (e: any) {
+			console.error('Failed to delete menu category:', e);
 		}
-		if (menuEditForm.category === value) {
-			menuEditForm.category = '';
+	}
+
+	// Menu Groups
+	let menuGroups: MenuGroup[] = $state([]);
+	let showManageMenuGroups = $state(false);
+	let newMenuGroupName = $state('');
+	let addMenuGroupError: string | null = $state(null);
+	let isAddingMenuGroup = $state(false);
+
+	function openManageMenuGroups() {
+		newMenuGroupName = '';
+		addMenuGroupError = null;
+		showManageMenuGroups = true;
+	}
+
+	function closeManageMenuGroups() {
+		showManageMenuGroups = false;
+		newMenuGroupName = '';
+		addMenuGroupError = null;
+	}
+
+	async function addMenuGroupItem() {
+		const trimmedName = newMenuGroupName.trim();
+		if (!trimmedName) {
+			addMenuGroupError = 'Name is required';
+			return;
+		}
+		if (menuGroups.some(g => g.name.toLowerCase() === trimmedName.toLowerCase())) {
+			addMenuGroupError = 'Group already exists';
+			return;
+		}
+		try {
+			isAddingMenuGroup = true;
+			const created = await createMenuGroup(trimmedName);
+			menuGroups = [...menuGroups, created];
+			newMenuGroupName = '';
+			addMenuGroupError = null;
+		} catch (e: any) {
+			addMenuGroupError = e.message || 'Failed to add menu group';
+		} finally {
+			isAddingMenuGroup = false;
+		}
+	}
+
+	async function deleteMenuGroupItem(id: string) {
+		try {
+			await deleteMenuGroup(id);
+			menuGroups = menuGroups.filter(g => g.id !== id);
+		} catch (e: any) {
+			console.error('Failed to delete menu group:', e);
 		}
 	}
 
@@ -420,6 +481,7 @@
 		description: '',
 		price: null,
 		category: '',
+		menu_group_id: '',
 		image_url: null,
 		is_available: true,
 		product_ids: [],
@@ -618,6 +680,7 @@
 			description: '',
 			price: null,
 			category: '',
+			menu_group_id: '',
 			image_url: null,
 			is_available: true,
 			product_ids: [],
@@ -679,7 +742,8 @@
 				isUploadingMenuImage = false;
 			}
 
-			await createMenu(newMenu);
+			const menuData = { ...newMenu, menu_group_id: newMenu.menu_group_id || null };
+			await createMenu(menuData);
 			await loadMenus();
 			createMenuSuccess = true;
 			setTimeout(() => {
@@ -743,6 +807,7 @@
 			description: menu.description,
 			price: menu.price,
 			category: menu.category,
+			menu_group_id: menu.menu_group_id,
 			is_available: menu.is_available,
 			product_ids: menu.products.map(p => p.id),
 		};
@@ -761,7 +826,8 @@
 		isSavingMenu = true;
 		saveMenuError = null;
 		try {
-			await updateMenu(id, menuEditForm);
+			const editData = { ...menuEditForm, menu_group_id: menuEditForm.menu_group_id || null } as UpdateMenuData;
+			await updateMenu(id, editData);
 			await loadMenus();
 			editingMenuId = null;
 			menuEditForm = {};
@@ -810,8 +876,23 @@
 	}
 
 	onMount(async () => {
-		await Promise.all([loadProducts(), loadAllergens(), loadMenus()]);
+		await Promise.all([loadProducts(), loadAllergens(), loadMenus(), loadCategories()]);
 	});
+
+	async function loadCategories() {
+		try {
+			const [productCats, menuCats, groups] = await Promise.all([
+				getCategories('product'),
+				getCategories('menu'),
+				getMenuGroups(),
+			]);
+			productCategories = productCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
+			menuCategories = menuCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
+			menuGroups = groups;
+		} catch (e) {
+			console.error('Failed to load categories:', e);
+		}
+	}
 
 	async function loadAllergens() {
 		try {
@@ -1896,7 +1977,32 @@
 									/>
 								</div>
 								<div>
-									<label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+									<label class="block text-sm font-medium text-gray-700 mb-1">Menu Group</label>
+									<div class="flex gap-2">
+										<select
+											bind:value={newMenu.menu_group_id}
+											class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										>
+											<option value="">Select...</option>
+											{#each menuGroups as group}
+												<option value={group.id}>{group.name}</option>
+											{/each}
+										</select>
+										<button
+											type="button"
+											onclick={openManageMenuGroups}
+											class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
+											title="Manage menu groups"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+											</svg>
+										</button>
+									</div>
+								</div>
+								<div>
+									<label class="block text-sm font-medium text-gray-700 mb-1">Course</label>
 									<div class="flex gap-2">
 										<select
 											bind:value={newMenu.category}
@@ -1911,7 +2017,7 @@
 											type="button"
 											onclick={openAddCategoryModal}
 											class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
-											title="Manage categories"
+											title="Manage courses"
 										>
 											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -2207,7 +2313,7 @@
 									<div class="min-w-0">
 										<p class="font-medium text-gray-900 truncate">{menu.name}</p>
 										<p class="text-xs text-gray-500">
-											{menu.category || 'Uncategorized'}
+											{#if menu.menu_group_id}{menuGroups.find(g => g.id === menu.menu_group_id)?.name || ''} &middot; {/if}{menu.category || 'Uncategorized'}
 											{#if menu.price !== null} | ¥{menu.price.toLocaleString()}{/if}
 										</p>
 									</div>
@@ -2313,7 +2419,32 @@
 														/>
 													</div>
 													<div>
-														<label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+														<label class="block text-sm font-medium text-gray-700 mb-1">Menu Group</label>
+														<div class="flex gap-2">
+															<select
+																bind:value={menuEditForm.menu_group_id}
+																class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+															>
+																<option value="">Select...</option>
+																{#each menuGroups as group}
+																	<option value={group.id}>{group.name}</option>
+																{/each}
+															</select>
+															<button
+																type="button"
+																onclick={openManageMenuGroups}
+																class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
+																title="Manage menu groups"
+															>
+																<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+																</svg>
+															</button>
+														</div>
+													</div>
+													<div>
+														<label class="block text-sm font-medium text-gray-700 mb-1">Course</label>
 														<div class="flex gap-2">
 															<select
 																bind:value={menuEditForm.category}
@@ -2328,7 +2459,7 @@
 																type="button"
 																onclick={openAddCategoryModal}
 																class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
-																title="Manage categories"
+																title="Manage courses"
 															>
 																<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 																	<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -2488,10 +2619,15 @@
 													</div>
 												{/if}
 
-												<!-- Price & Category -->
+												<!-- Details -->
 												<div>
 													<h4 class="text-sm font-medium text-gray-700 mb-2">Details</h4>
 													<div class="flex flex-wrap gap-2">
+														{#if menu.menu_group_id}
+															<span class="px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-md text-sm">
+																{menuGroups.find(g => g.id === menu.menu_group_id)?.name || 'Unknown Group'}
+															</span>
+														{/if}
 														{#if menu.price !== null}
 															<span class="px-2.5 py-1 bg-green-100 text-green-700 rounded-md text-sm">
 																¥{menu.price.toLocaleString()}
@@ -2683,10 +2819,10 @@
 							/>
 							<button
 								onclick={addProductCategory}
-								disabled={!newProductCategoryName.trim()}
+								disabled={!newProductCategoryName.trim() || isAddingProductCategory}
 								class="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 							>
-								Add
+								{isAddingProductCategory ? '...' : 'Add'}
 							</button>
 						</div>
 						{#if addProductCategoryError}
@@ -2701,7 +2837,7 @@
 									<div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
 										<span class="text-sm text-gray-700">{category.label}</span>
 										<button
-											onclick={() => deleteProductCategory(category.value)}
+											onclick={() => deleteProductCategory(category.id)}
 											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
 											title="Delete category"
 										>
@@ -2838,8 +2974,8 @@
 							</svg>
 						</div>
 						<div>
-							<h3 class="text-lg font-semibold text-gray-900">Manage Categories</h3>
-							<p class="text-sm text-gray-500">Add or remove menu categories</p>
+							<h3 class="text-lg font-semibold text-gray-900">Manage Courses</h3>
+							<p class="text-sm text-gray-500">Add or remove menu courses</p>
 						</div>
 					</div>
 				</div>
@@ -2848,21 +2984,21 @@
 				<div class="px-6 py-4 space-y-4">
 					<!-- Add New Category -->
 					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Add New Category</label>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Add New Course</label>
 						<div class="flex gap-2">
 							<input
 								type="text"
 								bind:value={newCategoryName}
-								placeholder="e.g., Breakfast, Kids Menu"
+								placeholder="e.g., Appetizer, Main Course"
 								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addCategory()}
 							/>
 							<button
 								onclick={addCategory}
-								disabled={!newCategoryName.trim()}
+								disabled={!newCategoryName.trim() || isAddingMenuCategory}
 								class="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 							>
-								Add
+								{isAddingMenuCategory ? '...' : 'Add'}
 							</button>
 						</div>
 						{#if addCategoryError}
@@ -2872,14 +3008,14 @@
 
 					<!-- All Categories List -->
 					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Categories ({menuCategories.length})</label>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Courses ({menuCategories.length})</label>
 						{#if menuCategories.length > 0}
 							<div class="space-y-2 max-h-48 overflow-y-auto">
 								{#each menuCategories as category}
 									<div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
 										<span class="text-sm text-gray-700">{category.label}</span>
 										<button
-											onclick={() => deleteCategory(category.value)}
+											onclick={() => deleteCategory(category.id)}
 											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
 											title="Delete category"
 										>
@@ -2900,6 +3036,93 @@
 				<div class="px-6 py-4 bg-gray-50 flex justify-end">
 					<button
 						onclick={closeAddCategoryModal}
+						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+					>
+						Done
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Manage Menu Groups Modal -->
+	{#if showManageMenuGroups}
+		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={closeManageMenuGroups}>
+			<div
+				class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<!-- Modal Header -->
+				<div class="px-6 py-4 border-b border-gray-200 bg-indigo-50">
+					<div class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+							<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+							</svg>
+						</div>
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900">Manage Menu Groups</h3>
+							<p class="text-sm text-gray-500">Add or remove menu groups (e.g., Day 1 Dinner, Kids Menu)</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Modal Body -->
+				<div class="px-6 py-4 space-y-4">
+					<!-- Add New Group -->
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Add New Menu Group</label>
+						<div class="flex gap-2">
+							<input
+								type="text"
+								bind:value={newMenuGroupName}
+								placeholder="e.g., Day 1 Dinner, Kids Menu"
+								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addMenuGroupItem()}
+							/>
+							<button
+								onclick={addMenuGroupItem}
+								disabled={!newMenuGroupName.trim() || isAddingMenuGroup}
+								class="px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							>
+								{isAddingMenuGroup ? '...' : 'Add'}
+							</button>
+						</div>
+						{#if addMenuGroupError}
+							<p class="mt-2 text-sm text-red-600">{addMenuGroupError}</p>
+						{/if}
+					</div>
+
+					<!-- All Groups List -->
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Menu Groups ({menuGroups.length})</label>
+						{#if menuGroups.length > 0}
+							<div class="space-y-2 max-h-48 overflow-y-auto">
+								{#each menuGroups as group}
+									<div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+										<span class="text-sm text-gray-700">{group.name}</span>
+										<button
+											onclick={() => deleteMenuGroupItem(group.id)}
+											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+											title="Delete menu group"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-sm text-gray-500 py-2">No menu groups. Add one above.</p>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Modal Footer -->
+				<div class="px-6 py-4 bg-gray-50 flex justify-end">
+					<button
+						onclick={closeManageMenuGroups}
 						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
 					>
 						Done
