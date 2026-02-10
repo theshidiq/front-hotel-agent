@@ -15,6 +15,7 @@ import { MenusService } from './menus.service';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
 import { MenuResponse } from './dto/menu-response.dto';
+import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('menus')
 @Controller('menus')
@@ -22,6 +23,7 @@ export class MenusController {
   constructor(private readonly menusService: MenusService) {}
 
   @Post()
+  @RequireStaff()
   @ApiOperation({ summary: 'Create a new menu item' })
   @ApiResponse({ status: 201, type: MenuResponse })
   async create(@Body() createMenuDto: CreateMenuDto): Promise<MenuResponse> {
@@ -44,6 +46,7 @@ export class MenusController {
   }
 
   @Put(':id')
+  @RequireStaff()
   @ApiOperation({ summary: 'Update menu item' })
   @ApiResponse({ status: 200, type: MenuResponse })
   async update(
@@ -54,6 +57,7 @@ export class MenusController {
   }
 
   @Delete(':id')
+  @RequireStaff()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete menu item' })
   @ApiResponse({ status: 204, description: 'Menu item deleted successfully' })

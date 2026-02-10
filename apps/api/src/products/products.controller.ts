@@ -15,6 +15,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponse } from './dto/product-response.dto';
+import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('products')
 @Controller('products')
@@ -22,6 +23,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
+  @RequireStaff()
   @ApiOperation({ summary: 'Create a new product' })
   @ApiResponse({ status: 201, type: ProductResponse })
   async create(@Body() createProductDto: CreateProductDto): Promise<ProductResponse> {
@@ -44,6 +46,7 @@ export class ProductsController {
   }
 
   @Put(':id')
+  @RequireStaff()
   @ApiOperation({ summary: 'Update product' })
   @ApiResponse({ status: 200, type: ProductResponse })
   async update(
@@ -54,6 +57,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @RequireStaff()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete product' })
   @ApiResponse({ status: 204, description: 'Product deleted successfully' })

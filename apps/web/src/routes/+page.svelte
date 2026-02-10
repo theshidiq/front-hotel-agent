@@ -4,6 +4,9 @@
 	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, deleteMenuGroup, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import { authState } from '$lib/auth.svelte';
+
+	const isStaff = $derived(authState.isStaff);
 
 	// Main Tab (Products vs Menu)
 	let mainTab: 'products' | 'menu' = $state('products');
@@ -1120,21 +1123,29 @@
 
 	<!-- Main Content -->
 	<div class="flex-1 flex flex-col overflow-hidden">
-		<header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 shrink-0">
-			<div class="flex items-center gap-3">
-				<h2 class="text-lg font-bold text-gray-900">{mainTab === 'products' ? '商品管理' : 'メニュー管理'}</h2>
-				<span class="text-sm text-gray-500">Allergen Management System</span>
+		<header class="bg-white border-b border-gray-200 shrink-0">
+			<div class="h-16 flex items-center justify-between px-6">
+				<div class="flex items-center gap-3">
+					<h2 class="text-lg font-bold text-gray-900">{mainTab === 'products' ? '商品管理' : 'メニュー管理'}</h2>
+					<span class="text-sm text-gray-500">Allergen Management System</span>
+				</div>
+				{#if mainTab === 'products' && isStaff}
+					<button
+						onclick={() => showAddProduct = !showAddProduct}
+						class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+						</svg>
+						Add Product
+					</button>
+				{/if}
 			</div>
-			{#if mainTab === 'products'}
-				<button
-					onclick={() => showAddProduct = !showAddProduct}
-					class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-					</svg>
-					Add Product
-				</button>
+			{#if !isStaff && !authState.loading}
+				<div class="bg-amber-50 border-t border-amber-200 px-6 py-2 flex items-center gap-2">
+					<span class="material-symbols-rounded text-amber-600 text-lg">visibility</span>
+					<span class="text-sm text-amber-700">閲覧モード — スタッフとしてログインすると編集できます</span>
+				</div>
 			{/if}
 		</header>
 
@@ -1143,6 +1154,7 @@
 
 		{#if mainTab === 'products'}
 		<!-- Add Product Section (always visible on mobile, toggle on desktop) -->
+		{#if isStaff}
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 {showAddProduct ? '' : 'md:hidden'}">
 			<!-- Tab Header -->
 			<div class="flex items-center justify-between mb-4">
@@ -1558,6 +1570,7 @@
 				</div>
 			{/if}
 		</section>
+		{/if}
 
 		<!-- Products Section -->
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 overflow-visible">
@@ -1668,6 +1681,7 @@
 												Save
 											</button>
 										{:else}
+											{#if isStaff}
 											<button
 												onclick={() => startEditing(product)}
 												class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 flex items-center gap-1"
@@ -1686,6 +1700,7 @@
 												</svg>
 												Delete
 											</button>
+											{/if}
 										{/if}
 									</div>
 
@@ -1917,6 +1932,7 @@
 		{:else}
 		<!-- Menu Tab Content -->
 		<!-- Add Menu Item Section -->
+		{#if isStaff}
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
 			<h2 class="text-lg font-semibold text-gray-900 mb-4">Add Menu Item</h2>
 
@@ -2206,6 +2222,7 @@
 				</div>
 			{/if}
 		</section>
+		{/if}
 
 		<!-- Allergen Report Table -->
 		{#if menus.length > 0}
@@ -2373,6 +2390,7 @@
 												Save
 											</button>
 										{:else}
+											{#if isStaff}
 											<button
 												onclick={() => startEditingMenu(menu)}
 												class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 flex items-center gap-1"
@@ -2391,6 +2409,7 @@
 												</svg>
 												Delete
 											</button>
+											{/if}
 										{/if}
 									</div>
 

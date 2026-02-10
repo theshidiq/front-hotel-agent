@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { authState, signOut } from '$lib/auth.svelte';
 
 	type NavItem = {
 		icon: string;
@@ -130,4 +131,60 @@
 		{/each}
 	</nav>
 
+	<!-- Auth Section -->
+	<div class="border-t border-slate-700 p-3">
+		{#if authState.loading}
+			<div class="flex items-center {collapsed ? 'justify-center' : 'gap-3 px-3'} py-2">
+				<span class="material-symbols-rounded text-lg text-slate-400 animate-pulse">hourglass_empty</span>
+				{#if !collapsed}
+					<span class="text-sm text-slate-400">Loading...</span>
+				{/if}
+			</div>
+		{:else if authState.isStaff && authState.staff}
+			{#if collapsed}
+				<button
+					onclick={signOut}
+					class="w-full flex justify-center p-2 rounded-md text-slate-300 hover:bg-slate-800 transition-colors"
+					title="{authState.staff.name} - ログアウト"
+				>
+					<span class="material-symbols-rounded text-lg">logout</span>
+				</button>
+			{:else}
+				<div class="flex items-center gap-3 px-3 py-2">
+					<div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+						{authState.staff.name.charAt(0).toUpperCase()}
+					</div>
+					<div class="flex-1 min-w-0">
+						<p class="text-sm font-medium text-white truncate">{authState.staff.name}</p>
+						<p class="text-xs text-slate-400 truncate">{authState.staff.position || 'スタッフ'}</p>
+					</div>
+					<button
+						onclick={signOut}
+						class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+						title="ログアウト"
+					>
+						<span class="material-symbols-rounded text-lg">logout</span>
+					</button>
+				</div>
+			{/if}
+		{:else}
+			{#if authState.error}
+				<div class="px-3 py-1.5 mb-2">
+					<p class="text-xs text-red-400 {collapsed ? 'hidden' : ''}">{authState.error}</p>
+				</div>
+			{/if}
+			<a
+				href="/login"
+				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium
+					transition-colors whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white
+					{collapsed ? 'justify-center' : ''}"
+				title={collapsed ? 'スタッフログイン' : undefined}
+			>
+				<span class="material-symbols-rounded text-lg shrink-0">login</span>
+				{#if !collapsed}
+					スタッフログイン
+				{/if}
+			</a>
+		{/if}
+	</div>
 </aside>

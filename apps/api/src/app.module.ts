@@ -14,6 +14,8 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { GuestAlertsModule } from './guest-alerts/guest-alerts.module';
 import { CategoriesModule } from './categories/categories.module';
 import { MenuGroupsModule } from './menu-groups/menu-groups.module';
+import { AuthModule } from './auth/auth.module';
+import { StaffsModule } from './staffs/staffs.module';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { MenuGroupsModule } from './menu-groups/menu-groups.module';
     }),
     HttpModule,
     SupabaseModule,
+    AuthModule,
     AllergensModule,
     QwenModule,
     ScanModule,
@@ -33,6 +36,7 @@ import { MenuGroupsModule } from './menu-groups/menu-groups.module';
     GuestAlertsModule,
     CategoriesModule,
     MenuGroupsModule,
+    StaffsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

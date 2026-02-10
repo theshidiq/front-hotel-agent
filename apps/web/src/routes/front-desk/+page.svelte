@@ -18,6 +18,9 @@
 	} from '$lib/api';
 	import { onMount } from 'svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import { authState } from '$lib/auth.svelte';
+
+	const isStaff = $derived(authState.isStaff);
 
 	// Navigation
 	type NavItem = 'reservations' | 'rooms' | 'notifications';
@@ -596,7 +599,8 @@
 	<!-- Main Content -->
 	<div class="flex-1 flex flex-col overflow-hidden">
 		<!-- Header -->
-		<header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6">
+		<header class="bg-white border-b border-gray-200">
+		<div class="h-16 flex items-center justify-between px-6">
 			<div class="flex items-center gap-4">
 				<h2 class="text-lg font-bold text-gray-900">{headerTitle()}</h2>
 				<span class="text-sm text-gray-500">{todayFormatted()}</span>
@@ -637,6 +641,7 @@
 				</div>
 			</div>
 			<div class="flex items-center gap-3">
+				{#if isStaff}
 				<button
 					onclick={generateDummyReservations}
 					disabled={generatingDummy}
@@ -645,6 +650,7 @@
 					<span class="material-symbols-rounded text-lg">add_circle</span>
 					{generatingDummy ? '作成中...' : 'ダミー作成'}
 				</button>
+				{/if}
 				<button
 					onclick={() => loadData()}
 					class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
@@ -654,12 +660,20 @@
 				</button>
 				<button
 					onclick={() => openCheckInWizard()}
-					class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+					disabled={!isStaff}
+					class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					<span class="material-symbols-rounded text-lg">qr_code_scanner</span>
 					チェックイン
 				</button>
 			</div>
+		</div>
+		{#if !isStaff && !authState.loading}
+			<div class="bg-amber-50 border-t border-amber-200 px-6 py-2 flex items-center gap-2">
+				<span class="material-symbols-rounded text-amber-600 text-lg">visibility</span>
+				<span class="text-sm text-amber-700">閲覧モード — スタッフとしてログインすると操作できます</span>
+			</div>
+		{/if}
 		</header>
 
 		<!-- Body -->
@@ -778,6 +792,7 @@
 										</div>
 
 										<!-- Close Button -->
+										{#if isStaff}
 										<div class="flex-shrink-0">
 											<button
 												onclick={() => handleAcknowledgeAlert(alert.id)}
@@ -787,6 +802,7 @@
 												<span class="material-symbols-rounded text-lg">close</span>
 											</button>
 										</div>
+										{/if}
 									</div>
 								</div>
 							{/each}
@@ -831,6 +847,7 @@
 											{/if}
 										</div>
 									</div>
+									{#if isStaff}
 									<button
 										onclick={(e) => { e.stopPropagation(); handleAcknowledgeAlert(alert.id); }}
 										class="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
@@ -838,6 +855,7 @@
 									>
 										<span class="material-symbols-rounded text-base">close</span>
 									</button>
+									{/if}
 								</div>
 							{/each}
 							{#if alerts.length > 3}
@@ -1008,14 +1026,16 @@
 										{#if reservation.status === 'confirmed'}
 											<button
 												onclick={() => openCheckInWizard(reservation)}
-												class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+												disabled={!isStaff}
+												class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												チェックイン
 											</button>
 										{:else if reservation.status === 'checked_in'}
 											<button
 												onclick={() => openCheckOutConfirm(reservation)}
-												class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+												disabled={!isStaff}
+												class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												チェックアウト
 											</button>

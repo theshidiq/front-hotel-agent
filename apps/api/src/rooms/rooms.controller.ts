@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
 import { RoomResponse } from './dto/room-response.dto';
 import { UpdateRoomStatusDto } from './dto/update-room-status.dto';
+import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('Rooms')
 @Controller('rooms')
@@ -25,6 +26,7 @@ export class RoomsController {
   }
 
   @Patch(':id/status')
+  @RequireStaff()
   @ApiOperation({ summary: 'Update room status' })
   @ApiResponse({ status: 200, type: RoomResponse })
   @ApiResponse({ status: 404, description: 'Room not found' })

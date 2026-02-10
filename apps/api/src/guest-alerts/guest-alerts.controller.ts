@@ -12,6 +12,7 @@ import { GuestAlertsService } from './guest-alerts.service';
 import { GuestAlertResponse } from './dto/guest-alert-response.dto';
 import { CreateGuestAlertDto } from './dto/create-guest-alert.dto';
 import { AcknowledgeAlertDto } from './dto/acknowledge-alert.dto';
+import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('guest-alerts')
 @Controller('guest-alerts')
@@ -39,12 +40,14 @@ export class GuestAlertsController {
   }
 
   @Post()
+  @RequireStaff()
   @ApiOperation({ summary: 'Create a new guest alert' })
   async create(@Body() dto: CreateGuestAlertDto): Promise<GuestAlertResponse> {
     return this.guestAlertsService.create(dto);
   }
 
   @Patch(':id/acknowledge')
+  @RequireStaff()
   @ApiOperation({ summary: 'Acknowledge an alert' })
   @ApiParam({ name: 'id', description: 'Alert UUID' })
   async acknowledge(
@@ -55,6 +58,7 @@ export class GuestAlertsController {
   }
 
   @Patch(':id/resolve')
+  @RequireStaff()
   @ApiOperation({ summary: 'Resolve an alert' })
   @ApiParam({ name: 'id', description: 'Alert UUID' })
   async resolve(@Param('id') id: string): Promise<GuestAlertResponse> {

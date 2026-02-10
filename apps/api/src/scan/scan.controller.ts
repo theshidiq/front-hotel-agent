@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ScanService } from './scan.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
+import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('scan')
 @Controller('scan')
@@ -10,6 +11,7 @@ export class ScanController {
   constructor(private readonly scanService: ScanService) {}
 
   @Post()
+  @RequireStaff()
   @ApiOperation({
     summary: 'Scan product image and auto-save',
     description:

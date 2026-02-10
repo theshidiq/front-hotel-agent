@@ -29,6 +29,7 @@ async function bootstrap() {
     .addTag('menu-items')
     .addTag('allergens')
     .addTag('ingredients')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);

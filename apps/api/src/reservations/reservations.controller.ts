@@ -14,6 +14,7 @@ import { CheckInDto } from './dto/check-in.dto';
 import { SearchReservationDto } from './dto/search-reservation.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { GuestUpdateDto } from './dto/guest-update.dto';
+import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('reservations')
 @Controller('reservations')
@@ -73,12 +74,14 @@ export class ReservationsController {
   }
 
   @Post()
+  @RequireStaff()
   @ApiOperation({ summary: 'Create a new reservation' })
   async create(@Body() dto: CreateReservationDto): Promise<ReservationResponse> {
     return this.reservationsService.create(dto);
   }
 
   @Patch(':id/check-in')
+  @RequireStaff()
   @ApiOperation({ summary: 'Check in a guest' })
   @ApiParam({ name: 'id', description: 'Reservation UUID' })
   async checkIn(
@@ -89,6 +92,7 @@ export class ReservationsController {
   }
 
   @Patch(':id/check-out')
+  @RequireStaff()
   @ApiOperation({ summary: 'Check out a guest' })
   @ApiParam({ name: 'id', description: 'Reservation UUID' })
   async checkOut(@Param('id') id: string): Promise<ReservationResponse> {

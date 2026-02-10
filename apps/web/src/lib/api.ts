@@ -1,4 +1,10 @@
+import { getAuthHeaders } from './auth.svelte';
+
 const API_URL = 'http://localhost:3002';
+
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+	return { ...extra, ...getAuthHeaders() };
+}
 
 export interface Allergen {
 	id: string;
@@ -42,7 +48,7 @@ export interface ScanResult {
 export async function scanProduct(imageUrl: string): Promise<ScanResult> {
 	const response = await fetch(`${API_URL}/scan`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ imageUrl }),
 	});
 
@@ -96,7 +102,7 @@ export interface CreateProductData {
 export async function updateProduct(id: string, data: UpdateProductData): Promise<Product> {
 	const response = await fetch(`${API_URL}/products/${id}`, {
 		method: 'PUT',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data),
 	});
 
@@ -111,6 +117,7 @@ export async function updateProduct(id: string, data: UpdateProductData): Promis
 export async function deleteProduct(id: string): Promise<void> {
 	const response = await fetch(`${API_URL}/products/${id}`, {
 		method: 'DELETE',
+		headers: authHeaders(),
 	});
 
 	if (!response.ok) {
@@ -122,7 +129,7 @@ export async function deleteProduct(id: string): Promise<void> {
 export async function createProduct(data: CreateProductData): Promise<Product> {
 	const response = await fetch(`${API_URL}/products`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data),
 	});
 
@@ -147,7 +154,7 @@ export async function getAllergens(): Promise<Allergen[]> {
 export async function createAllergen(name: string, category: string): Promise<Allergen> {
 	const response = await fetch(`${API_URL}/allergens`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ name, category }),
 	});
 
@@ -162,6 +169,7 @@ export async function createAllergen(name: string, category: string): Promise<Al
 export async function deleteAllergen(id: string): Promise<void> {
 	const response = await fetch(`${API_URL}/allergens/${id}`, {
 		method: 'DELETE',
+		headers: authHeaders(),
 	});
 
 	if (!response.ok) {
@@ -193,7 +201,7 @@ export async function getCategories(type: 'product' | 'menu'): Promise<Category[
 export async function createCategoryApi(name: string, type: 'product' | 'menu'): Promise<Category> {
 	const response = await fetch(`${API_URL}/categories`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ name, type }),
 	});
 
@@ -208,6 +216,7 @@ export async function createCategoryApi(name: string, type: 'product' | 'menu'):
 export async function deleteCategoryApi(id: string): Promise<void> {
 	const response = await fetch(`${API_URL}/categories/${id}`, {
 		method: 'DELETE',
+		headers: authHeaders(),
 	});
 
 	if (!response.ok) {
@@ -238,7 +247,7 @@ export async function getMenuGroups(): Promise<MenuGroup[]> {
 export async function createMenuGroup(name: string): Promise<MenuGroup> {
 	const response = await fetch(`${API_URL}/menu-groups`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ name }),
 	});
 
@@ -253,6 +262,7 @@ export async function createMenuGroup(name: string): Promise<MenuGroup> {
 export async function deleteMenuGroup(id: string): Promise<void> {
 	const response = await fetch(`${API_URL}/menu-groups/${id}`, {
 		method: 'DELETE',
+		headers: authHeaders(),
 	});
 
 	if (!response.ok) {
@@ -323,7 +333,7 @@ export async function getMenu(id: string): Promise<Menu> {
 export async function createMenu(data: CreateMenuData): Promise<Menu> {
 	const response = await fetch(`${API_URL}/menus`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data),
 	});
 
@@ -338,7 +348,7 @@ export async function createMenu(data: CreateMenuData): Promise<Menu> {
 export async function updateMenu(id: string, data: UpdateMenuData): Promise<Menu> {
 	const response = await fetch(`${API_URL}/menus/${id}`, {
 		method: 'PUT',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data),
 	});
 
@@ -353,6 +363,7 @@ export async function updateMenu(id: string, data: UpdateMenuData): Promise<Menu
 export async function deleteMenu(id: string): Promise<void> {
 	const response = await fetch(`${API_URL}/menus/${id}`, {
 		method: 'DELETE',
+		headers: authHeaders(),
 	});
 
 	if (!response.ok) {
@@ -407,7 +418,7 @@ export async function updateRoomStatus(
 ): Promise<Room> {
 	const response = await fetch(`${API_URL}/rooms/${roomNumber}/status`, {
 		method: 'PATCH',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ status, current_reservation_id: reservationId }),
 	});
 
@@ -549,7 +560,7 @@ export async function searchReservations(params: SearchReservationParams): Promi
 export async function createReservation(data: CreateReservationData): Promise<Reservation> {
 	const response = await fetch(`${API_URL}/reservations`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data),
 	});
 
@@ -564,7 +575,7 @@ export async function createReservation(data: CreateReservationData): Promise<Re
 export async function checkInReservation(id: string, data: CheckInData): Promise<Reservation> {
 	const response = await fetch(`${API_URL}/reservations/${id}/check-in`, {
 		method: 'PATCH',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data),
 	});
 
@@ -579,6 +590,7 @@ export async function checkInReservation(id: string, data: CheckInData): Promise
 export async function checkOutReservation(id: string): Promise<Reservation> {
 	const response = await fetch(`${API_URL}/reservations/${id}/check-out`, {
 		method: 'PATCH',
+		headers: authHeaders(),
 	});
 
 	if (!response.ok) {
@@ -679,7 +691,7 @@ export async function getGuestAlert(id: string): Promise<GuestAlert> {
 export async function createGuestAlert(data: CreateGuestAlertData): Promise<GuestAlert> {
 	const response = await fetch(`${API_URL}/guest-alerts`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data),
 	});
 
@@ -694,7 +706,7 @@ export async function createGuestAlert(data: CreateGuestAlertData): Promise<Gues
 export async function acknowledgeGuestAlert(id: string, acknowledgedBy?: string): Promise<GuestAlert> {
 	const response = await fetch(`${API_URL}/guest-alerts/${id}/acknowledge`, {
 		method: 'PATCH',
-		headers: { 'Content-Type': 'application/json' },
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ acknowledged_by: acknowledgedBy }),
 	});
 
@@ -709,6 +721,7 @@ export async function acknowledgeGuestAlert(id: string, acknowledgedBy?: string)
 export async function resolveGuestAlert(id: string): Promise<GuestAlert> {
 	const response = await fetch(`${API_URL}/guest-alerts/${id}/resolve`, {
 		method: 'PATCH',
+		headers: authHeaders(),
 	});
 
 	if (!response.ok) {
@@ -716,5 +729,57 @@ export async function resolveGuestAlert(id: string): Promise<GuestAlert> {
 		throw new Error(error.message || 'Resolve alert failed');
 	}
 
+	return response.json();
+}
+
+// ── Staff ─────────────────────────────────────────────────
+
+export interface StaffMember {
+	id: string;
+	name: string;
+	email: string | null;
+	position: string | null;
+	is_active: boolean;
+	created_at: string;
+}
+
+export interface CreateStaffData {
+	name: string;
+	email: string;
+	position: string;
+}
+
+export async function getStaffs(): Promise<StaffMember[]> {
+	const response = await fetch(`${API_URL}/staffs`);
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch staffs');
+	}
+	return response.json();
+}
+
+export async function updateStaffEmail(id: string, email: string): Promise<StaffMember> {
+	const response = await fetch(`${API_URL}/staffs/${id}/email`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ email }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to update staff email');
+	}
+	return response.json();
+}
+
+export async function createStaff(data: CreateStaffData): Promise<StaffMember> {
+	const response = await fetch(`${API_URL}/staffs`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create staff failed');
+	}
 	return response.json();
 }
