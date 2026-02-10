@@ -131,16 +131,9 @@
 		{/each}
 	</nav>
 
-	<!-- Auth Section -->
-	<div class="border-t border-slate-700 p-3">
-		{#if authState.loading}
-			<div class="flex items-center {collapsed ? 'justify-center' : 'gap-3 px-3'} py-2">
-				<span class="material-symbols-rounded text-lg text-slate-400 animate-pulse">hourglass_empty</span>
-				{#if !collapsed}
-					<span class="text-sm text-slate-400">Loading...</span>
-				{/if}
-			</div>
-		{:else if authState.isStaff && authState.staff}
+	<!-- Logged-in Staff Info -->
+	{#if authState.isStaff && authState.staff}
+		<div class="border-t border-slate-700 p-3">
 			{#if collapsed}
 				<button
 					onclick={signOut}
@@ -167,24 +160,6 @@
 					</button>
 				</div>
 			{/if}
-		{:else}
-			{#if authState.error}
-				<div class="px-3 py-1.5 mb-2">
-					<p class="text-xs text-red-400 {collapsed ? 'hidden' : ''}">{authState.error}</p>
-				</div>
-			{/if}
-			<a
-				href="/login"
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium
-					transition-colors whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white
-					{collapsed ? 'justify-center' : ''}"
-				title={collapsed ? 'スタッフログイン' : undefined}
-			>
-				<span class="material-symbols-rounded text-lg shrink-0">login</span>
-				{#if !collapsed}
-					スタッフログイン
-				{/if}
-			</a>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </aside>

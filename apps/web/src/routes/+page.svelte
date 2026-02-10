@@ -1129,17 +1129,28 @@
 					<h2 class="text-lg font-bold text-gray-900">{mainTab === 'products' ? '商品管理' : 'メニュー管理'}</h2>
 					<span class="text-sm text-gray-500">Allergen Management System</span>
 				</div>
-				{#if mainTab === 'products' && isStaff}
-					<button
-						onclick={() => showAddProduct = !showAddProduct}
-						class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-					>
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-						</svg>
-						Add Product
-					</button>
-				{/if}
+				<div class="flex items-center gap-3">
+					{#if mainTab === 'products' && isStaff}
+						<button
+							onclick={() => showAddProduct = !showAddProduct}
+							class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+						>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+							</svg>
+							Add Product
+						</button>
+					{/if}
+					{#if !authState.isStaff && !authState.loading}
+						<a
+							href="/login"
+							class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+						>
+							<span class="material-symbols-rounded text-lg">login</span>
+							ログイン
+						</a>
+					{/if}
+				</div>
 			</div>
 			{#if !isStaff && !authState.loading}
 				<div class="bg-amber-50 border-t border-amber-200 px-6 py-2 flex items-center gap-2">

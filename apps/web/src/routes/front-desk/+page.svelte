@@ -666,6 +666,16 @@
 					<span class="material-symbols-rounded text-lg">qr_code_scanner</span>
 					チェックイン
 				</button>
+				{#if !authState.isStaff && !authState.loading}
+					<div class="w-px h-8 bg-gray-200"></div>
+					<a
+						href="/login"
+						class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+					>
+						<span class="material-symbols-rounded text-lg">login</span>
+						ログイン
+					</a>
+				{/if}
 			</div>
 		</div>
 		{#if !isStaff && !authState.loading}
