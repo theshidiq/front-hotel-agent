@@ -10,6 +10,13 @@
 	});
 </script>
 
+<svelte:head>
+	<link
+		rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0"
+	/>
+</svelte:head>
+
 <div class="min-h-screen bg-gray-50">
 	{@render children()}
 </div>

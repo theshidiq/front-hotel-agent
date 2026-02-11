@@ -135,13 +135,21 @@
 	{#if authState.isStaff && authState.staff}
 		<div class="border-t border-slate-700 p-3">
 			{#if collapsed}
-				<button
-					onclick={signOut}
-					class="w-full flex justify-center p-2 rounded-md text-slate-300 hover:bg-slate-800 transition-colors"
-					title="{authState.staff.name} - ログアウト"
-				>
-					<span class="material-symbols-rounded text-lg">logout</span>
-				</button>
+				<div class="flex flex-col items-center gap-1">
+					<div
+						class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold"
+						title={authState.staff.name}
+					>
+						{authState.staff.name.charAt(0).toUpperCase()}
+					</div>
+					<button
+						onclick={signOut}
+						class="w-full flex justify-center p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+						title="ログアウト"
+					>
+						<span class="material-symbols-rounded text-base">logout</span>
+					</button>
+				</div>
 			{:else}
 				<div class="flex items-center gap-3 px-3 py-2">
 					<div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">

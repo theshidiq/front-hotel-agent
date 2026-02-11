@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Query, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Query, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CategoriesService, Category } from './categories.service';
 import { RequireStaff } from '../auth/staff.decorator';
@@ -26,6 +26,16 @@ export class CategoriesController {
     @Body() body: { name: string; type: 'product' | 'menu' },
   ): Promise<Category> {
     return this.categoriesService.create(body.name, body.type);
+  }
+
+  @Put(':id')
+  @RequireStaff()
+  @ApiOperation({ summary: 'Update a category name' })
+  async update(
+    @Param('id') id: string,
+    @Body() body: { name: string },
+  ): Promise<Category> {
+    return this.categoriesService.update(id, body.name);
   }
 
   @Delete(':id')

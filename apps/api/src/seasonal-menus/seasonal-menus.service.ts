@@ -1,0 +1,122 @@
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { SupabaseService } from '../supabase/supabase.service';
+
+export interface SeasonalMenu {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+@Injectable()
+export class SeasonalMenusService {
+  private readonly logger = new Logger(SeasonalMenusService.name);
+
+  constructor(private supabaseService: SupabaseService) {}
+
+  async findAll(): Promise<SeasonalMenu[]> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const { data, error } = await supabase
+      .from('seasonal_menus')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('sort_order')
+      .order('name');
+
+    if (error) {
+      this.logger.error(`Failed to fetch seasonal menus: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to fetch seasonal menus: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async create(data: { name: string; start_date?: string; end_date?: string }): Promise<SeasonalMenu> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    // Get max sort_order for auto-increment
+    const { data: existing } = await supabase
+      .from('seasonal_menus')
+      .select('sort_order')
+      .eq('restaurant_id', restaurantId)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+
+    const nextOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 1;
+
+    const { data: created, error } = await supabase
+      .from('seasonal_menus')
+      .insert({
+        restaurant_id: restaurantId,
+        name: data.name.trim(),
+        start_date: data.start_date || null,
+        end_date: data.end_date || null,
+        sort_order: nextOrder,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to create seasonal menu: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to create seasonal menu: ${error.message}`);
+    }
+
+    return created;
+  }
+
+  async update(id: string, data: { name?: string; start_date?: string; end_date?: string; is_active?: boolean }): Promise<SeasonalMenu> {
+    const supabase = this.supabaseService.getClient();
+
+    const updateData: Record<string, unknown> = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.start_date !== undefined) updateData.start_date = data.start_date || null;
+    if (data.end_date !== undefined) updateData.end_date = data.end_date || null;
+    if (data.is_active !== undefined) updateData.is_active = data.is_active;
+
+    const { data: updated, error } = await supabase
+      .from('seasonal_menus')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to update seasonal menu: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to update seasonal menu: ${error.message}`);
+    }
+
+    return updated;
+  }
+
+  async delete(id: string): Promise<void> {
+    const supabase = this.supabaseService.getClient();
+
+    // Nullify references on menu_groups and menus
+    await supabase
+      .from('menu_groups')
+      .update({ seasonal_menu_id: null })
+      .eq('seasonal_menu_id', id);
+
+    await supabase
+      .from('menus')
+      .update({ seasonal_menu_id: null })
+      .eq('seasonal_menu_id', id);
+
+    const { error } = await supabase
+      .from('seasonal_menus')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      this.logger.error(`Failed to delete seasonal menu: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to delete seasonal menu: ${error.message}`);
+    }
+  }
+}

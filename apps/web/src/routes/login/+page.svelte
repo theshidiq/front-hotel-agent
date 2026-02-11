@@ -137,13 +137,6 @@
 	});
 </script>
 
-<svelte:head>
-	<link
-		rel="stylesheet"
-		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0"
-	/>
-</svelte:head>
-
 <div class="min-h-screen bg-slate-900 flex flex-col">
 	<!-- Header -->
 	<header class="border-b border-slate-700 px-6 py-4">

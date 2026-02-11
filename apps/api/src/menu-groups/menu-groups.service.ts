@@ -1,37 +1,90 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+
+export interface AllowedCourse {
+  id: string;
+  category_id: string;
+  category_name: string;
+  category_value: string;
+}
 
 export interface MenuGroup {
   id: string;
   restaurant_id: string;
   name: string;
+  seasonal_menu_id: string | null;
   sort_order: number;
   created_at: string;
+  allowed_courses: AllowedCourse[];
 }
 
 @Injectable()
 export class MenuGroupsService {
+  private readonly logger = new Logger(MenuGroupsService.name);
+
   constructor(private supabaseService: SupabaseService) {}
 
-  async findAll(): Promise<MenuGroup[]> {
+  private async loadAllowedCourses(groupIds: string[]): Promise<Record<string, AllowedCourse[]>> {
+    if (groupIds.length === 0) return {};
+
+    const supabase = this.supabaseService.getClient();
+    const { data, error } = await supabase
+      .from('menu_group_courses')
+      .select('id, menu_group_id, category_id, categories(name, value)')
+      .in('menu_group_id', groupIds);
+
+    if (error) {
+      this.logger.error(`Failed to fetch menu group courses: ${error.message}`);
+      return {};
+    }
+
+    const result: Record<string, AllowedCourse[]> = {};
+    for (const row of data || []) {
+      const cat = row.categories as unknown as { name: string; value: string } | null;
+      if (!cat) continue;
+      if (!result[row.menu_group_id]) result[row.menu_group_id] = [];
+      result[row.menu_group_id].push({
+        id: row.id,
+        category_id: row.category_id,
+        category_name: cat.name,
+        category_value: cat.value,
+      });
+    }
+    return result;
+  }
+
+  async findAll(seasonalMenuId?: string): Promise<MenuGroup[]> {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('menu_groups')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .order('sort_order')
       .order('name');
 
-    if (error) {
-      throw new Error(`Failed to fetch menu groups: ${error.message}`);
+    if (seasonalMenuId) {
+      query = query.eq('seasonal_menu_id', seasonalMenuId);
     }
 
-    return data || [];
+    const { data, error } = await query;
+
+    if (error) {
+      this.logger.error(`Failed to fetch menu groups: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to fetch menu groups: ${error.message}`);
+    }
+
+    const groups = data || [];
+    const coursesMap = await this.loadAllowedCourses(groups.map(g => g.id));
+
+    return groups.map(g => ({
+      ...g,
+      allowed_courses: coursesMap[g.id] || [],
+    }));
   }
 
-  async create(name: string): Promise<MenuGroup> {
+  async create(data: { name: string; seasonal_menu_id?: string; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();
 
@@ -45,17 +98,81 @@ export class MenuGroupsService {
 
     const nextOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 1;
 
-    const { data, error } = await supabase
+    const { data: created, error } = await supabase
       .from('menu_groups')
-      .insert({ restaurant_id: restaurantId, name: name.trim(), sort_order: nextOrder })
+      .insert({
+        restaurant_id: restaurantId,
+        name: data.name.trim(),
+        seasonal_menu_id: data.seasonal_menu_id || null,
+        sort_order: nextOrder,
+      })
       .select()
       .single();
 
     if (error) {
-      throw new Error(`Failed to create menu group: ${error.message}`);
+      this.logger.error(`Failed to create menu group: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to create menu group: ${error.message}`);
     }
 
-    return data;
+    // Insert allowed courses
+    if (data.course_ids && data.course_ids.length > 0) {
+      const rows = data.course_ids.map(cid => ({
+        menu_group_id: created.id,
+        category_id: cid,
+      }));
+      await supabase.from('menu_group_courses').insert(rows);
+    }
+
+    // Re-fetch with courses
+    const coursesMap = await this.loadAllowedCourses([created.id]);
+    return { ...created, allowed_courses: coursesMap[created.id] || [] };
+  }
+
+  async update(id: string, data: { name?: string; seasonal_menu_id?: string | null; course_ids?: string[] }): Promise<MenuGroup> {
+    const supabase = this.supabaseService.getClient();
+
+    const updateData: Record<string, unknown> = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.seasonal_menu_id !== undefined) updateData.seasonal_menu_id = data.seasonal_menu_id || null;
+
+    if (Object.keys(updateData).length > 0) {
+      const { error } = await supabase
+        .from('menu_groups')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        this.logger.error(`Failed to update menu group: ${error.message}`);
+        throw new InternalServerErrorException(`Failed to update menu group: ${error.message}`);
+      }
+    }
+
+    // Replace allowed courses if provided
+    if (data.course_ids !== undefined) {
+      await supabase.from('menu_group_courses').delete().eq('menu_group_id', id);
+
+      if (data.course_ids.length > 0) {
+        const rows = data.course_ids.map(cid => ({
+          menu_group_id: id,
+          category_id: cid,
+        }));
+        await supabase.from('menu_group_courses').insert(rows);
+      }
+    }
+
+    // Re-fetch the updated group
+    const { data: updated, error: fetchError } = await supabase
+      .from('menu_groups')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      throw new InternalServerErrorException(`Failed to fetch updated menu group: ${fetchError.message}`);
+    }
+
+    const coursesMap = await this.loadAllowedCourses([id]);
+    return { ...updated, allowed_courses: coursesMap[id] || [] };
   }
 
   async delete(id: string): Promise<void> {
@@ -67,13 +184,16 @@ export class MenuGroupsService {
       .update({ menu_group_id: null })
       .eq('menu_group_id', id);
 
+    // menu_group_courses cascade-deletes automatically
+
     const { error } = await supabase
       .from('menu_groups')
       .delete()
       .eq('id', id);
 
     if (error) {
-      throw new Error(`Failed to delete menu group: ${error.message}`);
+      this.logger.error(`Failed to delete menu group: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to delete menu group: ${error.message}`);
     }
   }
 }

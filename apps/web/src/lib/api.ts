@@ -213,6 +213,21 @@ export async function createCategoryApi(name: string, type: 'product' | 'menu'):
 	return response.json();
 }
 
+export async function updateCategoryApi(id: string, name: string): Promise<Category> {
+	const response = await fetch(`${API_URL}/categories/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ name }),
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update category failed');
+	}
+
+	return response.json();
+}
+
 export async function deleteCategoryApi(id: string): Promise<void> {
 	const response = await fetch(`${API_URL}/categories/${id}`, {
 		method: 'DELETE',
@@ -225,17 +240,112 @@ export async function deleteCategoryApi(id: string): Promise<void> {
 	}
 }
 
-// Menu Group Types
-export interface MenuGroup {
+// Seasonal Menu Types
+export interface SeasonalMenu {
 	id: string;
 	restaurant_id: string;
 	name: string;
+	start_date: string | null;
+	end_date: string | null;
+	is_active: boolean;
 	sort_order: number;
 	created_at: string;
 }
 
-export async function getMenuGroups(): Promise<MenuGroup[]> {
-	const response = await fetch(`${API_URL}/menu-groups`);
+export interface CreateSeasonalMenuData {
+	name: string;
+	start_date?: string;
+	end_date?: string;
+}
+
+export interface UpdateSeasonalMenuData {
+	name?: string;
+	start_date?: string;
+	end_date?: string;
+	is_active?: boolean;
+}
+
+export async function getSeasonalMenus(): Promise<SeasonalMenu[]> {
+	const response = await fetch(`${API_URL}/seasonal-menus`);
+	if (!response.ok) {
+		throw new Error('Failed to fetch seasonal menus');
+	}
+	return response.json();
+}
+
+export async function createSeasonalMenu(data: CreateSeasonalMenuData): Promise<SeasonalMenu> {
+	const response = await fetch(`${API_URL}/seasonal-menus`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create seasonal menu failed');
+	}
+	return response.json();
+}
+
+export async function updateSeasonalMenu(
+	id: string,
+	data: UpdateSeasonalMenuData
+): Promise<SeasonalMenu> {
+	const response = await fetch(`${API_URL}/seasonal-menus/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update seasonal menu failed');
+	}
+	return response.json();
+}
+
+export async function deleteSeasonalMenu(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/seasonal-menus/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete seasonal menu failed');
+	}
+}
+
+// Menu Group Types
+export interface AllowedCourse {
+	id: string;
+	category_id: string;
+	category_name: string;
+	category_value: string;
+}
+
+export interface MenuGroup {
+	id: string;
+	restaurant_id: string;
+	name: string;
+	seasonal_menu_id: string | null;
+	sort_order: number;
+	created_at: string;
+	allowed_courses: AllowedCourse[];
+}
+
+export interface CreateMenuGroupData {
+	name: string;
+	seasonal_menu_id?: string;
+	course_ids?: string[];
+}
+
+export interface UpdateMenuGroupData {
+	name?: string;
+	seasonal_menu_id?: string | null;
+	course_ids?: string[];
+}
+
+export async function getMenuGroups(seasonalMenuId?: string): Promise<MenuGroup[]> {
+	const params = seasonalMenuId ? `?seasonal_menu_id=${seasonalMenuId}` : '';
+	const response = await fetch(`${API_URL}/menu-groups${params}`);
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch menu groups');
@@ -244,16 +354,31 @@ export async function getMenuGroups(): Promise<MenuGroup[]> {
 	return response.json();
 }
 
-export async function createMenuGroup(name: string): Promise<MenuGroup> {
+export async function createMenuGroup(data: CreateMenuGroupData): Promise<MenuGroup> {
 	const response = await fetch(`${API_URL}/menu-groups`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
-		body: JSON.stringify({ name }),
+		body: JSON.stringify(data),
 	});
 
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.message || 'Create menu group failed');
+	}
+
+	return response.json();
+}
+
+export async function updateMenuGroup(id: string, data: UpdateMenuGroupData): Promise<MenuGroup> {
+	const response = await fetch(`${API_URL}/menu-groups/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update menu group failed');
 	}
 
 	return response.json();
@@ -287,6 +412,7 @@ export interface Menu {
 	description: string | null;
 	price: number | null;
 	category: string | null;
+	seasonal_menu_id: string | null;
 	menu_group_id: string | null;
 	image_url: string | null;
 	is_available: boolean;
@@ -301,6 +427,7 @@ export interface CreateMenuData {
 	description?: string | null;
 	price?: number | null;
 	category?: string | null;
+	seasonal_menu_id?: string | null;
 	menu_group_id?: string | null;
 	image_url?: string | null;
 	is_available?: boolean;

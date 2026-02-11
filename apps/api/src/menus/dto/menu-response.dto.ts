@@ -38,6 +38,9 @@ export class MenuResponse {
   category: string | null;
 
   @ApiPropertyOptional()
+  seasonal_menu_id: string | null;
+
+  @ApiPropertyOptional()
   menu_group_id: string | null;
 
   @ApiPropertyOptional()

@@ -55,6 +55,24 @@ export class CategoriesService {
     return data;
   }
 
+  async update(id: string, name: string): Promise<Category> {
+    const supabase = this.supabaseService.getClient();
+    const value = name.trim().toLowerCase().replace(/\s+/g, '-');
+
+    const { data, error } = await supabase
+      .from('categories')
+      .update({ name: name.trim(), value })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update category: ${error.message}`);
+    }
+
+    return data;
+  }
+
   async delete(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 

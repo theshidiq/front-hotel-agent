@@ -1,6 +1,8 @@
-import { Controller, Get, Post, Delete, Body, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { MenuGroupsService, MenuGroup } from './menu-groups.service';
+import { CreateMenuGroupDto } from './dto/create-menu-group.dto';
+import { UpdateMenuGroupDto } from './dto/update-menu-group.dto';
 import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('menu-groups')
@@ -10,15 +12,23 @@ export class MenuGroupsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all menu groups' })
-  async findAll(): Promise<MenuGroup[]> {
-    return this.menuGroupsService.findAll();
+  @ApiQuery({ name: 'seasonal_menu_id', required: false })
+  async findAll(@Query('seasonal_menu_id') seasonalMenuId?: string): Promise<MenuGroup[]> {
+    return this.menuGroupsService.findAll(seasonalMenuId);
   }
 
   @Post()
   @RequireStaff()
   @ApiOperation({ summary: 'Create a new menu group' })
-  async create(@Body() body: { name: string }): Promise<MenuGroup> {
-    return this.menuGroupsService.create(body.name);
+  async create(@Body() dto: CreateMenuGroupDto): Promise<MenuGroup> {
+    return this.menuGroupsService.create(dto);
+  }
+
+  @Put(':id')
+  @RequireStaff()
+  @ApiOperation({ summary: 'Update a menu group' })
+  async update(@Param('id') id: string, @Body() dto: UpdateMenuGroupDto): Promise<MenuGroup> {
+    return this.menuGroupsService.update(id, dto);
   }
 
   @Delete(':id')

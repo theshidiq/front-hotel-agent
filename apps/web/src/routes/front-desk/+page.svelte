@@ -587,10 +587,6 @@
 		href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
 		rel="stylesheet"
 	/>
-	<link
-		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-		rel="stylesheet"
-	/>
 </svelte:head>
 
 <div class="flex h-screen bg-gray-100 font-['Noto_Sans_JP',sans-serif]">

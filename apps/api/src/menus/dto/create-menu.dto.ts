@@ -42,6 +42,12 @@ export class CreateMenuDto {
   @IsOptional()
   category?: string;
 
+  @ApiPropertyOptional({ description: 'Seasonal menu ID', nullable: true })
+  @ValidateIf((o) => o.seasonal_menu_id !== null)
+  @IsString()
+  @IsOptional()
+  seasonal_menu_id?: string | null;
+
   @ApiPropertyOptional({ description: 'Menu group ID (e.g., Day 1 Dinner, Kids Menu)', nullable: true })
   @ValidateIf((o) => o.menu_group_id !== null)
   @IsString()

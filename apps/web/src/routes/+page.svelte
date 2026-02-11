@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { uploadImage, compressImage } from '$lib/supabase';
-	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, deleteMenuGroup, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup } from '$lib/api';
+	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
+	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { authState } from '$lib/auth.svelte';
 
@@ -407,119 +408,60 @@
 	// Menu Categories
 	let menuCategories: { value: string; label: string; id: string }[] = $state([]);
 
-	// Add Category Modal State
-	let showAddCategoryModal = $state(false);
-	let newCategoryName = $state('');
-	let addCategoryError: string | null = $state(null);
-	let isAddingMenuCategory = $state(false);
+	// Menu Tree Config overlay
+	let showMenuTreeConfig = $state(false);
 
-	function openAddCategoryModal() {
-		newCategoryName = '';
-		addCategoryError = null;
-		showAddCategoryModal = true;
-	}
-
-	function closeAddCategoryModal() {
-		showAddCategoryModal = false;
-		newCategoryName = '';
-		addCategoryError = null;
-	}
-
-	async function addCategory() {
-		const trimmedName = newCategoryName.trim();
-		if (!trimmedName) {
-			addCategoryError = 'Category name is required';
-			return;
-		}
-
-		const value = trimmedName.toLowerCase().replace(/\s+/g, '-');
-
-		// Check if category already exists
-		if (menuCategories.some(c => c.value === value || c.label.toLowerCase() === trimmedName.toLowerCase())) {
-			addCategoryError = 'Category already exists';
-			return;
-		}
-
-		try {
-			isAddingMenuCategory = true;
-			const created = await createCategoryApi(trimmedName, 'menu');
-			menuCategories = [...menuCategories, { value: created.value, label: created.name, id: created.id }];
-			newMenu.category = created.value; // Auto-select the new category
-			newCategoryName = '';
-			addCategoryError = null;
-		} catch (e: any) {
-			addCategoryError = e.message || 'Failed to add category';
-		} finally {
-			isAddingMenuCategory = false;
-		}
-	}
-
-	async function deleteCategory(id: string) {
-		const cat = menuCategories.find(c => c.id === id);
-		try {
-			await deleteCategoryApi(id);
-			menuCategories = menuCategories.filter(c => c.id !== id);
-			// Clear selection if the deleted category was selected
-			if (cat && newMenu.category === cat.value) {
-				newMenu.category = '';
-			}
-			if (cat && menuEditForm.category === cat.value) {
-				menuEditForm.category = '';
-			}
-		} catch (e: any) {
-			console.error('Failed to delete menu category:', e);
-		}
-	}
+	// Seasonal Menus
+	let seasonalMenus: SeasonalMenu[] = $state([]);
 
 	// Menu Groups
 	let menuGroups: MenuGroup[] = $state([]);
-	let showManageMenuGroups = $state(false);
-	let newMenuGroupName = $state('');
-	let addMenuGroupError: string | null = $state(null);
-	let isAddingMenuGroup = $state(false);
 
-	function openManageMenuGroups() {
-		newMenuGroupName = '';
-		addMenuGroupError = null;
-		showManageMenuGroups = true;
+	// Tree config callbacks (wrappers that reload data after mutations)
+	async function treeCreateSeason(data: import('$lib/api').CreateSeasonalMenuData) {
+		const created = await createSeasonalMenu(data);
+		seasonalMenus = [...seasonalMenus, created];
 	}
 
-	function closeManageMenuGroups() {
-		showManageMenuGroups = false;
-		newMenuGroupName = '';
-		addMenuGroupError = null;
+	async function treeUpdateSeason(id: string, data: import('$lib/api').UpdateSeasonalMenuData) {
+		const updated = await updateSeasonalMenu(id, data);
+		seasonalMenus = seasonalMenus.map(s => s.id === id ? updated : s);
 	}
 
-	async function addMenuGroupItem() {
-		const trimmedName = newMenuGroupName.trim();
-		if (!trimmedName) {
-			addMenuGroupError = 'Name is required';
-			return;
-		}
-		if (menuGroups.some(g => g.name.toLowerCase() === trimmedName.toLowerCase())) {
-			addMenuGroupError = 'Group already exists';
-			return;
-		}
-		try {
-			isAddingMenuGroup = true;
-			const created = await createMenuGroup(trimmedName);
-			menuGroups = [...menuGroups, created];
-			newMenuGroupName = '';
-			addMenuGroupError = null;
-		} catch (e: any) {
-			addMenuGroupError = e.message || 'Failed to add menu group';
-		} finally {
-			isAddingMenuGroup = false;
-		}
+	async function treeDeleteSeason(id: string) {
+		await deleteSeasonalMenu(id);
+		seasonalMenus = seasonalMenus.filter(s => s.id !== id);
+		menuGroups = menuGroups.map(g => g.seasonal_menu_id === id ? { ...g, seasonal_menu_id: null } : g);
 	}
 
-	async function deleteMenuGroupItem(id: string) {
-		try {
-			await deleteMenuGroup(id);
-			menuGroups = menuGroups.filter(g => g.id !== id);
-		} catch (e: any) {
-			console.error('Failed to delete menu group:', e);
-		}
+	async function treeCreateGroup(data: import('$lib/api').CreateMenuGroupData) {
+		const created = await createMenuGroup(data);
+		menuGroups = [...menuGroups, created];
+	}
+
+	async function treeUpdateGroup(id: string, data: import('$lib/api').UpdateMenuGroupData) {
+		const updated = await updateMenuGroup(id, data);
+		menuGroups = menuGroups.map(g => g.id === id ? updated : g);
+	}
+
+	async function treeDeleteGroup(id: string) {
+		await deleteMenuGroup(id);
+		menuGroups = menuGroups.filter(g => g.id !== id);
+	}
+
+	async function treeCreateCourse(name: string) {
+		const created = await createCategoryApi(name, 'menu');
+		menuCategories = [...menuCategories, { value: created.value, label: created.name, id: created.id }];
+	}
+
+	async function treeUpdateCourse(id: string, name: string) {
+		const updated = await updateCategoryApi(id, name);
+		menuCategories = menuCategories.map(c => c.id === id ? { value: updated.value, label: updated.name, id: updated.id } : c);
+	}
+
+	async function treeDeleteCourse(id: string) {
+		await deleteCategoryApi(id);
+		menuCategories = menuCategories.filter(c => c.id !== id);
 	}
 
 	// Menu Create State
@@ -534,6 +476,7 @@
 		description: '',
 		price: null,
 		category: '',
+		seasonal_menu_id: '',
 		menu_group_id: '',
 		image_url: null,
 		is_available: true,
@@ -638,6 +581,74 @@
 		)
 	);
 
+	// Cascading dropdown logic for create form
+	const filteredMenuGroupsForCreate = $derived(
+		newMenu.seasonal_menu_id
+			? menuGroups.filter(g => g.seasonal_menu_id === newMenu.seasonal_menu_id)
+			: menuGroups
+	);
+	const filteredCoursesForCreate = $derived(() => {
+		if (!newMenu.menu_group_id) return menuCategories;
+		const group = menuGroups.find(g => g.id === newMenu.menu_group_id);
+		if (!group || !group.allowed_courses || group.allowed_courses.length === 0) return menuCategories;
+		const allowedValues = new Set(group.allowed_courses.map(c => c.category_value));
+		return menuCategories.filter(c => allowedValues.has(c.value));
+	});
+
+	// Cascading dropdown logic for edit form
+	const filteredMenuGroupsForEdit = $derived(
+		menuEditForm.seasonal_menu_id
+			? menuGroups.filter(g => g.seasonal_menu_id === menuEditForm.seasonal_menu_id)
+			: menuGroups
+	);
+	const filteredCoursesForEdit = $derived(() => {
+		if (!menuEditForm.menu_group_id) return menuCategories;
+		const group = menuGroups.find(g => g.id === menuEditForm.menu_group_id);
+		if (!group || !group.allowed_courses || group.allowed_courses.length === 0) return menuCategories;
+		const allowedValues = new Set(group.allowed_courses.map(c => c.category_value));
+		return menuCategories.filter(c => allowedValues.has(c.value));
+	});
+
+	// Track previous values for cascade resets
+	let prevCreateSeasonalMenuId = $state('');
+	let prevCreateMenuGroupId = $state('');
+	let prevEditSeasonalMenuId = $state('');
+	let prevEditMenuGroupId = $state('');
+
+	$effect(() => {
+		const current = newMenu.seasonal_menu_id || '';
+		if (prevCreateSeasonalMenuId !== '' && current !== prevCreateSeasonalMenuId) {
+			newMenu.menu_group_id = '';
+			newMenu.category = '';
+		}
+		prevCreateSeasonalMenuId = current;
+	});
+
+	$effect(() => {
+		const current = newMenu.menu_group_id || '';
+		if (prevCreateMenuGroupId !== '' && current !== prevCreateMenuGroupId) {
+			newMenu.category = '';
+		}
+		prevCreateMenuGroupId = current;
+	});
+
+	$effect(() => {
+		const current = menuEditForm.seasonal_menu_id || '';
+		if (prevEditSeasonalMenuId !== '' && current !== prevEditSeasonalMenuId) {
+			menuEditForm.menu_group_id = '';
+			menuEditForm.category = '';
+		}
+		prevEditSeasonalMenuId = current;
+	});
+
+	$effect(() => {
+		const current = menuEditForm.menu_group_id || '';
+		if (prevEditMenuGroupId !== '' && current !== prevEditMenuGroupId) {
+			menuEditForm.category = '';
+		}
+		prevEditMenuGroupId = current;
+	});
+
 	// Allergen Report Table - compute rows grouped by menu
 	const allergenColors: Record<string, string> = {
 		'牛肉': 'bg-red-500', '豚肉': 'bg-red-400', '鶏肉': 'bg-red-300',
@@ -733,6 +744,7 @@
 			description: '',
 			price: null,
 			category: '',
+			seasonal_menu_id: '',
 			menu_group_id: '',
 			image_url: null,
 			is_available: true,
@@ -795,7 +807,7 @@
 				isUploadingMenuImage = false;
 			}
 
-			const menuData = { ...newMenu, menu_group_id: newMenu.menu_group_id || null };
+			const menuData = { ...newMenu, seasonal_menu_id: newMenu.seasonal_menu_id || null, menu_group_id: newMenu.menu_group_id || null };
 			await createMenu(menuData);
 			await loadMenus();
 			createMenuSuccess = true;
@@ -860,6 +872,7 @@
 			description: menu.description,
 			price: menu.price,
 			category: menu.category,
+			seasonal_menu_id: menu.seasonal_menu_id || '',
 			menu_group_id: menu.menu_group_id,
 			is_available: menu.is_available,
 			product_ids: menu.products.map(p => p.id),
@@ -879,7 +892,7 @@
 		isSavingMenu = true;
 		saveMenuError = null;
 		try {
-			const editData = { ...menuEditForm, menu_group_id: menuEditForm.menu_group_id || null } as UpdateMenuData;
+			const editData = { ...menuEditForm, seasonal_menu_id: menuEditForm.seasonal_menu_id || null, menu_group_id: menuEditForm.menu_group_id || null } as UpdateMenuData;
 			await updateMenu(id, editData);
 			await loadMenus();
 			editingMenuId = null;
@@ -934,14 +947,16 @@
 
 	async function loadCategories() {
 		try {
-			const [productCats, menuCats, groups] = await Promise.all([
+			const [productCats, menuCats, groups, seasons] = await Promise.all([
 				getCategories('product'),
 				getCategories('menu'),
 				getMenuGroups(),
+				getSeasonalMenus(),
 			]);
 			productCategories = productCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
 			menuCategories = menuCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
 			menuGroups = groups;
+			seasonalMenus = seasons;
 		} catch (e) {
 			console.error('Failed to load categories:', e);
 		}
@@ -1110,10 +1125,6 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
 		href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-		rel="stylesheet"
-	/>
-	<link
-		href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
 		rel="stylesheet"
 	/>
 </svelte:head>
@@ -1942,6 +1953,21 @@
 		</section>
 		{:else}
 		<!-- Menu Tab Content -->
+		<!-- Configure Menu Structure Button -->
+		{#if isStaff}
+		<div class="flex justify-end mb-3">
+			<button
+				onclick={() => showMenuTreeConfig = true}
+				class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm"
+			>
+				<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+				</svg>
+				Configure Menu Structure
+			</button>
+		</div>
+		{/if}
+
 		<!-- Add Menu Item Section -->
 		{#if isStaff}
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
@@ -2012,30 +2038,52 @@
 									class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 								></textarea>
 							</div>
-							<div class="grid grid-cols-2 gap-3">
-								<div>
-									<label class="block text-sm font-medium text-gray-700 mb-1">Price</label>
-									<input
-										type="number"
-										bind:value={newMenu.price}
-										placeholder="e.g., 1500"
-										min="0"
-										step="1"
-										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+							<div>
+								<label class="block text-sm font-medium text-gray-700 mb-1">Price</label>
+								<input
+									type="number"
+									bind:value={newMenu.price}
+									placeholder="e.g., 1500"
+									min="0"
+									step="1"
+									class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+								/>
+							</div>
+							<div>
+								<label class="block text-sm font-medium text-gray-700 mb-1">Seasonal Menu</label>
+								<div class="flex gap-2">
+									<CustomSelect
+										bind:value={newMenu.seasonal_menu_id}
+										options={seasonalMenus.map(s => ({ value: s.id, label: s.name }))}
+										placeholder="Select season..."
+										class="flex-1"
 									/>
+									<button
+										type="button"
+										onclick={() => showMenuTreeConfig = true}
+										class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
+										title="Manage seasonal menus"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
+									</button>
 								</div>
+							</div>
+							<div class="grid grid-cols-2 gap-3">
 								<div>
 									<label class="block text-sm font-medium text-gray-700 mb-1">Menu Group</label>
 									<div class="flex gap-2">
 										<CustomSelect
 											bind:value={newMenu.menu_group_id}
-											options={menuGroups.map(g => ({ value: g.id, label: g.name }))}
-											placeholder="Select..."
+											options={filteredMenuGroupsForCreate.map(g => ({ value: g.id, label: g.name }))}
+											placeholder="Select group..."
 											class="flex-1"
 										/>
 										<button
 											type="button"
-											onclick={openManageMenuGroups}
+											onclick={() => showMenuTreeConfig = true}
 											class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
 											title="Manage menu groups"
 										>
@@ -2051,13 +2099,13 @@
 									<div class="flex gap-2">
 										<CustomSelect
 											bind:value={newMenu.category}
-											options={menuCategories.map(c => ({ value: c.value, label: c.label }))}
-											placeholder="Select..."
+											options={filteredCoursesForCreate().map(c => ({ value: c.value, label: c.label }))}
+											placeholder="Select course..."
 											class="flex-1"
 										/>
 										<button
 											type="button"
-											onclick={openAddCategoryModal}
+											onclick={() => showMenuTreeConfig = true}
 											class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
 											title="Manage courses"
 										>
@@ -2356,7 +2404,7 @@
 									<div class="min-w-0">
 										<p class="font-medium text-gray-900 truncate">{menu.name}</p>
 										<p class="text-xs text-gray-500">
-											{#if menu.menu_group_id}{menuGroups.find(g => g.id === menu.menu_group_id)?.name || ''} &middot; {/if}{menu.category || 'Uncategorized'}
+											{#if menu.seasonal_menu_id}{seasonalMenus.find(s => s.id === menu.seasonal_menu_id)?.name || ''} &rsaquo; {/if}{#if menu.menu_group_id}{menuGroups.find(g => g.id === menu.menu_group_id)?.name || ''} &rsaquo; {/if}{menu.category || 'Uncategorized'}
 											{#if menu.price !== null} | ¥{menu.price.toLocaleString()}{/if}
 										</p>
 									</div>
@@ -2449,29 +2497,51 @@
 														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 													></textarea>
 												</div>
-												<div class="grid grid-cols-2 gap-3">
-													<div>
-														<label class="block text-sm font-medium text-gray-700 mb-1">Price</label>
-														<input
-															type="number"
-															bind:value={menuEditForm.price}
-															min="0"
-															step="1"
-															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+												<div>
+													<label class="block text-sm font-medium text-gray-700 mb-1">Price</label>
+													<input
+														type="number"
+														bind:value={menuEditForm.price}
+														min="0"
+														step="1"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+													/>
+												</div>
+												<div>
+													<label class="block text-sm font-medium text-gray-700 mb-1">Seasonal Menu</label>
+													<div class="flex gap-2">
+														<CustomSelect
+															bind:value={menuEditForm.seasonal_menu_id}
+															options={seasonalMenus.map(s => ({ value: s.id, label: s.name }))}
+															placeholder="Select season..."
+															class="flex-1"
 														/>
+														<button
+															type="button"
+															onclick={() => showMenuTreeConfig = true}
+															class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
+															title="Manage seasonal menus"
+														>
+															<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+															</svg>
+														</button>
 													</div>
+												</div>
+												<div class="grid grid-cols-2 gap-3">
 													<div>
 														<label class="block text-sm font-medium text-gray-700 mb-1">Menu Group</label>
 														<div class="flex gap-2">
 															<CustomSelect
 																bind:value={menuEditForm.menu_group_id}
-																options={menuGroups.map(g => ({ value: g.id, label: g.name }))}
-																placeholder="Select..."
+																options={filteredMenuGroupsForEdit.map(g => ({ value: g.id, label: g.name }))}
+																placeholder="Select group..."
 																class="flex-1"
 															/>
 															<button
 																type="button"
-																onclick={openManageMenuGroups}
+																onclick={() => showMenuTreeConfig = true}
 																class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
 																title="Manage menu groups"
 															>
@@ -2487,13 +2557,13 @@
 														<div class="flex gap-2">
 															<CustomSelect
 																bind:value={menuEditForm.category}
-																options={menuCategories.map(c => ({ value: c.value, label: c.label }))}
-																placeholder="Select..."
+																options={filteredCoursesForEdit().map(c => ({ value: c.value, label: c.label }))}
+																placeholder="Select course..."
 																class="flex-1"
 															/>
 															<button
 																type="button"
-																onclick={openAddCategoryModal}
+																onclick={() => showMenuTreeConfig = true}
 																class="px-3 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center gap-1"
 																title="Manage courses"
 															>
@@ -2657,6 +2727,11 @@
 												<div>
 													<h4 class="text-sm font-medium text-gray-700 mb-2">Details</h4>
 													<div class="flex flex-wrap gap-2">
+														{#if menu.seasonal_menu_id}
+															<span class="px-2.5 py-1 bg-green-100 text-green-700 rounded-md text-sm">
+																{seasonalMenus.find(s => s.id === menu.seasonal_menu_id)?.name || 'Unknown Season'}
+															</span>
+														{/if}
 														{#if menu.menu_group_id}
 															<span class="px-2.5 py-1 bg-indigo-100 text-indigo-700 rounded-md text-sm">
 																{menuGroups.find(g => g.id === menu.menu_group_id)?.name || 'Unknown Group'}
@@ -2991,179 +3066,6 @@
 		</div>
 	{/if}
 
-	<!-- Manage Categories Modal -->
-	{#if showAddCategoryModal}
-		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={closeAddCategoryModal}>
-			<div
-				class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
-				onclick={(e) => e.stopPropagation()}
-			>
-				<!-- Modal Header -->
-				<div class="px-6 py-4 border-b border-gray-200 bg-blue-50">
-					<div class="flex items-center gap-3">
-						<div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-							<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-							</svg>
-						</div>
-						<div>
-							<h3 class="text-lg font-semibold text-gray-900">Manage Courses</h3>
-							<p class="text-sm text-gray-500">Add or remove menu courses</p>
-						</div>
-					</div>
-				</div>
-
-				<!-- Modal Body -->
-				<div class="px-6 py-4 space-y-4">
-					<!-- Add New Category -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Add New Course</label>
-						<div class="flex gap-2">
-							<input
-								type="text"
-								bind:value={newCategoryName}
-								placeholder="e.g., Appetizer, Main Course"
-								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addCategory()}
-							/>
-							<button
-								onclick={addCategory}
-								disabled={!newCategoryName.trim() || isAddingMenuCategory}
-								class="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-							>
-								{isAddingMenuCategory ? '...' : 'Add'}
-							</button>
-						</div>
-						{#if addCategoryError}
-							<p class="mt-2 text-sm text-red-600">{addCategoryError}</p>
-						{/if}
-					</div>
-
-					<!-- All Categories List -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Courses ({menuCategories.length})</label>
-						{#if menuCategories.length > 0}
-							<div class="space-y-2 max-h-48 overflow-y-auto">
-								{#each menuCategories as category}
-									<div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-										<span class="text-sm text-gray-700">{category.label}</span>
-										<button
-											onclick={() => deleteCategory(category.id)}
-											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-											title="Delete category"
-										>
-											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-											</svg>
-										</button>
-									</div>
-								{/each}
-							</div>
-						{:else}
-							<p class="text-sm text-gray-500 py-2">No categories. Add one above.</p>
-						{/if}
-					</div>
-				</div>
-
-				<!-- Modal Footer -->
-				<div class="px-6 py-4 bg-gray-50 flex justify-end">
-					<button
-						onclick={closeAddCategoryModal}
-						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
-					>
-						Done
-					</button>
-				</div>
-			</div>
-		</div>
-	{/if}
-
-	<!-- Manage Menu Groups Modal -->
-	{#if showManageMenuGroups}
-		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={closeManageMenuGroups}>
-			<div
-				class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
-				onclick={(e) => e.stopPropagation()}
-			>
-				<!-- Modal Header -->
-				<div class="px-6 py-4 border-b border-gray-200 bg-indigo-50">
-					<div class="flex items-center gap-3">
-						<div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-							<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-							</svg>
-						</div>
-						<div>
-							<h3 class="text-lg font-semibold text-gray-900">Manage Menu Groups</h3>
-							<p class="text-sm text-gray-500">Add or remove menu groups (e.g., Day 1 Dinner, Kids Menu)</p>
-						</div>
-					</div>
-				</div>
-
-				<!-- Modal Body -->
-				<div class="px-6 py-4 space-y-4">
-					<!-- Add New Group -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Add New Menu Group</label>
-						<div class="flex gap-2">
-							<input
-								type="text"
-								bind:value={newMenuGroupName}
-								placeholder="e.g., Day 1 Dinner, Kids Menu"
-								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addMenuGroupItem()}
-							/>
-							<button
-								onclick={addMenuGroupItem}
-								disabled={!newMenuGroupName.trim() || isAddingMenuGroup}
-								class="px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-							>
-								{isAddingMenuGroup ? '...' : 'Add'}
-							</button>
-						</div>
-						{#if addMenuGroupError}
-							<p class="mt-2 text-sm text-red-600">{addMenuGroupError}</p>
-						{/if}
-					</div>
-
-					<!-- All Groups List -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Menu Groups ({menuGroups.length})</label>
-						{#if menuGroups.length > 0}
-							<div class="space-y-2 max-h-48 overflow-y-auto">
-								{#each menuGroups as group}
-									<div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-										<span class="text-sm text-gray-700">{group.name}</span>
-										<button
-											onclick={() => deleteMenuGroupItem(group.id)}
-											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-											title="Delete menu group"
-										>
-											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-											</svg>
-										</button>
-									</div>
-								{/each}
-							</div>
-						{:else}
-							<p class="text-sm text-gray-500 py-2">No menu groups. Add one above.</p>
-						{/if}
-					</div>
-				</div>
-
-				<!-- Modal Footer -->
-				<div class="px-6 py-4 bg-gray-50 flex justify-end">
-					<button
-						onclick={closeManageMenuGroups}
-						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
-					>
-						Done
-					</button>
-				</div>
-			</div>
-		</div>
-	{/if}
 
 	<!-- Alternate Ingredients Modal -->
 	{#if showAlternatesModal && alternatesProduct}
@@ -3331,5 +3233,24 @@
 			</button>
 			<img src={expandedImageUrl} alt="Expanded" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" onclick={(e) => e.stopPropagation()} />
 		</div>
+	{/if}
+
+	{#if showMenuTreeConfig}
+		<MenuTreeConfig
+			{seasonalMenus}
+			{menuGroups}
+			{menuCategories}
+			{menus}
+			onCreateSeason={treeCreateSeason}
+			onUpdateSeason={treeUpdateSeason}
+			onDeleteSeason={treeDeleteSeason}
+			onCreateGroup={treeCreateGroup}
+			onUpdateGroup={treeUpdateGroup}
+			onDeleteGroup={treeDeleteGroup}
+			onCreateCourse={treeCreateCourse}
+			onUpdateCourse={treeUpdateCourse}
+			onDeleteCourse={treeDeleteCourse}
+			onClose={() => showMenuTreeConfig = false}
+		/>
 	{/if}
 </div>
