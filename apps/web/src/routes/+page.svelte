@@ -424,8 +424,14 @@
 	}
 
 	async function treeUpdateSeason(id: string, data: import('$lib/api').UpdateSeasonalMenuData) {
-		const updated = await updateSeasonalMenu(id, data);
-		seasonalMenus = seasonalMenus.map(s => s.id === id ? updated : s);
+		const prev = seasonalMenus;
+		seasonalMenus = seasonalMenus.map(s => s.id === id ? { ...s, ...data } : s);
+		try {
+			const updated = await updateSeasonalMenu(id, data);
+			seasonalMenus = seasonalMenus.map(s => s.id === id ? updated : s);
+		} catch {
+			seasonalMenus = prev;
+		}
 	}
 
 	async function treeDeleteSeason(id: string) {
@@ -440,8 +446,14 @@
 	}
 
 	async function treeUpdateGroup(id: string, data: import('$lib/api').UpdateMenuGroupData) {
-		const updated = await updateMenuGroup(id, data);
-		menuGroups = menuGroups.map(g => g.id === id ? updated : g);
+		const prev = menuGroups;
+		menuGroups = menuGroups.map(g => g.id === id ? { ...g, ...data } : g);
+		try {
+			const updated = await updateMenuGroup(id, data);
+			menuGroups = menuGroups.map(g => g.id === id ? updated : g);
+		} catch {
+			menuGroups = prev;
+		}
 	}
 
 	async function treeDeleteGroup(id: string) {
@@ -455,8 +467,14 @@
 	}
 
 	async function treeUpdateCourse(id: string, name: string) {
-		const updated = await updateCategoryApi(id, name);
-		menuCategories = menuCategories.map(c => c.id === id ? { value: updated.value, label: updated.name, id: updated.id } : c);
+		const prev = menuCategories;
+		menuCategories = menuCategories.map(c => c.id === id ? { ...c, label: name } : c);
+		try {
+			const updated = await updateCategoryApi(id, name);
+			menuCategories = menuCategories.map(c => c.id === id ? { value: updated.value, label: updated.name, id: updated.id } : c);
+		} catch {
+			menuCategories = prev;
+		}
 	}
 
 	async function treeDeleteCourse(id: string) {

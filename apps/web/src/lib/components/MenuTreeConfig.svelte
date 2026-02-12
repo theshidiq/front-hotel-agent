@@ -97,6 +97,19 @@
 	let newCourseName = $state('');
 	let isAddingCourse = $state(false);
 
+	// Course name lookup (menuCategories is the source of truth for names)
+	const courseNameMap = $derived.by(() => {
+		const map = new Map<string, string>();
+		for (const c of menuCategories) {
+			map.set(c.id, c.label);
+		}
+		return map;
+	});
+
+	function getCourseName(courseId: string, fallback: string): string {
+		return courseNameMap.get(courseId) ?? fallback;
+	}
+
 	// Menu count helper
 	const menuCountMap = $derived.by(() => {
 		const map = new Map<string, number>();
@@ -376,7 +389,7 @@
 							position: { x: 0, y: 0 },
 							data: {
 								courseId: c.category_id,
-								courseName: c.category_name,
+								courseName: getCourseName(c.category_id, c.category_name),
 								courseValue: c.category_value,
 								groupId: group.id,
 								menuCount: getMenuCount(group.id, c.category_value),
@@ -499,7 +512,7 @@
 							position: { x: 0, y: 0 },
 							data: {
 								courseId: c.category_id,
-								courseName: c.category_name,
+								courseName: getCourseName(c.category_id, c.category_name),
 								courseValue: c.category_value,
 								groupId: group.id,
 								menuCount: getMenuCount(group.id, c.category_value),
