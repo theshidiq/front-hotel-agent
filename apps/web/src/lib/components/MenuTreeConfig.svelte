@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SeasonalMenu, MenuGroup, Menu, CreateSeasonalMenuData, CreateMenuGroupData, UpdateMenuGroupData, UpdateSeasonalMenuData } from '$lib/api';
+	import type { SeasonalMenu, MenuGroup, Menu, Product, CreateSeasonalMenuData, CreateMenuGroupData, UpdateMenuGroupData, UpdateSeasonalMenuData, CreateMenuData } from '$lib/api';
 	import { SvelteFlow, Background, type Node, type Edge, Position } from '@xyflow/svelte';
 	import dagre from '@dagrejs/dagre';
 	import SeasonNode from './flow/SeasonNode.svelte';
@@ -7,6 +7,8 @@
 	import CourseNode from './flow/CourseNode.svelte';
 	import AddButtonNode from './flow/AddButtonNode.svelte';
 	import CourseToggleNode from './flow/CourseToggleNode.svelte';
+	import MenuListNode from './flow/MenuListNode.svelte';
+	import MenuFormSidebar from './flow/MenuFormSidebar.svelte';
 
 	import '@xyflow/svelte/dist/style.css';
 
@@ -24,6 +26,9 @@
 		onCreateCourse: (name: string) => Promise<void>;
 		onUpdateCourse: (id: string, name: string) => Promise<void>;
 		onDeleteCourse: (id: string) => Promise<void>;
+		products: Product[];
+		onCreateMenu: (data: CreateMenuData) => Promise<void>;
+		onDeleteMenu: (id: string) => Promise<void>;
 		onClose: () => void;
 	}
 
@@ -41,6 +46,9 @@
 		onCreateCourse,
 		onUpdateCourse,
 		onDeleteCourse,
+		products,
+		onCreateMenu,
+		onDeleteMenu,
 		onClose,
 	}: Props = $props();
 
@@ -51,6 +59,7 @@
 		course: CourseNode,
 		addButton: AddButtonNode,
 		courseToggle: CourseToggleNode,
+		menuList: MenuListNode,
 	};
 
 	// Node dimensions for dagre layout
@@ -61,6 +70,7 @@
 		addButton: { width: 200, height: 45 },
 		courseToggle: { width: 280, height: 220 },
 		unassignedRoot: { width: 220, height: 50 },
+		menuList: { width: 220, height: 100 },
 	};
 
 	// Flow state
@@ -69,6 +79,9 @@
 
 	// Course toggle state
 	let courseToggleGroupId: string | null = $state(null);
+
+	// Menu sidebar state
+	let sidebarContext: { groupId: string; courseValue: string; courseName: string; seasonalMenuId?: string | null } | null = $state(null);
 
 	// Inline form state
 	let addingSeasonForm = $state(false);
@@ -233,6 +246,31 @@
 		}
 	}
 
+	function handleOpenMenuSidebar(groupId: string, courseValue: string, courseName: string) {
+		const group = menuGroups.find(g => g.id === groupId);
+		sidebarContext = {
+			groupId,
+			courseValue,
+			courseName,
+			seasonalMenuId: group?.seasonal_menu_id || null,
+		};
+	}
+
+	function handleCloseSidebar() {
+		sidebarContext = null;
+	}
+
+	async function handleCreateMenuFromSidebar(data: CreateMenuData) {
+		await onCreateMenu(data);
+		sidebarContext = null;
+	}
+
+	function handleDeleteMenuFromTree(menuId: string) {
+		if (confirm('Delete this menu item?')) {
+			onDeleteMenu(menuId);
+		}
+	}
+
 	// Build tree from data
 	function buildTree() {
 		const rawNodes: Node[] = [];
@@ -339,9 +377,12 @@
 							data: {
 								courseId: c.category_id,
 								courseName: c.category_name,
+								courseValue: c.category_value,
+								groupId: group.id,
 								menuCount: getMenuCount(group.id, c.category_value),
 								isRestricted: true,
 								onRename: handleRenameCourse,
+								onAddMenu: handleOpenMenuSidebar,
 							},
 						});
 
@@ -352,6 +393,30 @@
 							type: 'smoothstep',
 							style: 'stroke: #3b82f6; stroke-width: 1.5;',
 						});
+
+						// Menu list node (if menus exist for this group+course)
+						const courseMenus = menus.filter(
+							m => m.menu_group_id === group.id && m.category === c.category_value
+						);
+						if (courseMenus.length > 0) {
+							const menuListNodeId = `menus-${group.id}-${c.category_value}`;
+							rawNodes.push({
+								id: menuListNodeId,
+								type: 'menuList',
+								position: { x: 0, y: 0 },
+								data: {
+									menus: courseMenus,
+									onDelete: handleDeleteMenuFromTree,
+								},
+							});
+							rawEdges.push({
+								id: `e-course-menus-${group.id}-${c.category_value}`,
+								source: courseNodeId,
+								target: menuListNodeId,
+								type: 'smoothstep',
+								style: 'stroke: #f59e0b; stroke-width: 1.5;',
+							});
+						}
 					}
 				}
 
@@ -435,9 +500,12 @@
 							data: {
 								courseId: c.category_id,
 								courseName: c.category_name,
+								courseValue: c.category_value,
+								groupId: group.id,
 								menuCount: getMenuCount(group.id, c.category_value),
 								isRestricted: true,
 								onRename: handleRenameCourse,
+								onAddMenu: handleOpenMenuSidebar,
 							},
 						});
 
@@ -448,6 +516,30 @@
 							type: 'smoothstep',
 							style: 'stroke: #3b82f6; stroke-width: 1.5;',
 						});
+
+						// Menu list node (if menus exist for this group+course)
+						const courseMenus = menus.filter(
+							m => m.menu_group_id === group.id && m.category === c.category_value
+						);
+						if (courseMenus.length > 0) {
+							const menuListNodeId = `menus-${group.id}-${c.category_value}`;
+							rawNodes.push({
+								id: menuListNodeId,
+								type: 'menuList',
+								position: { x: 0, y: 0 },
+								data: {
+									menus: courseMenus,
+									onDelete: handleDeleteMenuFromTree,
+								},
+							});
+							rawEdges.push({
+								id: `e-course-menus-${group.id}-${c.category_value}`,
+								source: courseNodeId,
+								target: menuListNodeId,
+								type: 'smoothstep',
+								style: 'stroke: #f59e0b; stroke-width: 1.5;',
+							});
+						}
 					}
 				}
 
@@ -610,6 +702,16 @@
 		</div>
 	</div>
 </div>
+
+<!-- Menu Form Sidebar -->
+{#if sidebarContext}
+	<MenuFormSidebar
+		context={sidebarContext}
+		{products}
+		onSubmit={handleCreateMenuFromSidebar}
+		onClose={handleCloseSidebar}
+	/>
+{/if}
 
 <style>
 	:global(.svelte-flow) {

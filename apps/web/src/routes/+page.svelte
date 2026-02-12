@@ -464,6 +464,16 @@
 		menuCategories = menuCategories.filter(c => c.id !== id);
 	}
 
+	async function treeCreateMenu(data: import('$lib/api').CreateMenuData) {
+		await createMenu(data);
+		menus = await getMenus();
+	}
+
+	async function treeDeleteMenu(id: string) {
+		await deleteMenu(id);
+		menus = menus.filter(m => m.id !== id);
+	}
+
 	// Menu Create State
 	let isCreatingMenu = $state(false);
 	let createMenuError: string | null = $state(null);
@@ -3241,6 +3251,7 @@
 			{menuGroups}
 			{menuCategories}
 			{menus}
+			{products}
 			onCreateSeason={treeCreateSeason}
 			onUpdateSeason={treeUpdateSeason}
 			onDeleteSeason={treeDeleteSeason}
@@ -3250,6 +3261,8 @@
 			onCreateCourse={treeCreateCourse}
 			onUpdateCourse={treeUpdateCourse}
 			onDeleteCourse={treeDeleteCourse}
+			onCreateMenu={treeCreateMenu}
+			onDeleteMenu={treeDeleteMenu}
 			onClose={() => showMenuTreeConfig = false}
 		/>
 	{/if}
