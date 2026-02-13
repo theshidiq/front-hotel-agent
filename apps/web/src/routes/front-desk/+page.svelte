@@ -28,6 +28,7 @@
 
 	// Sidebar
 	let sidebarCollapsed = $state(false);
+	let sidebarMobileOpen = $state(false);
 	const sidebarSections = $derived([
 		{
 			label: 'フロント',
@@ -590,16 +591,23 @@
 </svelte:head>
 
 <div class="flex h-screen bg-gray-100 font-['Noto_Sans_JP',sans-serif]">
-	<Sidebar sections={sidebarSections} bind:collapsed={sidebarCollapsed} />
+	<Sidebar sections={sidebarSections} bind:collapsed={sidebarCollapsed} bind:mobileOpen={sidebarMobileOpen} />
 
 	<!-- Main Content -->
 	<div class="flex-1 flex flex-col overflow-hidden">
 		<!-- Header -->
 		<header class="bg-white border-b border-gray-200">
-		<div class="h-16 flex items-center justify-between px-6">
-			<div class="flex items-center gap-4">
+		<div class="h-16 flex items-center justify-between px-4 md:px-6">
+			<div class="flex items-center gap-3 md:gap-4">
+				<button
+					onclick={() => sidebarMobileOpen = true}
+					class="md:hidden p-1.5 -ml-1 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+					aria-label="メニューを開く"
+				>
+					<span class="material-symbols-rounded text-xl">menu</span>
+				</button>
 				<h2 class="text-lg font-bold text-gray-900">{headerTitle()}</h2>
-				<span class="text-sm text-gray-500">{todayFormatted()}</span>
+				<span class="text-sm text-gray-500 hidden sm:inline">{todayFormatted()}</span>
 				<!-- Date Filter Dropdown -->
 				<div class="relative">
 					<button
@@ -683,7 +691,7 @@
 		</header>
 
 		<!-- Body -->
-		<main class="flex-1 overflow-auto p-6">
+		<main class="flex-1 overflow-auto p-3 md:p-6">
 			{#if activeNav === 'notifications'}
 				<!-- Notifications View -->
 				<div class="space-y-4">
