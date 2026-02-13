@@ -1,6 +1,6 @@
 import { getAuthHeaders } from './auth.svelte';
 
-const API_URL = 'http://localhost:3002';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
 	return { ...extra, ...getAuthHeaders() };
