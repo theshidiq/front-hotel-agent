@@ -30,7 +30,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="rounded-lg px-3 py-2 min-w-[160px] border-2 shadow-sm cursor-pointer hover:shadow-md transition-shadow {data.isRestricted ? 'bg-blue-50 border-blue-500' : 'bg-blue-50/50 border-blue-300'}"
-	onclick={() => data.onViewDetail?.(data.groupId, data.courseValue, data.courseName)}
+	onclick={() => data.onViewDetail?.(data.courseId, data.groupId, data.courseValue, data.courseName)}
 >
 	<div class="flex items-center gap-2">
 		<svg class="w-3.5 h-3.5 flex-shrink-0 {data.isRestricted ? 'text-blue-600' : 'text-blue-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">

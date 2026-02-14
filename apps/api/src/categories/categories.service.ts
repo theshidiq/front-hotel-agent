@@ -7,7 +7,17 @@ export interface Category {
   type: 'product' | 'menu';
   name: string;
   value: string;
+  image_url: string | null;
+  description: string | null;
+  price: number | null;
   created_at: string;
+}
+
+export interface UpdateCategoryData {
+  name?: string;
+  image_url?: string | null;
+  description?: string | null;
+  price?: number | null;
 }
 
 @Injectable()
@@ -55,13 +65,21 @@ export class CategoriesService {
     return data;
   }
 
-  async update(id: string, name: string): Promise<Category> {
+  async update(id: string, updateData: UpdateCategoryData): Promise<Category> {
     const supabase = this.supabaseService.getClient();
-    const value = name.trim().toLowerCase().replace(/\s+/g, '-');
+
+    const payload: Record<string, any> = {};
+    if (updateData.name !== undefined) {
+      payload.name = updateData.name.trim();
+      payload.value = updateData.name.trim().toLowerCase().replace(/\s+/g, '-');
+    }
+    if (updateData.image_url !== undefined) payload.image_url = updateData.image_url;
+    if (updateData.description !== undefined) payload.description = updateData.description;
+    if (updateData.price !== undefined) payload.price = updateData.price;
 
     const { data, error } = await supabase
       .from('categories')
-      .update({ name: name.trim(), value })
+      .update(payload)
       .eq('id', id)
       .select()
       .single();

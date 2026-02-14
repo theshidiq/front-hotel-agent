@@ -1,22 +1,22 @@
 <script lang="ts">
-	import type { Menu, Product, UpdateMenuData } from '$lib/api';
+	import type { Menu, Product, UpdateCategoryData } from '$lib/api';
 	import { uploadImage, compressImage } from '$lib/supabase';
 
 	interface Props {
+		courseId: string;
 		courseName: string;
+		courseCategory?: { value: string; label: string; id: string; image_url?: string | null; description?: string | null; price?: number | null } | null;
 		menus: Menu[];
 		products: Product[];
-		onUpdateMenu: (id: string, data: UpdateMenuData) => Promise<void>;
+		onUpdateCourseDetails: (id: string, data: UpdateCategoryData) => Promise<void>;
 		onDeleteMenu: (id: string) => void;
 		onAddMenu: () => void;
 		onClose: () => void;
 	}
 
-	let { courseName, menus, products, onUpdateMenu, onDeleteMenu, onAddMenu, onClose }: Props = $props();
+	let { courseId, courseName, courseCategory, menus, products, onUpdateCourseDetails, onDeleteMenu, onAddMenu, onClose }: Props = $props();
 
-	// Course-level fields (from the first menu as representative)
-	const firstMenu = $derived(menus.length > 0 ? menus[0] : null);
-
+	// Course-level fields (from the category)
 	let courseImage: string | null = $state(null);
 	let courseImageFile: File | null = $state(null);
 	let courseDescription = $state('');
@@ -28,17 +28,16 @@
 	let origDescription = $state('');
 	let origPrice = $state('');
 
-	// Initialize from first menu when menus change
+	// Initialize from category
 	$effect(() => {
-		if (firstMenu) {
-			courseImage = firstMenu.image_url;
-			origImage = firstMenu.image_url;
-			courseDescription = firstMenu.description || '';
-			origDescription = firstMenu.description || '';
-			coursePrice = firstMenu.price !== null ? String(firstMenu.price) : '';
-			origPrice = firstMenu.price !== null ? String(firstMenu.price) : '';
-			courseImageFile = null;
-		}
+		const cat = courseCategory;
+		courseImage = cat?.image_url || null;
+		origImage = cat?.image_url || null;
+		courseDescription = cat?.description || '';
+		origDescription = cat?.description || '';
+		coursePrice = cat?.price != null ? String(cat.price) : '';
+		origPrice = cat?.price != null ? String(cat.price) : '';
+		courseImageFile = null;
 	});
 
 	const hasCourseChanges = $derived(
@@ -77,7 +76,7 @@
 	}
 
 	async function saveCourseDetails() {
-		if (!firstMenu || isSubmitting) return;
+		if (isSubmitting) return;
 		isSubmitting = true;
 		try {
 			let image_url: string | undefined = undefined;
@@ -88,15 +87,12 @@
 				image_url = '';
 			}
 
-			const data: UpdateMenuData = {};
+			const data: UpdateCategoryData = {};
 			if (courseDescription !== origDescription) data.description = courseDescription || null;
 			if (coursePrice !== origPrice) data.price = coursePrice ? parseFloat(coursePrice) : null;
 			if (image_url !== undefined) data.image_url = image_url || null;
 
-			// Apply course-level changes to all menus in this course
-			for (const menu of menus) {
-				await onUpdateMenu(menu.id, data);
-			}
+			await onUpdateCourseDetails(courseId, data);
 
 			origDescription = courseDescription;
 			origPrice = coursePrice;

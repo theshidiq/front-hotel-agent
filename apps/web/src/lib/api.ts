@@ -185,7 +185,17 @@ export interface Category {
 	type: 'product' | 'menu';
 	name: string;
 	value: string;
+	image_url: string | null;
+	description: string | null;
+	price: number | null;
 	created_at: string;
+}
+
+export interface UpdateCategoryData {
+	name?: string;
+	image_url?: string | null;
+	description?: string | null;
+	price?: number | null;
 }
 
 export async function getCategories(type: 'product' | 'menu'): Promise<Category[]> {
@@ -213,11 +223,11 @@ export async function createCategoryApi(name: string, type: 'product' | 'menu'):
 	return response.json();
 }
 
-export async function updateCategoryApi(id: string, name: string): Promise<Category> {
+export async function updateCategoryApi(id: string, data: UpdateCategoryData): Promise<Category> {
 	const response = await fetch(`${API_URL}/categories/${id}`, {
 		method: 'PUT',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
-		body: JSON.stringify({ name }),
+		body: JSON.stringify(data),
 	});
 
 	if (!response.ok) {

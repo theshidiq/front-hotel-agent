@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { uploadImage, compressImage } from '$lib/supabase';
-	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu } from '$lib/api';
+	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -407,7 +407,7 @@
 	let isDeletingMenu = $state(false);
 
 	// Menu Categories
-	let menuCategories: { value: string; label: string; id: string }[] = $state([]);
+	let menuCategories: { value: string; label: string; id: string; image_url?: string | null; description?: string | null; price?: number | null }[] = $state([]);
 
 	// Menu Tree Config overlay
 	let showMenuTreeConfig = $state(false);
@@ -471,11 +471,15 @@
 		const prev = menuCategories;
 		menuCategories = menuCategories.map(c => c.id === id ? { ...c, label: name } : c);
 		try {
-			const updated = await updateCategoryApi(id, name);
+			const updated = await updateCategoryApi(id, { name });
 			menuCategories = menuCategories.map(c => c.id === id ? { value: updated.value, label: updated.name, id: updated.id } : c);
 		} catch {
 			menuCategories = prev;
 		}
+	}
+
+	async function treeUpdateCourseDetails(id: string, data: UpdateCategoryData) {
+		await updateCategoryApi(id, data);
 	}
 
 	async function treeDeleteCourse(id: string) {
@@ -1022,7 +1026,7 @@
 				getSeasonalMenus(),
 			]);
 			productCategories = productCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
-			menuCategories = menuCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
+			menuCategories = menuCats.map(c => ({ value: c.value, label: c.name, id: c.id, image_url: c.image_url, description: c.description, price: c.price }));
 			menuGroups = groups;
 			seasonalMenus = seasons;
 		} catch (e) {
@@ -3355,6 +3359,7 @@
 			onDeleteGroup={treeDeleteGroup}
 			onCreateCourse={treeCreateCourse}
 			onUpdateCourse={treeUpdateCourse}
+			onUpdateCourseDetails={treeUpdateCourseDetails}
 			onDeleteCourse={treeDeleteCourse}
 			onCreateMenu={treeCreateMenu}
 			onUpdateMenu={treeUpdateMenu}

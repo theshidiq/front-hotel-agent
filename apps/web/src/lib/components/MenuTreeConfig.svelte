@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SeasonalMenu, MenuGroup, Menu, Product, CreateSeasonalMenuData, CreateMenuGroupData, UpdateMenuGroupData, UpdateSeasonalMenuData, CreateMenuData, UpdateMenuData } from '$lib/api';
+	import type { SeasonalMenu, MenuGroup, Menu, Product, CreateSeasonalMenuData, CreateMenuGroupData, UpdateMenuGroupData, UpdateSeasonalMenuData, CreateMenuData, UpdateMenuData, UpdateCategoryData } from '$lib/api';
 	import { SvelteFlow, Background, type Node, type Edge, Position } from '@xyflow/svelte';
 	import dagre from '@dagrejs/dagre';
 	import SeasonNode from './flow/SeasonNode.svelte';
@@ -16,7 +16,7 @@
 	interface Props {
 		seasonalMenus: SeasonalMenu[];
 		menuGroups: MenuGroup[];
-		menuCategories: { value: string; label: string; id: string }[];
+		menuCategories: { value: string; label: string; id: string; image_url?: string | null; description?: string | null; price?: number | null }[];
 		menus: Menu[];
 		onCreateSeason: (data: CreateSeasonalMenuData) => Promise<void>;
 		onUpdateSeason: (id: string, data: UpdateSeasonalMenuData) => Promise<void>;
@@ -26,6 +26,7 @@
 		onDeleteGroup: (id: string) => Promise<void>;
 		onCreateCourse: (name: string) => Promise<void>;
 		onUpdateCourse: (id: string, name: string) => Promise<void>;
+		onUpdateCourseDetails: (id: string, data: UpdateCategoryData) => Promise<void>;
 		onDeleteCourse: (id: string) => Promise<void>;
 		products: Product[];
 		onCreateMenu: (data: CreateMenuData) => Promise<void>;
@@ -47,6 +48,7 @@
 		onDeleteGroup,
 		onCreateCourse,
 		onUpdateCourse,
+		onUpdateCourseDetails,
 		onDeleteCourse,
 		products,
 		onCreateMenu,
@@ -288,7 +290,7 @@
 	}
 
 	// Course detail sidebar state
-	let detailContext: { groupId: string; courseValue: string; courseName: string; seasonalMenuId?: string | null } | null = $state(null);
+	let detailContext: { courseId: string; groupId: string; courseValue: string; courseName: string } | null = $state(null);
 
 	const detailMenus = $derived(
 		detailContext
@@ -296,16 +298,21 @@
 			: []
 	);
 
-	function handleOpenCourseDetail(groupId: string, courseValue: string, courseName: string) {
-		detailContext = { groupId, courseValue, courseName };
+	// Get the category object for detail sidebar
+	const detailCategory = $derived(
+		detailContext ? menuCategories.find(c => c.id === detailContext!.courseId) : null
+	);
+
+	function handleOpenCourseDetail(courseId: string, groupId: string, courseValue: string, courseName: string) {
+		detailContext = { courseId, groupId, courseValue, courseName };
 	}
 
 	function handleCloseCourseDetail() {
 		detailContext = null;
 	}
 
-	async function handleUpdateMenuFromDetail(id: string, data: UpdateMenuData) {
-		await onUpdateMenu(id, data);
+	async function handleUpdateCourseDetailsFromDetail(id: string, data: UpdateCategoryData) {
+		await onUpdateCourseDetails(id, data);
 	}
 
 	function handleDeleteMenuFromDetail(id: string) {
@@ -772,10 +779,12 @@
 <!-- Course Detail Sidebar -->
 {#if detailContext}
 	<CourseDetailSidebar
+		courseId={detailContext.courseId}
 		courseName={detailContext.courseName}
+		courseCategory={detailCategory}
 		menus={detailMenus}
 		{products}
-		onUpdateMenu={handleUpdateMenuFromDetail}
+		onUpdateCourseDetails={handleUpdateCourseDetailsFromDetail}
 		onDeleteMenu={handleDeleteMenuFromDetail}
 		onAddMenu={handleAddMenuFromDetail}
 		onClose={handleCloseCourseDetail}

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Query, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { CategoriesService, Category } from './categories.service';
+import { CategoriesService, Category, UpdateCategoryData } from './categories.service';
 import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('categories')
@@ -30,12 +30,12 @@ export class CategoriesController {
 
   @Put(':id')
   @RequireStaff()
-  @ApiOperation({ summary: 'Update a category name' })
+  @ApiOperation({ summary: 'Update a category' })
   async update(
     @Param('id') id: string,
-    @Body() body: { name: string },
+    @Body() body: UpdateCategoryData,
   ): Promise<Category> {
-    return this.categoriesService.update(id, body.name);
+    return this.categoriesService.update(id, body);
   }
 
   @Delete(':id')
