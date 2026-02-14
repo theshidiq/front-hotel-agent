@@ -27,7 +27,11 @@
 
 <Handle type="target" position={Position.Top} />
 
-<div class="rounded-lg px-3 py-2 min-w-[160px] border-2 shadow-sm {data.isRestricted ? 'bg-blue-50 border-blue-500' : 'bg-blue-50/50 border-blue-300'}">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="rounded-lg px-3 py-2 min-w-[160px] border-2 shadow-sm cursor-pointer hover:shadow-md transition-shadow {data.isRestricted ? 'bg-blue-50 border-blue-500' : 'bg-blue-50/50 border-blue-300'}"
+	onclick={() => data.onViewDetail?.(data.groupId, data.courseValue, data.courseName)}
+>
 	<div class="flex items-center gap-2">
 		<svg class="w-3.5 h-3.5 flex-shrink-0 {data.isRestricted ? 'text-blue-600' : 'text-blue-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -37,6 +41,7 @@
 				type="text"
 				bind:value={editName}
 				class="nodrag text-sm bg-white border border-blue-300 rounded px-1.5 py-0.5 w-full focus:ring-2 focus:ring-blue-400 focus:outline-none"
+				onclick={(e) => e.stopPropagation()}
 				onkeydown={(e) => {
 					if (e.key === 'Enter') submitEdit();
 					if (e.key === 'Escape') cancelEdit();
@@ -45,11 +50,10 @@
 				autofocus
 			/>
 		{:else}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<span
-				class="text-sm cursor-pointer hover:underline {data.isRestricted ? 'text-gray-900' : 'text-gray-700'}"
-				ondblclick={startEdit}
-				title={data.onRename ? 'Double-click to rename' : ''}
+				class="text-sm {data.isRestricted ? 'text-gray-900' : 'text-gray-700'}"
+				ondblclick={(e) => { e.stopPropagation(); startEdit(); }}
+				title={data.onRename ? 'Double-click to rename · Click to view details' : 'Click to view details'}
 			>{data.courseName}</span>
 		{/if}
 		<span class="text-xs px-1.5 py-0.5 rounded flex-shrink-0 {data.menuCount > 0 ? 'text-blue-600 bg-blue-100' : 'text-gray-400 bg-gray-100'}">
@@ -59,7 +63,7 @@
 			<button
 				class="nodrag p-0.5 rounded hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors flex-shrink-0"
 				title="Add menu item"
-				onclick={() => data.onAddMenu(data.groupId, data.courseValue, data.courseName)}
+				onclick={(e) => { e.stopPropagation(); data.onAddMenu(data.groupId, data.courseValue, data.courseName); }}
 			>
 				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />

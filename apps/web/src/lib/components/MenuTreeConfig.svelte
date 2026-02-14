@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SeasonalMenu, MenuGroup, Menu, Product, CreateSeasonalMenuData, CreateMenuGroupData, UpdateMenuGroupData, UpdateSeasonalMenuData, CreateMenuData } from '$lib/api';
+	import type { SeasonalMenu, MenuGroup, Menu, Product, CreateSeasonalMenuData, CreateMenuGroupData, UpdateMenuGroupData, UpdateSeasonalMenuData, CreateMenuData, UpdateMenuData } from '$lib/api';
 	import { SvelteFlow, Background, type Node, type Edge, Position } from '@xyflow/svelte';
 	import dagre from '@dagrejs/dagre';
 	import SeasonNode from './flow/SeasonNode.svelte';
@@ -9,6 +9,7 @@
 	import CourseToggleNode from './flow/CourseToggleNode.svelte';
 	import MenuListNode from './flow/MenuListNode.svelte';
 	import MenuFormSidebar from './flow/MenuFormSidebar.svelte';
+	import CourseDetailSidebar from './flow/CourseDetailSidebar.svelte';
 
 	import '@xyflow/svelte/dist/style.css';
 
@@ -28,6 +29,7 @@
 		onDeleteCourse: (id: string) => Promise<void>;
 		products: Product[];
 		onCreateMenu: (data: CreateMenuData) => Promise<void>;
+		onUpdateMenu: (id: string, data: UpdateMenuData) => Promise<void>;
 		onDeleteMenu: (id: string) => Promise<void>;
 		onClose: () => void;
 	}
@@ -48,6 +50,7 @@
 		onDeleteCourse,
 		products,
 		onCreateMenu,
+		onUpdateMenu,
 		onDeleteMenu,
 		onClose,
 	}: Props = $props();
@@ -284,6 +287,44 @@
 		}
 	}
 
+	// Course detail sidebar state
+	let detailContext: { groupId: string; courseValue: string; courseName: string; seasonalMenuId?: string | null } | null = $state(null);
+
+	const detailMenus = $derived(
+		detailContext
+			? menus.filter(m => m.menu_group_id === detailContext!.groupId && m.category === detailContext!.courseValue)
+			: []
+	);
+
+	function handleOpenCourseDetail(groupId: string, courseValue: string, courseName: string) {
+		detailContext = { groupId, courseValue, courseName };
+	}
+
+	function handleCloseCourseDetail() {
+		detailContext = null;
+	}
+
+	async function handleUpdateMenuFromDetail(id: string, data: UpdateMenuData) {
+		await onUpdateMenu(id, data);
+	}
+
+	function handleDeleteMenuFromDetail(id: string) {
+		if (confirm('Delete this menu item?')) {
+			onDeleteMenu(id);
+		}
+	}
+
+	function handleAddMenuFromDetail() {
+		if (!detailContext) return;
+		const group = menuGroups.find(g => g.id === detailContext!.groupId);
+		sidebarContext = {
+			groupId: detailContext.groupId,
+			courseValue: detailContext.courseValue,
+			courseName: detailContext.courseName,
+			seasonalMenuId: group?.seasonal_menu_id || null,
+		};
+	}
+
 	// Build tree from data
 	function buildTree() {
 		const rawNodes: Node[] = [];
@@ -396,6 +437,7 @@
 								isRestricted: true,
 								onRename: handleRenameCourse,
 								onAddMenu: handleOpenMenuSidebar,
+								onViewDetail: handleOpenCourseDetail,
 							},
 						});
 
@@ -519,6 +561,7 @@
 								isRestricted: true,
 								onRename: handleRenameCourse,
 								onAddMenu: handleOpenMenuSidebar,
+								onViewDetail: handleOpenCourseDetail,
 							},
 						});
 
@@ -723,6 +766,19 @@
 		{products}
 		onSubmit={handleCreateMenuFromSidebar}
 		onClose={handleCloseSidebar}
+	/>
+{/if}
+
+<!-- Course Detail Sidebar -->
+{#if detailContext}
+	<CourseDetailSidebar
+		courseName={detailContext.courseName}
+		menus={detailMenus}
+		{products}
+		onUpdateMenu={handleUpdateMenuFromDetail}
+		onDeleteMenu={handleDeleteMenuFromDetail}
+		onAddMenu={handleAddMenuFromDetail}
+		onClose={handleCloseCourseDetail}
 	/>
 {/if}
 

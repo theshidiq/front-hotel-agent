@@ -488,6 +488,11 @@
 		menus = await getMenus();
 	}
 
+	async function treeUpdateMenu(id: string, data: import('$lib/api').UpdateMenuData) {
+		await updateMenu(id, data);
+		menus = await getMenus();
+	}
+
 	async function treeDeleteMenu(id: string) {
 		await deleteMenu(id);
 		menus = menus.filter(m => m.id !== id);
@@ -3352,6 +3357,7 @@
 			onUpdateCourse={treeUpdateCourse}
 			onDeleteCourse={treeDeleteCourse}
 			onCreateMenu={treeCreateMenu}
+			onUpdateMenu={treeUpdateMenu}
 			onDeleteMenu={treeDeleteMenu}
 			onClose={() => showMenuTreeConfig = false}
 		/>
