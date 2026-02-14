@@ -727,6 +727,32 @@
 		return rows;
 	});
 
+	// New grouped table data: each entry is a product row within a menu
+	type AllergenTableMenuGroup = {
+		menu: Menu;
+		products: { name: string; allergens: { id: string; name: string }[] }[];
+	};
+
+	const allergenTableGrouped = $derived.by(() => {
+		const groups: AllergenTableMenuGroup[] = [];
+		for (const menu of menus) {
+			const products = (menu.products || [])
+				.filter(p => (p.allergens || []).length > 0)
+				.map(p => ({ name: p.name, allergens: p.allergens || [] }));
+			if (products.length > 0) {
+				groups.push({ menu, products });
+			}
+		}
+		return groups;
+	});
+
+	const allergenTableLeft2 = $derived(
+		allergenTableGrouped.slice(0, Math.ceil(allergenTableGrouped.length / 2))
+	);
+	const allergenTableRight2 = $derived(
+		allergenTableGrouped.slice(Math.ceil(allergenTableGrouped.length / 2))
+	);
+
 	const allergenTableLeft = $derived.by(() => {
 		const midpoint = Math.ceil(menus.length / 2);
 		const leftMenuNames = new Set(menus.slice(0, midpoint).map(m => m.name));
@@ -751,11 +777,19 @@
 		try {
 			const { utils, writeFile } = await import('xlsx');
 			const wsData: string[][] = [['メニュー', 'アレルギー', '商品/食材']];
-			for (const row of allergenTableData) {
-				wsData.push([row.menuName, row.allergenName, row.productNames]);
+			for (const group of allergenTableGrouped) {
+				let isFirst = true;
+				for (const product of group.products) {
+					wsData.push([
+						isFirst ? group.menu.name : '',
+						product.allergens.map(a => a.name).join('、'),
+						product.name,
+					]);
+					isFirst = false;
+				}
 			}
 			const ws = utils.aoa_to_sheet(wsData);
-			ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 40 }];
+			ws['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 40 }];
 			const wb = utils.book_new();
 			utils.book_append_sheet(wb, ws, 'Allergen Report');
 			const today = new Date().toISOString().split('T')[0];
@@ -2369,54 +2403,63 @@
 			</div>
 
 			{#if showAllergenReport}
-				{#if allergenTableData.length === 0}
+				{#if allergenTableGrouped.length === 0}
 					<p class="text-center text-gray-400 py-6 text-sm">No allergens found in any menu. Link products with allergens to see the report.</p>
 				{:else}
 					<div class="flex gap-5">
-						<!-- Left Table -->
-						<div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
-							<div class="bg-slate-800 text-white text-xs font-semibold flex">
-								<div class="w-[140px] px-3 py-2.5">メニュー</div>
-								<div class="w-[110px] px-2 py-2.5">アレルギー</div>
-								<div class="flex-1 px-2 py-2.5">商品/食材</div>
+						{#each [allergenTableLeft2, allergenTableRight2] as tableGroups}
+							{#if tableGroups.length > 0}
+							<div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+								<table class="w-full">
+									<thead>
+										<tr class="bg-slate-800 text-white text-xs font-semibold">
+											<th class="w-[140px] px-3 py-2.5 text-left">メニュー</th>
+											<th class="px-2 py-2.5 text-left">アレルギー</th>
+											<th class="px-2 py-2.5 text-left">商品/食材</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each tableGroups as group, gi}
+											{#each group.products as product, pi}
+												<tr class="border-t {pi === 0 && gi > 0 ? 'border-t-2 border-t-blue-300' : 'border-gray-100'} {pi % 2 === 0 ? 'bg-green-50/30' : 'bg-white'}">
+													{#if pi === 0}
+														<td rowspan={group.products.length + 1} class="w-[140px] px-3 py-2 align-top border-r border-gray-100">
+															<span class="font-semibold text-gray-900 text-xs">{group.menu.name}</span>
+														</td>
+													{/if}
+													<td class="px-2 py-1.5">
+														<div class="flex flex-wrap gap-1">
+															{#each product.allergens as allergen}
+																<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
+															{/each}
+														</div>
+													</td>
+													<td class="px-2 py-1.5 text-gray-600 text-xs">{product.name}</td>
+												</tr>
+											{/each}
+											<!-- Menu image row -->
+											<tr class="border-t border-gray-100 {group.products.length % 2 === 0 ? 'bg-green-50/30' : 'bg-white'}">
+												<td colspan="2" class="px-2 py-1.5">
+													{#if group.menu.image_url}
+														<img src={group.menu.image_url} alt={group.menu.name} class="w-16 h-12 object-cover rounded" />
+													{:else}
+														<span class="text-[10px] text-gray-300 italic">no image</span>
+													{/if}
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+								{#if tableGroups.length === 0}
+									<div class="px-3 py-4 text-center text-gray-400 text-xs">No data</div>
+								{/if}
 							</div>
-							{#each allergenTableLeft as row, i}
-								<div class="flex text-sm border-t {row.isFirstInMenu && i > 0 ? 'border-t-2 border-t-blue-300' : 'border-gray-100'} {i % 2 === 0 ? 'bg-green-50/50' : 'bg-white'}">
-									<div class="w-[140px] px-3 py-2 font-semibold text-gray-900 text-xs">{row.menuName}</div>
-									<div class="w-[110px] px-2 py-2">
-										<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(row.allergenName)}">{row.allergenName}</span>
-									</div>
-									<div class="flex-1 px-2 py-2 text-gray-600 text-xs">{row.productNames}</div>
-								</div>
-							{/each}
-							{#if allergenTableLeft.length === 0}
-								<div class="px-3 py-4 text-center text-gray-400 text-xs">No data</div>
 							{/if}
-						</div>
-
-						<!-- Right Table -->
-						{#if allergenTableRight.length > 0}
-						<div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
-							<div class="bg-slate-800 text-white text-xs font-semibold flex">
-								<div class="w-[140px] px-3 py-2.5">メニュー</div>
-								<div class="w-[110px] px-2 py-2.5">アレルギー</div>
-								<div class="flex-1 px-2 py-2.5">商品/食材</div>
-							</div>
-							{#each allergenTableRight as row, i}
-								<div class="flex text-sm border-t {row.isFirstInMenu && i > 0 ? 'border-t-2 border-t-blue-300' : 'border-gray-100'} {i % 2 === 0 ? 'bg-green-50/50' : 'bg-white'}">
-									<div class="w-[140px] px-3 py-2 font-semibold text-gray-900 text-xs">{row.menuName}</div>
-									<div class="w-[110px] px-2 py-2">
-										<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(row.allergenName)}">{row.allergenName}</span>
-									</div>
-									<div class="flex-1 px-2 py-2 text-gray-600 text-xs">{row.productNames}</div>
-								</div>
-							{/each}
-						</div>
-						{/if}
+						{/each}
 					</div>
 
 					<p class="text-[10px] text-gray-400 mt-3">
-						Generated: {new Date().toISOString().split('T')[0]} | {menus.length} menus, {allergenTableData.length} allergen entries
+						Generated: {new Date().toISOString().split('T')[0]} | {menus.length} menus, {allergenTableGrouped.length} menu entries
 					</p>
 				{/if}
 			{/if}
