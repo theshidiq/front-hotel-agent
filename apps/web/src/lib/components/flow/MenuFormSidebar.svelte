@@ -33,6 +33,12 @@
 	let productSearchTerm = $state('');
 	let productSearchFocused = $state(false);
 
+	// Alternate ingredients (maps product_id -> alternate product_ids)
+	let productAlternates: Record<string, string[]> = $state({});
+	let showAlternatesFor: string | null = $state(null);
+	let alternateSearchTerm = $state('');
+	let alternateSearchFocused = $state(false);
+
 	const availableProducts = $derived(
 		products.filter(
 			(p) =>
@@ -56,6 +62,28 @@
 		return Array.from(map.values());
 	});
 
+	const alternatesProduct = $derived(
+		showAlternatesFor ? products.find((p) => p.id === showAlternatesFor) : null
+	);
+
+	const availableAlternates = $derived(
+		showAlternatesFor
+			? products.filter(
+					(p) =>
+						p.id !== showAlternatesFor &&
+						!(productAlternates[showAlternatesFor] || []).includes(p.id) &&
+						(alternateSearchTerm === '' ||
+							p.name.toLowerCase().includes(alternateSearchTerm.toLowerCase()))
+				)
+			: []
+	);
+
+	const selectedAlternates = $derived(
+		showAlternatesFor
+			? products.filter((p) => (productAlternates[showAlternatesFor!] || []).includes(p.id))
+			: []
+	);
+
 	function addProduct(productId: string) {
 		selectedProductIds = [...selectedProductIds, productId];
 		productSearchTerm = '';
@@ -63,6 +91,40 @@
 
 	function removeProduct(productId: string) {
 		selectedProductIds = selectedProductIds.filter((id) => id !== productId);
+		// Also clean up alternates for removed product
+		const { [productId]: _, ...rest } = productAlternates;
+		productAlternates = rest;
+	}
+
+	function openAlternates(productId: string) {
+		showAlternatesFor = productId;
+		alternateSearchTerm = '';
+		alternateSearchFocused = false;
+	}
+
+	function closeAlternates() {
+		showAlternatesFor = null;
+		alternateSearchTerm = '';
+	}
+
+	function addAlternate(productId: string) {
+		if (!showAlternatesFor) return;
+		const current = productAlternates[showAlternatesFor] || [];
+		if (!current.includes(productId)) {
+			productAlternates[showAlternatesFor] = [...current, productId];
+		}
+		alternateSearchTerm = '';
+	}
+
+	function removeAlternate(productId: string) {
+		if (!showAlternatesFor) return;
+		productAlternates[showAlternatesFor] = (productAlternates[showAlternatesFor] || []).filter(
+			(id) => id !== productId
+		);
+	}
+
+	function getAlternatesCount(productId: string): number {
+		return (productAlternates[productId] || []).length;
 	}
 
 	function handleImageSelect(e: Event) {
@@ -265,15 +327,29 @@
 					{#each selectedProducts as product}
 						<div class="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-white border border-gray-200 rounded-md">
 							<span class="text-sm text-gray-800 truncate flex-1">{product.name}</span>
-							<button
-								onclick={() => removeProduct(product.id)}
-								class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-								title="Remove"
-							>
-								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-								</svg>
-							</button>
+							<div class="flex items-center gap-1 flex-shrink-0">
+								<button
+									onclick={() => openAlternates(product.id)}
+									class="p-1 rounded transition-colors {getAlternatesCount(product.id) > 0 ? 'text-orange-600 hover:bg-orange-50' : 'text-gray-400 hover:text-orange-600 hover:bg-orange-50'}"
+									title="Set alternates"
+								>
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+									</svg>
+								</button>
+								{#if getAlternatesCount(product.id) > 0}
+									<span class="text-xs text-orange-600 font-medium min-w-[1rem] text-center">{getAlternatesCount(product.id)}</span>
+								{/if}
+								<button
+									onclick={() => removeProduct(product.id)}
+									class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+									title="Remove"
+								>
+									<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+									</svg>
+								</button>
+							</div>
 						</div>
 					{/each}
 				</div>
@@ -323,3 +399,154 @@
 		</button>
 	</div>
 </div>
+
+<!-- Alternates Modal -->
+{#if showAlternatesFor && alternatesProduct}
+	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]" onclick={closeAlternates}>
+		<div
+			class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<!-- Header -->
+			<div class="px-6 py-4 border-b border-gray-200 bg-orange-50">
+				<div class="flex items-center gap-3">
+					<div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+						<svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+						</svg>
+					</div>
+					<div>
+						<h3 class="text-lg font-semibold text-gray-900">Alternate Ingredients</h3>
+						<p class="text-sm text-gray-500">for <span class="font-medium text-orange-700">{alternatesProduct.name}</span></p>
+					</div>
+				</div>
+			</div>
+
+			<!-- Body -->
+			<div class="px-6 py-4 space-y-4">
+				<div class="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+					<svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+					<p>Add products that can substitute <strong>{alternatesProduct.name}</strong> when a guest has allergies or dietary restrictions.</p>
+				</div>
+
+				{#if alternatesProduct.allergens && alternatesProduct.allergens.length > 0}
+					<div class="p-3 bg-red-50 rounded-lg">
+						<p class="text-xs font-medium text-red-700 mb-1.5">Current Allergens:</p>
+						<div class="flex flex-wrap gap-1">
+							{#each alternatesProduct.allergens as allergen}
+								<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">{allergen.name}</span>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Search -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-2">Add Alternate Product</label>
+					<div class="relative">
+						<input
+							type="text"
+							bind:value={alternateSearchTerm}
+							onfocus={() => (alternateSearchFocused = true)}
+							onblur={() => setTimeout(() => (alternateSearchFocused = false), 200)}
+							placeholder="Search for alternate products..."
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+						/>
+						{#if alternateSearchFocused && availableAlternates.length > 0}
+							<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+								{#each availableAlternates.slice(0, 8) as product}
+									<button
+										onclick={() => addAlternate(product.id)}
+										class="w-full px-3 py-2 text-left hover:bg-orange-50 transition-colors flex items-center justify-between gap-2"
+									>
+										<div class="flex items-center gap-2 min-w-0">
+											{#if product.image_url}
+												<img src={product.image_url} alt="" class="w-8 h-8 object-cover rounded" />
+											{:else}
+												<div class="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-gray-400">
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+													</svg>
+												</div>
+											{/if}
+											<span class="truncate text-sm">{product.name}</span>
+										</div>
+										{#if product.allergens && product.allergens.length > 0}
+											<div class="flex gap-1 flex-shrink-0">
+												{#each product.allergens.slice(0, 2) as allergen}
+													<span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs">{allergen.name}</span>
+												{/each}
+												{#if product.allergens.length > 2}
+													<span class="text-xs text-gray-400">+{product.allergens.length - 2}</span>
+												{/if}
+											</div>
+										{:else}
+											<span class="px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs">No allergens</span>
+										{/if}
+									</button>
+								{/each}
+							</div>
+						{:else if alternateSearchFocused && availableAlternates.length === 0}
+							<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500 text-center">
+								No more products available
+							</div>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Selected Alternates -->
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-2">Selected Alternates ({selectedAlternates.length})</label>
+					{#if selectedAlternates.length > 0}
+						<div class="space-y-2 max-h-40 overflow-y-auto">
+							{#each selectedAlternates as product}
+								<div class="flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+									<div class="flex items-center gap-2 min-w-0">
+										<span class="text-sm text-gray-700 truncate">{product.name}</span>
+										{#if product.allergens && product.allergens.length > 0}
+											<div class="flex gap-1 flex-shrink-0">
+												{#each product.allergens.slice(0, 2) as allergen}
+													<span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs">{allergen.name}</span>
+												{/each}
+												{#if product.allergens.length > 2}
+													<span class="text-xs text-gray-400">+{product.allergens.length - 2}</span>
+												{/if}
+											</div>
+										{:else}
+											<span class="px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs">No allergens</span>
+										{/if}
+									</div>
+									<button
+										onclick={() => removeAlternate(product.id)}
+										class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+										title="Remove alternate"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="p-3 bg-gray-50 rounded-lg text-center text-gray-400 text-sm">
+							No alternates configured. Add products above that can substitute this ingredient.
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Footer -->
+			<div class="px-6 py-4 bg-gray-50 flex justify-end">
+				<button
+					onclick={closeAlternates}
+					class="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+				>
+					Done
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
