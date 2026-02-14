@@ -1239,12 +1239,33 @@
 					<!-- Upload Area -->
 					<div>
 						{#if showCamera}
-							<div>
-								<video bind:this={videoEl} autoplay playsinline muted class="w-full rounded-lg bg-black"></video>
+							<!-- Mobile: fullscreen camera overlay -->
+							<div class="fixed inset-0 z-50 bg-black flex flex-col md:relative md:inset-auto md:z-auto md:bg-transparent md:rounded-lg md:overflow-hidden">
+								<video bind:this={videoEl} autoplay playsinline muted class="flex-1 object-cover w-full md:rounded-lg md:object-contain"></video>
 								{#if cameraError}
-									<p class="mt-2 text-red-600 text-sm">{cameraError}</p>
+									<div class="absolute top-12 left-4 right-4 md:static md:mt-2 md:mx-0">
+										<p class="text-red-400 text-sm bg-black/70 rounded-lg px-3 py-2 md:bg-transparent md:text-red-600 md:p-0">{cameraError}</p>
+									</div>
 								{/if}
-								<div class="mt-3 flex gap-2">
+								<!-- Mobile: bottom controls -->
+								<div class="absolute bottom-0 left-0 right-0 p-6 pb-10 flex items-center justify-center gap-6 bg-gradient-to-t from-black/80 to-transparent md:hidden">
+									<button
+										onclick={closeCamera}
+										class="w-12 h-12 rounded-full bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
+									>
+										<span class="material-symbols-rounded text-2xl">close</span>
+									</button>
+									<button
+										onclick={capturePhoto}
+										class="rounded-full bg-white flex items-center justify-center shadow-lg"
+										style="width: 72px; height: 72px;"
+									>
+										<div class="rounded-full border-4 border-gray-300" style="width: 62px; height: 62px;"></div>
+									</button>
+									<div class="w-12 h-12"></div>
+								</div>
+								<!-- Desktop: inline controls -->
+								<div class="hidden md:flex mt-3 gap-2">
 									<button
 										onclick={capturePhoto}
 										class="flex-1 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
