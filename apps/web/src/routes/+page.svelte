@@ -1530,40 +1530,62 @@
 									<div>
 										<label class="block text-sm font-medium text-gray-700 mb-2">Dietary Information</label>
 										<div class="grid grid-cols-2 gap-2">
-											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_vegetarian ? 'bg-green-100 ring-2 ring-green-300' : 'bg-gray-50 hover:bg-gray-100'}">
 												<input type="checkbox" bind:checked={scanReviewProduct.is_vegetarian} class="w-4 h-4 text-green-600 rounded" />
-												<span class="text-sm">Vegetarian</span>
+												<span class="text-sm {scanReviewProduct.is_vegetarian ? 'text-green-700 font-medium' : ''}">Vegetarian</span>
 											</label>
-											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_vegan ? 'bg-green-100 ring-2 ring-green-300' : 'bg-gray-50 hover:bg-gray-100'}">
 												<input type="checkbox" bind:checked={scanReviewProduct.is_vegan} class="w-4 h-4 text-green-600 rounded" />
-												<span class="text-sm">Vegan</span>
+												<span class="text-sm {scanReviewProduct.is_vegan ? 'text-green-700 font-medium' : ''}">Vegan</span>
 											</label>
-											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_halal ? 'bg-emerald-100 ring-2 ring-emerald-300' : 'bg-gray-50 hover:bg-gray-100'}">
 												<input type="checkbox" bind:checked={scanReviewProduct.is_halal} class="w-4 h-4 text-emerald-600 rounded" />
-												<span class="text-sm">Halal</span>
+												<span class="text-sm {scanReviewProduct.is_halal ? 'text-emerald-700 font-medium' : ''}">Halal</span>
 											</label>
-											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_gluten_free ? 'bg-amber-100 ring-2 ring-amber-300' : 'bg-gray-50 hover:bg-gray-100'}">
 												<input type="checkbox" bind:checked={scanReviewProduct.is_gluten_free} class="w-4 h-4 text-amber-600 rounded" />
-												<span class="text-sm">Gluten-Free</span>
+												<span class="text-sm {scanReviewProduct.is_gluten_free ? 'text-amber-700 font-medium' : ''}">Gluten-Free</span>
 											</label>
 										</div>
 									</div>
 
 									<div>
 										<label class="block text-sm font-medium text-gray-700 mb-2">Allergens</label>
+										<!-- Selected allergens shown at top -->
+										{#if (scanReviewProduct.allergen_ids || []).length > 0}
+											<div class="mb-2">
+												<p class="text-xs text-gray-500 mb-1">Selected ({(scanReviewProduct.allergen_ids || []).length})</p>
+												<div class="flex flex-wrap gap-1.5">
+													{#each allergens.filter(a => (scanReviewProduct.allergen_ids || []).includes(a.id)) as allergen}
+														<button
+															type="button"
+															onclick={() => toggleScanAllergen(allergen.id)}
+															class="px-2.5 py-1 rounded-md text-sm bg-red-100 text-red-700 ring-2 ring-red-300 flex items-center gap-1"
+														>
+															{allergen.name}
+															<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+														</button>
+													{/each}
+												</div>
+											</div>
+										{/if}
+										<!-- Search and all allergens -->
 										<div class="mb-2">
 											<input type="text" bind:value={scanAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
 										</div>
 										<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
-											{#each scanSearchedAllergens as allergen}
+											{#each scanSearchedAllergens.filter(a => !(scanReviewProduct.allergen_ids || []).includes(a.id)) as allergen}
 												<button
 													type="button"
 													onclick={() => toggleScanAllergen(allergen.id)}
-													class="px-2.5 py-1 rounded-md text-sm transition-colors {(scanReviewProduct.allergen_ids || []).includes(allergen.id) ? 'bg-red-100 text-red-700 ring-2 ring-red-300' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}"
+													class="px-2.5 py-1 rounded-md text-sm transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
 												>
 													{allergen.name}
 												</button>
 											{/each}
+											{#if scanSearchedAllergens.filter(a => !(scanReviewProduct.allergen_ids || []).includes(a.id)).length === 0}
+												<span class="text-gray-400 text-xs">All allergens selected or no results</span>
+											{/if}
 										</div>
 									</div>
 								</div>
