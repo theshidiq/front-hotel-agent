@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { NutritionInfo } from '../../qwen/dto/ocr-response.dto';
 
 export class ScanSessionResponse {
   @ApiProperty()
@@ -24,6 +25,37 @@ export class ScanSessionResponse {
 
   @ApiProperty()
   updated_at: string;
+}
+
+export class ScanExtractResponse {
+  @ApiProperty()
+  scan_session: ScanSessionResponse;
+
+  @ApiProperty()
+  extracted_data: {
+    product_name: string | null;
+    brand: string | null;
+    category: string | null;
+    ingredients_raw: string | null;
+    nutrition_per_100g: NutritionInfo | null;
+    storage_instructions: string | null;
+    preparation_instructions: string | null;
+    is_vegetarian: boolean;
+    is_vegan: boolean;
+    is_halal: boolean;
+    is_gluten_free: boolean;
+  };
+
+  @ApiProperty()
+  matched_allergens: {
+    id: string;
+    name: string;
+    category: string;
+    source: string;
+  }[];
+
+  @ApiProperty()
+  image_url: string;
 }
 
 export class ScanResultResponse {

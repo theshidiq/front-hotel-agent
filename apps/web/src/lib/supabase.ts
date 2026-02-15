@@ -77,6 +77,11 @@ export async function compressImage(
 	});
 }
 
+/** Higher quality compression optimized for OCR text recognition (e.g. Japanese product labels) */
+export async function compressImageForOCR(file: File): Promise<File> {
+	return compressImage(file, 2560, 0.95);
+}
+
 export async function uploadImage(file: File): Promise<string> {
 	const fileExt = file.name.split('.').pop();
 	const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;

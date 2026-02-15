@@ -2,7 +2,7 @@ import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ScanService } from './scan.service';
 import { CreateScanDto } from './dto/create-scan.dto';
-import { ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
+import { ScanExtractResponse, ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
 import { RequireStaff } from '../auth/staff.decorator';
 
 @ApiTags('scan')
@@ -19,6 +19,17 @@ export class ScanController {
   })
   async createScan(@Body() createScanDto: CreateScanDto): Promise<ScanResultResponse> {
     return this.scanService.createScan(createScanDto);
+  }
+
+  @Post('extract')
+  @RequireStaff()
+  @ApiOperation({
+    summary: 'Extract product data from image without saving',
+    description:
+      'Runs OCR on the image and returns extracted data for user review before saving',
+  })
+  async extractOnly(@Body() createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
+    return this.scanService.extractOnly(createScanDto);
   }
 
   @Get()

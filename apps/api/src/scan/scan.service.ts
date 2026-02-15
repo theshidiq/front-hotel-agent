@@ -3,7 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { QwenVisionService } from '../qwen/qwen-vision.service';
 import { AllergensService } from '../allergens/allergens.service';
 import { CreateScanDto } from './dto/create-scan.dto';
-import { ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
+import { ScanExtractResponse, ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
 
 @Injectable()
 export class ScanService {
@@ -195,6 +195,128 @@ export class ScanService {
     }
 
     return links;
+  }
+
+  async extractOnly(createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    // 1. Create scan session
+    const { data: scanSession, error: scanError } = await supabase
+      .from('scan_sessions')
+      .insert({
+        restaurant_id: restaurantId,
+        image_url: createScanDto.imageUrl,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (scanError) {
+      throw new Error(`Failed to create scan session: ${scanError.message}`);
+    }
+
+    try {
+      await supabase
+        .from('scan_sessions')
+        .update({ status: 'processing' })
+        .eq('id', scanSession.id);
+
+      // 2. Call Qwen Vision API
+      const { extractedData, rawResponse } =
+        await this.qwenVisionService.extractProductData(createScanDto.imageUrl);
+
+      // 3. Save raw response
+      await supabase
+        .from('scan_sessions')
+        .update({ raw_response: rawResponse })
+        .eq('id', scanSession.id);
+
+      // 4. Match allergens (without inserting into DB)
+      const matchedAllergens = await this.matchAllergens(
+        extractedData.allergens,
+        extractedData.ingredients_raw,
+      );
+
+      // 5. Update scan session as completed (no product_id since we don't create one)
+      const { data: updatedSession } = await supabase
+        .from('scan_sessions')
+        .update({ status: 'completed' })
+        .eq('id', scanSession.id)
+        .select()
+        .single();
+
+      return {
+        scan_session: updatedSession,
+        extracted_data: {
+          product_name: extractedData.product_name,
+          brand: extractedData.brand,
+          category: extractedData.category,
+          ingredients_raw: extractedData.ingredients_raw,
+          nutrition_per_100g: extractedData.nutrition_per_100g,
+          storage_instructions: extractedData.storage_instructions,
+          preparation_instructions: extractedData.preparation_instructions,
+          is_vegetarian: extractedData.is_vegetarian,
+          is_vegan: extractedData.is_vegan,
+          is_halal: extractedData.is_halal,
+          is_gluten_free: extractedData.is_gluten_free,
+        },
+        matched_allergens: matchedAllergens,
+        image_url: createScanDto.imageUrl,
+      };
+    } catch (error) {
+      await supabase
+        .from('scan_sessions')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+        })
+        .eq('id', scanSession.id);
+
+      this.logger.error(`Scan extract failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private async matchAllergens(
+    allergenNames: string[],
+    ingredientsRaw: string | null,
+  ): Promise<{ id: string; name: string; category: string; source: string }[]> {
+    const matches: { id: string; name: string; category: string; source: string }[] = [];
+    const matchedIds = new Set<string>();
+
+    // 1. Match by Qwen-extracted allergen names
+    if (allergenNames && allergenNames.length > 0) {
+      const found = await this.allergensService.findByNames(allergenNames);
+      for (const allergen of found) {
+        matchedIds.add(allergen.id);
+        matches.push({
+          id: allergen.id,
+          name: allergen.name,
+          category: allergen.category,
+          source: 'label',
+        });
+      }
+    }
+
+    // 2. Scan ingredients text for additional allergens
+    if (ingredientsRaw) {
+      const allAllergens = await this.allergensService.findAll();
+      for (const allergen of allAllergens) {
+        if (matchedIds.has(allergen.id)) continue;
+        if (ingredientsRaw.includes(allergen.name)) {
+          matchedIds.add(allergen.id);
+          matches.push({
+            id: allergen.id,
+            name: allergen.name,
+            category: allergen.category,
+            source: 'inferred',
+          });
+        }
+      }
+    }
+
+    return matches;
   }
 
   async findOne(id: string): Promise<ScanResultResponse> {

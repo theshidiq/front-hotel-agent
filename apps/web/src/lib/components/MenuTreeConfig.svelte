@@ -316,21 +316,9 @@
 	}
 
 	function handleDeleteMenuFromDetail(id: string) {
-		if (confirm('Delete this menu item?')) {
-			onDeleteMenu(id);
-		}
+		onDeleteMenu(id);
 	}
 
-	function handleAddMenuFromDetail() {
-		if (!detailContext) return;
-		const group = menuGroups.find(g => g.id === detailContext!.groupId);
-		sidebarContext = {
-			groupId: detailContext.groupId,
-			courseValue: detailContext.courseValue,
-			courseName: detailContext.courseName,
-			seasonalMenuId: group?.seasonal_menu_id || null,
-		};
-	}
 
 	// Build tree from data
 	function buildTree() {
@@ -443,7 +431,7 @@
 								menuCount: getMenuCount(group.id, c.category_value),
 								isRestricted: true,
 								onRename: handleRenameCourse,
-								onAddMenu: handleOpenMenuSidebar,
+								
 								onViewDetail: handleOpenCourseDetail,
 							},
 						});
@@ -567,7 +555,7 @@
 								menuCount: getMenuCount(group.id, c.category_value),
 								isRestricted: true,
 								onRename: handleRenameCourse,
-								onAddMenu: handleOpenMenuSidebar,
+								
 								onViewDetail: handleOpenCourseDetail,
 							},
 						});
@@ -784,9 +772,12 @@
 		courseCategory={detailCategory}
 		menus={detailMenus}
 		{products}
+		groupId={detailContext.groupId}
+		seasonalMenuId={menuGroups.find(g => g.id === detailContext?.groupId)?.seasonal_menu_id}
 		onUpdateCourseDetails={handleUpdateCourseDetailsFromDetail}
+		onRenameCourse={handleRenameCourse}
+		onCreateMenu={handleCreateMenuFromSidebar}
 		onDeleteMenu={handleDeleteMenuFromDetail}
-		onAddMenu={handleAddMenuFromDetail}
 		onClose={handleCloseCourseDetail}
 	/>
 {/if}

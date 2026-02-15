@@ -60,6 +60,44 @@ export async function scanProduct(imageUrl: string): Promise<ScanResult> {
 	return response.json();
 }
 
+export interface ScanExtractResult {
+	scan_session: {
+		id: string;
+		status: string;
+		image_url: string;
+	};
+	extracted_data: {
+		product_name: string | null;
+		brand: string | null;
+		category: string | null;
+		ingredients_raw: string | null;
+		nutrition_per_100g: { calories?: number; protein?: number; fat?: number; carbs?: number; sodium?: number } | null;
+		storage_instructions: string | null;
+		preparation_instructions: string | null;
+		is_vegetarian: boolean;
+		is_vegan: boolean;
+		is_halal: boolean;
+		is_gluten_free: boolean;
+	};
+	matched_allergens: { id: string; name: string; category: string; source: string }[];
+	image_url: string;
+}
+
+export async function scanExtract(imageUrl: string): Promise<ScanExtractResult> {
+	const response = await fetch(`${API_URL}/scan/extract`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ imageUrl }),
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Scan failed');
+	}
+
+	return response.json();
+}
+
 export async function getProducts(): Promise<Product[]> {
 	const response = await fetch(`${API_URL}/products`);
 

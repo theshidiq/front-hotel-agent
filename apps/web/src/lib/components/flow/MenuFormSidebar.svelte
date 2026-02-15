@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Product, CreateMenuData, Allergen } from '$lib/api';
-	import { uploadImage, compressImage } from '$lib/supabase';
 
 	interface SidebarContext {
 		groupId: string;
@@ -20,12 +19,7 @@
 
 	// Form state
 	let name = $state('');
-	let description = $state('');
-	let price = $state<string>('');
 	let selectedProductIds = $state<string[]>([]);
-	let imageFile: File | null = $state(null);
-	let imagePreview: string | null = $state(null);
-	let isUploadingImage = $state(false);
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
 
@@ -127,21 +121,6 @@
 		return (productAlternates[productId] || []).length;
 	}
 
-	function handleImageSelect(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-		imageFile = file;
-		if (imagePreview) URL.revokeObjectURL(imagePreview);
-		imagePreview = URL.createObjectURL(file);
-	}
-
-	function clearImage() {
-		if (imagePreview) URL.revokeObjectURL(imagePreview);
-		imageFile = null;
-		imagePreview = null;
-	}
-
 	async function handleSubmit() {
 		if (!name.trim()) {
 			error = 'Menu name is required';
@@ -150,22 +129,11 @@
 		isSubmitting = true;
 		error = null;
 		try {
-			let image_url: string | null = null;
-			if (imageFile) {
-				isUploadingImage = true;
-				const compressed = await compressImage(imageFile);
-				image_url = await uploadImage(compressed);
-				isUploadingImage = false;
-			}
-
 			const data: CreateMenuData = {
 				name: name.trim(),
-				description: description.trim() || null,
-				price: price ? parseFloat(price) : null,
 				category: context.courseValue,
 				menu_group_id: context.groupId,
 				seasonal_menu_id: context.seasonalMenuId || null,
-				image_url,
 				is_available: true,
 				product_ids: selectedProductIds.length > 0 ? selectedProductIds : undefined,
 			};
@@ -174,7 +142,6 @@
 			error = e.message || 'Failed to create menu';
 		} finally {
 			isSubmitting = false;
-			isUploadingImage = false;
 		}
 	}
 
@@ -216,57 +183,6 @@
 				class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none"
 				onkeydown={(e) => e.key === 'Enter' && handleSubmit()}
 			/>
-		</div>
-
-		<!-- Description -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-			<textarea
-				bind:value={description}
-				placeholder="Brief description..."
-				rows={2}
-				class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none resize-none"
-			></textarea>
-		</div>
-
-		<!-- Price -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 mb-1">Price (¥)</label>
-			<input
-				type="number"
-				bind:value={price}
-				placeholder="0"
-				min="0"
-				step="1"
-				class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none"
-			/>
-		</div>
-
-		<!-- Image -->
-		<div>
-			<label class="block text-sm font-medium text-gray-700 mb-1">Image</label>
-			{#if imagePreview}
-				<div class="relative">
-					<img src={imagePreview} alt="Preview" class="w-full rounded-lg object-cover max-h-36" />
-					<button
-						onclick={clearImage}
-						class="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-						title="Remove image"
-					>
-						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-						</svg>
-					</button>
-				</div>
-			{:else}
-				<label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-amber-400 hover:bg-amber-50/30 transition-colors">
-					<svg class="w-6 h-6 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-					</svg>
-					<span class="text-xs text-gray-500">Click to upload image</span>
-					<input type="file" accept="image/*" class="hidden" onchange={handleImageSelect} />
-				</label>
-			{/if}
 		</div>
 
 		<!-- Product Selection -->
@@ -402,7 +318,7 @@
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
 					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 				</svg>
-				{isUploadingImage ? 'Uploading image...' : 'Creating...'}
+				Creating...
 			{:else}
 				Add Menu Item
 			{/if}

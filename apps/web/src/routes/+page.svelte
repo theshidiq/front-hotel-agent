@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { uploadImage, compressImage } from '$lib/supabase';
-	import { scanProduct, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData } from '$lib/api';
+	import { uploadImage, compressImage, compressImageForOCR } from '$lib/supabase';
+	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -27,6 +27,26 @@
 	let isScanning = $state(false);
 	let scanResult: { product: Product; existing_product?: { id: string; name: string; brand: string | null; image_url: string | null } } | null = $state(null);
 	let scanError: string | null = $state(null);
+
+	// Scan review form state
+	let scanExtractData: ScanExtractResult | null = $state(null);
+	let scanReviewProduct: CreateProductData = $state({
+		name: '',
+		brand: '',
+		category: '',
+		ingredients_raw: '',
+		storage_instructions: '',
+		preparation_instructions: '',
+		is_vegetarian: false,
+		is_vegan: false,
+		is_halal: false,
+		is_gluten_free: false,
+		allergen_ids: [],
+		image_url: null,
+	});
+	let isSavingScan = $state(false);
+	let scanSaveError: string | null = $state(null);
+	let scanSaveSuccess = $state(false);
 
 	// Camera State
 	let showCamera = $state(false);
@@ -259,6 +279,20 @@
 			newProduct.allergen_ids = ids.filter(id => id !== allergenId);
 		} else {
 			newProduct.allergen_ids = [...ids, allergenId];
+		}
+	}
+
+	let scanAllergenSearch = $state('');
+	const scanSearchedAllergens = $derived(
+		scanAllergenSearch ? allergens.filter(a => a.name.toLowerCase().includes(scanAllergenSearch.toLowerCase())) : allergens
+	);
+
+	function toggleScanAllergen(allergenId: string) {
+		const ids = scanReviewProduct.allergen_ids || [];
+		if (ids.includes(allergenId)) {
+			scanReviewProduct.allergen_ids = ids.filter(id => id !== allergenId);
+		} else {
+			scanReviewProduct.allergen_ids = [...ids, allergenId];
 		}
 	}
 
@@ -1080,11 +1114,14 @@
 			scanError = 'Please select an image file';
 			return;
 		}
-		const compressed = await compressImage(file);
+		const compressed = await compressImageForOCR(file);
 		selectedFile = compressed;
 		previewUrl = URL.createObjectURL(compressed);
 		scanError = null;
 		scanResult = null;
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
 	}
 
 	function clearSelection() {
@@ -1093,6 +1130,9 @@
 		previewUrl = null;
 		scanResult = null;
 		scanError = null;
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
 	}
 
 	async function openCamera() {
@@ -1100,7 +1140,11 @@
 		showCamera = true;
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
-				video: { facingMode: 'environment' }
+				video: {
+					facingMode: 'environment',
+					width: { ideal: 2560 },
+					height: { ideal: 1920 }
+				}
 			});
 			cameraStream = stream;
 			if (videoEl) {
@@ -1156,18 +1200,34 @@
 		if (!selectedFile) return;
 		isScanning = true;
 		scanError = null;
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
 
 		try {
 			// 1. Upload image to Supabase storage
 			const imageUrl = await uploadImage(selectedFile);
 
-			// 2. Call scan API
-			const result = await scanProduct(imageUrl);
+			// 2. Call extract-only API (no auto-save)
+			const result = await scanExtract(imageUrl);
+			scanExtractData = result;
 
-			scanResult = { product: result.product, existing_product: result.existing_product };
-
-			// 3. Refresh products list
-			await loadProducts();
+			// 3. Populate review form with extracted data
+			const d = result.extracted_data;
+			scanReviewProduct = {
+				name: d.product_name || '',
+				brand: d.brand || '',
+				category: d.category || '',
+				ingredients_raw: d.ingredients_raw || '',
+				storage_instructions: d.storage_instructions || '',
+				preparation_instructions: d.preparation_instructions || '',
+				is_vegetarian: d.is_vegetarian,
+				is_vegan: d.is_vegan,
+				is_halal: d.is_halal,
+				is_gluten_free: d.is_gluten_free,
+				allergen_ids: result.matched_allergens.map(a => a.id),
+				image_url: result.image_url,
+			};
 		} catch (e: any) {
 			scanError = e.message || 'Scan failed';
 		} finally {
@@ -1175,19 +1235,44 @@
 		}
 	}
 
-	async function deleteDuplicate() {
-		if (!scanResult?.product?.id) return;
+	async function confirmScanSave() {
+		if (!scanReviewProduct.name.trim()) {
+			scanSaveError = 'Product name is required';
+			return;
+		}
+		isSavingScan = true;
+		scanSaveError = null;
+
 		try {
-			await deleteProduct(scanResult.product.id);
+			await createProduct(scanReviewProduct);
 			await loadProducts();
-			clearSelection();
+			scanSaveSuccess = true;
 		} catch (e: any) {
-			scanError = e.message || 'Failed to delete duplicate';
+			scanSaveError = e.message || 'Failed to save product';
+		} finally {
+			isSavingScan = false;
 		}
 	}
 
 	function scanAnother() {
 		clearSelection();
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
+		scanReviewProduct = {
+			name: '',
+			brand: '',
+			category: '',
+			ingredients_raw: '',
+			storage_instructions: '',
+			preparation_instructions: '',
+			is_vegetarian: false,
+			is_vegan: false,
+			is_halal: false,
+			is_gluten_free: false,
+			allergen_ids: [],
+			image_url: null,
+		};
 	}
 </script>
 
@@ -1377,7 +1462,7 @@
 					{/if}
 				</div>
 
-				<!-- Results -->
+				<!-- Results / Review Form -->
 				<div>
 					{#if isScanning}
 						<div class="flex flex-col items-center justify-center h-full py-8 text-center">
@@ -1387,98 +1472,157 @@
 							<p class="text-gray-600 text-sm">Analyzing image...</p>
 							<p class="text-gray-400 text-xs mt-1">This may take a few seconds</p>
 						</div>
-					{:else if scanResult}
-						<div class="space-y-3">
-							{#if scanResult.existing_product}
-								<div class="flex items-center gap-2 p-2 bg-amber-50 rounded-lg">
-									<svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-									</svg>
-									<span class="text-amber-700 text-sm font-medium">Product already exists!</span>
-								</div>
-								<p class="text-xs text-gray-500">A product with this name already exists in your database.</p>
-							{:else}
-								<div class="flex items-center gap-2">
-									<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-									</svg>
-									<span class="text-green-600 text-sm font-medium">Product saved!</span>
-								</div>
-							{/if}
-							<div>
-								<h3 class="font-semibold text-gray-900">{scanResult.product.name}</h3>
-								<p class="text-gray-500 text-sm">{scanResult.product.brand || 'Unknown brand'}</p>
+					{:else if scanSaveSuccess}
+						<div class="space-y-4 py-4">
+							<div class="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+								<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+								</svg>
+								<span class="text-green-700 text-sm font-medium">Product saved successfully!</span>
 							</div>
-							<div>
-								<p class="text-xs text-gray-500 mb-1">Allergens</p>
-								<div class="flex flex-wrap gap-1">
-									{#if scanResult.product.allergens && scanResult.product.allergens.length > 0}
-										{#each scanResult.product.allergens as allergen}
-											<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">{allergen.name}</span>
-										{/each}
-									{:else}
-										<span class="text-gray-400 text-xs">None detected</span>
-									{/if}
-								</div>
+							<button onclick={scanAnother} class="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+								Scan Another
+							</button>
+						</div>
+					{:else if scanExtractData}
+						<!-- Editable review form pre-filled with OCR data -->
+						<div class="space-y-4">
+							<div class="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+								<svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+								<span class="text-blue-700 text-xs">Review extracted data and confirm to save</span>
 							</div>
-							<div>
-								<p class="text-xs text-gray-500 mb-1">Dietary</p>
-								<div class="flex gap-1">
-									{#if scanResult.product.is_vegetarian}
-										<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Vegetarian</span>
-									{/if}
-									{#if scanResult.product.is_vegan}
-										<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Vegan</span>
-									{/if}
-									{#if scanResult.product.is_halal}
-										<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">Halal</span>
-									{/if}
-									{#if scanResult.product.is_gluten_free}
-										<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">Gluten-Free</span>
-									{/if}
-								</div>
-							</div>
-							{#if scanResult.product.nutrition_per_100g}
-								<div>
-									<p class="text-xs text-gray-500 mb-1">Nutrition (per 100g)</p>
-									<div class="grid grid-cols-5 gap-1 text-center">
-										<div class="bg-gray-50 rounded p-1">
-											<p class="font-semibold text-sm">{scanResult.product.nutrition_per_100g.calories || '-'}</p>
-											<p class="text-xs text-gray-500">kcal</p>
+
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<!-- Left Column -->
+								<div class="space-y-3">
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+										<input
+											type="text"
+											bind:value={scanReviewProduct.name}
+											placeholder="Product name"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+
+									<div class="grid grid-cols-2 gap-3">
+										<div>
+											<label class="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+											<input
+												type="text"
+												bind:value={scanReviewProduct.brand}
+												placeholder="Brand"
+												class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+											/>
 										</div>
-										<div class="bg-gray-50 rounded p-1">
-											<p class="font-semibold text-sm">{scanResult.product.nutrition_per_100g.protein || '-'}g</p>
-											<p class="text-xs text-gray-500">Protein</p>
+										<div>
+											<label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+											<CustomSelect
+												bind:value={scanReviewProduct.category}
+												options={productCategories.map(c => ({ value: c.value, label: c.label }))}
+												placeholder="Select..."
+											/>
 										</div>
-										<div class="bg-gray-50 rounded p-1">
-											<p class="font-semibold text-sm">{scanResult.product.nutrition_per_100g.fat || '-'}g</p>
-											<p class="text-xs text-gray-500">Fat</p>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-2">Dietary Information</label>
+										<div class="grid grid-cols-2 gap-2">
+											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_vegetarian} class="w-4 h-4 text-green-600 rounded" />
+												<span class="text-sm">Vegetarian</span>
+											</label>
+											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_vegan} class="w-4 h-4 text-green-600 rounded" />
+												<span class="text-sm">Vegan</span>
+											</label>
+											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_halal} class="w-4 h-4 text-emerald-600 rounded" />
+												<span class="text-sm">Halal</span>
+											</label>
+											<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_gluten_free} class="w-4 h-4 text-amber-600 rounded" />
+												<span class="text-sm">Gluten-Free</span>
+											</label>
 										</div>
-										<div class="bg-gray-50 rounded p-1">
-											<p class="font-semibold text-sm">{scanResult.product.nutrition_per_100g.carbs || '-'}g</p>
-											<p class="text-xs text-gray-500">Carbs</p>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-2">Allergens</label>
+										<div class="mb-2">
+											<input type="text" bind:value={scanAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
 										</div>
-										<div class="bg-gray-50 rounded p-1">
-											<p class="font-semibold text-sm">{scanResult.product.nutrition_per_100g.sodium || '-'}</p>
-											<p class="text-xs text-gray-500">Na</p>
+										<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
+											{#each scanSearchedAllergens as allergen}
+												<button
+													type="button"
+													onclick={() => toggleScanAllergen(allergen.id)}
+													class="px-2.5 py-1 rounded-md text-sm transition-colors {(scanReviewProduct.allergen_ids || []).includes(allergen.id) ? 'bg-red-100 text-red-700 ring-2 ring-red-300' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}"
+												>
+													{allergen.name}
+												</button>
+											{/each}
 										</div>
 									</div>
 								</div>
-							{/if}
-							{#if scanResult.existing_product}
-								<div class="flex gap-2">
-									<button onclick={deleteDuplicate} class="flex-1 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
-										Delete Duplicate
-									</button>
-									<button onclick={scanAnother} class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">
-										Keep Both
-									</button>
+
+								<!-- Right Column -->
+								<div class="space-y-3">
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Ingredients</label>
+										<textarea
+											bind:value={scanReviewProduct.ingredients_raw}
+											rows="3"
+											placeholder="Ingredients list..."
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										></textarea>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Storage Instructions</label>
+										<textarea
+											bind:value={scanReviewProduct.storage_instructions}
+											rows="2"
+											placeholder="Storage instructions..."
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										></textarea>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Preparation Instructions</label>
+										<textarea
+											bind:value={scanReviewProduct.preparation_instructions}
+											rows="2"
+											placeholder="Preparation instructions..."
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										></textarea>
+									</div>
 								</div>
-							{:else}
-								<button onclick={scanAnother} class="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
-									Scan Another
-								</button>
+							</div>
+
+							{#if scanSaveError}
+								<p class="text-red-600 text-sm">{scanSaveError}</p>
 							{/if}
+
+							<div class="flex gap-2 pt-2">
+								<button
+									onclick={confirmScanSave}
+									disabled={isSavingScan}
+									class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+								>
+									{#if isSavingScan}
+										<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+										Saving...
+									{:else}
+										Confirm & Save
+									{/if}
+								</button>
+								<button onclick={scanAnother} class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+									Discard
+								</button>
+							</div>
 						</div>
 					{:else}
 						<div class="flex flex-col items-center justify-center h-full py-8 text-center text-gray-400">
