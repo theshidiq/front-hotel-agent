@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { uploadImage, compressImage, compressImageForOCR } from '$lib/supabase';
-	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
+	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -556,7 +556,6 @@
 	});
 
 	// Alternate Ingredients State (maps product_id -> array of alternate product_ids)
-	// This is stored locally for now - can be extended to backend later
 	let productAlternates: Record<string, string[]> = $state({});
 	let showAlternatesModal = $state(false);
 	let alternatesForProductId: string | null = $state(null);
@@ -599,18 +598,31 @@
 		alternateSearchTerm = '';
 	}
 
-	function addAlternate(productId: string) {
+	async function addAlternate(productId: string) {
 		if (!alternatesForProductId) return;
 		const current = productAlternates[alternatesForProductId] || [];
 		if (!current.includes(productId)) {
 			productAlternates[alternatesForProductId] = [...current, productId];
+			try {
+				await addProductAlternate(alternatesForProductId, productId);
+			} catch (e) {
+				console.error('Failed to save alternate:', e);
+				productAlternates[alternatesForProductId] = current;
+			}
 		}
 		alternateSearchTerm = '';
 	}
 
-	function removeAlternate(productId: string) {
+	async function removeAlternate(productId: string) {
 		if (!alternatesForProductId) return;
-		productAlternates[alternatesForProductId] = (productAlternates[alternatesForProductId] || []).filter(id => id !== productId);
+		const prev = productAlternates[alternatesForProductId] || [];
+		productAlternates[alternatesForProductId] = prev.filter(id => id !== productId);
+		try {
+			await removeProductAlternate(alternatesForProductId, productId);
+		} catch (e) {
+			console.error('Failed to remove alternate:', e);
+			productAlternates[alternatesForProductId] = prev;
+		}
 	}
 
 	function getAlternatesCount(productId: string): number {
@@ -620,6 +632,45 @@
 	function getAlternatesForProduct(productId: string): typeof products {
 		const alternateIds = productAlternates[productId] || [];
 		return products.filter(p => alternateIds.includes(p.id));
+	}
+
+	async function loadAlternates() {
+		try {
+			const rows = await getProductAlternates();
+			const map: Record<string, string[]> = {};
+			for (const row of rows) {
+				if (!map[row.product_id]) map[row.product_id] = [];
+				map[row.product_id].push(row.alternate_product_id);
+			}
+			productAlternates = map;
+		} catch (e) {
+			console.error('Failed to load alternates:', e);
+		}
+	}
+
+	// Callback for CourseDetailSidebar to add/remove alternates via API
+	async function handleAddAlternate(productId: string, alternateProductId: string) {
+		const current = productAlternates[productId] || [];
+		if (!current.includes(alternateProductId)) {
+			productAlternates[productId] = [...current, alternateProductId];
+			try {
+				await addProductAlternate(productId, alternateProductId);
+			} catch (e) {
+				console.error('Failed to save alternate:', e);
+				productAlternates[productId] = current;
+			}
+		}
+	}
+
+	async function handleRemoveAlternate(productId: string, alternateProductId: string) {
+		const prev = productAlternates[productId] || [];
+		productAlternates[productId] = prev.filter(id => id !== alternateProductId);
+		try {
+			await removeProductAlternate(productId, alternateProductId);
+		} catch (e) {
+			console.error('Failed to remove alternate:', e);
+			productAlternates[productId] = prev;
+		}
 	}
 
 	// Product search for menu creation
@@ -739,100 +790,86 @@
 		return allergenColors[name] || 'bg-gray-500';
 	}
 
-	type AllergenTableRow = { menuName: string; allergenName: string; productNames: string; isFirstInMenu: boolean };
-
-	const allergenTableData = $derived.by(() => {
-		const rows: AllergenTableRow[] = [];
-		for (const menu of menus) {
-			const allergenProductMap = new Map<string, string[]>();
-			for (const product of menu.products || []) {
-				for (const allergen of product.allergens || []) {
-					if (!allergenProductMap.has(allergen.name)) {
-						allergenProductMap.set(allergen.name, []);
-					}
-					const list = allergenProductMap.get(allergen.name)!;
-					if (!list.includes(product.name)) {
-						list.push(product.name);
-					}
-				}
-			}
-			let isFirst = true;
-			for (const [allergenName, productNames] of allergenProductMap) {
-				rows.push({
-					menuName: isFirst ? menu.name : '',
-					allergenName,
-					productNames: productNames.join(', '),
-					isFirstInMenu: isFirst,
-				});
-				isFirst = false;
-			}
-		}
-		return rows;
-	});
-
-	// New grouped table data: each entry is a product row within a menu
+	// Allergen table grouped by course then by menu
 	type AllergenTableMenuGroup = {
 		menu: Menu;
-		products: { name: string; allergens: { id: string; name: string }[] }[];
+		products: { id: string; name: string; image_url: string | null; allergens: { id: string; name: string }[] }[];
+	};
+
+	type AllergenTableCourseGroup = {
+		courseName: string;
+		courseImage: string | null;
+		menus: AllergenTableMenuGroup[];
 	};
 
 	const allergenTableGrouped = $derived.by(() => {
+		const productMap = new Map(products.map(p => [p.id, p]));
 		const groups: AllergenTableMenuGroup[] = [];
 		for (const menu of menus) {
-			const products = (menu.products || [])
+			const prods = (menu.products || [])
 				.filter(p => (p.allergens || []).length > 0)
-				.map(p => ({ name: p.name, allergens: p.allergens || [] }));
-			if (products.length > 0) {
-				groups.push({ menu, products });
+				.map(p => ({ id: p.id, name: p.name, image_url: productMap.get(p.id)?.image_url || null, allergens: p.allergens || [] }));
+			if (prods.length > 0) {
+				groups.push({ menu, products: prods });
 			}
 		}
 		return groups;
 	});
 
-	const allergenTableLeft2 = $derived(
-		allergenTableGrouped.slice(0, Math.ceil(allergenTableGrouped.length / 2))
-	);
-	const allergenTableRight2 = $derived(
-		allergenTableGrouped.slice(Math.ceil(allergenTableGrouped.length / 2))
-	);
-
-	const allergenTableLeft = $derived.by(() => {
-		const midpoint = Math.ceil(menus.length / 2);
-		const leftMenuNames = new Set(menus.slice(0, midpoint).map(m => m.name));
-		const result: AllergenTableRow[] = [];
-		let currentMenu = '';
-		for (const row of allergenTableData) {
-			if (row.isFirstInMenu) currentMenu = row.menuName;
-			if (leftMenuNames.has(currentMenu)) result.push(row);
+	const allergenTableByCourse = $derived.by(() => {
+		const courseMap = new Map<string, AllergenTableCourseGroup>();
+		for (const group of allergenTableGrouped) {
+			const courseValue = group.menu.category || 'uncategorized';
+			const cat = menuCategories.find(c => c.value === courseValue);
+			const courseName = cat?.label || courseValue;
+			const courseImage = cat?.image_url || null;
+			if (!courseMap.has(courseValue)) {
+				courseMap.set(courseValue, { courseName, courseImage, menus: [] });
+			}
+			courseMap.get(courseValue)!.menus.push(group);
 		}
-		return result;
+		return Array.from(courseMap.values());
 	});
-
-	const allergenTableRight = $derived(
-		allergenTableData.filter(r => !allergenTableLeft.includes(r))
-	);
 
 	let showAllergenReport = $state(false);
 	let isExporting = $state(false);
+	let isPrinting = $state(false);
+	let allergenReportSearch = $state('');
+
+	const filteredAllergenTableByCourse = $derived.by(() => {
+		const q = allergenReportSearch.trim().toLowerCase();
+		if (!q) return allergenTableByCourse;
+		return allergenTableByCourse.filter(course => {
+			if (course.courseName.toLowerCase().includes(q)) return true;
+			return course.menus.some(group =>
+				group.products.some(product =>
+					product.name.toLowerCase().includes(q) ||
+					product.allergens.some(a => a.name.toLowerCase().includes(q))
+				)
+			);
+		});
+	});
 
 	async function exportAllergenXlsx() {
 		isExporting = true;
 		try {
 			const { utils, writeFile } = await import('xlsx');
-			const wsData: string[][] = [['メニュー', 'アレルギー', '商品/食材']];
-			for (const group of allergenTableGrouped) {
-				let isFirst = true;
-				for (const product of group.products) {
-					wsData.push([
-						isFirst ? group.menu.name : '',
-						product.allergens.map(a => a.name).join('、'),
-						product.name,
-					]);
-					isFirst = false;
+			const wsData: string[][] = [['コース', '商品/食材', 'アレルギー']];
+			for (const course of allergenTableByCourse) {
+				let isCourseFirst = true;
+				for (const group of course.menus) {
+					for (const product of group.products) {
+						wsData.push([
+							isCourseFirst ? course.courseName : '',
+							product.name,
+							product.allergens.map(a => a.name).join('、'),
+						]);
+						isCourseFirst = false;
+					}
 				}
 			}
 			const ws = utils.aoa_to_sheet(wsData);
-			ws['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 40 }];
+			ws['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 40 }];
 			const wb = utils.book_new();
 			utils.book_append_sheet(wb, ws, 'Allergen Report');
 			const today = new Date().toISOString().split('T')[0];
@@ -841,6 +878,130 @@
 			console.error('Export failed:', e);
 		} finally {
 			isExporting = false;
+		}
+	}
+
+	const allergenHexColors: Record<string, string> = {
+		'牛肉': '#ef4444', '豚肉': '#f87171', '鶏肉': '#fca5a5',
+		'小麦': '#f59e0b', '大麦': '#fbbf24', 'ライ麦': '#fbbf24', 'オーツ麦': '#fbbf24',
+		'卵': '#f97316',
+		'乳': '#3b82f6', 'チーズ': '#60a5fa',
+		'えび': '#ec4899', 'かに': '#06b6d4',
+		'大豆': '#8b5cf6',
+		'ごま': '#ca8a04',
+		'落花生': '#92400e', 'くるみ': '#d97706', 'カシューナッツ': '#d97706', 'アーモンド': '#d97706',
+		'そば': '#78716c',
+		'さば': '#14b8a6', 'さけ': '#2dd4bf', 'いくら': '#2dd4bf', 'あわび': '#2dd4bf', 'いか': '#2dd4bf',
+	};
+
+	function getAllergenHexColor(name: string): string {
+		return allergenHexColors[name] || '#6b7280';
+	}
+
+	function printAllergenReport() {
+		isPrinting = true;
+		try {
+			const today = new Date().toISOString().split('T')[0];
+			let coursesHtml = '';
+			for (const course of allergenTableByCourse) {
+				const courseImgHtml = course.courseImage
+					? `<img src="${course.courseImage}" style="width:100%;height:100%;object-fit:cover;" />`
+					: `<div style="width:100%;height:100%;background:#334155;display:flex;align-items:center;justify-content:center;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>`;
+
+				let productsHtml = '';
+				let idx = 0;
+				for (let gi = 0; gi < course.menus.length; gi++) {
+					const group = course.menus[gi];
+					for (let pi = 0; pi < group.products.length; pi++) {
+						const product = group.products[pi];
+						const bgColor = pi % 2 === 0 ? '#ffffff' : '#f9fafb';
+						const groupBorder = pi === 0 && gi > 0 ? 'border-top:2px solid #e2e8f0;' : 'border-top:1px solid #f3f4f6;';
+						const productImgHtml = product.image_url
+							? `<img src="${product.image_url}" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0;" />`
+							: `<div style="width:36px;height:36px;border-radius:4px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></div>`;
+
+						const allergensHtml = product.allergens.map(a =>
+							`<span style="display:inline-block;padding:2px 8px;background:${getAllergenHexColor(a.name)};color:white;font-size:10px;font-weight:500;border-radius:4px;margin:1px;">${a.name}</span>`
+						).join('');
+
+						productsHtml += `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${bgColor};${groupBorder}">
+							${productImgHtml}
+							<span style="font-size:13px;font-weight:500;color:#1f2937;width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${product.name}</span>
+							<div style="display:flex;flex-wrap:wrap;gap:3px;flex:1;">${allergensHtml}</div>
+						</div>`;
+
+						// Alternate products
+						const alts = getAlternatesForProduct(product.id);
+						for (const alt of alts) {
+							const altImgHtml = alt.image_url
+								? `<img src="${alt.image_url}" style="width:28px;height:28px;border-radius:4px;object-fit:cover;flex-shrink:0;" />`
+								: `<div style="width:28px;height:28px;border-radius:4px;background:#fff7ed;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fdba74" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></div>`;
+							const altAllergensHtml = (alt.allergens || []).map(a =>
+								`<span style="display:inline-block;padding:1px 6px;background:${getAllergenHexColor(a.name)};color:white;font-size:9px;font-weight:500;border-radius:4px;margin:1px;">${a.name}</span>`
+							).join('');
+
+							productsHtml += `<div style="display:flex;align-items:center;gap:8px;padding:4px 12px 4px 32px;background:#fff7ed40;border-top:1px solid #f3f4f6;">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+								${altImgHtml}
+								<span style="font-size:11px;font-weight:500;color:#c2410c;width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${alt.name}</span>
+								<div style="display:flex;flex-wrap:wrap;gap:2px;flex:1;">${altAllergensHtml}</div>
+							</div>`;
+						}
+
+						idx++;
+					}
+				}
+
+				const totalProducts = course.menus.reduce((sum: number, g: AllergenTableMenuGroup) => sum + g.products.length, 0);
+				coursesHtml += `<div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:16px;display:flex;break-inside:avoid;">
+					<div style="width:140px;flex-shrink:0;background:#1e293b;overflow:hidden;">${courseImgHtml}</div>
+					<div style="flex:1;min-width:0;">
+						<div style="background:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb;">
+							<span style="color:#111827;font-size:16px;font-weight:700;letter-spacing:0.5px;">${course.courseName}</span>
+							<span style="color:#9ca3af;font-size:11px;">${totalProducts} products</span>
+						</div>
+						${productsHtml}
+					</div>
+				</div>`;
+			}
+
+			const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>アレルゲン一覧表 - ${today}</title>
+<style>
+	@page { size: A4 portrait; margin: 15mm 12mm; }
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+	.header { text-align: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb; }
+	.header h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
+	.header p { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+	.footer { text-align: center; font-size: 9px; color: #9ca3af; margin-top: 16px; padding-top: 8px; border-top: 1px solid #e5e7eb; }
+</style>
+</head>
+<body>
+<div class="header">
+	<h1>アレルゲン一覧表</h1>
+	<p>Allergen Report | ${today} | ${allergenTableByCourse.length} courses</p>
+</div>
+${coursesHtml}
+<div class="footer">Generated: ${today} | ${allergenTableByCourse.length} courses, ${allergenTableGrouped.length} menu entries</div>
+</body>
+</html>`;
+
+			const printWindow = window.open('', '_blank');
+			if (printWindow) {
+				printWindow.document.write(html);
+				printWindow.document.close();
+				printWindow.onload = () => {
+					printWindow.print();
+				};
+			}
+		} catch (e) {
+			console.error('Print failed:', e);
+		} finally {
+			isPrinting = false;
 		}
 	}
 
@@ -1048,7 +1209,7 @@
 	}
 
 	onMount(async () => {
-		await Promise.all([loadProducts(), loadAllergens(), loadMenus(), loadCategories()]);
+		await Promise.all([loadProducts(), loadAllergens(), loadMenus(), loadCategories(), loadAlternates()]);
 	});
 
 	async function loadCategories() {
@@ -2558,85 +2719,108 @@
 					<span class="text-sm text-gray-500">Allergen Report</span>
 				</div>
 				<div class="flex items-center gap-2">
+					<input
+						type="text"
+						bind:value={allergenReportSearch}
+						placeholder="Search course, product, allergen..."
+						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+					/>
 					<button
-						onclick={() => showAllergenReport = !showAllergenReport}
-						class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors {showAllergenReport ? 'bg-slate-900 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'}"
+						onclick={printAllergenReport}
+						disabled={isPrinting}
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
 					>
-						{showAllergenReport ? 'Hide Table' : 'Show Table'}
+						<span class="material-symbols-rounded text-base">print</span>
+						{isPrinting ? 'Preparing...' : 'Print PDF'}
 					</button>
-					{#if showAllergenReport}
-						<button
-							onclick={exportAllergenXlsx}
-							disabled={isExporting}
-							class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-						>
-							<span class="material-symbols-rounded text-base">download</span>
-							{isExporting ? 'Exporting...' : 'Export .xlsx'}
-						</button>
-					{/if}
+					<button
+						onclick={exportAllergenXlsx}
+						disabled={isExporting}
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+					>
+						<span class="material-symbols-rounded text-base">download</span>
+						{isExporting ? 'Exporting...' : 'Export .xlsx'}
+					</button>
 				</div>
 			</div>
 
-			{#if showAllergenReport}
-				{#if allergenTableGrouped.length === 0}
-					<p class="text-center text-gray-400 py-6 text-sm">No allergens found in any menu. Link products with allergens to see the report.</p>
-				{:else}
-					<div class="flex gap-5">
-						{#each [allergenTableLeft2, allergenTableRight2] as tableGroups}
-							{#if tableGroups.length > 0}
-							<div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
-								<table class="w-full">
-									<thead>
-										<tr class="bg-slate-800 text-white text-xs font-semibold">
-											<th class="w-[140px] px-3 py-2.5 text-left">メニュー</th>
-											<th class="px-2 py-2.5 text-left">アレルギー</th>
-											<th class="px-2 py-2.5 text-left">商品/食材</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#each tableGroups as group, gi}
-											{#each group.products as product, pi}
-												<tr class="border-t {pi === 0 && gi > 0 ? 'border-t-2 border-t-blue-300' : 'border-gray-100'} {pi % 2 === 0 ? 'bg-green-50/30' : 'bg-white'}">
-													{#if pi === 0}
-														<td rowspan={group.products.length + 1} class="w-[140px] px-3 py-2 align-top border-r border-gray-100">
-															<span class="font-semibold text-gray-900 text-xs">{group.menu.name}</span>
-														</td>
-													{/if}
-													<td class="px-2 py-1.5">
-														<div class="flex flex-wrap gap-1">
-															{#each product.allergens as allergen}
-																<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
-															{/each}
-														</div>
-													</td>
-													<td class="px-2 py-1.5 text-gray-600 text-xs">{product.name}</td>
-												</tr>
-											{/each}
-											<!-- Menu image row -->
-											<tr class="border-t border-gray-100 {group.products.length % 2 === 0 ? 'bg-green-50/30' : 'bg-white'}">
-												<td colspan="2" class="px-2 py-1.5">
-													{#if group.menu.image_url}
-														<img src={group.menu.image_url} alt={group.menu.name} class="w-16 h-12 object-cover rounded" />
-													{:else}
-														<span class="text-[10px] text-gray-300 italic">no image</span>
-													{/if}
-												</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
-								{#if tableGroups.length === 0}
-									<div class="px-3 py-4 text-center text-gray-400 text-xs">No data</div>
+			{#if allergenTableByCourse.length === 0}
+				<p class="text-center text-gray-400 py-6 text-sm">No allergens found in any menu. Link products with allergens to see the report.</p>
+			{:else if filteredAllergenTableByCourse.length === 0}
+				<p class="text-center text-gray-400 py-6 text-sm">No results for "{allergenReportSearch}"</p>
+			{:else}
+				<div class="space-y-4">
+					{#each filteredAllergenTableByCourse as course}
+						<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm flex">
+							<!-- Large course image on the left -->
+							<div class="w-40 flex-shrink-0 bg-slate-800 relative">
+								{#if course.courseImage}
+									<img src={course.courseImage} alt={course.courseName} class="w-full h-full object-cover" />
+								{:else}
+									<div class="w-full h-full flex items-center justify-center bg-slate-700">
+										<svg class="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+									</div>
 								{/if}
 							</div>
-							{/if}
-						{/each}
-					</div>
+							<!-- Right side: course name + product rows -->
+							<div class="flex-1 min-w-0">
+								<!-- Course name header -->
+								<div class="bg-white px-4 py-2.5 flex items-center justify-between border-b border-gray-200">
+									<h3 class="text-gray-900 text-lg font-bold tracking-wide">{course.courseName}</h3>
+									<span class="text-gray-400 text-xs">{course.menus.reduce((sum, g) => sum + g.products.length, 0)} products</span>
+								</div>
+								<!-- Product rows -->
+								<div class="divide-y divide-gray-100">
+									{#each course.menus as group, gi}
+										{#each group.products as product, pi}
+											<!-- Main product row -->
+											<div class="flex items-center gap-3 px-3 py-2 {pi % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} {pi === 0 && gi > 0 ? 'border-t-2 border-slate-200' : ''}">
+												{#if product.image_url}
+													<img src={product.image_url} alt={product.name} class="w-9 h-9 rounded object-cover flex-shrink-0" />
+												{:else}
+													<div class="w-9 h-9 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+														<svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+													</div>
+												{/if}
+												<span class="text-sm text-gray-800 font-medium w-36 truncate flex-shrink-0" title={product.name}>{product.name}</span>
+												<div class="flex flex-wrap gap-1 flex-1 min-w-0">
+													{#each product.allergens as allergen}
+														<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
+													{/each}
+												</div>
+											</div>
+											<!-- Alternate product rows -->
+											{#each getAlternatesForProduct(product.id) as alt}
+												<div class="flex items-center gap-3 px-3 py-1.5 bg-orange-50/40 pl-8">
+													<svg class="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+													</svg>
+													{#if alt.image_url}
+														<img src={alt.image_url} alt={alt.name} class="w-7 h-7 rounded object-cover flex-shrink-0" />
+													{:else}
+														<div class="w-7 h-7 rounded bg-orange-100 flex items-center justify-center flex-shrink-0">
+															<svg class="w-3 h-3 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+														</div>
+													{/if}
+													<span class="text-xs text-orange-700 font-medium w-36 truncate flex-shrink-0" title={alt.name}>{alt.name}</span>
+													<div class="flex flex-wrap gap-1 flex-1 min-w-0">
+														{#each alt.allergens || [] as allergen}
+															<span class="inline-block px-1.5 py-0.5 text-white text-[9px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
+														{/each}
+													</div>
+												</div>
+											{/each}
+										{/each}
+									{/each}
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
 
-					<p class="text-[10px] text-gray-400 mt-3">
-						Generated: {new Date().toISOString().split('T')[0]} | {menus.length} menus, {allergenTableGrouped.length} menu entries
-					</p>
-				{/if}
+				<p class="text-[10px] text-gray-400 mt-3">
+					Generated: {new Date().toISOString().split('T')[0]} | {filteredAllergenTableByCourse.length} courses, {allergenTableGrouped.length} menu entries
+				</p>
 			{/if}
 		</section>
 		{/if}
@@ -3517,6 +3701,9 @@
 			{menuCategories}
 			{menus}
 			{products}
+			{productAlternates}
+			onAddAlternate={handleAddAlternate}
+			onRemoveAlternate={handleRemoveAlternate}
 			onCreateSeason={treeCreateSeason}
 			onUpdateSeason={treeUpdateSeason}
 			onDeleteSeason={treeDeleteSeason}
