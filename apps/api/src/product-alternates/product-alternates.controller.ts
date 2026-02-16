@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ProductAlternatesService, ProductAlternate } from './product-alternates.service';
-import { RequireStaff } from '../auth/staff.decorator';
+import { RequirePermission } from '../auth/permission.decorator';
 
 @ApiTags('product-alternates')
 @Controller('product-alternates')
@@ -15,7 +15,7 @@ export class ProductAlternatesController {
   }
 
   @Post()
-  @RequireStaff()
+  @RequirePermission('products.edit')
   @ApiOperation({ summary: 'Add an alternate product' })
   async create(
     @Body() body: { product_id: string; alternate_product_id: string },
@@ -24,7 +24,7 @@ export class ProductAlternatesController {
   }
 
   @Delete(':productId/:alternateProductId')
-  @RequireStaff()
+  @RequirePermission('products.edit')
   @ApiOperation({ summary: 'Remove an alternate product' })
   async delete(
     @Param('productId') productId: string,

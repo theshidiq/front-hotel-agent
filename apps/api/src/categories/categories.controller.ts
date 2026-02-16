@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Query, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CategoriesService, Category, UpdateCategoryData } from './categories.service';
-import { RequireStaff } from '../auth/staff.decorator';
+import { RequirePermission } from '../auth/permission.decorator';
 
 @ApiTags('categories')
 @Controller('categories')
@@ -20,7 +20,7 @@ export class CategoriesController {
   }
 
   @Post()
-  @RequireStaff()
+  @RequirePermission('categories.manage')
   @ApiOperation({ summary: 'Create a new category' })
   async create(
     @Body() body: { name: string; type: 'product' | 'menu' },
@@ -29,7 +29,7 @@ export class CategoriesController {
   }
 
   @Put(':id')
-  @RequireStaff()
+  @RequirePermission('categories.manage')
   @ApiOperation({ summary: 'Update a category' })
   async update(
     @Param('id') id: string,
@@ -39,7 +39,7 @@ export class CategoriesController {
   }
 
   @Delete(':id')
-  @RequireStaff()
+  @RequirePermission('categories.manage')
   @ApiOperation({ summary: 'Delete a category' })
   async delete(@Param('id') id: string): Promise<void> {
     return this.categoriesService.delete(id);

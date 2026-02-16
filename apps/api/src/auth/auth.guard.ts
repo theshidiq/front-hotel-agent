@@ -44,7 +44,7 @@ export class StaffAuthGuard implements CanActivate {
     const restaurantId = this.supabaseService.getRestaurantId();
     const { data: staff, error: staffError } = await supabase
       .from('staff')
-      .select('id, name, email, position')
+      .select('id, name, email, position, is_admin, role_id')
       .eq('email', email)
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true)
@@ -55,6 +55,24 @@ export class StaffAuthGuard implements CanActivate {
       throw new UnauthorizedException('You are not registered as staff');
     }
 
+    // Load permissions from role
+    let permissions: string[] = [];
+    let roleName: string | null = null;
+    if (staff.role_id) {
+      const { data: role } = await supabase
+        .from('roles')
+        .select('name')
+        .eq('id', staff.role_id)
+        .single();
+      roleName = role?.name ?? null;
+
+      const { data: rolePerms } = await supabase
+        .from('role_permissions')
+        .select('permission')
+        .eq('role_id', staff.role_id);
+      permissions = (rolePerms || []).map((rp) => rp.permission);
+    }
+
     // Attach staff info to request for use in controllers
     request.user = {
       authId: user.id,
@@ -62,6 +80,10 @@ export class StaffAuthGuard implements CanActivate {
       staffId: staff.id,
       name: staff.name,
       position: staff.position,
+      isAdmin: staff.is_admin ?? false,
+      roleId: staff.role_id,
+      roleName,
+      permissions,
     };
 
     return true;

@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Delete, Query, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { AllergensService, Allergen } from './allergens.service';
-import { RequireStaff } from '../auth/staff.decorator';
+import { RequirePermission } from '../auth/permission.decorator';
 
 @ApiTags('allergens')
 @Controller('allergens')
@@ -30,7 +30,7 @@ export class AllergensController {
   }
 
   @Post()
-  @RequireStaff()
+  @RequirePermission('allergens.manage')
   @ApiOperation({ summary: 'Create a new allergen' })
   async create(
     @Body() body: { name: string; category: string },
@@ -39,7 +39,7 @@ export class AllergensController {
   }
 
   @Delete(':id')
-  @RequireStaff()
+  @RequirePermission('allergens.manage')
   @ApiOperation({ summary: 'Delete an allergen' })
   async delete(@Param('id') id: string): Promise<void> {
     return this.allergensService.delete(id);
