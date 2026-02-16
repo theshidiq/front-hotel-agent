@@ -5,7 +5,7 @@
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import { authState } from '$lib/auth.svelte';
+	import { authState, can } from '$lib/auth.svelte';
 
 	const isStaff = $derived(authState.isStaff);
 
@@ -1145,7 +1145,7 @@ ${coursesHtml}
 					<span class="text-sm text-gray-500 hidden sm:inline">Allergen Management System</span>
 				</div>
 				<div class="flex items-center gap-3">
-					{#if mainTab === 'products' && isStaff}
+					{#if mainTab === 'products' && (can('products.create') || can('products.scan'))}
 						<button
 							onclick={() => showAddProduct = !showAddProduct}
 							class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -1156,7 +1156,7 @@ ${coursesHtml}
 							Add Product
 						</button>
 					{/if}
-					{#if mainTab === 'menu' && isStaff}
+					{#if mainTab === 'menu' && can('menus.structure')}
 						<button
 							onclick={() => showMenuTreeConfig = true}
 							class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
@@ -1191,7 +1191,7 @@ ${coursesHtml}
 
 		{#if mainTab === 'products'}
 		<!-- Add Product Section (always visible on mobile, toggle on desktop) -->
-		{#if isStaff}
+		{#if can('products.create') || can('products.scan')}
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 {showAddProduct ? '' : 'md:hidden'}">
 			<!-- Tab Header -->
 			<div class="flex items-center justify-between mb-4">
@@ -1824,7 +1824,7 @@ ${coursesHtml}
 												Save
 											</button>
 										{:else}
-											{#if isStaff}
+											{#if can('products.edit')}
 											<button
 												onclick={() => startEditing(product)}
 												class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 flex items-center gap-1"
@@ -1834,6 +1834,8 @@ ${coursesHtml}
 												</svg>
 												Edit
 											</button>
+											{/if}
+											{#if can('products.delete')}
 											<button
 												onclick={() => handleDeleteProduct(product.id)}
 												class="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 flex items-center gap-1"

@@ -914,6 +914,8 @@ export interface StaffMember {
 	name: string;
 	email: string | null;
 	position: string | null;
+	is_admin: boolean;
+	role_id: string | null;
 	is_active: boolean;
 	created_at: string;
 }
@@ -957,6 +959,127 @@ export async function createStaff(data: CreateStaffData): Promise<StaffMember> {
 		throw new Error(error.message || 'Create staff failed');
 	}
 	return response.json();
+}
+
+export async function updateStaffRole(id: string, roleId: string | null): Promise<StaffMember> {
+	const response = await fetch(`${API_URL}/staffs/${id}/role`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ role_id: roleId }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to update staff role');
+	}
+	return response.json();
+}
+
+export async function updateStaffAdmin(id: string, isAdmin: boolean): Promise<StaffMember> {
+	const response = await fetch(`${API_URL}/staffs/${id}/admin`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ is_admin: isAdmin }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to update admin status');
+	}
+	return response.json();
+}
+
+// ── Roles ─────────────────────────────────────────────────
+
+export interface Role {
+	id: string;
+	restaurant_id: string;
+	name: string;
+	description: string | null;
+	is_default: boolean;
+	created_at: string;
+	permissions: string[];
+}
+
+export interface CreateRoleData {
+	name: string;
+	description?: string;
+	permissions?: string[];
+}
+
+export interface UpdateRoleData {
+	name?: string;
+	description?: string;
+}
+
+export async function getRoles(): Promise<Role[]> {
+	const response = await fetch(`${API_URL}/roles`, {
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch roles');
+	}
+	return response.json();
+}
+
+export async function getRolePermissionsList(): Promise<string[]> {
+	const response = await fetch(`${API_URL}/roles/permissions`, {
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch permissions list');
+	}
+	return response.json();
+}
+
+export async function createRole(data: CreateRoleData): Promise<Role> {
+	const response = await fetch(`${API_URL}/roles`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create role failed');
+	}
+	return response.json();
+}
+
+export async function updateRoleApi(id: string, data: UpdateRoleData): Promise<Role> {
+	const response = await fetch(`${API_URL}/roles/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update role failed');
+	}
+	return response.json();
+}
+
+export async function updateRolePermissions(id: string, permissions: string[]): Promise<Role> {
+	const response = await fetch(`${API_URL}/roles/${id}/permissions`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ permissions }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update role permissions failed');
+	}
+	return response.json();
+}
+
+export async function deleteRole(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/roles/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete role failed');
+	}
 }
 
 // Product Alternates

@@ -14,9 +14,16 @@ interface Staff {
 	position: string | null;
 }
 
+interface StaffRole {
+	id: string;
+	name: string;
+}
+
 interface StaffWithPeriod extends Staff {
 	start_period: PeriodJson | null;
 	end_period: PeriodJson | null;
+	is_admin: boolean;
+	role_id: string | null;
 }
 
 interface AuthState {
@@ -25,6 +32,9 @@ interface AuthState {
 	staff: Staff | null;
 	loading: boolean;
 	isStaff: boolean;
+	isAdmin: boolean;
+	permissions: string[];
+	role: StaffRole | null;
 	error: string | null;
 }
 
@@ -35,8 +45,15 @@ export let authState: AuthState = $state({
 	staff: null,
 	loading: true,
 	isStaff: false,
+	isAdmin: false,
+	permissions: [],
+	role: null,
 	error: null,
 });
+
+export function can(permission: string): boolean {
+	return authState.isAdmin || authState.permissions.includes(permission);
+}
 
 const PENDING_EMAIL_KEY = 'pending_staff_email';
 const STAFF_END_PERIOD_KEY = 'staff_end_period';
@@ -115,7 +132,7 @@ function isStoredPeriodExpired(): boolean {
 async function checkStaffStatus(email: string): Promise<StaffWithPeriod | null> {
 	const { data, error } = await supabase
 		.from('staff')
-		.select('id, name, email, position, start_period, end_period')
+		.select('id, name, email, position, start_period, end_period, is_admin, role_id')
 		.eq('email', email)
 		.eq('is_active', true)
 		.limit(1)
@@ -125,6 +142,24 @@ async function checkStaffStatus(email: string): Promise<StaffWithPeriod | null> 
 		return null;
 	}
 	return data as StaffWithPeriod;
+}
+
+async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | null; permissions: string[] }> {
+	const { data: role } = await supabase
+		.from('roles')
+		.select('id, name')
+		.eq('id', roleId)
+		.single();
+
+	const { data: perms } = await supabase
+		.from('role_permissions')
+		.select('permission')
+		.eq('role_id', roleId);
+
+	return {
+		role: role ? { id: role.id, name: role.name } : null,
+		permissions: (perms || []).map((p: { permission: string }) => p.permission),
+	};
 }
 
 async function handleSignedIn(email: string): Promise<void> {
@@ -175,7 +210,26 @@ async function handleSignedIn(email: string): Promise<void> {
 
 	authState.staff = { id: staff.id, name: staff.name, email: staff.email, position: staff.position };
 	authState.isStaff = true;
+	authState.isAdmin = staff.is_admin ?? false;
 	authState.error = null;
+
+	// Load role and permissions
+	if (staff.is_admin) {
+		// Admins have all permissions, but still load role name for display
+		if (staff.role_id) {
+			const { role } = await loadRolePermissions(staff.role_id);
+			authState.role = role;
+		}
+		authState.permissions = [];
+	} else if (staff.role_id) {
+		const { role, permissions } = await loadRolePermissions(staff.role_id);
+		authState.role = role;
+		authState.permissions = permissions;
+	} else {
+		authState.role = null;
+		authState.permissions = [];
+	}
+
 	authState.loading = false;
 }
 
@@ -246,6 +300,9 @@ export async function signOut(): Promise<void> {
 	authState.session = null;
 	authState.staff = null;
 	authState.isStaff = false;
+	authState.isAdmin = false;
+	authState.permissions = [];
+	authState.role = null;
 	authState.error = null;
 	clearPendingStaffEmail();
 	clearStaffPeriod();
