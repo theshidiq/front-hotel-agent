@@ -8,6 +8,9 @@
 		courseCategory?: { value: string; label: string; id: string; image_url?: string | null; description?: string | null; price?: number | null } | null;
 		menus: Menu[];
 		products: Product[];
+		productAlternates: Record<string, string[]>;
+		onAddAlternate: (productId: string, alternateProductId: string) => Promise<void>;
+		onRemoveAlternate: (productId: string, alternateProductId: string) => Promise<void>;
 		groupId: string;
 		seasonalMenuId?: string | null;
 		onUpdateCourseDetails: (id: string, data: UpdateCategoryData) => Promise<void>;
@@ -17,7 +20,7 @@
 		onClose: () => void;
 	}
 
-	let { courseId, courseName, courseCategory, menus, products, groupId, seasonalMenuId, onUpdateCourseDetails, onRenameCourse, onCreateMenu, onDeleteMenu, onClose }: Props = $props();
+	let { courseId, courseName, courseCategory, menus, products, productAlternates, onAddAlternate, onRemoveAlternate, groupId, seasonalMenuId, onUpdateCourseDetails, onRenameCourse, onCreateMenu, onDeleteMenu, onClose }: Props = $props();
 
 	// Course name
 	let courseNameInput = $state(courseName);
@@ -37,17 +40,12 @@
 	let origPrice = $state('');
 	let origHasPrice = $state(false);
 
-	// Add menu form state
-	let showAddForm = $state(false);
-	let newMenuName = $state('');
-	let selectedProductIds = $state<string[]>([]);
-	let isCreatingMenu = $state(false);
-	let createError = $state<string | null>(null);
+	// Product search state
 	let productSearchTerm = $state('');
 	let productSearchFocused = $state(false);
+	let isAddingProduct = $state(false);
 
 	// Alternate ingredients
-	let productAlternates: Record<string, string[]> = $state({});
 	let showAlternatesFor: string | null = $state(null);
 	let alternateSearchTerm = $state('');
 	let alternateSearchFocused = $state(false);
@@ -81,6 +79,21 @@
 		(courseImage === null && origImage !== null)
 	);
 
+	// Flat product list from all menus in this course
+	const courseProducts = $derived.by(() => {
+		const list: { product: { id: string; name: string; image_url: string | null; allergens: { id: string; name: string; category: string }[] }; menuId: string }[] = [];
+		const seen = new Set<string>();
+		for (const menu of menus) {
+			for (const product of menu.products || []) {
+				if (!seen.has(product.id)) {
+					seen.add(product.id);
+					list.push({ product, menuId: menu.id });
+				}
+			}
+		}
+		return list;
+	});
+
 	// All allergens derived across all menus in this course
 	const allAllergens = $derived.by(() => {
 		const map = new Map<string, { id: string; name: string; category: string }>();
@@ -94,29 +107,17 @@
 		return Array.from(map.values());
 	});
 
-	// Add menu form derived values
+	// Products available to add (exclude ones already in course)
+	const courseProductIds = $derived(new Set(courseProducts.map(cp => cp.product.id)));
+
 	const availableProducts = $derived(
 		products.filter(
 			(p) =>
-				!selectedProductIds.includes(p.id) &&
+				!courseProductIds.has(p.id) &&
 				(productSearchTerm === '' ||
 					p.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
 		)
 	);
-
-	const selectedProducts = $derived(products.filter((p) => selectedProductIds.includes(p.id)));
-
-	const derivedAllergens = $derived.by(() => {
-		const map = new Map<string, Allergen>();
-		for (const product of selectedProducts) {
-			for (const allergen of product.allergens || []) {
-				if (!map.has(allergen.id)) {
-					map.set(allergen.id, allergen);
-				}
-			}
-		}
-		return Array.from(map.values());
-	});
 
 	const alternatesProduct = $derived(
 		showAlternatesFor ? products.find((p) => p.id === showAlternatesFor) : null
@@ -209,38 +210,27 @@
 	let scrollContainer: HTMLDivElement | undefined = $state(undefined);
 	let menuSectionEl: HTMLDivElement | undefined = $state(undefined);
 
-	// Add menu form functions
-	function openAddForm() {
-		showAddForm = true;
-		newMenuName = '';
-		selectedProductIds = [];
-		productAlternates = {};
-		createError = null;
+	// Add product directly (creates a menu behind the scenes)
+	async function handleAddProduct(product: Product) {
+		if (isAddingProduct) return;
+		isAddingProduct = true;
 		productSearchTerm = '';
-		// Scroll to menu section after DOM updates
-		requestAnimationFrame(() => {
-			menuSectionEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-		});
-	}
-
-	function closeAddForm() {
-		showAddForm = false;
-		newMenuName = '';
-		selectedProductIds = [];
-		productAlternates = {};
-		createError = null;
-		productSearchTerm = '';
-	}
-
-	function addProduct(productId: string) {
-		selectedProductIds = [...selectedProductIds, productId];
-		productSearchTerm = '';
-	}
-
-	function removeProduct(productId: string) {
-		selectedProductIds = selectedProductIds.filter((id) => id !== productId);
-		const { [productId]: _, ...rest } = productAlternates;
-		productAlternates = rest;
+		try {
+			const courseValue = courseCategory?.value || '';
+			const data: CreateMenuData = {
+				name: product.name,
+				category: courseValue,
+				menu_group_id: groupId,
+				seasonal_menu_id: seasonalMenuId || null,
+				is_available: true,
+				product_ids: [product.id],
+			};
+			await onCreateMenu(data);
+		} catch (e: any) {
+			console.error('Failed to add product:', e);
+		} finally {
+			isAddingProduct = false;
+		}
 	}
 
 	function openAlternates(productId: string) {
@@ -254,58 +244,25 @@
 		alternateSearchTerm = '';
 	}
 
-	function addAlternate(productId: string) {
+	async function addAlternate(productId: string) {
 		if (!showAlternatesFor) return;
-		const current = productAlternates[showAlternatesFor] || [];
-		if (!current.includes(productId)) {
-			productAlternates[showAlternatesFor] = [...current, productId];
-		}
+		await onAddAlternate(showAlternatesFor, productId);
 		alternateSearchTerm = '';
 	}
 
-	function removeAlternate(productId: string) {
+	async function removeAlternate(productId: string) {
 		if (!showAlternatesFor) return;
-		productAlternates[showAlternatesFor] = (productAlternates[showAlternatesFor] || []).filter(
-			(id) => id !== productId
-		);
+		await onRemoveAlternate(showAlternatesFor, productId);
 	}
 
 	function getAlternatesCount(productId: string): number {
 		return (productAlternates[productId] || []).length;
 	}
 
-	async function handleCreateMenu() {
-		if (!newMenuName.trim()) {
-			createError = 'Menu name is required';
-			return;
-		}
-		isCreatingMenu = true;
-		createError = null;
-		try {
-			const courseValue = courseCategory?.value || '';
-			const data: CreateMenuData = {
-				name: newMenuName.trim(),
-				category: courseValue,
-				menu_group_id: groupId,
-				seasonal_menu_id: seasonalMenuId || null,
-				is_available: true,
-				product_ids: selectedProductIds.length > 0 ? selectedProductIds : undefined,
-			};
-			await onCreateMenu(data);
-			closeAddForm();
-		} catch (e: any) {
-			createError = e.message || 'Failed to create menu';
-		} finally {
-			isCreatingMenu = false;
-		}
-	}
-
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			if (showAlternatesFor) {
 				closeAlternates();
-			} else if (showAddForm) {
-				closeAddForm();
 			} else {
 				onClose();
 			}
@@ -474,281 +431,156 @@
 			</div>
 		</div>
 
-		<!-- Menu Items Section — swaps in-place between list and add form -->
+		<!-- Products Section -->
 		<div bind:this={menuSectionEl} class="px-6 pt-6 pb-6 bg-gray-50/50">
 			<div class="flex justify-between items-center mb-4">
 				<div class="flex items-center gap-2">
-					{#if showAddForm}
-						<button
-							onclick={closeAddForm}
-							class="text-gray-400 hover:text-gray-600 transition-colors p-0.5 rounded hover:bg-gray-100 mr-1"
-						>
-							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-							</svg>
-						</button>
-						<h3 class="text-xs font-bold text-amber-600 uppercase tracking-widest">New Menu Item</h3>
-					{:else}
-						<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Menu Items</h3>
-						<span class="bg-gray-200 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{menus.length}</span>
-					{/if}
+					<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Products</h3>
+					<span class="bg-gray-200 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{courseProducts.length}</span>
 				</div>
-				{#if !showAddForm}
-					<button
-						onclick={openAddForm}
-						class="text-amber-600 hover:text-amber-700 text-xs font-bold uppercase tracking-wide flex items-center gap-1 hover:underline decoration-amber-500/30 underline-offset-4"
-					>
-						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-						</svg>
-						Add Item
-					</button>
+			</div>
+
+			<!-- Product search to add -->
+			<div class="relative mb-4">
+				<div class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-amber-400 focus-within:border-amber-400 transition-all">
+					<svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+					</svg>
+					<input
+						type="text"
+						bind:value={productSearchTerm}
+						onfocus={() => (productSearchFocused = true)}
+						onblur={() => setTimeout(() => (productSearchFocused = false), 200)}
+						placeholder="Add product..."
+						class="flex-1 text-sm border-0 p-0 focus:ring-0 focus:outline-none bg-transparent placeholder-gray-400"
+					/>
+				</div>
+				{#if productSearchFocused && availableProducts.length > 0}
+					<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+						{#each availableProducts.slice(0, 15) as product}
+							<button
+								onclick={() => handleAddProduct(product)}
+								class="w-full px-3 py-2 text-left text-sm hover:bg-amber-50 flex items-center justify-between border-b border-gray-100 last:border-b-0 transition-colors"
+							>
+								<div class="flex items-center gap-2">
+									{#if product.image_url}
+										<img src={product.image_url} alt="" class="w-6 h-6 rounded object-cover" />
+									{:else}
+										<div class="w-6 h-6 bg-gray-100 rounded flex items-center justify-center">
+											<svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+											</svg>
+										</div>
+									{/if}
+									<span class="truncate">{product.name}</span>
+								</div>
+								{#if product.allergens && product.allergens.length > 0}
+									<span class="text-xs text-red-500 flex-shrink-0">{product.allergens.length} allergens</span>
+								{/if}
+							</button>
+						{/each}
+						{#if availableProducts.length > 15}
+							<div class="px-3 py-2 text-xs text-gray-400 text-center bg-gray-50">
+								+{availableProducts.length - 15} more (type to filter)
+							</div>
+						{/if}
+					</div>
 				{/if}
 			</div>
 
-			{#if showAddForm}
-				<!-- Add form -->
-				<div class="space-y-4" style="min-height: 70vh;">
-					<!-- Name -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-400">*</span></label>
-						<input
-							type="text"
-							bind:value={newMenuName}
-							placeholder="e.g., Grilled Salmon"
-							class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none"
-							onkeydown={(e) => e.key === 'Enter' && handleCreateMenu()}
-						/>
-					</div>
-
-					<!-- Product Search -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-1">Products/Ingredients</label>
-						<div class="relative">
-							<input
-								type="text"
-								bind:value={productSearchTerm}
-								onfocus={() => (productSearchFocused = true)}
-								onblur={() => setTimeout(() => (productSearchFocused = false), 200)}
-								placeholder="Search products..."
-								class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none"
-							/>
-							{#if productSearchFocused && availableProducts.length > 0}
-								<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-									{#each availableProducts.slice(0, 15) as product}
+			<!-- Product list -->
+			{#if courseProducts.length === 0}
+				<div class="flex flex-col items-center justify-center py-10 text-gray-400">
+					<svg class="w-10 h-10 mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+					</svg>
+					<p class="text-sm">No products yet</p>
+					<p class="text-xs mt-1">Search above to add products</p>
+				</div>
+			{:else}
+				<div class="space-y-2">
+					{#each courseProducts as item (item.product.id)}
+						<div class="rounded-xl overflow-hidden transition-all duration-200 {confirmingDeleteId === item.menuId ? 'ring-2 ring-red-300' : ''}">
+							{#if confirmingDeleteId === item.menuId}
+								<!-- Inline delete confirmation -->
+								<div class="bg-red-50 p-3 border border-red-200 rounded-xl">
+									<div class="flex items-center gap-2 mb-2.5">
+										<div class="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+											<svg class="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+											</svg>
+										</div>
+										<p class="text-sm font-semibold text-red-700">Remove {item.product.name}?</p>
+									</div>
+									<div class="flex gap-2">
 										<button
-											onclick={() => addProduct(product.id)}
-											class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center justify-between border-b border-gray-100 last:border-b-0"
+											onclick={() => { confirmingDeleteId = null; }}
+											class="flex-1 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
 										>
-											<div class="flex items-center gap-2">
-												{#if product.image_url}
-													<img src={product.image_url} alt="" class="w-6 h-6 rounded object-cover" />
-												{:else}
-													<div class="w-6 h-6 bg-gray-100 rounded flex items-center justify-center">
-														<svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-														</svg>
-													</div>
-												{/if}
-												<span class="truncate">{product.name}</span>
-											</div>
-											{#if product.allergens && product.allergens.length > 0}
-												<span class="text-xs text-red-500 flex-shrink-0">{product.allergens.length} allergens</span>
-											{/if}
+											Cancel
 										</button>
-									{/each}
-									{#if availableProducts.length > 15}
-										<div class="px-3 py-2 text-xs text-gray-400 text-center bg-gray-50">
-											+{availableProducts.length - 15} more (type to filter)
+										<button
+											onclick={() => { onDeleteMenu(item.menuId); confirmingDeleteId = null; }}
+											class="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+										>
+											Remove
+										</button>
+									</div>
+								</div>
+							{:else}
+								<!-- Product row -->
+								<div class="bg-white px-3 py-2.5 flex items-center gap-3 border border-transparent hover:border-gray-100 rounded-xl group transition-all shadow-[0_1px_4px_rgba(0,0,0,0.02)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+									{#if item.product.image_url}
+										<img src={item.product.image_url} alt="" class="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+									{:else}
+										<div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+											<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+											</svg>
 										</div>
 									{/if}
-								</div>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Selected Products -->
-					{#if selectedProducts.length > 0}
-						<div>
-							<div class="flex items-center justify-between mb-1.5">
-								<label class="text-sm font-medium text-gray-700">Selected ({selectedProducts.length})</label>
-								<div class="flex items-center gap-3 text-xs text-gray-400">
-									<span class="flex items-center gap-1">
+									<div class="flex-1 min-w-0">
+										<span class="text-sm font-medium text-gray-800 truncate block">{item.product.name}</span>
+										{#if item.product.allergens && item.product.allergens.length > 0}
+											<div class="flex flex-wrap gap-1 mt-1">
+												{#each item.product.allergens as allergen}
+													<span class="px-1.5 py-0.5 bg-red-50 text-red-400 rounded text-[10px] font-semibold">{allergen.name}</span>
+												{/each}
+											</div>
+										{/if}
+									</div>
+									<!-- Alternates button - always visible -->
+									<button
+										onclick={() => openAlternates(item.product.id)}
+										class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors flex-shrink-0 {getAlternatesCount(item.product.id) > 0 ? 'bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100' : 'bg-gray-50 text-gray-400 border border-gray-200 hover:bg-gray-100 hover:text-orange-600'}"
+										title="Set alternates"
+									>
 										<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
 										</svg>
-										Alternates
-									</span>
+										{#if getAlternatesCount(item.product.id) > 0}
+											<span>{getAlternatesCount(item.product.id)}</span>
+										{/if}
+									</button>
+									<!-- Delete button - hover only -->
+									<button
+										onclick={() => { confirmingDeleteId = item.menuId; }}
+										class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 p-1 rounded hover:bg-red-50"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
 								</div>
-							</div>
-							<div class="space-y-1 p-2 bg-gray-50 rounded-lg">
-								{#each selectedProducts as product}
-									<div class="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-white border border-gray-200 rounded-md">
-										<span class="text-sm text-gray-800 truncate flex-1">{product.name}</span>
-										<div class="flex items-center gap-1 flex-shrink-0">
-											<button
-												onclick={() => openAlternates(product.id)}
-												class="p-1 rounded transition-colors {getAlternatesCount(product.id) > 0 ? 'text-orange-600 hover:bg-orange-50' : 'text-gray-400 hover:text-orange-600 hover:bg-orange-50'}"
-												title="Set alternates"
-											>
-												<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-												</svg>
-											</button>
-											{#if getAlternatesCount(product.id) > 0}
-												<span class="text-xs text-orange-600 font-medium">{getAlternatesCount(product.id)}</span>
-											{/if}
-											<button
-												onclick={() => removeProduct(product.id)}
-												class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-												title="Remove"
-											>
-												<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-												</svg>
-											</button>
-										</div>
-									</div>
-								{/each}
-							</div>
-						</div>
-					{/if}
-
-					<!-- Derived Allergens -->
-					{#if derivedAllergens.length > 0}
-						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-1">Derived Allergens</label>
-							<div class="flex flex-wrap gap-1.5">
-								{#each derivedAllergens as allergen}
-									<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">{allergen.name}</span>
-								{/each}
-							</div>
-						</div>
-					{/if}
-
-					{#if createError}
-						<p class="text-red-600 text-sm">{createError}</p>
-					{/if}
-
-					<!-- Submit button inside the form area -->
-					<div class="pt-2">
-						<button
-							onclick={handleCreateMenu}
-							disabled={isCreatingMenu || !newMenuName.trim()}
-							class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:shadow-lg hover:shadow-amber-200 text-white text-sm font-bold py-3 px-4 rounded-xl flex justify-center items-center gap-2 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:shadow-none disabled:hover:translate-y-0"
-						>
-							{#if isCreatingMenu}
-								<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-								</svg>
-								Creating...
-							{:else}
-								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-								</svg>
-								Add Menu Item
 							{/if}
-						</button>
-					</div>
+						</div>
+					{/each}
 				</div>
-			{:else}
-				<!-- Menu items list -->
-				{#if menus.length === 0}
-					<div class="flex flex-col items-center justify-center py-10 text-gray-400">
-						<svg class="w-10 h-10 mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-						</svg>
-						<p class="text-sm">No menu items yet</p>
-						<button onclick={openAddForm} class="mt-2 text-amber-600 hover:text-amber-700 text-sm font-medium">Add your first item</button>
-					</div>
-				{:else if menus.length > 0}
-					<div class="space-y-4">
-						{#each menus as menu (menu.id)}
-							<div class="rounded-xl overflow-hidden transition-all duration-200 {confirmingDeleteId === menu.id ? 'ring-2 ring-red-300' : ''}">
-								{#if confirmingDeleteId === menu.id}
-									<!-- Inline delete confirmation -->
-									<div class="bg-red-50 p-4 border border-red-200 rounded-xl">
-										<div class="flex items-center gap-2 mb-3">
-											<div class="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-												<svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-												</svg>
-											</div>
-											<div>
-												<p class="text-sm font-semibold text-red-700">Delete "{menu.name}"?</p>
-												<p class="text-xs text-red-400">This action cannot be undone</p>
-											</div>
-										</div>
-										<div class="flex gap-2">
-											<button
-												onclick={() => { confirmingDeleteId = null; }}
-												class="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-											>
-												Cancel
-											</button>
-											<button
-												onclick={() => { onDeleteMenu(menu.id); confirmingDeleteId = null; }}
-												class="flex-1 px-3 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-											>
-												Delete
-											</button>
-										</div>
-									</div>
-								{:else}
-									<!-- Normal card -->
-									<div class="bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] transition-all duration-300 border border-transparent hover:border-gray-100 group rounded-xl">
-										<div class="flex justify-between items-start mb-3">
-											<div>
-												<h4 class="text-base font-bold text-gray-800 leading-tight">{menu.name}</h4>
-												{#if menu.products.length > 0}
-													<p class="text-xs text-gray-400 mt-1 font-medium">
-														{menu.products.map(p => p.name).join(', ')}
-													</p>
-												{/if}
-											</div>
-											<button
-												onclick={() => { confirmingDeleteId = menu.id; }}
-												class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-											>
-												<svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-												</svg>
-											</button>
-										</div>
-
-										{#if menu.allergens && menu.allergens.length > 0}
-											<div class="flex flex-wrap gap-2 mt-3">
-												{#each menu.allergens.slice(0, 4) as allergen}
-													<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-red-50 text-red-400 tracking-wide uppercase">
-														{allergen.name}
-													</span>
-												{/each}
-												{#if menu.allergens.length > 4}
-													<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-400 border border-gray-200">
-														+{menu.allergens.length - 4}
-													</span>
-												{/if}
-											</div>
-										{/if}
-
-										{#if menu.allergens && menu.allergens.length > 4}
-											<div class="mt-3 pt-3 border-t border-gray-50 flex flex-wrap gap-1.5">
-												<span class="text-[10px] text-gray-400">Contains:</span>
-												<span class="text-[10px] text-gray-500 font-medium">{menu.allergens.map(a => a.name).join(', ')}</span>
-											</div>
-										{/if}
-									</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{/if}
 			{/if}
 		</div>
 
-			<!-- Total Allergens summary -->
-		{#if !showAddForm && allAllergens.length > 0}
+		<!-- Total Allergens summary -->
+		{#if allAllergens.length > 0}
 			<div class="px-6 pt-4 pb-6">
 				<div class="pt-4 border-t border-gray-200">
 					<h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Total Allergens</h3>
@@ -760,6 +592,7 @@
 				</div>
 			</div>
 		{/if}
+
 	</div>
 
 	<!-- Footer -->
@@ -782,17 +615,6 @@
 					</svg>
 					Save Changes
 				{/if}
-			</button>
-		{/if}
-		{#if !showAddForm}
-			<button
-				onclick={openAddForm}
-				class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:shadow-lg hover:shadow-amber-200 text-white text-sm font-bold py-3 px-4 rounded-xl flex justify-center items-center gap-2 transition-all transform hover:-translate-y-0.5"
-			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-				</svg>
-				Add Menu Item
 			</button>
 		{/if}
 		<button

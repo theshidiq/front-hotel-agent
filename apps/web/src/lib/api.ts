@@ -958,3 +958,47 @@ export async function createStaff(data: CreateStaffData): Promise<StaffMember> {
 	}
 	return response.json();
 }
+
+// Product Alternates
+export interface ProductAlternate {
+	id: string;
+	restaurant_id: string;
+	product_id: string;
+	alternate_product_id: string;
+	created_at: string;
+}
+
+export async function getProductAlternates(): Promise<ProductAlternate[]> {
+	const response = await fetch(`${API_URL}/product-alternates`, {
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch product alternates');
+	}
+	return response.json();
+}
+
+export async function addProductAlternate(productId: string, alternateProductId: string): Promise<ProductAlternate> {
+	const response = await fetch(`${API_URL}/product-alternates`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ product_id: productId, alternate_product_id: alternateProductId }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to add product alternate');
+	}
+	return response.json();
+}
+
+export async function removeProductAlternate(productId: string, alternateProductId: string): Promise<void> {
+	const response = await fetch(`${API_URL}/product-alternates/${productId}/${alternateProductId}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to remove product alternate');
+	}
+}

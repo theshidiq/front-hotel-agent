@@ -29,6 +29,9 @@
 		onUpdateCourseDetails: (id: string, data: UpdateCategoryData) => Promise<void>;
 		onDeleteCourse: (id: string) => Promise<void>;
 		products: Product[];
+		productAlternates: Record<string, string[]>;
+		onAddAlternate: (productId: string, alternateProductId: string) => Promise<void>;
+		onRemoveAlternate: (productId: string, alternateProductId: string) => Promise<void>;
 		onCreateMenu: (data: CreateMenuData) => Promise<void>;
 		onUpdateMenu: (id: string, data: UpdateMenuData) => Promise<void>;
 		onDeleteMenu: (id: string) => Promise<void>;
@@ -51,6 +54,9 @@
 		onUpdateCourseDetails,
 		onDeleteCourse,
 		products,
+		productAlternates,
+		onAddAlternate,
+		onRemoveAlternate,
 		onCreateMenu,
 		onUpdateMenu,
 		onDeleteMenu,
@@ -772,6 +778,9 @@
 		courseCategory={detailCategory}
 		menus={detailMenus}
 		{products}
+		{productAlternates}
+		{onAddAlternate}
+		{onRemoveAlternate}
 		groupId={detailContext.groupId}
 		seasonalMenuId={menuGroups.find(g => g.id === detailContext?.groupId)?.seasonal_menu_id}
 		onUpdateCourseDetails={handleUpdateCourseDetailsFromDetail}
