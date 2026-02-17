@@ -196,6 +196,69 @@ export class RolesService {
     return this.findOne(id);
   }
 
+  async findDefault(): Promise<Role | null> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const { data: role } = await supabase
+      .from('roles')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_default', true)
+      .single();
+
+    if (!role) return null;
+
+    const { data: perms } = await supabase
+      .from('role_permissions')
+      .select('permission')
+      .eq('role_id', role.id);
+
+    return {
+      ...role,
+      permissions: (perms || []).map((p) => p.permission),
+    };
+  }
+
+  async setDefault(id: string): Promise<Role> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    // Validate role exists
+    await this.findOne(id);
+
+    // Clear any existing default
+    await supabase
+      .from('roles')
+      .update({ is_default: false })
+      .eq('restaurant_id', restaurantId)
+      .eq('is_default', true);
+
+    // Set the new default
+    const { error } = await supabase
+      .from('roles')
+      .update({ is_default: true })
+      .eq('id', id);
+
+    if (error) {
+      throw new InternalServerErrorException(`Failed to set default role: ${error.message}`);
+    }
+
+    this.logger.log(`Set role ${id} as default guest role`);
+    return this.findOne(id);
+  }
+
+  async clearDefault(): Promise<void> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    await supabase
+      .from('roles')
+      .update({ is_default: false })
+      .eq('restaurant_id', restaurantId)
+      .eq('is_default', true);
+  }
+
   async remove(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();

@@ -36,6 +36,7 @@ interface AuthState {
 	permissions: string[];
 	role: StaffRole | null;
 	error: string | null;
+	guestPermissions: string[];
 }
 
 // Module-level reactive state (Svelte 5 runes)
@@ -49,10 +50,15 @@ export let authState: AuthState = $state({
 	permissions: [],
 	role: null,
 	error: null,
+	guestPermissions: [],
 });
 
 export function can(permission: string): boolean {
-	return authState.isAdmin || authState.permissions.includes(permission);
+	if (authState.isAdmin) return true;
+	if (authState.isStaff) return authState.permissions.includes(permission);
+	// Non-logged-in guest: check default guest role permissions
+	// If no default role is set (empty array), deny by default
+	return authState.guestPermissions.includes(permission);
 }
 
 const PENDING_EMAIL_KEY = 'pending_staff_email';
@@ -233,6 +239,21 @@ async function handleSignedIn(email: string): Promise<void> {
 	authState.loading = false;
 }
 
+async function loadGuestPermissions(): Promise<void> {
+	try {
+		const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+		const response = await fetch(`${API_URL}/roles/default`);
+		if (response.ok) {
+			const role = await response.json();
+			if (role && role.permissions) {
+				authState.guestPermissions = role.permissions;
+			}
+		}
+	} catch {
+		// Silently fail — guests just get no permissions
+	}
+}
+
 export async function initAuth(): Promise<void> {
 	// Quick local check: if stored period has expired, sign out immediately
 	if (isStoredPeriodExpired()) {
@@ -241,6 +262,9 @@ export async function initAuth(): Promise<void> {
 		authState.loading = false;
 		return;
 	}
+
+	// Load guest default role permissions (for non-logged-in users)
+	await loadGuestPermissions();
 
 	// Get initial session
 	const {
@@ -306,6 +330,8 @@ export async function signOut(): Promise<void> {
 	authState.error = null;
 	clearPendingStaffEmail();
 	clearStaffPeriod();
+	// Reload guest permissions for non-logged-in view
+	loadGuestPermissions();
 }
 
 export function getAuthHeaders(): Record<string, string> {

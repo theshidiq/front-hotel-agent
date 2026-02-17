@@ -9,6 +9,8 @@
 		updateRoleApi,
 		updateRolePermissions,
 		deleteRole,
+		setRoleAsDefault,
+		clearRoleDefault,
 		createStaff,
 		updateStaffRole,
 		updateStaffAdmin,
@@ -34,9 +36,12 @@
 	// Role management
 	let editingRole: Role | null = $state(null);
 	let editingPermissions: Set<string> = $state(new Set());
+	let editRoleName = $state('');
+	let editRoleDescription = $state('');
 	let showNewRole = $state(false);
 	let newRoleName = $state('');
 	let newRoleDescription = $state('');
+	let newRolePermissions: Set<string> = $state(new Set());
 	let roleSaving = $state(false);
 
 	// Staff detail modal
@@ -110,8 +115,18 @@
 		}
 	}
 
-	onMount(() => {
-		if (!authState.loading && !authState.isAdmin) {
+	function waitForAuth(): Promise<void> {
+		return new Promise((resolve) => {
+			if (!authState.loading) { resolve(); return; }
+			const interval = setInterval(() => {
+				if (!authState.loading) { clearInterval(interval); resolve(); }
+			}, 50);
+		});
+	}
+
+	onMount(async () => {
+		await waitForAuth();
+		if (!authState.isAdmin) {
 			window.location.href = '/';
 			return;
 		}
@@ -164,8 +179,21 @@
 
 	// ── Role actions ──
 	function startEditingRole(role: Role) {
+		showNewRole = false;
 		editingRole = role;
 		editingPermissions = new Set(role.permissions);
+		editRoleName = role.name;
+		editRoleDescription = role.description || '';
+	}
+
+	function startNewRole() {
+		editingRole = null;
+		showNewRole = !showNewRole;
+		if (showNewRole) {
+			newRoleName = '';
+			newRoleDescription = '';
+			newRolePermissions = new Set();
+		}
 	}
 
 	function togglePermission(perm: string) {
@@ -178,10 +206,18 @@
 		editingPermissions = newSet;
 	}
 
-	async function saveRolePermissions() {
+	async function saveRoleChanges() {
 		if (!editingRole) return;
 		roleSaving = true;
 		try {
+			// Save name/description if changed
+			if (editRoleName.trim() !== editingRole.name || editRoleDescription.trim() !== (editingRole.description || '')) {
+				await updateRoleApi(editingRole.id, {
+					name: editRoleName.trim(),
+					description: editRoleDescription.trim() || undefined,
+				});
+			}
+			// Save permissions
 			await updateRolePermissions(editingRole.id, [...editingPermissions]);
 			await loadAll();
 			editingRole = null;
@@ -192,22 +228,51 @@
 		}
 	}
 
+	function toggleNewRolePermission(perm: string) {
+		const newSet = new Set(newRolePermissions);
+		if (newSet.has(perm)) {
+			newSet.delete(perm);
+		} else {
+			newSet.add(perm);
+		}
+		newRolePermissions = newSet;
+	}
+
 	async function handleCreateRole() {
 		if (!newRoleName.trim()) return;
 		roleSaving = true;
 		try {
-			await createRole({
+			const role = await createRole({
 				name: newRoleName.trim(),
 				description: newRoleDescription.trim() || undefined,
+				permissions: [...newRolePermissions],
 			});
+			// If permissions were selected, save them too
+			if (newRolePermissions.size > 0) {
+				await updateRolePermissions(role.id, [...newRolePermissions]);
+			}
 			newRoleName = '';
 			newRoleDescription = '';
+			newRolePermissions = new Set();
 			showNewRole = false;
 			await loadAll();
 		} catch (e: any) {
 			error = e.message;
 		} finally {
 			roleSaving = false;
+		}
+	}
+
+	async function handleToggleDefault(role: Role) {
+		try {
+			if (role.is_default) {
+				await clearRoleDefault(role.id);
+			} else {
+				await setRoleAsDefault(role.id);
+			}
+			await loadAll();
+		} catch (e: any) {
+			error = e.message;
 		}
 	}
 
@@ -374,45 +439,13 @@
 						Role Management
 					</h2>
 					<button
-						onclick={() => showNewRole = !showNewRole}
+						onclick={startNewRole}
 						class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
 					>
 						<span class="material-symbols-rounded text-lg">add</span>
 						New Role
 					</button>
 				</div>
-
-				{#if showNewRole}
-					<div class="px-5 py-4 bg-blue-50/50 border-b border-gray-100">
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<input
-								bind:value={newRoleName}
-								placeholder="Role name"
-								class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							/>
-							<input
-								bind:value={newRoleDescription}
-								placeholder="Description (optional)"
-								class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							/>
-						</div>
-						<div class="flex justify-end gap-2 mt-3">
-							<button
-								onclick={() => { showNewRole = false; newRoleName = ''; newRoleDescription = ''; }}
-								class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-							>
-								Cancel
-							</button>
-							<button
-								onclick={handleCreateRole}
-								disabled={roleSaving || !newRoleName.trim()}
-								class="px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-							>
-								{roleSaving ? 'Creating...' : 'Create'}
-							</button>
-						</div>
-					</div>
-				{/if}
 
 				<!-- Role cards -->
 				<div class="px-5 py-4">
@@ -423,23 +456,42 @@
 								class="px-4 py-3 border rounded-lg text-left transition-all min-w-[120px]
 									{editingRole?.id === role.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}"
 							>
-								<p class="text-sm font-medium text-gray-900">{role.name}</p>
+								<div class="flex items-center gap-1.5">
+									<p class="text-sm font-medium text-gray-900">{role.name}</p>
+									{#if role.is_default}
+										<span class="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 rounded">Guest Default</span>
+									{/if}
+								</div>
 								<p class="text-xs text-gray-500 mt-0.5">{role.permissions.length} permissions</p>
 							</button>
 						{/each}
 					</div>
 
-					<!-- Permission editor -->
+					<!-- Permission editor (edit existing role) -->
 					{#if editingRole}
 						<div class="border border-gray-200 rounded-lg p-5 bg-gray-50/50">
 							<div class="flex items-center justify-between mb-4">
-								<div>
-									<h3 class="text-sm font-semibold text-gray-900">Editing: {editingRole.name}</h3>
-									{#if editingRole.description}
-										<p class="text-xs text-gray-500 mt-0.5">{editingRole.description}</p>
-									{/if}
+								<div class="flex items-center gap-3 flex-1 min-w-0">
+									<input
+										bind:value={editRoleName}
+										class="text-sm font-semibold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 w-40"
+										placeholder="Role name"
+									/>
+									<input
+										bind:value={editRoleDescription}
+										class="text-xs text-gray-500 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 flex-1"
+										placeholder="Description (optional)"
+									/>
 								</div>
-								<div class="flex items-center gap-2">
+								<div class="flex items-center gap-2 shrink-0">
+									<button
+										onclick={() => handleToggleDefault(editingRole!)}
+										class="px-3 py-1.5 text-sm rounded-lg transition-colors
+											{editingRole!.is_default ? 'text-green-700 bg-green-50 hover:bg-green-100' : 'text-gray-600 hover:bg-gray-100'}"
+										title={editingRole!.is_default ? 'Remove as guest default' : 'Set as guest default role'}
+									>
+										{editingRole!.is_default ? 'Guest Default' : 'Set as Default'}
+									</button>
 									<button
 										onclick={() => handleDeleteRole(editingRole!.id)}
 										class="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -461,21 +513,17 @@
 										<p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">{group.label}</p>
 										<div class="flex flex-wrap gap-2">
 											{#each group.permissions as perm}
-												<label
+												<button
+													type="button"
+													onclick={() => togglePermission(perm.key)}
 													class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
 														{editingPermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
 												>
-													<input
-														type="checkbox"
-														checked={editingPermissions.has(perm.key)}
-														onchange={() => togglePermission(perm.key)}
-														class="sr-only"
-													/>
 													<span class="material-symbols-rounded text-sm">
 														{editingPermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
 													</span>
 													<span class="text-sm">{perm.label}</span>
-												</label>
+												</button>
 											{/each}
 										</div>
 									</div>
@@ -484,11 +532,70 @@
 
 							<div class="flex justify-end mt-5">
 								<button
-									onclick={saveRolePermissions}
-									disabled={roleSaving}
+									onclick={saveRoleChanges}
+									disabled={roleSaving || !editRoleName.trim()}
 									class="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
 								>
-									{roleSaving ? 'Saving...' : 'Save Permissions'}
+									{roleSaving ? 'Saving...' : 'Save Changes'}
+								</button>
+							</div>
+						</div>
+					{/if}
+
+					<!-- New role form (below role cards, same position as edit panel) -->
+					{#if showNewRole}
+						<div class="border border-green-200 rounded-lg p-5 bg-green-50/30">
+							<div class="flex items-center justify-between mb-4">
+								<div class="flex items-center gap-3 flex-1 min-w-0">
+									<input
+										bind:value={newRoleName}
+										class="text-sm font-semibold text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 w-40"
+										placeholder="Role name"
+									/>
+									<input
+										bind:value={newRoleDescription}
+										class="text-xs text-gray-500 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 flex-1"
+										placeholder="Description (optional)"
+									/>
+								</div>
+								<button
+									onclick={() => { showNewRole = false; newRoleName = ''; newRoleDescription = ''; newRolePermissions = new Set(); }}
+									class="px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 rounded-lg shrink-0"
+								>
+									Cancel
+								</button>
+							</div>
+
+							<div class="space-y-4">
+								{#each Object.entries(permissionGroups) as [, group]}
+									<div>
+										<p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">{group.label}</p>
+										<div class="flex flex-wrap gap-2">
+											{#each group.permissions as perm}
+												<button
+													type="button"
+													onclick={() => toggleNewRolePermission(perm.key)}
+													class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
+														{newRolePermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
+												>
+													<span class="material-symbols-rounded text-sm">
+														{newRolePermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
+													</span>
+													<span class="text-sm">{perm.label}</span>
+												</button>
+											{/each}
+										</div>
+									</div>
+								{/each}
+							</div>
+
+							<div class="flex justify-end mt-5">
+								<button
+									onclick={handleCreateRole}
+									disabled={roleSaving || !newRoleName.trim()}
+									class="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+								>
+									{roleSaving ? 'Creating...' : 'Create Role'}
 								</button>
 							</div>
 						</div>

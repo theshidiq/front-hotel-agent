@@ -12,6 +12,17 @@
 	// Main Tab (Products vs Menu)
 	let mainTab: 'products' | 'menu' = $state('products');
 
+	// Redirect to an accessible tab when permissions load (both staff and guests)
+	$effect(() => {
+		if (!authState.loading) {
+			if (mainTab === 'products' && !canViewProducts) {
+				if (canViewMenus) mainTab = 'menu';
+			} else if (mainTab === 'menu' && !canViewMenus) {
+				if (canViewProducts) mainTab = 'products';
+			}
+		}
+	});
+
 	// Sidebar
 	let sidebarCollapsed = $state(false);
 	let sidebarMobileOpen = $state(false);
@@ -378,21 +389,31 @@
 	let menus: Menu[] = $state([]);
 
 	// Sidebar sections (must be after products & menus declarations)
-	const sidebarSections = $derived([
-		{
-			label: 'フロント',
-			items: [
-				{ icon: 'calendar_today', label: '予約管理', href: '/front-desk', active: false },
-			]
-		},
-		{
-			label: '食材管理',
-			items: [
-				{ icon: 'inventory_2', label: '商品管理', badge: products.length, active: mainTab === 'products', onclick: () => mainTab = 'products' },
-				{ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' },
-			]
+	// Permission-aware for both staff and guests (can() handles both)
+	const canViewProducts = $derived(can('products.view'));
+	const canViewMenus = $derived(can('menus.view'));
+
+	const sidebarSections = $derived.by(() => {
+		const foodItems: { icon: string; label: string; badge?: number; active: boolean; onclick?: () => void; href?: string }[] = [];
+		if (canViewProducts) {
+			foodItems.push({ icon: 'inventory_2', label: '商品管理', badge: products.length, active: mainTab === 'products', onclick: () => mainTab = 'products' });
 		}
-	]);
+		if (canViewMenus) {
+			foodItems.push({ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' });
+		}
+		const sections = [
+			{
+				label: 'フロント',
+				items: [
+					{ icon: 'calendar_today', label: '予約管理', href: '/front-desk', active: false },
+				]
+			},
+		];
+		if (foodItems.length > 0) {
+			sections.push({ label: '食材管理', items: foodItems });
+		}
+		return sections;
+	});
 
 	// Menu Group filter for products
 	let selectedProductMenuGroup: string = $state('all');
@@ -2091,6 +2112,7 @@ ${coursesHtml}
 						placeholder="Search course, product, allergen..."
 						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
 					/>
+					{#if can('reports.print')}
 					<button
 						onclick={printAllergenReport}
 						disabled={isPrinting}
@@ -2099,6 +2121,8 @@ ${coursesHtml}
 						<span class="material-symbols-rounded text-base">print</span>
 						{isPrinting ? 'Preparing...' : 'Print PDF'}
 					</button>
+					{/if}
+					{#if can('reports.export')}
 					<button
 						onclick={exportAllergenXlsx}
 						disabled={isExporting}
@@ -2107,6 +2131,7 @@ ${coursesHtml}
 						<span class="material-symbols-rounded text-base">download</span>
 						{isExporting ? 'Exporting...' : 'Export .xlsx'}
 					</button>
+					{/if}
 				</div>
 			</div>
 

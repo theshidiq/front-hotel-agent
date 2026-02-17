@@ -1082,6 +1082,36 @@ export async function deleteRole(id: string): Promise<void> {
 	}
 }
 
+export async function getDefaultRole(): Promise<Role | null> {
+	const response = await fetch(`${API_URL}/roles/default`);
+	if (!response.ok) return null;
+	const data = await response.json();
+	return data || null;
+}
+
+export async function setRoleAsDefault(id: string): Promise<Role> {
+	const response = await fetch(`${API_URL}/roles/${id}/default`, {
+		method: 'PATCH',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to set default role');
+	}
+	return response.json();
+}
+
+export async function clearRoleDefault(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/roles/${id}/default`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to clear default role');
+	}
+}
+
 // Product Alternates
 export interface ProductAlternate {
 	id: string;

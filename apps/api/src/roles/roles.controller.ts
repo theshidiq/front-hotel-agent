@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { RolesService, Role, ALL_PERMISSIONS } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -9,6 +9,13 @@ import { RequirePermission } from '../auth/permission.decorator';
 @Controller('roles')
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
+
+  // Public endpoint — no auth required
+  @Get('default')
+  @ApiOperation({ summary: 'Get the default guest role with permissions (public)' })
+  async getDefault(): Promise<Role | null> {
+    return this.rolesService.findDefault();
+  }
 
   @Get()
   @RequirePermission()
@@ -46,6 +53,20 @@ export class RolesController {
     @Body() dto: UpdateRolePermissionsDto,
   ): Promise<Role> {
     return this.rolesService.updatePermissions(id, dto.permissions);
+  }
+
+  @Patch(':id/default')
+  @RequirePermission('staff.manage')
+  @ApiOperation({ summary: 'Set a role as the default guest role' })
+  async setDefault(@Param('id') id: string): Promise<Role> {
+    return this.rolesService.setDefault(id);
+  }
+
+  @Delete(':id/default')
+  @RequirePermission('staff.manage')
+  @ApiOperation({ summary: 'Clear the default guest role' })
+  async clearDefault(@Param('id') id: string): Promise<void> {
+    return this.rolesService.clearDefault();
   }
 
   @Delete(':id')
