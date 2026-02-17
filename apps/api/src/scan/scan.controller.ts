@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ScanService } from './scan.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanExtractResponse, ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
-import { RequireStaff } from '../auth/staff.decorator';
+import { RequirePermission } from '../auth/permission.decorator';
 
 @ApiTags('scan')
 @Controller('scan')
@@ -11,7 +11,7 @@ export class ScanController {
   constructor(private readonly scanService: ScanService) {}
 
   @Post()
-  @RequireStaff()
+  @RequirePermission('products.scan')
   @ApiOperation({
     summary: 'Scan product image and auto-save',
     description:
@@ -22,7 +22,7 @@ export class ScanController {
   }
 
   @Post('extract')
-  @RequireStaff()
+  @RequirePermission('products.scan')
   @ApiOperation({
     summary: 'Extract product data from image without saving',
     description:

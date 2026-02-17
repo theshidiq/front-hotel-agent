@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { StaffAuthGuard } from './auth.guard';
+import { PermissionGuard } from './permission.guard';
 import { SupabaseModule } from '../supabase/supabase.module';
 
 @Module({
   imports: [SupabaseModule],
-  providers: [StaffAuthGuard],
-  exports: [StaffAuthGuard],
+  providers: [StaffAuthGuard, PermissionGuard],
+  exports: [StaffAuthGuard, PermissionGuard],
 })
 export class AuthModule {}

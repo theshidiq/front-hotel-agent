@@ -5,12 +5,23 @@
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import { authState } from '$lib/auth.svelte';
+	import { authState, can } from '$lib/auth.svelte';
 
 	const isStaff = $derived(authState.isStaff);
 
 	// Main Tab (Products vs Menu)
 	let mainTab: 'products' | 'menu' = $state('products');
+
+	// Redirect to an accessible tab when permissions load (both staff and guests)
+	$effect(() => {
+		if (!authState.loading) {
+			if (mainTab === 'products' && !canViewProducts) {
+				if (canViewMenus) mainTab = 'menu';
+			} else if (mainTab === 'menu' && !canViewMenus) {
+				if (canViewProducts) mainTab = 'products';
+			}
+		}
+	});
 
 	// Sidebar
 	let sidebarCollapsed = $state(false);
@@ -378,21 +389,31 @@
 	let menus: Menu[] = $state([]);
 
 	// Sidebar sections (must be after products & menus declarations)
-	const sidebarSections = $derived([
-		{
-			label: 'フロント',
-			items: [
-				{ icon: 'calendar_today', label: '予約管理', href: '/front-desk', active: false },
-			]
-		},
-		{
-			label: '食材管理',
-			items: [
-				{ icon: 'inventory_2', label: '商品管理', badge: products.length, active: mainTab === 'products', onclick: () => mainTab = 'products' },
-				{ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' },
-			]
+	// Permission-aware for both staff and guests (can() handles both)
+	const canViewProducts = $derived(can('products.view'));
+	const canViewMenus = $derived(can('menus.view'));
+
+	const sidebarSections = $derived.by(() => {
+		const foodItems: { icon: string; label: string; badge?: number; active: boolean; onclick?: () => void; href?: string }[] = [];
+		if (canViewProducts) {
+			foodItems.push({ icon: 'inventory_2', label: '商品管理', badge: products.length, active: mainTab === 'products', onclick: () => mainTab = 'products' });
 		}
-	]);
+		if (canViewMenus) {
+			foodItems.push({ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' });
+		}
+		const sections = [
+			{
+				label: 'フロント',
+				items: [
+					{ icon: 'calendar_today', label: '予約管理', href: '/front-desk', active: false },
+				]
+			},
+		];
+		if (foodItems.length > 0) {
+			sections.push({ label: '食材管理', items: foodItems });
+		}
+		return sections;
+	});
 
 	// Menu Group filter for products
 	let selectedProductMenuGroup: string = $state('all');
@@ -1145,7 +1166,7 @@ ${coursesHtml}
 					<span class="text-sm text-gray-500 hidden sm:inline">Allergen Management System</span>
 				</div>
 				<div class="flex items-center gap-3">
-					{#if mainTab === 'products' && isStaff}
+					{#if mainTab === 'products' && (can('products.create') || can('products.scan'))}
 						<button
 							onclick={() => showAddProduct = !showAddProduct}
 							class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -1156,7 +1177,7 @@ ${coursesHtml}
 							Add Product
 						</button>
 					{/if}
-					{#if mainTab === 'menu' && isStaff}
+					{#if mainTab === 'menu' && can('menus.structure')}
 						<button
 							onclick={() => showMenuTreeConfig = true}
 							class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
@@ -1191,7 +1212,7 @@ ${coursesHtml}
 
 		{#if mainTab === 'products'}
 		<!-- Add Product Section (always visible on mobile, toggle on desktop) -->
-		{#if isStaff}
+		{#if can('products.create') || can('products.scan')}
 		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 {showAddProduct ? '' : 'md:hidden'}">
 			<!-- Tab Header -->
 			<div class="flex items-center justify-between mb-4">
@@ -1276,7 +1297,11 @@ ${coursesHtml}
 										Choose File
 										<input type="file" accept="image/*" class="hidden" onchange={handleFileInput} />
 									</label>
-									<button onclick={openCamera} class="px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+									<button onclick={openCamera} class="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1.5">
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
 										Camera
 									</button>
 								</div>
@@ -1820,7 +1845,7 @@ ${coursesHtml}
 												Save
 											</button>
 										{:else}
-											{#if isStaff}
+											{#if can('products.edit')}
 											<button
 												onclick={() => startEditing(product)}
 												class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 flex items-center gap-1"
@@ -1830,6 +1855,8 @@ ${coursesHtml}
 												</svg>
 												Edit
 											</button>
+											{/if}
+											{#if can('products.delete')}
 											<button
 												onclick={() => handleDeleteProduct(product.id)}
 												class="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 flex items-center gap-1"
@@ -2085,6 +2112,7 @@ ${coursesHtml}
 						placeholder="Search course, product, allergen..."
 						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
 					/>
+					{#if can('reports.print')}
 					<button
 						onclick={printAllergenReport}
 						disabled={isPrinting}
@@ -2093,6 +2121,8 @@ ${coursesHtml}
 						<span class="material-symbols-rounded text-base">print</span>
 						{isPrinting ? 'Preparing...' : 'Print PDF'}
 					</button>
+					{/if}
+					{#if can('reports.export')}
 					<button
 						onclick={exportAllergenXlsx}
 						disabled={isExporting}
@@ -2101,6 +2131,7 @@ ${coursesHtml}
 						<span class="material-symbols-rounded text-base">download</span>
 						{isExporting ? 'Exporting...' : 'Export .xlsx'}
 					</button>
+					{/if}
 				</div>
 			</div>
 

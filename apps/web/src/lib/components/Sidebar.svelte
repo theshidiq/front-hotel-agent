@@ -118,13 +118,27 @@
 		{#if authState.isStaff && authState.staff}
 			<div class="border-t border-slate-700 p-3">
 				<div class="flex items-center gap-3 px-3 py-2">
-					<div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
-						{authState.staff.name.charAt(0).toUpperCase()}
-					</div>
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-white truncate">{authState.staff.name}</p>
-						<p class="text-xs text-slate-400 truncate">{authState.staff.position || 'スタッフ'}</p>
-					</div>
+					<a
+						href={authState.isAdmin ? '/admin' : '/account'}
+						onclick={closeMobile}
+						class="flex items-center gap-3 flex-1 min-w-0 rounded-md hover:bg-slate-800 transition-colors -mx-1 px-1 py-0.5"
+					>
+						<div class="w-8 h-8 rounded-full {authState.isAdmin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center text-white text-sm font-bold shrink-0">
+							{authState.staff.name.charAt(0).toUpperCase()}
+						</div>
+						<div class="flex-1 min-w-0">
+							<p class="text-sm font-medium text-white truncate">{authState.staff.name}</p>
+							<p class="text-xs text-slate-400 truncate">
+								{#if authState.isAdmin}
+									Admin
+								{:else if authState.role}
+									{authState.role.name}
+								{:else}
+									{authState.staff.position || 'スタッフ'}
+								{/if}
+							</p>
+						</div>
+					</a>
 					<button
 						onclick={signOut}
 						class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
@@ -239,12 +253,13 @@
 		<div class="border-t border-slate-700 p-3">
 			{#if collapsed}
 				<div class="flex flex-col items-center gap-1">
-					<div
-						class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold"
+					<a
+						href={authState.isAdmin ? '/admin' : '/account'}
+						class="w-8 h-8 rounded-full {authState.isAdmin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center text-white text-sm font-bold hover:ring-2 hover:ring-slate-500 transition-all"
 						title={authState.staff.name}
 					>
 						{authState.staff.name.charAt(0).toUpperCase()}
-					</div>
+					</a>
 					<button
 						onclick={signOut}
 						class="w-full flex justify-center p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -255,13 +270,26 @@
 				</div>
 			{:else}
 				<div class="flex items-center gap-3 px-3 py-2">
-					<div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
-						{authState.staff.name.charAt(0).toUpperCase()}
-					</div>
-					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-white truncate">{authState.staff.name}</p>
-						<p class="text-xs text-slate-400 truncate">{authState.staff.position || 'スタッフ'}</p>
-					</div>
+					<a
+						href={authState.isAdmin ? '/admin' : '/account'}
+						class="flex items-center gap-3 flex-1 min-w-0 rounded-md hover:bg-slate-800 transition-colors -mx-1 px-1 py-0.5"
+					>
+						<div class="w-8 h-8 rounded-full {authState.isAdmin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center text-white text-sm font-bold shrink-0">
+							{authState.staff.name.charAt(0).toUpperCase()}
+						</div>
+						<div class="flex-1 min-w-0">
+							<p class="text-sm font-medium text-white truncate">{authState.staff.name}</p>
+							<p class="text-xs text-slate-400 truncate">
+								{#if authState.isAdmin}
+									Admin
+								{:else if authState.role}
+									{authState.role.name}
+								{:else}
+									{authState.staff.position || 'スタッフ'}
+								{/if}
+							</p>
+						</div>
+					</a>
 					<button
 						onclick={signOut}
 						class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"

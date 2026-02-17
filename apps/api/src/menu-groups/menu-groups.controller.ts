@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { MenuGroupsService, MenuGroup } from './menu-groups.service';
 import { CreateMenuGroupDto } from './dto/create-menu-group.dto';
 import { UpdateMenuGroupDto } from './dto/update-menu-group.dto';
-import { RequireStaff } from '../auth/staff.decorator';
+import { RequirePermission } from '../auth/permission.decorator';
 
 @ApiTags('menu-groups')
 @Controller('menu-groups')
@@ -18,21 +18,21 @@ export class MenuGroupsController {
   }
 
   @Post()
-  @RequireStaff()
+  @RequirePermission('menus.structure')
   @ApiOperation({ summary: 'Create a new menu group' })
   async create(@Body() dto: CreateMenuGroupDto): Promise<MenuGroup> {
     return this.menuGroupsService.create(dto);
   }
 
   @Put(':id')
-  @RequireStaff()
+  @RequirePermission('menus.structure')
   @ApiOperation({ summary: 'Update a menu group' })
   async update(@Param('id') id: string, @Body() dto: UpdateMenuGroupDto): Promise<MenuGroup> {
     return this.menuGroupsService.update(id, dto);
   }
 
   @Delete(':id')
-  @RequireStaff()
+  @RequirePermission('menus.structure')
   @ApiOperation({ summary: 'Delete a menu group' })
   async delete(@Param('id') id: string): Promise<void> {
     return this.menuGroupsService.delete(id);

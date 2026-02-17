@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 interface PeriodJson {
@@ -7,6 +7,8 @@ interface PeriodJson {
   day: number;
 }
 
+const STAFF_FIELDS = 'id, restaurant_id, name, email, position, is_active, is_admin, role_id, start_period, end_period, created_at';
+
 export interface Staff {
   id: string;
   restaurant_id: string;
@@ -14,6 +16,8 @@ export interface Staff {
   email: string;
   position: string | null;
   is_active: boolean;
+  is_admin: boolean;
+  role_id: string | null;
   start_period: PeriodJson | null;
   end_period: PeriodJson | null;
   created_at: string;
@@ -52,7 +56,7 @@ export class StaffsService {
 
     const { data, error } = await supabase
       .from('staff')
-      .select('id, restaurant_id, name, email, position, is_active, start_period, end_period, created_at')
+      .select(STAFF_FIELDS)
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true)
       .order('name');
@@ -75,7 +79,7 @@ export class StaffsService {
       .update({ email: email.trim().toLowerCase() })
       .eq('id', id)
       .eq('restaurant_id', restaurantId)
-      .select('id, restaurant_id, name, email, position, is_active, start_period, end_period, created_at')
+      .select(STAFF_FIELDS)
       .single();
 
     if (error) {
@@ -93,7 +97,7 @@ export class StaffsService {
     const { data, error } = await supabase
       .from('staff')
       .insert({ restaurant_id: restaurantId, name: name.trim(), email: email.trim().toLowerCase(), position: position.trim() })
-      .select('id, restaurant_id, name, email, position, is_active, start_period, end_period, created_at')
+      .select(STAFF_FIELDS)
       .single();
 
     if (error) {
@@ -101,6 +105,66 @@ export class StaffsService {
       throw new InternalServerErrorException(`Failed to register staff: ${error.message}`);
     }
 
+    return data;
+  }
+
+  async updateRole(id: string, roleId: string | null): Promise<Staff> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const { data, error } = await supabase
+      .from('staff')
+      .update({ role_id: roleId })
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .select(STAFF_FIELDS)
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to update staff role: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to update staff role: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async updateAdmin(id: string, isAdmin: boolean, requestingStaffId: string): Promise<Staff> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    // Safety: cannot demote yourself
+    if (!isAdmin && id === requestingStaffId) {
+      throw new BadRequestException('Cannot remove your own admin access');
+    }
+
+    // Safety: cannot remove the last admin
+    if (!isAdmin) {
+      const { data: admins } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .eq('is_admin', true);
+
+      if (admins && admins.length <= 1) {
+        throw new BadRequestException('Cannot remove the last admin. Promote another admin first.');
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('staff')
+      .update({ is_admin: isAdmin })
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .select(STAFF_FIELDS)
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to update admin status: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to update admin status: ${error.message}`);
+    }
+
+    this.logger.log(`Staff ${id} admin status set to ${isAdmin}`);
     return data;
   }
 }

@@ -18,6 +18,7 @@ import { AuthModule } from './auth/auth.module';
 import { StaffsModule } from './staffs/staffs.module';
 import { SeasonalMenusModule } from './seasonal-menus/seasonal-menus.module';
 import { ProductAlternatesModule } from './product-alternates/product-alternates.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ProductAlternatesModule } from './product-alternates/product-alternates
     StaffsModule,
     SeasonalMenusModule,
     ProductAlternatesModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
