@@ -83,7 +83,6 @@ export class ReservationsService {
   }
 
   async lookupByQR(qrCode: string): Promise<ReservationResponse> {
-    // QR code is the same as guest_token
     return this.lookupByToken(qrCode);
   }
 
@@ -133,8 +132,18 @@ export class ReservationsService {
   }
 
   async checkIn(id: string, dto: CheckInDto): Promise<ReservationResponse> {
-    // Get current reservation
-    const reservation = await this.findOne(id);
+    // Light-weight status check (no allergen enrichment needed)
+    const { data: reservation, error: fetchError } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .select('*')
+      .eq('id', id)
+      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .single();
+
+    if (fetchError || !reservation) {
+      throw new NotFoundException('Reservation not found');
+    }
 
     if (reservation.status === 'checked_in') {
       throw new BadRequestException('Guest is already checked in');
@@ -167,53 +176,68 @@ export class ReservationsService {
       throw new InternalServerErrorException(error.message);
     }
 
-    // Update room status to occupied
-    await this.roomsService.setOccupied(reservation.room_number, id);
+    // Update room status + create alert in parallel
+    const tasks: Promise<any>[] = [
+      this.roomsService.setOccupied(reservation.room_number, id),
+    ];
 
-    // Create guest alert if allergens are present
     if (dto.allergen_ids && dto.allergen_ids.length > 0) {
-      await this.createCheckInAlert(data, dto.allergen_ids);
+      tasks.push(this.createCheckInAlert(data, dto.allergen_ids));
     }
+
+    await Promise.all(tasks);
 
     return this.enrichWithAllergens(data);
   }
 
   async checkOut(id: string): Promise<ReservationResponse> {
-    const reservation = await this.findOne(id);
+    // Light-weight status check
+    const { data: reservation, error: fetchError } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .select('id, status, room_number')
+      .eq('id', id)
+      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .single();
+
+    if (fetchError || !reservation) {
+      throw new NotFoundException('Reservation not found');
+    }
 
     if (reservation.status !== 'checked_in') {
       throw new BadRequestException('Cannot check out: guest is not checked in');
     }
 
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('reservations')
-      .update({
-        status: 'checked_out',
-        checked_out_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    // Update reservation + room in parallel
+    const [updateResult] = await Promise.all([
+      this.supabaseService
+        .getClient()
+        .from('reservations')
+        .update({
+          status: 'checked_out',
+          checked_out_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single(),
+      this.supabaseService
+        .getClient()
+        .from('rooms')
+        .update({
+          status: 'cleaning',
+          current_reservation_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('room_number', reservation.room_number)
+        .eq('restaurant_id', this.supabaseService.getRestaurantId()),
+    ]);
 
-    if (error) {
-      throw new InternalServerErrorException(error.message);
+    if (updateResult.error) {
+      throw new InternalServerErrorException(updateResult.error.message);
     }
 
-    // Set room to cleaning status
-    await this.supabaseService
-      .getClient()
-      .from('rooms')
-      .update({
-        status: 'cleaning',
-        current_reservation_id: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('room_number', reservation.room_number)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId());
-
-    return data;
+    return updateResult.data;
   }
 
   async updateByToken(token: string, dto: GuestUpdateDto): Promise<ReservationResponse> {
@@ -249,9 +273,9 @@ export class ReservationsService {
       throw new InternalServerErrorException(error.message);
     }
 
-    // Create alert for kitchen if allergens were updated
+    // Create alert for kitchen if allergens were updated (non-blocking)
     if (dto.allergen_ids && dto.allergen_ids.length > 0) {
-      await this.supabaseService
+      this.supabaseService
         .getClient()
         .from('guest_alerts')
         .insert({
@@ -265,7 +289,8 @@ export class ReservationsService {
           allergen_ids: dto.allergen_ids,
           message: 'ゲストがアレルギー情報を更新しました',
           status: 'new',
-        });
+        })
+        .then(() => {});
     }
 
     return this.enrichWithAllergens(data);

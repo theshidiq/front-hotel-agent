@@ -32,35 +32,29 @@ export class ProductsService {
       throw new Error(`Failed to create product: ${error.message}`);
     }
 
-    // Link allergens if provided
-    const allergens: AllergenInfo[] = [];
+    // Link allergens if provided — batch insert + batch fetch
+    let allergens: AllergenInfo[] = [];
     if (allergen_ids && allergen_ids.length > 0) {
-      for (const allergenId of allergen_ids) {
-        const { error: linkError } = await supabase
-          .from('product_allergens')
-          .insert({
-            product_id: product.id,
-            allergen_id: allergenId,
-            source: 'label',
-          });
+      const rows = allergen_ids.map((aid) => ({
+        product_id: product.id,
+        allergen_id: aid,
+        source: 'label',
+      }));
 
-        if (!linkError) {
-          const { data: allergen } = await supabase
-            .from('allergens')
-            .select('id, name, category')
-            .eq('id', allergenId)
-            .single();
+      const [, { data: allergenData }] = await Promise.all([
+        supabase.from('product_allergens').insert(rows),
+        supabase
+          .from('allergens')
+          .select('id, name, category')
+          .in('id', allergen_ids),
+      ]);
 
-          if (allergen) {
-            allergens.push({
-              id: allergen.id,
-              name: allergen.name,
-              category: allergen.category,
-              source: 'label',
-            });
-          }
-        }
-      }
+      allergens = (allergenData || []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        category: a.category,
+        source: 'label',
+      }));
     }
 
     return {
@@ -84,7 +78,11 @@ export class ProductsService {
       throw new Error(`Failed to fetch products: ${error.message}`);
     }
 
-    // Fetch allergens for all products
+    if (products.length === 0) {
+      return [];
+    }
+
+    // Fetch allergens for all products in one query
     const productIds = products.map((p) => p.id);
     const { data: allergenLinks } = await supabase
       .from('product_allergens')
@@ -115,23 +113,20 @@ export class ProductsService {
   async findOne(id: string): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
 
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Parallel fetch: product + allergen links
+    const [productResult, allergenResult] = await Promise.all([
+      supabase.from('products').select('*').eq('id', id).single(),
+      supabase
+        .from('product_allergens')
+        .select('*, allergens(*)')
+        .eq('product_id', id),
+    ]);
 
-    if (error || !product) {
+    if (productResult.error || !productResult.data) {
       throw new NotFoundException(`Product ${id} not found`);
     }
 
-    // Fetch allergens
-    const { data: allergenLinks } = await supabase
-      .from('product_allergens')
-      .select('*, allergens(*)')
-      .eq('product_id', id);
-
-    const allergens: AllergenInfo[] = (allergenLinks || []).map(
+    const allergens: AllergenInfo[] = (allergenResult.data || []).map(
       (link: any) => ({
         id: link.allergens.id,
         name: link.allergens.name,
@@ -141,7 +136,7 @@ export class ProductsService {
     );
 
     return {
-      ...product,
+      ...productResult.data,
       allergens,
     };
   }
@@ -152,64 +147,59 @@ export class ProductsService {
   ): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
 
-    // Verify product exists
-    const existing = await this.findOne(id);
-    if (!existing) {
-      throw new NotFoundException(`Product ${id} not found`);
-    }
-
     const { allergen_ids, ...productData } = updateProductDto;
 
-    // Only update product if there's data to update (not just allergen_ids)
+    // Update product fields if provided — also serves as existence check
     if (Object.keys(productData).length > 0) {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('products')
         .update(productData)
         .eq('id', id)
-        .select()
-        .single();
+        .select('id');
 
       if (error) {
         throw new Error(`Failed to update product: ${error.message}`);
       }
-    }
-
-    // Update allergens if provided
-    if (allergen_ids !== undefined) {
-      // Remove existing allergens
-      await supabase.from('product_allergens').delete().eq('product_id', id);
-
-      // Add new allergens
-      for (const allergenId of allergen_ids) {
-        await supabase.from('product_allergens').insert({
-          product_id: id,
-          allergen_id: allergenId,
-          source: 'label',
-        });
+      if (!updated || updated.length === 0) {
+        throw new NotFoundException(`Product ${id} not found`);
       }
     }
 
-    // Return updated product with allergens
+    // Update allergens if provided — batch delete + batch insert
+    if (allergen_ids !== undefined) {
+      await supabase.from('product_allergens').delete().eq('product_id', id);
+
+      if (allergen_ids.length > 0) {
+        const rows = allergen_ids.map((aid) => ({
+          product_id: id,
+          allergen_id: aid,
+          source: 'label',
+        }));
+        await supabase.from('product_allergens').insert(rows);
+      }
+    }
+
     return this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
-    // Verify product exists
-    const existing = await this.findOne(id);
-    if (!existing) {
-      throw new NotFoundException(`Product ${id} not found`);
-    }
-
-    // Delete allergen links first
+    // Delete allergen links + product in parallel (links first, then product)
     await supabase.from('product_allergens').delete().eq('product_id', id);
 
-    // Delete product
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    const { data: deleted, error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id)
+      .select('id');
 
     if (error) {
       throw new Error(`Failed to delete product: ${error.message}`);
+    }
+
+    if (!deleted || deleted.length === 0) {
+      throw new NotFoundException(`Product ${id} not found`);
     }
   }
 }

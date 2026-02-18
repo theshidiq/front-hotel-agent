@@ -58,8 +58,12 @@ export class RolesService {
       throw new InternalServerErrorException(`Failed to fetch roles: ${error.message}`);
     }
 
-    // Load permissions for each role
-    const roleIds = (roles || []).map((r) => r.id);
+    if (!roles || roles.length === 0) {
+      return [];
+    }
+
+    // Batch load permissions for all roles in one query
+    const roleIds = roles.map((r) => r.id);
     const { data: allPerms } = await supabase
       .from('role_permissions')
       .select('role_id, permission')
@@ -72,7 +76,7 @@ export class RolesService {
       permsByRole.set(perm.role_id, existing);
     }
 
-    return (roles || []).map((r) => ({
+    return roles.map((r) => ({
       ...r,
       permissions: permsByRole.get(r.id) || [],
     }));
@@ -81,24 +85,19 @@ export class RolesService {
   async findOne(id: string): Promise<Role> {
     const supabase = this.supabaseService.getClient();
 
-    const { data: role, error } = await supabase
-      .from('roles')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Parallel fetch: role + permissions
+    const [roleResult, permsResult] = await Promise.all([
+      supabase.from('roles').select('*').eq('id', id).single(),
+      supabase.from('role_permissions').select('permission').eq('role_id', id),
+    ]);
 
-    if (error || !role) {
+    if (roleResult.error || !roleResult.data) {
       throw new NotFoundException(`Role ${id} not found`);
     }
 
-    const { data: perms } = await supabase
-      .from('role_permissions')
-      .select('permission')
-      .eq('role_id', id);
-
     return {
-      ...role,
-      permissions: (perms || []).map((p) => p.permission),
+      ...roleResult.data,
+      permissions: (permsResult.data || []).map((p) => p.permission),
     };
   }
 
@@ -128,18 +127,20 @@ export class RolesService {
     }
 
     // Add permissions if provided
-    if (permissions && permissions.length > 0) {
-      const validPerms = permissions.filter((p) =>
-        ALL_PERMISSIONS.includes(p as Permission),
+    const validPerms = (permissions || []).filter((p) =>
+      ALL_PERMISSIONS.includes(p as Permission),
+    );
+
+    if (validPerms.length > 0) {
+      await supabase.from('role_permissions').insert(
+        validPerms.map((p) => ({ role_id: role.id, permission: p })),
       );
-      if (validPerms.length > 0) {
-        await supabase.from('role_permissions').insert(
-          validPerms.map((p) => ({ role_id: role.id, permission: p })),
-        );
-      }
     }
 
-    return this.findOne(role.id);
+    return {
+      ...role,
+      permissions: validPerms,
+    };
   }
 
   async update(id: string, name?: string, description?: string): Promise<Role> {
@@ -171,16 +172,20 @@ export class RolesService {
   async updatePermissions(id: string, permissions: string[]): Promise<Role> {
     const supabase = this.supabaseService.getClient();
 
-    // Validate role exists
-    await this.findOne(id);
-
     // Validate permissions
     const validPerms = permissions.filter((p) =>
       ALL_PERMISSIONS.includes(p as Permission),
     );
 
-    // Delete all existing permissions
-    await supabase.from('role_permissions').delete().eq('role_id', id);
+    // Delete all existing + get role data in parallel
+    const [, roleResult] = await Promise.all([
+      supabase.from('role_permissions').delete().eq('role_id', id),
+      supabase.from('roles').select('*').eq('id', id).single(),
+    ]);
+
+    if (roleResult.error || !roleResult.data) {
+      throw new NotFoundException(`Role ${id} not found`);
+    }
 
     // Insert new permissions
     if (validPerms.length > 0) {
@@ -193,7 +198,11 @@ export class RolesService {
     }
 
     this.logger.log(`Updated role ${id} permissions: [${validPerms.join(', ')}]`);
-    return this.findOne(id);
+
+    return {
+      ...roleResult.data,
+      permissions: validPerms,
+    };
   }
 
   async findDefault(): Promise<Role | null> {
@@ -224,15 +233,15 @@ export class RolesService {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();
 
-    // Validate role exists
-    await this.findOne(id);
-
-    // Clear any existing default
-    await supabase
-      .from('roles')
-      .update({ is_default: false })
-      .eq('restaurant_id', restaurantId)
-      .eq('is_default', true);
+    // Clear existing default + validate role exists in parallel
+    const [, roleResult] = await Promise.all([
+      supabase
+        .from('roles')
+        .update({ is_default: false })
+        .eq('restaurant_id', restaurantId)
+        .eq('is_default', true),
+      this.findOne(id),
+    ]);
 
     // Set the new default
     const { error } = await supabase
@@ -245,7 +254,11 @@ export class RolesService {
     }
 
     this.logger.log(`Set role ${id} as default guest role`);
-    return this.findOne(id);
+
+    return {
+      ...roleResult,
+      is_default: true,
+    };
   }
 
   async clearDefault(): Promise<void> {

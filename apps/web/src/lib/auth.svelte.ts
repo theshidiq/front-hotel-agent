@@ -151,16 +151,11 @@ async function checkStaffStatus(email: string): Promise<StaffWithPeriod | null> 
 }
 
 async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | null; permissions: string[] }> {
-	const { data: role } = await supabase
-		.from('roles')
-		.select('id, name')
-		.eq('id', roleId)
-		.single();
-
-	const { data: perms } = await supabase
-		.from('role_permissions')
-		.select('permission')
-		.eq('role_id', roleId);
+	// Parallel fetch: role + permissions
+	const [{ data: role }, { data: perms }] = await Promise.all([
+		supabase.from('roles').select('id, name').eq('id', roleId).single(),
+		supabase.from('role_permissions').select('permission').eq('role_id', roleId),
+	]);
 
 	return {
 		role: role ? { id: role.id, name: role.name } : null,
@@ -263,13 +258,13 @@ export async function initAuth(): Promise<void> {
 		return;
 	}
 
-	// Load guest default role permissions (for non-logged-in users)
-	await loadGuestPermissions();
+	// Parallel: load guest permissions + get session (independent operations)
+	const [, sessionResult] = await Promise.all([
+		loadGuestPermissions(),
+		supabase.auth.getSession(),
+	]);
 
-	// Get initial session
-	const {
-		data: { session },
-	} = await supabase.auth.getSession();
+	const session = sessionResult.data.session;
 
 	if (session?.user?.email) {
 		authState.user = session.user;

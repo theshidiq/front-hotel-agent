@@ -47,65 +47,66 @@ export class ScanService {
       const { extractedData, rawResponse } =
         await this.qwenVisionService.extractProductData(createScanDto.imageUrl);
 
-      // 4. Save raw response
-      await supabase
-        .from('scan_sessions')
-        .update({ raw_response: rawResponse })
-        .eq('id', scanSession.id);
+      // 4. Save raw response + create product in parallel
+      const [, productResult] = await Promise.all([
+        supabase
+          .from('scan_sessions')
+          .update({ raw_response: rawResponse })
+          .eq('id', scanSession.id),
+        supabase
+          .from('products')
+          .insert({
+            restaurant_id: restaurantId,
+            name: extractedData.product_name || 'Unknown Product',
+            brand: extractedData.brand,
+            category: extractedData.category,
+            ingredients_raw: extractedData.ingredients_raw,
+            nutrition_per_100g: extractedData.nutrition_per_100g,
+            storage_instructions: extractedData.storage_instructions,
+            preparation_instructions: extractedData.preparation_instructions,
+            is_vegetarian: extractedData.is_vegetarian,
+            is_vegan: extractedData.is_vegan,
+            is_halal: extractedData.is_halal,
+            is_gluten_free: extractedData.is_gluten_free,
+            image_url: createScanDto.imageUrl,
+          })
+          .select()
+          .single(),
+      ]);
 
-      // 5. Create product
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .insert({
-          restaurant_id: restaurantId,
-          name: extractedData.product_name || 'Unknown Product',
-          brand: extractedData.brand,
-          category: extractedData.category,
-          ingredients_raw: extractedData.ingredients_raw,
-          nutrition_per_100g: extractedData.nutrition_per_100g,
-          storage_instructions: extractedData.storage_instructions,
-          preparation_instructions: extractedData.preparation_instructions,
-          is_vegetarian: extractedData.is_vegetarian,
-          is_vegan: extractedData.is_vegan,
-          is_halal: extractedData.is_halal,
-          is_gluten_free: extractedData.is_gluten_free,
-          image_url: createScanDto.imageUrl,
-        })
-        .select()
-        .single();
-
-      if (productError) {
-        throw new Error(`Failed to create product: ${productError.message}`);
+      if (productResult.error) {
+        throw new Error(`Failed to create product: ${productResult.error.message}`);
       }
 
+      const product = productResult.data;
       this.logger.log(`Created product: ${product.id}`);
 
-      // 6. Check for existing product with same name (duplicate detection)
-      let existingProduct = null;
+      // 6. Check duplicate + link allergens in parallel
       const productName = product.name?.trim();
-      if (productName && productName !== 'Unknown Product') {
-        const { data: duplicates } = await supabase
-          .from('products')
-          .select('id, name, brand, image_url')
-          .eq('restaurant_id', restaurantId)
-          .ilike('name', productName)
-          .neq('id', product.id)
-          .limit(1);
+      const [duplicateResult, allergenLinks] = await Promise.all([
+        productName && productName !== 'Unknown Product'
+          ? supabase
+              .from('products')
+              .select('id, name, brand, image_url')
+              .eq('restaurant_id', restaurantId)
+              .ilike('name', productName)
+              .neq('id', product.id)
+              .limit(1)
+          : Promise.resolve({ data: null }),
+        this.linkAllergens(
+          product.id,
+          extractedData.allergens,
+          extractedData.ingredients_raw,
+        ),
+      ]);
 
-        if (duplicates && duplicates.length > 0) {
-          existingProduct = duplicates[0];
-          this.logger.log(`Duplicate product found: ${existingProduct.id} (${existingProduct.name})`);
-        }
+      let existingProduct = null;
+      if (duplicateResult.data && duplicateResult.data.length > 0) {
+        existingProduct = duplicateResult.data[0];
+        this.logger.log(`Duplicate product found: ${existingProduct.id} (${existingProduct.name})`);
       }
 
-      // 7. Link allergens (from Qwen labels + ingredient text scanning)
-      const allergenLinks = await this.linkAllergens(
-        product.id,
-        extractedData.allergens,
-        extractedData.ingredients_raw,
-      );
-
-      // 8. Update scan session with product_id and completed status
+      // 7. Update scan session with product_id and completed status
       const { data: updatedSession } = await supabase
         .from('scan_sessions')
         .update({
@@ -148,50 +149,50 @@ export class ScanService {
     const links: { id: string; name: string; category: string; source: string }[] = [];
     const linkedIds = new Set<string>();
 
-    // 1. Match by Qwen-extracted allergen names
-    if (allergenNames && allergenNames.length > 0) {
-      const matchedAllergens = await this.allergensService.findByNames(allergenNames);
-      for (const allergen of matchedAllergens) {
-        const { error } = await supabase.from('product_allergens').insert({
-          product_id: productId,
-          allergen_id: allergen.id,
-          source: 'label',
-        });
-        if (!error) {
+    // Fetch label-matched + all allergens in parallel
+    const [matchedAllergens, allAllergens] = await Promise.all([
+      allergenNames && allergenNames.length > 0
+        ? this.allergensService.findByNames(allergenNames)
+        : Promise.resolve([]),
+      ingredientsRaw ? this.allergensService.findAll() : Promise.resolve([]),
+    ]);
+
+    // 1. Collect label-matched allergens
+    for (const allergen of matchedAllergens) {
+      linkedIds.add(allergen.id);
+      links.push({
+        id: allergen.id,
+        name: allergen.name,
+        category: allergen.category,
+        source: 'label',
+      });
+    }
+
+    // 2. Scan ingredients text for additional allergens
+    if (ingredientsRaw) {
+      for (const allergen of allAllergens) {
+        if (linkedIds.has(allergen.id)) continue;
+        if (ingredientsRaw.includes(allergen.name)) {
           linkedIds.add(allergen.id);
           links.push({
             id: allergen.id,
             name: allergen.name,
             category: allergen.category,
-            source: 'label',
-          });
-        }
-      }
-    }
-
-    // 2. Scan ingredients_raw text against all known allergens
-    if (ingredientsRaw) {
-      const allAllergens = await this.allergensService.findAll();
-      for (const allergen of allAllergens) {
-        if (linkedIds.has(allergen.id)) continue;
-        if (ingredientsRaw.includes(allergen.name)) {
-          const { error } = await supabase.from('product_allergens').insert({
-            product_id: productId,
-            allergen_id: allergen.id,
             source: 'inferred',
           });
-          if (!error) {
-            linkedIds.add(allergen.id);
-            links.push({
-              id: allergen.id,
-              name: allergen.name,
-              category: allergen.category,
-              source: 'inferred',
-            });
-          }
         }
       }
       this.logger.log(`Inferred ${links.filter(l => l.source === 'inferred').length} allergens from ingredients text`);
+    }
+
+    // 3. Batch insert all allergen links at once
+    if (links.length > 0) {
+      const rows = links.map((l) => ({
+        product_id: productId,
+        allergen_id: l.id,
+        source: l.source,
+      }));
+      await supabase.from('product_allergens').insert(rows);
     }
 
     return links;
@@ -226,19 +227,19 @@ export class ScanService {
       const { extractedData, rawResponse } =
         await this.qwenVisionService.extractProductData(createScanDto.imageUrl);
 
-      // 3. Save raw response
-      await supabase
-        .from('scan_sessions')
-        .update({ raw_response: rawResponse })
-        .eq('id', scanSession.id);
+      // 3. Save raw response + match allergens in parallel
+      const [, matchedAllergens] = await Promise.all([
+        supabase
+          .from('scan_sessions')
+          .update({ raw_response: rawResponse })
+          .eq('id', scanSession.id),
+        this.matchAllergens(
+          extractedData.allergens,
+          extractedData.ingredients_raw,
+        ),
+      ]);
 
-      // 4. Match allergens (without inserting into DB)
-      const matchedAllergens = await this.matchAllergens(
-        extractedData.allergens,
-        extractedData.ingredients_raw,
-      );
-
-      // 5. Update scan session as completed (no product_id since we don't create one)
+      // 4. Update scan session as completed
       const { data: updatedSession } = await supabase
         .from('scan_sessions')
         .update({ status: 'completed' })
@@ -285,23 +286,27 @@ export class ScanService {
     const matches: { id: string; name: string; category: string; source: string }[] = [];
     const matchedIds = new Set<string>();
 
-    // 1. Match by Qwen-extracted allergen names
-    if (allergenNames && allergenNames.length > 0) {
-      const found = await this.allergensService.findByNames(allergenNames);
-      for (const allergen of found) {
-        matchedIds.add(allergen.id);
-        matches.push({
-          id: allergen.id,
-          name: allergen.name,
-          category: allergen.category,
-          source: 'label',
-        });
-      }
+    // Fetch label-matched + all allergens in parallel
+    const [found, allAllergens] = await Promise.all([
+      allergenNames && allergenNames.length > 0
+        ? this.allergensService.findByNames(allergenNames)
+        : Promise.resolve([]),
+      ingredientsRaw ? this.allergensService.findAll() : Promise.resolve([]),
+    ]);
+
+    // 1. Label matches
+    for (const allergen of found) {
+      matchedIds.add(allergen.id);
+      matches.push({
+        id: allergen.id,
+        name: allergen.name,
+        category: allergen.category,
+        source: 'label',
+      });
     }
 
-    // 2. Scan ingredients text for additional allergens
+    // 2. Ingredient text matches
     if (ingredientsRaw) {
-      const allAllergens = await this.allergensService.findAll();
       for (const allergen of allAllergens) {
         if (matchedIds.has(allergen.id)) continue;
         if (ingredientsRaw.includes(allergen.name)) {
@@ -335,22 +340,23 @@ export class ScanService {
     let product = null;
 
     if (scanSession.product_id) {
-      const { data: productData } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', scanSession.product_id)
-        .single();
-
-      if (productData) {
-        // Get allergens for product
-        const { data: allergenLinks } = await supabase
+      // Parallel fetch: product + allergens
+      const [productResult, allergenResult] = await Promise.all([
+        supabase
+          .from('products')
+          .select('*')
+          .eq('id', scanSession.product_id)
+          .single(),
+        supabase
           .from('product_allergens')
           .select('*, allergens(*)')
-          .eq('product_id', productData.id);
+          .eq('product_id', scanSession.product_id),
+      ]);
 
+      if (productResult.data) {
         product = {
-          ...productData,
-          allergens: (allergenLinks || []).map((link: any) => ({
+          ...productResult.data,
+          allergens: (allergenResult.data || []).map((link: any) => ({
             id: link.allergens.id,
             name: link.allergens.name,
             category: link.allergens.category,

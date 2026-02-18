@@ -30,14 +30,13 @@ export class MenusService {
       throw new Error(`Failed to create menu: ${error.message}`);
     }
 
-    // Link products if provided
+    // Link products if provided — batch insert
     if (product_ids && product_ids.length > 0) {
-      for (const productId of product_ids) {
-        await supabase.from('menu_products').insert({
-          menu_id: menu.id,
-          product_id: productId,
-        });
-      }
+      const rows = product_ids.map((pid) => ({
+        menu_id: menu.id,
+        product_id: pid,
+      }));
+      await supabase.from('menu_products').insert(rows);
     }
 
     // Return complete menu with products and derived allergens
@@ -59,31 +58,38 @@ export class MenusService {
       throw new Error(`Failed to fetch menus: ${error.message}`);
     }
 
-    // Fetch products and allergens for all menus
+    if (menus.length === 0) {
+      return [];
+    }
+
     const menuIds = menus.map((m) => m.id);
 
-    // Get all menu_products links
+    // Get menu_products links
     const { data: menuProductLinks } = await supabase
       .from('menu_products')
       .select('menu_id, product_id')
       .in('menu_id', menuIds);
 
-    // Get unique product IDs
     const productIds = [
       ...new Set((menuProductLinks || []).map((mp) => mp.product_id)),
     ];
 
-    // Fetch all products
-    const { data: products } = await supabase
-      .from('products')
-      .select('*')
-      .in('id', productIds);
+    if (productIds.length === 0) {
+      return menus.map((menu) => ({
+        ...menu,
+        products: [],
+        allergens: [],
+      }));
+    }
 
-    // Fetch allergens for all products
-    const { data: allergenLinks } = await supabase
-      .from('product_allergens')
-      .select('*, allergens(*)')
-      .in('product_id', productIds);
+    // Parallel fetch: products + allergen links
+    const [{ data: products }, { data: allergenLinks }] = await Promise.all([
+      supabase.from('products').select('*').in('id', productIds),
+      supabase
+        .from('product_allergens')
+        .select('*, allergens(*)')
+        .in('product_id', productIds),
+    ]);
 
     // Group allergens by product
     const allergensByProduct = new Map<string, AllergenInfo[]>();
@@ -146,38 +152,31 @@ export class MenusService {
   async findOne(id: string): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
 
-    const { data: menu, error } = await supabase
-      .from('menus')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Parallel fetch: menu + product links
+    const [menuResult, linksResult] = await Promise.all([
+      supabase.from('menus').select('*').eq('id', id).single(),
+      supabase.from('menu_products').select('product_id').eq('menu_id', id),
+    ]);
 
-    if (error || !menu) {
+    if (menuResult.error || !menuResult.data) {
       throw new NotFoundException(`Menu ${id} not found`);
     }
 
-    // Fetch linked products
-    const { data: menuProductLinks } = await supabase
-      .from('menu_products')
-      .select('product_id')
-      .eq('menu_id', id);
-
-    const productIds = (menuProductLinks || []).map((mp) => mp.product_id);
+    const menu = menuResult.data;
+    const productIds = (linksResult.data || []).map((mp) => mp.product_id);
 
     let products: MenuProductInfo[] = [];
 
     if (productIds.length > 0) {
-      // Fetch products
-      const { data: productData } = await supabase
-        .from('products')
-        .select('*')
-        .in('id', productIds);
-
-      // Fetch allergens for products
-      const { data: allergenLinks } = await supabase
-        .from('product_allergens')
-        .select('*, allergens(*)')
-        .in('product_id', productIds);
+      // Parallel fetch: products + allergen links
+      const [{ data: productData }, { data: allergenLinks }] =
+        await Promise.all([
+          supabase.from('products').select('*').in('id', productIds),
+          supabase
+            .from('product_allergens')
+            .select('*, allergens(*)')
+            .in('product_id', productIds),
+        ]);
 
       // Group allergens by product
       const allergensByProduct = new Map<string, AllergenInfo[]>();
@@ -216,15 +215,9 @@ export class MenusService {
   async update(id: string, updateMenuDto: UpdateMenuDto): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
 
-    // Verify menu exists
-    const existing = await this.findOne(id);
-    if (!existing) {
-      throw new NotFoundException(`Menu ${id} not found`);
-    }
-
     const { product_ids, ...menuData } = updateMenuDto;
 
-    // Update menu
+    // Update menu — also serves as existence check
     const { error } = await supabase
       .from('menus')
       .update({
@@ -237,41 +230,41 @@ export class MenusService {
       throw new Error(`Failed to update menu: ${error.message}`);
     }
 
-    // Update products if provided
+    // Update products if provided — batch delete + batch insert
     if (product_ids !== undefined) {
-      // Remove existing product links
       await supabase.from('menu_products').delete().eq('menu_id', id);
 
-      // Add new product links
-      for (const productId of product_ids) {
-        await supabase.from('menu_products').insert({
+      if (product_ids.length > 0) {
+        const rows = product_ids.map((pid) => ({
           menu_id: id,
-          product_id: productId,
-        });
+          product_id: pid,
+        }));
+        await supabase.from('menu_products').insert(rows);
       }
     }
 
-    // Return updated menu with products and allergens
     return this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
-    // Verify menu exists
-    const existing = await this.findOne(id);
-    if (!existing) {
-      throw new NotFoundException(`Menu ${id} not found`);
-    }
-
-    // Delete product links first (CASCADE should handle this, but explicit is safer)
+    // Delete product links first
     await supabase.from('menu_products').delete().eq('menu_id', id);
 
     // Delete menu
-    const { error } = await supabase.from('menus').delete().eq('id', id);
+    const { data: deleted, error } = await supabase
+      .from('menus')
+      .delete()
+      .eq('id', id)
+      .select('id');
 
     if (error) {
       throw new Error(`Failed to delete menu: ${error.message}`);
+    }
+
+    if (!deleted || deleted.length === 0) {
+      throw new NotFoundException(`Menu ${id} not found`);
     }
   }
 
