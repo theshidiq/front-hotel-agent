@@ -36,6 +36,7 @@
 		onCreateMenu: (data: CreateMenuData) => Promise<void>;
 		onUpdateMenu: (id: string, data: UpdateMenuData) => Promise<void>;
 		onDeleteMenu: (id: string) => Promise<void>;
+		onSwitchToPanel?: () => void;
 		onClose: () => void;
 	}
 
@@ -61,6 +62,7 @@
 		onCreateMenu,
 		onUpdateMenu,
 		onDeleteMenu,
+		onSwitchToPanel,
 		onClose,
 	}: Props = $props();
 
@@ -113,6 +115,15 @@
 	let isAddingCourse = $state(false);
 	let addCourseError = $state('');
 
+	// Toast notification
+	let toast: { message: string; timeout: ReturnType<typeof setTimeout> } | null = $state(null);
+
+	function showToast(message: string) {
+		if (toast) clearTimeout(toast.timeout);
+		const timeout = setTimeout(() => { toast = null; }, 2000);
+		toast = { message, timeout };
+	}
+
 	// Course name lookup (menuCategories is the source of truth for names)
 	const courseNameMap = $derived.by(() => {
 		const map = new Map<string, string>();
@@ -156,6 +167,12 @@
 				.map(m => ({ id: m.id, name: m.name, price: m.price, description: m.description })),
 		}));
 	});
+
+	const activeGroupSeasonName = $derived(
+		activeGroup?.seasonal_menu_id
+			? seasonalMenus.find(s => s.id === activeGroup.seasonal_menu_id)?.name ?? null
+			: null
+	);
 
 	const activeGroupAvailableCourses = $derived.by(() => {
 		if (!activeGroup) return [];
@@ -293,10 +310,26 @@
 		}
 	}
 
-	function handleDeleteCourse(id: string) {
-		if (confirm('Delete this course? It will be removed from all groups.')) {
-			onDeleteCourse(id);
-		}
+	// Inline delete confirmation for courses
+	let confirmDeleteCourseId: string | null = $state(null);
+	let confirmDeleteTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+
+	function requestDeleteCourse(id: string) {
+		if (confirmDeleteTimeout) clearTimeout(confirmDeleteTimeout);
+		confirmDeleteCourseId = id;
+		confirmDeleteTimeout = setTimeout(() => { confirmDeleteCourseId = null; }, 3000);
+	}
+
+	function confirmDeleteCourse(id: string) {
+		if (confirmDeleteTimeout) clearTimeout(confirmDeleteTimeout);
+		confirmDeleteCourseId = null;
+		onDeleteCourse(id);
+		showToast('Course deleted');
+	}
+
+	function cancelDeleteCourse() {
+		if (confirmDeleteTimeout) clearTimeout(confirmDeleteTimeout);
+		confirmDeleteCourseId = null;
 	}
 
 	function handleOpenMenuSidebar(groupId: string, courseValue: string, courseName: string) {
@@ -319,9 +352,9 @@
 	}
 
 	function handleDeleteMenuFromTree(menuId: string) {
-		if (confirm('Delete this menu item?')) {
-			onDeleteMenu(menuId);
-		}
+		const menu = menus.find(m => m.id === menuId);
+		onDeleteMenu(menuId);
+		showToast(`${menu?.name ?? 'Menu item'} deleted`);
 	}
 
 	// Course detail sidebar state
@@ -663,15 +696,29 @@
 			<h2 class="text-xl font-bold text-gray-900">Menu Structure</h2>
 			<p class="text-sm text-gray-500">Configure seasonal menus, groups, and courses — pan & zoom to explore</p>
 		</div>
-		<button
-			onclick={onClose}
-			aria-label="Close"
-			class="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-		>
-			<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-			</svg>
-		</button>
+		<div class="flex items-center gap-2">
+			{#if onSwitchToPanel}
+				<button
+					onclick={onSwitchToPanel}
+					class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+					title="Switch to panel view"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+					</svg>
+					Panel View
+				</button>
+			{/if}
+			<button
+				onclick={onClose}
+				aria-label="Close"
+				class="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+			>
+				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
 	</div>
 
 	<!-- Inline add forms (floating above the canvas) -->
@@ -777,18 +824,37 @@
 
 			<div class="flex flex-wrap gap-2">
 				{#each menuCategories as course}
-					<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
-						<span class="text-sm text-blue-800">{course.label}</span>
-						<button
-							onclick={() => handleDeleteCourse(course.id)}
-							class="text-blue-400 hover:text-red-500 transition-colors"
-							title="Delete course"
-						>
-							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-							</svg>
-						</button>
-					</div>
+					{#if confirmDeleteCourseId === course.id}
+						<div class="flex items-center gap-1.5 bg-red-50 border border-red-300 rounded-full px-3 py-1 animate-pulse">
+							<span class="text-sm text-red-700">削除?</span>
+							<button
+								onclick={() => confirmDeleteCourse(course.id)}
+								class="text-red-500 hover:text-red-700 font-bold text-xs transition-colors"
+							>
+								Yes
+							</button>
+							<span class="text-red-200">|</span>
+							<button
+								onclick={cancelDeleteCourse}
+								class="text-gray-400 hover:text-gray-600 text-xs transition-colors"
+							>
+								No
+							</button>
+						</div>
+					{:else}
+						<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
+							<span class="text-sm text-blue-800">{course.label}</span>
+							<button
+								onclick={() => requestDeleteCourse(course.id)}
+								class="text-blue-400 hover:text-red-500 transition-colors"
+								title="Delete course"
+							>
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						</div>
+					{/if}
 				{/each}
 				{#if menuCategories.length === 0}
 					<p class="text-sm text-gray-400">No courses defined yet. Add one above.</p>
@@ -802,6 +868,7 @@
 	<MenuPreviewPanel
 		groupId={activeGroup.id}
 		groupName={activeGroup.name}
+		seasonName={activeGroupSeasonName}
 		displayTitle={activeGroup.display_title ?? null}
 		courses={activeGroupCourses}
 		availableCourses={activeGroupAvailableCourses}
@@ -843,7 +910,21 @@
 	/>
 {/if}
 
+<!-- Toast notification -->
+{#if toast}
+	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg animate-fade-in">
+		{toast.message}
+	</div>
+{/if}
+
 <style>
+	@keyframes fade-in {
+		from { opacity: 0; transform: translate(-50%, 8px); }
+		to { opacity: 1; transform: translate(-50%, 0); }
+	}
+	.animate-fade-in {
+		animation: fade-in 0.2s ease-out;
+	}
 	:global(.svelte-flow) {
 		background-color: #f9fafb;
 	}

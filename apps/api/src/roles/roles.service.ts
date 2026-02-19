@@ -24,6 +24,13 @@ export const ALL_PERMISSIONS = [
   'reports.export',
   'categories.manage',
   'staff.manage',
+  'reservations.view',
+  'reservations.checkin',
+  'reservations.checkout',
+  'reservations.create',
+  'rooms.view',
+  'notifications.view',
+  'notifications.manage',
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];

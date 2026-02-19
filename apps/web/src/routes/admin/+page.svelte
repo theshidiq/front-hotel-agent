@@ -47,48 +47,96 @@
 	let selectedStaff: StaffMember | null = $state(null);
 	let staffDetailSaving = $state(false);
 
-	// Permission groups for display
-	const permissionGroups: Record<string, { label: string; permissions: { key: string; label: string }[] }> = {
-		products: {
-			label: 'Products',
-			permissions: [
-				{ key: 'products.view', label: 'View' },
-				{ key: 'products.create', label: 'Create' },
-				{ key: 'products.edit', label: 'Edit' },
-				{ key: 'products.delete', label: 'Delete' },
-				{ key: 'products.scan', label: 'Scan' },
-			],
+	// Permission groups organized by page
+	interface PermGroup { label: string; permissions: { key: string; label: string }[] }
+	interface PageSection { label: string; icon: string; groups: Record<string, PermGroup> }
+
+	const permissionPages: Record<string, PageSection> = {
+		food: {
+			label: 'Food Management',
+			icon: 'restaurant',
+			groups: {
+				products: {
+					label: 'Products',
+					permissions: [
+						{ key: 'products.view', label: 'View' },
+						{ key: 'products.create', label: 'Create' },
+						{ key: 'products.edit', label: 'Edit' },
+						{ key: 'products.delete', label: 'Delete' },
+						{ key: 'products.scan', label: 'Scan' },
+					],
+				},
+				menus: {
+					label: 'Menus',
+					permissions: [
+						{ key: 'menus.view', label: 'View' },
+						{ key: 'menus.create', label: 'Create' },
+						{ key: 'menus.edit', label: 'Edit' },
+						{ key: 'menus.delete', label: 'Delete' },
+						{ key: 'menus.structure', label: 'Structure' },
+					],
+				},
+				allergens: {
+					label: 'Allergens',
+					permissions: [
+						{ key: 'allergens.view', label: 'View' },
+						{ key: 'allergens.manage', label: 'Manage' },
+					],
+				},
+				reports: {
+					label: 'Reports',
+					permissions: [
+						{ key: 'reports.print', label: 'Print' },
+						{ key: 'reports.export', label: 'Export' },
+					],
+				},
+				categories: {
+					label: 'Categories',
+					permissions: [
+						{ key: 'categories.manage', label: 'Manage' },
+					],
+				},
+			},
 		},
-		menus: {
-			label: 'Menus',
-			permissions: [
-				{ key: 'menus.view', label: 'View' },
-				{ key: 'menus.create', label: 'Create' },
-				{ key: 'menus.edit', label: 'Edit' },
-				{ key: 'menus.delete', label: 'Delete' },
-				{ key: 'menus.structure', label: 'Structure' },
-			],
+		frontDesk: {
+			label: 'Front Desk',
+			icon: 'concierge',
+			groups: {
+				reservations: {
+					label: 'Reservations',
+					permissions: [
+						{ key: 'reservations.view', label: 'View' },
+						{ key: 'reservations.create', label: 'Create' },
+						{ key: 'reservations.checkin', label: 'Check-in' },
+						{ key: 'reservations.checkout', label: 'Check-out' },
+					],
+				},
+				rooms: {
+					label: 'Rooms',
+					permissions: [
+						{ key: 'rooms.view', label: 'View' },
+					],
+				},
+				notifications: {
+					label: 'Notifications',
+					permissions: [
+						{ key: 'notifications.view', label: 'View' },
+						{ key: 'notifications.manage', label: 'Manage' },
+					],
+				},
+			},
 		},
-		allergens: {
-			label: 'Allergens',
-			permissions: [
-				{ key: 'allergens.view', label: 'View' },
-				{ key: 'allergens.manage', label: 'Manage' },
-			],
-		},
-		reports: {
-			label: 'Reports',
-			permissions: [
-				{ key: 'reports.print', label: 'Print' },
-				{ key: 'reports.export', label: 'Export' },
-			],
-		},
-		settings: {
-			label: 'Settings',
-			permissions: [
-				{ key: 'categories.manage', label: 'Categories' },
-				{ key: 'staff.manage', label: 'Staff' },
-			],
+		admin: {
+			label: 'Admin',
+			icon: 'admin_panel_settings',
+			groups: {
+				staff: {
+					label: 'Staff',
+					permissions: [
+						{ key: 'staff.manage', label: 'Manage' },
+					],
+				},
+			},
 		},
 	};
 
@@ -501,22 +549,32 @@
 							</div>
 
 							<div class="space-y-4">
-								{#each Object.entries(permissionGroups) as [groupKey, group]}
+								{#each Object.entries(permissionPages) as [pageKey, page]}
 									<div>
-										<p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">{group.label}</p>
-										<div class="flex flex-wrap gap-2">
-											{#each group.permissions as perm}
-												<button
-													type="button"
-													onclick={() => togglePermission(perm.key)}
-													class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
-														{editingPermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
-												>
-													<span class="material-symbols-rounded text-sm">
-														{editingPermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
-													</span>
-													<span class="text-sm">{perm.label}</span>
-												</button>
+										<div class="flex items-center gap-1.5 mb-3">
+											<span class="material-symbols-rounded text-base text-gray-400">{page.icon}</span>
+											<p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">{page.label}</p>
+										</div>
+										<div class="space-y-3 pl-1">
+											{#each Object.entries(page.groups) as [groupKey, group]}
+												<div>
+													<p class="text-xs font-medium text-gray-500 mb-1.5">{group.label}</p>
+													<div class="flex flex-wrap gap-2">
+														{#each group.permissions as perm}
+															<button
+																type="button"
+																onclick={() => togglePermission(perm.key)}
+																class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
+																	{editingPermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
+															>
+																<span class="material-symbols-rounded text-sm">
+																	{editingPermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
+																</span>
+																<span class="text-sm">{perm.label}</span>
+															</button>
+														{/each}
+													</div>
+												</div>
 											{/each}
 										</div>
 									</div>
@@ -560,22 +618,32 @@
 							</div>
 
 							<div class="space-y-4">
-								{#each Object.entries(permissionGroups) as [, group]}
+								{#each Object.entries(permissionPages) as [pageKey, page]}
 									<div>
-										<p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">{group.label}</p>
-										<div class="flex flex-wrap gap-2">
-											{#each group.permissions as perm}
-												<button
-													type="button"
-													onclick={() => toggleNewRolePermission(perm.key)}
-													class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
-														{newRolePermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
-												>
-													<span class="material-symbols-rounded text-sm">
-														{newRolePermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
-													</span>
-													<span class="text-sm">{perm.label}</span>
-												</button>
+										<div class="flex items-center gap-1.5 mb-3">
+											<span class="material-symbols-rounded text-base text-gray-400">{page.icon}</span>
+											<p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">{page.label}</p>
+										</div>
+										<div class="space-y-3 pl-1">
+											{#each Object.entries(page.groups) as [, group]}
+												<div>
+													<p class="text-xs font-medium text-gray-500 mb-1.5">{group.label}</p>
+													<div class="flex flex-wrap gap-2">
+														{#each group.permissions as perm}
+															<button
+																type="button"
+																onclick={() => toggleNewRolePermission(perm.key)}
+																class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
+																	{newRolePermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
+															>
+																<span class="material-symbols-rounded text-sm">
+																	{newRolePermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
+																</span>
+																<span class="text-sm">{perm.label}</span>
+															</button>
+														{/each}
+													</div>
+												</div>
 											{/each}
 										</div>
 									</div>

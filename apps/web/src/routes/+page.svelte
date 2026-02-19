@@ -4,6 +4,7 @@
 	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
+	import MenuStructurePanel from '$lib/components/MenuStructurePanel.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { authState, can } from '$lib/auth.svelte';
 
@@ -392,6 +393,9 @@
 	// Permission-aware for both staff and guests (can() handles both)
 	const canViewProducts = $derived(can('products.view'));
 	const canViewMenus = $derived(can('menus.view'));
+	const canAccessFrontDesk = $derived(
+		can('reservations.view') || can('rooms.view') || can('notifications.view')
+	);
 
 	const sidebarSections = $derived.by(() => {
 		const foodItems: { icon: string; label: string; badge?: number; active: boolean; onclick?: () => void; href?: string }[] = [];
@@ -401,14 +405,15 @@
 		if (canViewMenus) {
 			foodItems.push({ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' });
 		}
-		const sections = [
-			{
+		const sections: { label: string; items: any[] }[] = [];
+		if (canAccessFrontDesk) {
+			sections.push({
 				label: 'フロント',
 				items: [
 					{ icon: 'calendar_today', label: '予約管理', href: '/front-desk', active: false },
 				]
-			},
-		];
+			});
+		}
 		if (foodItems.length > 0) {
 			sections.push({ label: '食材管理', items: foodItems });
 		}
@@ -455,6 +460,7 @@
 
 	// Menu Tree Config overlay
 	let showMenuTreeConfig = $state(false);
+	let menuStructureView: 'panel' | 'tree' = $state('panel');
 
 	// Seasonal Menus
 	let seasonalMenus: SeasonalMenu[] = $state([]);
@@ -2566,7 +2572,33 @@ ${coursesHtml}
 		</div>
 	{/if}
 
-	{#if showMenuTreeConfig}
+	{#if showMenuTreeConfig && menuStructureView === 'panel'}
+		<MenuStructurePanel
+			{seasonalMenus}
+			{menuGroups}
+			{menuCategories}
+			{menus}
+			{products}
+			{productAlternates}
+			onAddAlternate={handleAddAlternate}
+			onRemoveAlternate={handleRemoveAlternate}
+			onCreateSeason={treeCreateSeason}
+			onUpdateSeason={treeUpdateSeason}
+			onDeleteSeason={treeDeleteSeason}
+			onCreateGroup={treeCreateGroup}
+			onUpdateGroup={treeUpdateGroup}
+			onDeleteGroup={treeDeleteGroup}
+			onCreateCourse={treeCreateCourse}
+			onUpdateCourse={treeUpdateCourse}
+			onUpdateCourseDetails={treeUpdateCourseDetails}
+			onDeleteCourse={treeDeleteCourse}
+			onCreateMenu={treeCreateMenu}
+			onUpdateMenu={treeUpdateMenu}
+			onDeleteMenu={treeDeleteMenu}
+			onSwitchToTree={() => { menuStructureView = 'tree'; }}
+			onClose={() => showMenuTreeConfig = false}
+		/>
+	{:else if showMenuTreeConfig && menuStructureView === 'tree'}
 		<MenuTreeConfig
 			{seasonalMenus}
 			{menuGroups}
@@ -2589,6 +2621,7 @@ ${coursesHtml}
 			onCreateMenu={treeCreateMenu}
 			onUpdateMenu={treeUpdateMenu}
 			onDeleteMenu={treeDeleteMenu}
+			onSwitchToPanel={() => { menuStructureView = 'panel'; }}
 			onClose={() => showMenuTreeConfig = false}
 		/>
 	{/if}

@@ -18,7 +18,7 @@
 	} from '$lib/api';
 	import { onMount } from 'svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import { authState } from '$lib/auth.svelte';
+	import { authState, can } from '$lib/auth.svelte';
 
 	const isStaff = $derived(authState.isStaff);
 
@@ -26,26 +26,42 @@
 	type NavItem = 'reservations' | 'rooms' | 'notifications';
 	let activeNav = $state<NavItem>('reservations');
 
+	// Permission-based nav: auto-select first available tab
+	const canViewReservations = $derived(can('reservations.view'));
+	const canViewRooms = $derived(can('rooms.view'));
+	const canViewNotifications = $derived(can('notifications.view'));
+
 	// Sidebar
 	let sidebarCollapsed = $state(false);
 	let sidebarMobileOpen = $state(false);
-	const sidebarSections = $derived([
-		{
-			label: 'フロント',
-			items: [
-				{ icon: 'calendar_today', label: '予約管理', active: activeNav === 'reservations', onclick: () => activeNav = 'reservations' },
-				{ icon: 'door_open', label: '客室状況', active: activeNav === 'rooms', onclick: () => activeNav = 'rooms' },
-				{ icon: 'notifications', label: '通知', badge: alerts.length > 0 ? alerts.length : undefined, badgeVariant: 'alert' as const, active: activeNav === 'notifications', onclick: () => activeNav = 'notifications' },
-			]
-		},
-		{
-			label: '食材管理',
-			items: [
-				{ icon: 'inventory_2', label: '商品管理', href: '/', active: false },
-				{ icon: 'restaurant_menu', label: 'メニュー管理', href: '/', active: false },
-			]
+	const sidebarSections = $derived(() => {
+		const frontDeskItems: { icon: string; label: string; active: boolean; onclick: () => void; badge?: number; badgeVariant?: 'alert' }[] = [];
+		if (canViewReservations) {
+			frontDeskItems.push({ icon: 'calendar_today', label: '予約管理', active: activeNav === 'reservations', onclick: () => activeNav = 'reservations' });
 		}
-	]);
+		if (canViewRooms) {
+			frontDeskItems.push({ icon: 'door_open', label: '客室状況', active: activeNav === 'rooms', onclick: () => activeNav = 'rooms' });
+		}
+		if (canViewNotifications) {
+			frontDeskItems.push({ icon: 'notifications', label: '通知', badge: alerts.length > 0 ? alerts.length : undefined, badgeVariant: 'alert' as const, active: activeNav === 'notifications', onclick: () => activeNav = 'notifications' });
+		}
+
+		const sections: { label: string; items: any[] }[] = [];
+		if (frontDeskItems.length > 0) {
+			sections.push({ label: 'フロント', items: frontDeskItems });
+		}
+		const foodItems: { icon: string; label: string; href: string; active: boolean }[] = [];
+		if (can('products.view')) {
+			foodItems.push({ icon: 'inventory_2', label: '商品管理', href: '/', active: false });
+		}
+		if (can('menus.view')) {
+			foodItems.push({ icon: 'restaurant_menu', label: 'メニュー管理', href: '/', active: false });
+		}
+		if (foodItems.length > 0) {
+			sections.push({ label: '食材管理', items: foodItems });
+		}
+		return sections;
+	});
 
 	// State
 	let reservations = $state<Reservation[]>([]);
@@ -575,6 +591,16 @@
 		return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 	}
 
+	// Auto-select first permitted nav tab (once)
+	let navInitialized = $state(false);
+	$effect(() => {
+		if (authState.loading || navInitialized) return;
+		navInitialized = true;
+		if (canViewReservations) { activeNav = 'reservations'; }
+		else if (canViewRooms) { activeNav = 'rooms'; }
+		else if (canViewNotifications) { activeNav = 'notifications'; }
+	});
+
 	onMount(() => {
 		loadData();
 	});
@@ -664,7 +690,7 @@
 				</button>
 				<button
 					onclick={() => openCheckInWizard()}
-					disabled={!isStaff}
+					disabled={!can('reservations.checkin')}
 					class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					<span class="material-symbols-rounded text-lg">qr_code_scanner</span>
@@ -692,7 +718,7 @@
 
 		<!-- Body -->
 		<main class="flex-1 overflow-auto p-3 md:p-6">
-			{#if activeNav === 'notifications'}
+			{#if activeNav === 'notifications' && canViewNotifications}
 				<!-- Notifications View -->
 				<div class="space-y-4">
 					<div class="flex items-center justify-between mb-6">
@@ -806,7 +832,7 @@
 										</div>
 
 										<!-- Close Button -->
-										{#if isStaff}
+										{#if can('notifications.manage')}
 										<div class="flex-shrink-0">
 											<button
 												onclick={() => handleAcknowledgeAlert(alert.id)}
@@ -861,7 +887,7 @@
 											{/if}
 										</div>
 									</div>
-									{#if isStaff}
+									{#if can('notifications.manage')}
 									<button
 										onclick={(e) => { e.stopPropagation(); handleAcknowledgeAlert(alert.id); }}
 										class="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
@@ -1040,7 +1066,7 @@
 										{#if reservation.status === 'confirmed'}
 											<button
 												onclick={() => openCheckInWizard(reservation)}
-												disabled={!isStaff}
+												disabled={!can('reservations.checkin')}
 												class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												チェックイン
@@ -1048,7 +1074,7 @@
 										{:else if reservation.status === 'checked_in'}
 											<button
 												onclick={() => openCheckOutConfirm(reservation)}
-												disabled={!isStaff}
+												disabled={!can('reservations.checkout')}
 												class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												チェックアウト
