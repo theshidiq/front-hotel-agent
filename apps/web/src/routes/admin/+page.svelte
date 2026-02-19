@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { authState } from '$lib/auth.svelte';
 	import {
 		getStaffs,
@@ -115,17 +114,11 @@
 		}
 	}
 
-	function waitForAuth(): Promise<void> {
-		return new Promise((resolve) => {
-			if (!authState.loading) { resolve(); return; }
-			const interval = setInterval(() => {
-				if (!authState.loading) { clearInterval(interval); resolve(); }
-			}, 50);
-		});
-	}
+	let initialized = $state(false);
 
-	onMount(async () => {
-		await waitForAuth();
+	$effect(() => {
+		if (authState.loading || initialized) return;
+		initialized = true;
 		if (!authState.isAdmin) {
 			window.location.href = '/';
 			return;

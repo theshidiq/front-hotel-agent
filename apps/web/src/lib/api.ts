@@ -373,6 +373,7 @@ export interface MenuGroup {
 	id: string;
 	restaurant_id: string;
 	name: string;
+	display_title: string | null;
 	seasonal_menu_id: string | null;
 	sort_order: number;
 	created_at: string;
@@ -381,12 +382,14 @@ export interface MenuGroup {
 
 export interface CreateMenuGroupData {
 	name: string;
+	display_title?: string;
 	seasonal_menu_id?: string;
 	course_ids?: string[];
 }
 
 export interface UpdateMenuGroupData {
 	name?: string;
+	display_title?: string | null;
 	seasonal_menu_id?: string | null;
 	course_ids?: string[];
 }

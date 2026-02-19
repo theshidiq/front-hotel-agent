@@ -10,6 +10,7 @@
 	import MenuListNode from './flow/MenuListNode.svelte';
 	import MenuFormSidebar from './flow/MenuFormSidebar.svelte';
 	import CourseDetailSidebar from './flow/CourseDetailSidebar.svelte';
+	import MenuPreviewPanel from './flow/MenuPreviewPanel.svelte';
 
 	import '@xyflow/svelte/dist/style.css';
 
@@ -91,6 +92,9 @@
 	// Course toggle state
 	let courseToggleGroupId: string | null = $state(null);
 
+	// Active group for menu preview
+	let activeGroupId: string | null = $state(null);
+
 	// Menu sidebar state
 	let sidebarContext: { groupId: string; courseValue: string; courseName: string; seasonalMenuId?: string | null } | null = $state(null);
 
@@ -107,6 +111,7 @@
 	let showAddCourse = $state(false);
 	let newCourseName = $state('');
 	let isAddingCourse = $state(false);
+	let addCourseError = $state('');
 
 	// Course name lookup (menuCategories is the source of truth for names)
 	const courseNameMap = $derived.by(() => {
@@ -136,6 +141,27 @@
 	function getMenuCount(groupId: string, courseValue: string): number {
 		return menuCountMap.get(`${groupId}_${courseValue}`) || 0;
 	}
+
+	// Active group preview data
+	const activeGroup = $derived(menuGroups.find(g => g.id === activeGroupId) ?? null);
+
+	const activeGroupCourses = $derived.by(() => {
+		if (!activeGroup) return [];
+		return (activeGroup.allowed_courses || []).map(ac => ({
+			courseId: ac.category_id,
+			courseName: getCourseName(ac.category_id, ac.category_name),
+			courseValue: ac.category_value,
+			menus: menus
+				.filter(m => m.menu_group_id === activeGroup.id && m.category === ac.category_value)
+				.map(m => ({ id: m.id, name: m.name, price: m.price, description: m.description })),
+		}));
+	});
+
+	const activeGroupAvailableCourses = $derived.by(() => {
+		if (!activeGroup) return [];
+		const assignedIds = new Set(activeGroup.allowed_courses.map(c => c.category_id));
+		return menuCategories.filter(c => !assignedIds.has(c.id));
+	});
 
 	// Dagre layout
 	function layoutWithDagre(rawNodes: Node[], rawEdges: Edge[]): { nodes: Node[]; edges: Edge[] } {
@@ -255,10 +281,13 @@
 	async function submitNewCourse() {
 		if (!newCourseName.trim() || isAddingCourse) return;
 		isAddingCourse = true;
+		addCourseError = '';
 		try {
 			await onCreateCourse(newCourseName.trim());
 			newCourseName = '';
 			showAddCourse = false;
+		} catch (err: unknown) {
+			addCourseError = err instanceof Error ? err.message : 'Failed to add course';
 		} finally {
 			isAddingCourse = false;
 		}
@@ -385,6 +414,8 @@
 						onToggleCourses: toggleCoursePanel,
 						onDelete: handleDeleteGroup,
 						onRename: handleRenameGroup,
+						isActive: activeGroupId === group.id,
+						onSelectGroup: (id: string) => { activeGroupId = id; },
 					},
 				});
 
@@ -509,6 +540,8 @@
 						onToggleCourses: toggleCoursePanel,
 						onDelete: handleDeleteGroup,
 						onRename: handleRenameGroup,
+						isActive: activeGroupId === group.id,
+						onSelectGroup: (id: string) => { activeGroupId = id; },
 					},
 				});
 
@@ -614,6 +647,7 @@
 		menuCategories;
 		menus;
 		courseToggleGroupId;
+		activeGroupId;
 
 		const result = buildTree();
 		nodes = result.nodes;
@@ -698,67 +732,85 @@
 			minZoom={0.2}
 			maxZoom={2}
 			defaultEdgeOptions={{ type: 'smoothstep' }}
-			onpaneclick={() => { if (courseToggleGroupId) courseToggleGroupId = null; }}
+			onpaneclick={() => { if (courseToggleGroupId) courseToggleGroupId = null; activeGroupId = null; }}
 		>
 			<Background />
 		</SvelteFlow>
 	</div>
 
-	<!-- Bottom: Available Courses management -->
+	<!-- Bottom: Available Courses (always visible when no group selected) -->
 	<div class="bg-white border-t border-gray-200 px-6 py-4 flex-shrink-0">
-		<div class="flex items-center justify-between mb-2">
-			<div>
-				<h3 class="text-sm font-semibold text-gray-900">Available Courses</h3>
-				<p class="text-xs text-gray-500">Courses available for assignment to menu groups</p>
-			</div>
-			<button
-				onclick={() => { showAddCourse = !showAddCourse; newCourseName = ''; }}
-				class="text-sm text-blue-600 hover:text-blue-800 font-medium"
-			>
-				{showAddCourse ? 'Cancel' : '+ Add Course'}
-			</button>
-		</div>
-
-		{#if showAddCourse}
-			<div class="flex gap-2 mb-3">
-				<input
-					type="text"
-					bind:value={newCourseName}
-					placeholder="Course name (e.g., Appetizer)"
-					class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400"
-					onkeydown={(e) => e.key === 'Enter' && submitNewCourse()}
-				/>
+			<div class="flex items-center justify-between mb-2">
+				<div>
+					<h3 class="text-sm font-semibold text-gray-900">Available Courses</h3>
+					<p class="text-xs text-gray-500">Courses available for assignment to menu groups</p>
+				</div>
 				<button
-					onclick={submitNewCourse}
-					disabled={isAddingCourse || !newCourseName.trim()}
-					class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+					onclick={() => { showAddCourse = !showAddCourse; newCourseName = ''; }}
+					class="text-sm text-blue-600 hover:text-blue-800 font-medium"
 				>
-					{isAddingCourse ? 'Adding...' : 'Add'}
+					{showAddCourse ? 'Cancel' : '+ Add Course'}
 				</button>
 			</div>
-		{/if}
 
-		<div class="flex flex-wrap gap-2">
-			{#each menuCategories as course}
-				<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
-					<span class="text-sm text-blue-800">{course.label}</span>
+			{#if showAddCourse}
+				<div class="flex gap-2 mb-3">
+					<input
+						type="text"
+						bind:value={newCourseName}
+						placeholder="Course name (e.g., Appetizer)"
+						class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400"
+						onkeydown={(e) => e.key === 'Enter' && submitNewCourse()}
+					/>
 					<button
-						onclick={() => handleDeleteCourse(course.id)}
-						class="text-blue-400 hover:text-red-500 transition-colors"
-						title="Delete course"
+						onclick={submitNewCourse}
+						disabled={isAddingCourse || !newCourseName.trim()}
+						class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
 					>
-						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-						</svg>
+						{isAddingCourse ? 'Adding...' : 'Add'}
 					</button>
 				</div>
-			{/each}
-			{#if menuCategories.length === 0}
-				<p class="text-sm text-gray-400">No courses defined yet. Add one above.</p>
+				{#if addCourseError}
+					<p class="text-xs text-red-500 mb-2">{addCourseError}</p>
+				{/if}
 			{/if}
+
+			<div class="flex flex-wrap gap-2">
+				{#each menuCategories as course}
+					<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
+						<span class="text-sm text-blue-800">{course.label}</span>
+						<button
+							onclick={() => handleDeleteCourse(course.id)}
+							class="text-blue-400 hover:text-red-500 transition-colors"
+							title="Delete course"
+						>
+							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+							</svg>
+						</button>
+					</div>
+				{/each}
+				{#if menuCategories.length === 0}
+					<p class="text-sm text-gray-400">No courses defined yet. Add one above.</p>
+				{/if}
+			</div>
 		</div>
-	</div>
 </div>
+
+<!-- Menu Preview Panel (fullscreen overlay) -->
+{#if activeGroup}
+	<MenuPreviewPanel
+		groupId={activeGroup.id}
+		groupName={activeGroup.name}
+		displayTitle={activeGroup.display_title ?? null}
+		courses={activeGroupCourses}
+		availableCourses={activeGroupAvailableCourses}
+		onUpdateDisplayTitle={(title) => { onUpdateGroup(activeGroup!.id, { display_title: title }); }}
+		onToggleCourse={handleToggleCourse}
+		onDeleteMenu={handleDeleteMenuFromTree}
+		onClose={() => { activeGroupId = null; }}
+	/>
+{/if}
 
 <!-- Menu Form Sidebar -->
 {#if sidebarContext}

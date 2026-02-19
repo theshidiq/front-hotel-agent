@@ -6,6 +6,11 @@ export class CreateMenuGroupDto {
   @IsString()
   name: string;
 
+  @ApiPropertyOptional({ description: 'Guest-facing display title for the menu' })
+  @IsString()
+  @IsOptional()
+  display_title?: string;
+
   @ApiPropertyOptional({ description: 'Seasonal menu ID this group belongs to' })
   @IsString()
   @IsOptional()

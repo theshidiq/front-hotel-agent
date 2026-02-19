@@ -12,6 +12,7 @@ export interface MenuGroup {
   id: string;
   restaurant_id: string;
   name: string;
+  display_title: string | null;
   seasonal_menu_id: string | null;
   sort_order: number;
   created_at: string;
@@ -128,11 +129,12 @@ export class MenuGroupsService {
     return { ...created, allowed_courses: coursesMap[created.id] || [] };
   }
 
-  async update(id: string, data: { name?: string; seasonal_menu_id?: string | null; course_ids?: string[] }): Promise<MenuGroup> {
+  async update(id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
 
     const updateData: Record<string, unknown> = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.display_title !== undefined) updateData.display_title = data.display_title || null;
     if (data.seasonal_menu_id !== undefined) updateData.seasonal_menu_id = data.seasonal_menu_id || null;
 
     if (Object.keys(updateData).length > 0) {
