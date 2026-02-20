@@ -103,6 +103,10 @@
 	let isAddingCourse = $state(false);
 	let addCourseError = $state('');
 
+	// Rename course
+	let renamingCourseId: string | null = $state(null);
+	let renameCourseValue = $state('');
+
 	// Toast
 	let toast: { message: string; timeout: ReturnType<typeof setTimeout> } | null = $state(null);
 
@@ -169,6 +173,35 @@
 		return menuCountMap.get(`${groupId}_${courseValue}`) || 0;
 	}
 
+	// Link maps: parent→kids and kids→parent
+	const kidsGroupNameMap = $derived.by(() => {
+		const map = new Map<string, { id: string; name: string }>();
+		for (const g of menuGroups) {
+			if (g.kids_group_id) {
+				const kg = menuGroups.find(k => k.id === g.kids_group_id);
+				if (kg) map.set(g.id, { id: kg.id, name: kg.name });
+			}
+		}
+		return map;
+	});
+
+	const parentGroupNameMap = $derived.by(() => {
+		const map = new Map<string, { id: string; name: string }>();
+		for (const g of menuGroups) {
+			if (g.kids_group_id) {
+				map.set(g.kids_group_id, { id: g.id, name: g.name });
+			}
+		}
+		return map;
+	});
+
+	// For a kids group, get parent group's menu count for a shared course
+	function getLinkedMenuCount(groupId: string, courseValue: string): number {
+		const parent = parentGroupNameMap.get(groupId);
+		if (!parent) return 0;
+		return menuCountMap.get(`${parent.id}_${courseValue}`) || 0;
+	}
+
 	const unassignedGroups = $derived(menuGroups.filter(g => !g.seasonal_menu_id));
 
 	// Active group data for preview
@@ -196,6 +229,30 @@
 		if (!activeGroup) return [];
 		const assignedIds = new Set(activeGroup.allowed_courses.map(c => c.category_id));
 		return menuCategories.filter(c => !assignedIds.has(c.id));
+	});
+
+	// Kids group derived — show courses that overlap with the main (parent) group
+	const activeKidsGroup = $derived.by(() => {
+		if (!activeGroup?.kids_group_id) return null;
+		const kg = menuGroups.find(g => g.id === activeGroup.kids_group_id);
+		if (!kg) return null;
+		// Show kids group's courses that also exist in the main group
+		const mainCourseIds = new Set(activeGroup.allowed_courses.map(c => c.category_id));
+		const sharedCourseNames = kg.allowed_courses
+			.filter(c => mainCourseIds.has(c.category_id))
+			.map(c => c.category_name);
+		return {
+			id: kg.id,
+			name: kg.name,
+			courseNames: sharedCourseNames,
+		};
+	});
+
+	const activeLinkableGroups = $derived.by(() => {
+		if (!activeGroup) return [];
+		return menuGroups
+			.filter(g => g.id !== activeGroup.id)
+			.map(g => ({ id: g.id, name: g.name }));
 	});
 
 	// Detail sidebar derived
@@ -286,6 +343,10 @@
 		await onUpdateGroup(groupId, { course_ids: newIds });
 	}
 
+	async function handleReorderCourses(groupId: string, courseIds: string[]) {
+		await onUpdateGroup(groupId, { course_ids: courseIds });
+	}
+
 	function handleOpenCourseDetail(courseId: string, groupId: string, courseValue: string, courseName: string) {
 		detailContext = { courseId, groupId, courseValue, courseName };
 	}
@@ -316,12 +377,27 @@
 		}
 	}
 
+	function startRenameCourse(course: { id: string; label: string }) {
+		renamingCourseId = course.id;
+		renameCourseValue = course.label;
+	}
+
+	function submitRenameCourse(id: string) {
+		const trimmed = renameCourseValue.trim();
+		const current = menuCategories.find(c => c.id === id);
+		if (trimmed && current && trimmed !== current.label) {
+			onUpdateCourse(id, trimmed);
+		}
+		renamingCourseId = null;
+	}
+
 	function handleWindowClick(e: MouseEvent) {
-		if (!editingSeasonId && !editingGroupId) return;
+		if (!editingSeasonId && !editingGroupId && !renamingCourseId) return;
 		const target = e.target as HTMLElement;
 		if (target.closest('[data-edit-form]')) return;
 		if (editingSeasonId) submitEditSeason(editingSeasonId);
 		if (editingGroupId) submitEditGroup(editingGroupId);
+		if (renamingCourseId) submitRenameCourse(renamingCourseId);
 	}
 </script>
 
@@ -381,7 +457,7 @@
 						bind:value={newSeasonName}
 						placeholder="Season name (e.g., Summer 2025)"
 						class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-400 focus:border-green-400"
-						onkeydown={(e) => e.key === 'Enter' && submitSeason()}
+						onkeydown={(e) => e.key === 'Enter' && !e.isComposing && submitSeason()}
 					/>
 					<div class="flex gap-2">
 						<input type="date" bind:value={newSeasonStartDate} class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -418,7 +494,7 @@
 										type="text"
 										bind:value={editSeasonName}
 										class="font-semibold text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 text-sm w-48 focus:ring-2 focus:ring-green-400"
-										onkeydown={(e) => { if (e.key === 'Enter') submitEditSeason(season.id); if (e.key === 'Escape') { editingSeasonId = null; } }}
+										onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitEditSeason(season.id); if (e.key === 'Escape') { editingSeasonId = null; } }}
 										autofocus
 									/>
 									<input
@@ -483,7 +559,7 @@
 													type="text"
 													bind:value={editGroupName}
 													class="font-medium text-gray-900 bg-white border border-indigo-300 rounded px-2 py-1 text-sm w-40 focus:ring-2 focus:ring-indigo-400"
-													onkeydown={(e) => { if (e.key === 'Enter') submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
+													onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
 													autofocus
 												/>
 												<button onclick={() => submitEditGroup(group.id)} class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Save</button>
@@ -498,6 +574,18 @@
 											>{group.name}</span>
 										{/if}
 										<span class="text-xs text-gray-400">{courseCount} course{courseCount !== 1 ? 's' : ''}</span>
+										{#if kidsGroupNameMap.get(group.id)}
+											<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
+												<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+												子供: {kidsGroupNameMap.get(group.id)?.name}
+											</span>
+										{/if}
+										{#if parentGroupNameMap.get(group.id)}
+											<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
+												<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+												親: {parentGroupNameMap.get(group.id)?.name}
+											</span>
+										{/if}
 										<div class="ml-auto flex items-center gap-1">
 											<button onclick={() => { activeGroupId = group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium hover:bg-orange-100 transition-colors" title="Preview お品書き">
 												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
@@ -545,12 +633,17 @@
 										<div class="flex flex-wrap gap-2">
 											{#each group.allowed_courses as ac}
 												{@const count = getMenuCount(group.id, ac.category_value)}
+												{@const linkedCount = getLinkedMenuCount(group.id, ac.category_value)}
 												<button
 													onclick={() => handleOpenCourseDetail(ac.category_id, group.id, ac.category_value, getCourseName(ac.category_id, ac.category_name))}
-													class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:shadow-sm {count > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
+													class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:shadow-sm {count > 0 || linkedCount > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
 												>
 													<span class="font-medium">{getCourseName(ac.category_id, ac.category_name)}</span>
-													<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold {count > 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'}">{count}</span>
+													{#if linkedCount > 0 && count === 0}
+														<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-700" title="Inherited from {parentGroupNameMap.get(group.id)?.name}">{linkedCount}</span>
+													{:else}
+														<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold {count > 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'}">{count}</span>
+													{/if}
 												</button>
 											{/each}
 										</div>
@@ -589,7 +682,7 @@
 												type="text"
 												bind:value={editGroupName}
 												class="font-medium text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 text-sm w-40 focus:ring-2 focus:ring-indigo-400"
-												onkeydown={(e) => { if (e.key === 'Enter') submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
+												onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
 												autofocus
 											/>
 											<button onclick={() => submitEditGroup(group.id)} class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Save</button>
@@ -604,6 +697,18 @@
 										>{group.name}</span>
 									{/if}
 									<span class="text-xs text-gray-400">{courseCount} course{courseCount !== 1 ? 's' : ''}</span>
+									{#if kidsGroupNameMap.get(group.id)}
+										<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
+											<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+											子供: {kidsGroupNameMap.get(group.id)?.name}
+										</span>
+									{/if}
+									{#if parentGroupNameMap.get(group.id)}
+										<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
+											<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+											親: {parentGroupNameMap.get(group.id)?.name}
+										</span>
+									{/if}
 									<div class="ml-auto flex items-center gap-1">
 										<button onclick={() => { activeGroupId = group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium hover:bg-orange-100 transition-colors">
 											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
@@ -649,12 +754,17 @@
 									<div class="flex flex-wrap gap-2">
 										{#each group.allowed_courses as ac}
 											{@const count = getMenuCount(group.id, ac.category_value)}
+											{@const linkedCount = getLinkedMenuCount(group.id, ac.category_value)}
 											<button
 												onclick={() => handleOpenCourseDetail(ac.category_id, group.id, ac.category_value, getCourseName(ac.category_id, ac.category_name))}
-												class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:shadow-sm {count > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
+												class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:shadow-sm {count > 0 || linkedCount > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
 											>
 												<span class="font-medium">{getCourseName(ac.category_id, ac.category_name)}</span>
-												<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold {count > 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'}">{count}</span>
+												{#if linkedCount > 0 && count === 0}
+													<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-700" title="Inherited from {parentGroupNameMap.get(group.id)?.name}">{linkedCount}</span>
+												{:else}
+													<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold {count > 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'}">{count}</span>
+												{/if}
 											</button>
 										{/each}
 									</div>
@@ -684,7 +794,7 @@
 
 			{#if showAddCourse}
 				<div class="flex gap-2 mb-3">
-					<input type="text" bind:value={newCourseName} placeholder="Course name (e.g., Appetizer)" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400" onkeydown={(e) => e.key === 'Enter' && submitNewCourse()} />
+					<input type="text" bind:value={newCourseName} placeholder="Course name (e.g., Appetizer)" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400" onkeydown={(e) => e.key === 'Enter' && !e.isComposing && submitNewCourse()} />
 					<button onclick={submitNewCourse} disabled={isAddingCourse || !newCourseName.trim()} class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
 						{isAddingCourse ? 'Adding...' : 'Add'}
 					</button>
@@ -703,9 +813,31 @@
 							<span class="text-red-200">|</span>
 							<button onclick={() => cancelDelete()} class="text-gray-400 hover:text-gray-600 text-xs">No</button>
 						</div>
+					{:else if renamingCourseId === course.id}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="flex items-center gap-1.5 bg-blue-100 border border-blue-400 rounded-full px-1.5 py-0.5" data-edit-form onclick={(e) => e.stopPropagation()}>
+							<input
+								type="text"
+								bind:value={renameCourseValue}
+								class="bg-transparent border-none text-sm text-blue-900 font-medium w-24 focus:outline-none focus:ring-0 px-1"
+								onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitRenameCourse(course.id); if (e.key === 'Escape') renamingCourseId = null; }}
+								autofocus
+							/>
+							<button onclick={() => submitRenameCourse(course.id)} class="text-blue-600 hover:text-blue-800 transition-colors" title="Save">
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+							</button>
+							<button onclick={() => { renamingCourseId = null; }} class="text-gray-400 hover:text-gray-600 transition-colors" title="Cancel">
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+							</button>
+						</div>
 					{:else}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
-							<span class="text-sm text-blue-800">{course.label}</span>
+							<span
+								class="text-sm text-blue-800 cursor-pointer hover:underline"
+								ondblclick={() => startRenameCourse(course)}
+								title="Double-click to rename"
+							>{course.label}</span>
 							<button onclick={() => requestDelete(course.id, 'course')} class="text-blue-400 hover:text-red-500 transition-colors" title="Delete course">
 								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
 							</button>
@@ -729,8 +861,12 @@
 		displayTitle={activeGroup.display_title ?? null}
 		courses={activeGroupCourses}
 		availableCourses={activeGroupAvailableCourses}
+		kidsGroup={activeKidsGroup}
+		linkableGroups={activeLinkableGroups}
 		onUpdateDisplayTitle={(title) => { onUpdateGroup(activeGroup!.id, { display_title: title }); }}
 		onToggleCourse={handleToggleCourse}
+		onReorderCourses={handleReorderCourses}
+		onLinkKidsGroup={(kidsGroupId) => { onUpdateGroup(activeGroup!.id, { kids_group_id: kidsGroupId }); }}
 		onDeleteMenu={handleDeleteMenuFromTree}
 		onClose={() => { activeGroupId = null; }}
 	/>

@@ -59,6 +59,19 @@
 		{/if}
 	</div>
 
+	{#if data.linkedKidsName}
+		<div class="flex items-center gap-1 mb-1 px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200">
+			<svg class="w-2.5 h-2.5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+			<span class="text-[10px] text-purple-700 font-medium">子供: {data.linkedKidsName}</span>
+		</div>
+	{/if}
+	{#if data.linkedParentName}
+		<div class="flex items-center gap-1 mb-1 px-1.5 py-0.5 rounded bg-purple-50 border border-purple-200">
+			<svg class="w-2.5 h-2.5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+			<span class="text-[10px] text-purple-700 font-medium">親: {data.linkedParentName}</span>
+		</div>
+	{/if}
+
 	<div class="flex items-center justify-between">
 		<span class="text-xs px-2 py-0.5 rounded-full {data.courseCount > 0 ? 'text-indigo-700 bg-indigo-100' : 'text-gray-500 bg-gray-100'}">
 			{data.courseCount > 0 ? `${data.courseCount} course${data.courseCount !== 1 ? 's' : ''}` : 'No courses'}

@@ -1134,7 +1134,7 @@
 								bind:value={qrInput}
 								placeholder="トークンを入力..."
 								class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-								onkeydown={(e) => e.key === 'Enter' && searchByQR()}
+								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && searchByQR()}
 							/>
 							<button
 								onclick={searchByQR}

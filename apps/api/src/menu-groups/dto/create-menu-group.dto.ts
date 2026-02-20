@@ -21,4 +21,9 @@ export class CreateMenuGroupDto {
   @IsString({ each: true })
   @IsOptional()
   course_ids?: string[];
+
+  @ApiPropertyOptional({ description: 'Linked kids menu group ID' })
+  @IsString()
+  @IsOptional()
+  kids_group_id?: string | null;
 }

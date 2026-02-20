@@ -14,6 +14,7 @@ export interface MenuGroup {
   name: string;
   display_title: string | null;
   seasonal_menu_id: string | null;
+  kids_group_id: string | null;
   sort_order: number;
   created_at: string;
   allowed_courses: AllowedCourse[];
@@ -31,8 +32,9 @@ export class MenuGroupsService {
     const supabase = this.supabaseService.getClient();
     const { data, error } = await supabase
       .from('menu_group_courses')
-      .select('id, menu_group_id, category_id, categories(name, value)')
-      .in('menu_group_id', groupIds);
+      .select('id, menu_group_id, category_id, sort_order, categories(name, value)')
+      .in('menu_group_id', groupIds)
+      .order('sort_order');
 
     if (error) {
       this.logger.error(`Failed to fetch menu group courses: ${error.message}`);
@@ -115,11 +117,12 @@ export class MenuGroupsService {
       throw new InternalServerErrorException(`Failed to create menu group: ${error.message}`);
     }
 
-    // Insert allowed courses
+    // Insert allowed courses with sort_order
     if (data.course_ids && data.course_ids.length > 0) {
-      const rows = data.course_ids.map(cid => ({
+      const rows = data.course_ids.map((cid, idx) => ({
         menu_group_id: created.id,
         category_id: cid,
+        sort_order: idx,
       }));
       await supabase.from('menu_group_courses').insert(rows);
     }
@@ -129,13 +132,14 @@ export class MenuGroupsService {
     return { ...created, allowed_courses: coursesMap[created.id] || [] };
   }
 
-  async update(id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; course_ids?: string[] }): Promise<MenuGroup> {
+  async update(id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; kids_group_id?: string | null; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
 
     const updateData: Record<string, unknown> = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.display_title !== undefined) updateData.display_title = data.display_title || null;
     if (data.seasonal_menu_id !== undefined) updateData.seasonal_menu_id = data.seasonal_menu_id || null;
+    if (data.kids_group_id !== undefined) updateData.kids_group_id = data.kids_group_id || null;
 
     if (Object.keys(updateData).length > 0) {
       const { error } = await supabase
@@ -154,9 +158,10 @@ export class MenuGroupsService {
       await supabase.from('menu_group_courses').delete().eq('menu_group_id', id);
 
       if (data.course_ids.length > 0) {
-        const rows = data.course_ids.map(cid => ({
+        const rows = data.course_ids.map((cid, idx) => ({
           menu_group_id: id,
           category_id: cid,
+          sort_order: idx,
         }));
         await supabase.from('menu_group_courses').insert(rows);
       }

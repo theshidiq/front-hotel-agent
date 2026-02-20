@@ -115,6 +115,10 @@
 	let isAddingCourse = $state(false);
 	let addCourseError = $state('');
 
+	// Rename course
+	let renamingCourseId: string | null = $state(null);
+	let renameCourseValue = $state('');
+
 	// Toast notification
 	let toast: { message: string; timeout: ReturnType<typeof setTimeout> } | null = $state(null);
 
@@ -153,6 +157,18 @@
 		return menuCountMap.get(`${groupId}_${courseValue}`) || 0;
 	}
 
+	// Link name helpers for tree nodes
+	function getLinkedKidsName(groupId: string): string | null {
+		const g = menuGroups.find(mg => mg.id === groupId);
+		if (!g?.kids_group_id) return null;
+		return menuGroups.find(mg => mg.id === g.kids_group_id)?.name ?? null;
+	}
+
+	function getLinkedParentName(groupId: string): string | null {
+		const parent = menuGroups.find(mg => mg.kids_group_id === groupId);
+		return parent?.name ?? null;
+	}
+
 	// Active group preview data
 	const activeGroup = $derived(menuGroups.find(g => g.id === activeGroupId) ?? null);
 
@@ -178,6 +194,30 @@
 		if (!activeGroup) return [];
 		const assignedIds = new Set(activeGroup.allowed_courses.map(c => c.category_id));
 		return menuCategories.filter(c => !assignedIds.has(c.id));
+	});
+
+	// Kids group derived — show courses that overlap with the main (parent) group
+	const activeKidsGroup = $derived.by(() => {
+		if (!activeGroup?.kids_group_id) return null;
+		const kg = menuGroups.find(g => g.id === activeGroup.kids_group_id);
+		if (!kg) return null;
+		// Show kids group's courses that also exist in the main group
+		const mainCourseIds = new Set(activeGroup.allowed_courses.map(c => c.category_id));
+		const sharedCourseNames = kg.allowed_courses
+			.filter(c => mainCourseIds.has(c.category_id))
+			.map(c => c.category_name);
+		return {
+			id: kg.id,
+			name: kg.name,
+			courseNames: sharedCourseNames,
+		};
+	});
+
+	const activeLinkableGroups = $derived.by(() => {
+		if (!activeGroup) return [];
+		return menuGroups
+			.filter(g => g.id !== activeGroup.id)
+			.map(g => ({ id: g.id, name: g.name }));
 	});
 
 	// Dagre layout
@@ -295,6 +335,10 @@
 		await onUpdateGroup(groupId, { course_ids: newIds });
 	}
 
+	async function handleReorderCourses(groupId: string, courseIds: string[]) {
+		await onUpdateGroup(groupId, { course_ids: courseIds });
+	}
+
 	async function submitNewCourse() {
 		if (!newCourseName.trim() || isAddingCourse) return;
 		isAddingCourse = true;
@@ -308,6 +352,20 @@
 		} finally {
 			isAddingCourse = false;
 		}
+	}
+
+	function startRenameCourse(course: { id: string; label: string }) {
+		renamingCourseId = course.id;
+		renameCourseValue = course.label;
+	}
+
+	function submitRenameCourse(id: string) {
+		const trimmed = renameCourseValue.trim();
+		const current = menuCategories.find(c => c.id === id);
+		if (trimmed && current && trimmed !== current.label) {
+			onUpdateCourse(id, trimmed);
+		}
+		renamingCourseId = null;
 	}
 
 	// Inline delete confirmation for courses
@@ -444,6 +502,8 @@
 					data: {
 						group,
 						courseCount,
+						linkedKidsName: getLinkedKidsName(group.id),
+						linkedParentName: getLinkedParentName(group.id),
 						onToggleCourses: toggleCoursePanel,
 						onDelete: handleDeleteGroup,
 						onRename: handleRenameGroup,
@@ -570,6 +630,8 @@
 					data: {
 						group,
 						courseCount,
+						linkedKidsName: getLinkedKidsName(group.id),
+						linkedParentName: getLinkedParentName(group.id),
 						onToggleCourses: toggleCoursePanel,
 						onDelete: handleDeleteGroup,
 						onRename: handleRenameGroup,
@@ -731,7 +793,7 @@
 					bind:value={newSeasonName}
 					placeholder="Season name (e.g., Summer 2025)"
 					class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-400 focus:border-green-400"
-					onkeydown={(e) => e.key === 'Enter' && submitSeason()}
+					onkeydown={(e) => e.key === 'Enter' && !e.isComposing && submitSeason()}
 				/>
 				<div class="flex gap-2">
 					<input
@@ -807,7 +869,7 @@
 						bind:value={newCourseName}
 						placeholder="Course name (e.g., Appetizer)"
 						class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400"
-						onkeydown={(e) => e.key === 'Enter' && submitNewCourse()}
+						onkeydown={(e) => e.key === 'Enter' && !e.isComposing && submitNewCourse()}
 					/>
 					<button
 						onclick={submitNewCourse}
@@ -841,9 +903,31 @@
 								No
 							</button>
 						</div>
+					{:else if renamingCourseId === course.id}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="flex items-center gap-1.5 bg-blue-100 border border-blue-400 rounded-full px-1.5 py-0.5" onclick={(e) => e.stopPropagation()}>
+							<input
+								type="text"
+								bind:value={renameCourseValue}
+								class="bg-transparent border-none text-sm text-blue-900 font-medium w-24 focus:outline-none focus:ring-0 px-1"
+								onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitRenameCourse(course.id); if (e.key === 'Escape') renamingCourseId = null; }}
+								autofocus
+							/>
+							<button onclick={() => submitRenameCourse(course.id)} class="text-blue-600 hover:text-blue-800 transition-colors" title="Save">
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+							</button>
+							<button onclick={() => { renamingCourseId = null; }} class="text-gray-400 hover:text-gray-600 transition-colors" title="Cancel">
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+							</button>
+						</div>
 					{:else}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
-							<span class="text-sm text-blue-800">{course.label}</span>
+							<span
+								class="text-sm text-blue-800 cursor-pointer hover:underline"
+								ondblclick={() => startRenameCourse(course)}
+								title="Double-click to rename"
+							>{course.label}</span>
 							<button
 								onclick={() => requestDeleteCourse(course.id)}
 								class="text-blue-400 hover:text-red-500 transition-colors"
@@ -872,8 +956,12 @@
 		displayTitle={activeGroup.display_title ?? null}
 		courses={activeGroupCourses}
 		availableCourses={activeGroupAvailableCourses}
+		kidsGroup={activeKidsGroup}
+		linkableGroups={activeLinkableGroups}
 		onUpdateDisplayTitle={(title) => { onUpdateGroup(activeGroup!.id, { display_title: title }); }}
 		onToggleCourse={handleToggleCourse}
+		onReorderCourses={handleReorderCourses}
+		onLinkKidsGroup={(kidsGroupId) => { onUpdateGroup(activeGroup!.id, { kids_group_id: kidsGroupId }); }}
 		onDeleteMenu={handleDeleteMenuFromTree}
 		onClose={() => { activeGroupId = null; }}
 	/>

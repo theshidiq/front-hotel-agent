@@ -181,7 +181,7 @@
 				bind:value={name}
 				placeholder="e.g., Grilled Salmon"
 				class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 focus:outline-none"
-				onkeydown={(e) => e.key === 'Enter' && handleSubmit()}
+				onkeydown={(e) => e.key === 'Enter' && !e.isComposing && handleSubmit()}
 			/>
 		</div>
 
