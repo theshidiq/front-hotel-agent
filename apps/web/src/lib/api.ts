@@ -375,7 +375,7 @@ export interface MenuGroup {
 	name: string;
 	display_title: string | null;
 	seasonal_menu_id: string | null;
-	kids_group_id: string | null;
+	kids_group_ids: string[];
 	sort_order: number;
 	created_at: string;
 	allowed_courses: AllowedCourse[];

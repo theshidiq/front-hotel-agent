@@ -22,8 +22,9 @@ export class CreateMenuGroupDto {
   @IsOptional()
   course_ids?: string[];
 
-  @ApiPropertyOptional({ description: 'Linked kids menu group ID' })
-  @IsString()
+  @ApiPropertyOptional({ description: 'Array of linked kids menu group IDs', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  kids_group_id?: string | null;
+  kids_group_ids?: string[];
 }

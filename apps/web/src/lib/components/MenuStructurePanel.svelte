@@ -79,6 +79,9 @@
 	// Active group for preview panel
 	let activeGroupId: string | null = $state(null);
 
+	// Active kids group for preview (default to first linked kids group, or null)
+	let activeKidsGroupId: string | null = $state(null);
+
 	// Menu sidebar
 	let sidebarContext: { groupId: string; courseValue: string; courseName: string; seasonalMenuId?: string | null } | null = $state(null);
 
@@ -177,13 +180,16 @@
 		return menuCountMap.get(`${groupId}_${courseValue}`) || 0;
 	}
 
-	// Link maps: parent→kids and kids→parent
-	const kidsGroupNameMap = $derived.by(() => {
-		const map = new Map<string, { id: string; name: string }>();
+	// Link maps: parent→kids (array) and kids→parent
+	const kidsGroupsMap = $derived.by(() => {
+		const map = new Map<string, Array<{ id: string; name: string }>>();
 		for (const g of menuGroups) {
-			if (g.kids_group_id) {
-				const kg = menuGroups.find(k => k.id === g.kids_group_id);
-				if (kg) map.set(g.id, { id: kg.id, name: kg.name });
+			if (g.kids_group_ids && g.kids_group_ids.length > 0) {
+				const kids = g.kids_group_ids
+					.map(id => menuGroups.find(k => k.id === id))
+					.filter(k => k !== undefined)
+					.map(k => ({ id: k!.id, name: k!.name }));
+				if (kids.length > 0) map.set(g.id, kids);
 			}
 		}
 		return map;
@@ -192,8 +198,10 @@
 	const parentGroupNameMap = $derived.by(() => {
 		const map = new Map<string, { id: string; name: string }>();
 		for (const g of menuGroups) {
-			if (g.kids_group_id) {
-				map.set(g.kids_group_id, { id: g.id, name: g.name });
+			if (g.kids_group_ids && g.kids_group_ids.length > 0) {
+				for (const kidsId of g.kids_group_ids) {
+					map.set(kidsId, { id: g.id, name: g.name });
+				}
 			}
 		}
 		return map;
@@ -219,9 +227,11 @@
 		// Find all group IDs that are kids (linked to by some parent)
 		const kidsIds = new Set<string>();
 		for (const g of groups) {
-			if (g.kids_group_id) {
-				const kid = groups.find(k => k.id === g.kids_group_id);
-				if (kid) kidsIds.add(kid.id);
+			if (g.kids_group_ids && g.kids_group_ids.length > 0) {
+				for (const kidId of g.kids_group_ids) {
+					const kid = groups.find(k => k.id === kidId);
+					if (kid) kidsIds.add(kid.id);
+				}
 			}
 		}
 
@@ -230,9 +240,11 @@
 		for (const g of groups) {
 			if (kidsIds.has(g.id)) continue; // skip, will be nested under parent
 			const children: MenuGroup[] = [];
-			if (g.kids_group_id) {
-				const kid = groups.find(k => k.id === g.kids_group_id);
-				if (kid) children.push(kid);
+			if (g.kids_group_ids && g.kids_group_ids.length > 0) {
+				for (const kidId of g.kids_group_ids) {
+					const kid = groups.find(k => k.id === kidId);
+					if (kid) children.push(kid);
+				}
 			}
 			clusters.push({ parent: g, children });
 		}
@@ -240,7 +252,7 @@
 		// Also add any orphaned kids (kids whose parent isn't in this group list)
 		for (const g of groups) {
 			if (kidsIds.has(g.id)) {
-				const hasParentInList = groups.some(p => p.kids_group_id === g.id);
+				const hasParentInList = groups.some(p => p.kids_group_ids?.includes(g.id));
 				if (!hasParentInList) {
 					clusters.push({ parent: g, children: [] });
 				}
@@ -277,10 +289,31 @@
 		return menuCategories.filter(c => !assignedIds.has(c.id));
 	});
 
-	// Kids group derived — show courses that overlap with the main (parent) group
+	// Kids groups derived — show all linked kids groups for the active group
+	const activeKidsGroups = $derived.by(() => {
+		if (!activeGroup?.kids_group_ids || activeGroup.kids_group_ids.length === 0) return [];
+		return activeGroup.kids_group_ids
+			.map(id => menuGroups.find(g => g.id === id))
+			.filter(g => g !== undefined) as MenuGroup[];
+	});
+
+	// Auto-select first kids group when active group changes, or use the currently selected one
+	$effect(() => {
+		if (activeGroup && activeKidsGroups.length > 0) {
+			// If currently selected kids group is not in the new active group's kids list, reset to first
+			if (!activeKidsGroupId || !activeGroup.kids_group_ids?.includes(activeKidsGroupId)) {
+				// Default to first kids group (e.g., "子供 A CK70")
+				activeKidsGroupId = activeKidsGroups[0].id;
+			}
+		} else {
+			activeKidsGroupId = null;
+		}
+	});
+
+	// Active kids group for preview — show the selected kids group's courses
 	const activeKidsGroup = $derived.by(() => {
-		if (!activeGroup?.kids_group_id) return null;
-		const kg = menuGroups.find(g => g.id === activeGroup.kids_group_id);
+		if (!activeGroup || !activeKidsGroupId) return null;
+		const kg = menuGroups.find(g => g.id === activeKidsGroupId);
 		if (!kg) return null;
 		// Show kids group's courses that also exist in the main group
 		const mainCourseIds = new Set(activeGroup.allowed_courses.map(c => c.category_id));
@@ -295,10 +328,12 @@
 	});
 
 	const activeLinkableGroups = $derived.by(() => {
-		if (!activeGroup) return [];
-		return menuGroups
-			.filter(g => g.id !== activeGroup.id)
-			.map(g => ({ id: g.id, name: g.name }));
+		if (!activeGroup || !activeGroup.kids_group_ids || activeGroup.kids_group_ids.length === 0) return [];
+		// Only show the linked kids groups in the preview selector
+		return activeGroup.kids_group_ids
+			.map(id => menuGroups.find(g => g.id === id))
+			.filter(g => g !== undefined)
+			.map(g => ({ id: g!.id, name: g!.name }));
 	});
 
 	// Detail sidebar derived
@@ -359,8 +394,19 @@
 	async function handleAddGroup(seasonId: string) {
 		if (isSubmitting) return;
 		isSubmitting = true;
+		const beforeCount = menuGroups.length;
 		try {
 			await onCreateGroup({ name: 'New Group', seasonal_menu_id: seasonId || undefined });
+			// Wait a tick for the menuGroups prop to update
+			await new Promise(resolve => setTimeout(resolve, 0));
+			// Find the newly created group (should be the new one)
+			if (menuGroups.length > beforeCount) {
+				const newGroup = menuGroups.find((g, idx) => idx >= beforeCount);
+				if (newGroup) {
+					editingGroupId = newGroup.id;
+					editGroupName = ''; // Start with empty string so placeholder shows
+				}
+			}
 		} finally {
 			isSubmitting = false;
 		}
@@ -373,8 +419,13 @@
 
 	function submitEditGroup(id: string) {
 		const trimmed = editGroupName.trim();
-		if (trimmed && trimmed !== menuGroups.find(g => g.id === id)?.name) {
-			onUpdateGroup(id, { name: trimmed });
+		const currentGroup = menuGroups.find(g => g.id === id);
+
+		// If empty, keep the current name or use "New Group" as fallback
+		const finalName = trimmed || currentGroup?.name || 'New Group';
+
+		if (finalName !== currentGroup?.name) {
+			onUpdateGroup(id, { name: finalName });
 		}
 		editingGroupId = null;
 	}
@@ -393,10 +444,15 @@
 		await onUpdateGroup(groupId, { course_ids: courseIds });
 	}
 
-	function handleLinkKids(groupId: string, kidsGroupId: string | null) {
-		onUpdateGroup(groupId, { kids_group_id: kidsGroupId });
-		kidsLinkGroupId = null;
-		showToast(kidsGroupId ? 'Kids group linked' : 'Kids group unlinked');
+	function handleToggleKidsLink(groupId: string, kidsGroupId: string) {
+		const group = menuGroups.find(g => g.id === groupId);
+		if (!group) return;
+		const currentIds = group.kids_group_ids || [];
+		const newIds = currentIds.includes(kidsGroupId)
+			? currentIds.filter(id => id !== kidsGroupId)
+			: [...currentIds, kidsGroupId];
+		onUpdateGroup(groupId, { kids_group_ids: newIds });
+		showToast(currentIds.includes(kidsGroupId) ? 'Kids group unlinked' : 'Kids group linked');
 	}
 
 	function handleOpenCourseDetail(courseId: string, groupId: string, courseValue: string, courseName: string) {
@@ -443,6 +499,15 @@
 		renamingCourseId = null;
 	}
 
+	// Action to focus input element
+	function focusInput(node: HTMLInputElement) {
+		// Use requestAnimationFrame to ensure DOM is ready
+		requestAnimationFrame(() => {
+			node.focus();
+			node.select(); // Select all text if any exists
+		});
+	}
+
 	function handleWindowClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
 
@@ -455,6 +520,16 @@
 		if (showCoursesDropdown && !target.closest('[data-courses-dropdown]')) {
 			showCoursesDropdown = false;
 			showAddCourse = false;
+		}
+
+		// Close course toggle dropdown when clicking outside it
+		if (courseToggleGroupId && !target.closest('[data-course-toggle-dropdown]') && !target.closest('[data-course-toggle-button]')) {
+			courseToggleGroupId = null;
+		}
+
+		// Close kids link dropdown when clicking outside it
+		if (kidsLinkGroupId && !target.closest('[data-kids-link-dropdown]') && !target.closest('[data-kids-link-button]')) {
+			kidsLinkGroupId = null;
 		}
 
 		if (!editingSeasonId && !editingGroupId && !renamingCourseId) return;
@@ -482,9 +557,10 @@
 					<input
 						type="text"
 						bind:value={editGroupName}
+						placeholder="Enter group name"
+						use:focusInput
 						class="font-medium text-gray-900 bg-white border border-indigo-300 rounded px-2 py-1 text-sm w-40 focus:ring-2 focus:ring-indigo-400"
 						onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
-						autofocus
 					/>
 					<button onclick={() => submitEditGroup(group.id)} class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Save</button>
 					<button onclick={() => { editingGroupId = null; }} class="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
@@ -498,10 +574,11 @@
 				>{group.name}</span>
 			{/if}
 			<span class="text-xs text-gray-400">{courseCount} course{courseCount !== 1 ? 's' : ''}</span>
-			{#if kidsGroupNameMap.get(group.id)}
+			{#if kidsGroupsMap.get(group.id)}
+				{@const kidsGroups = kidsGroupsMap.get(group.id)}
 				<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
 					<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-					子供: {kidsGroupNameMap.get(group.id)?.name}
+					子供: {kidsGroups?.map(k => k.name).join(', ')}
 				</span>
 			{/if}
 			{#if parentGroupNameMap.get(group.id)}
@@ -517,12 +594,13 @@
 						Preview
 					</button>
 				{/if}
-				<button onclick={() => { courseToggleGroupId = courseToggleGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors" title="Manage courses">
+				<button data-course-toggle-button onclick={() => { courseToggleGroupId = courseToggleGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors" title="Manage courses">
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
 					Courses
 				</button>
 				{#if !isChild}
-					<button onclick={() => { kidsLinkGroupId = kidsLinkGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors {group.kids_group_id ? 'bg-purple-50 text-purple-700 hover:bg-purple-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}" title="Link kids group">
+					{@const hasKidsLinks = group.kids_group_ids && group.kids_group_ids.length > 0}
+					<button data-kids-link-button onclick={() => { kidsLinkGroupId = kidsLinkGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors {hasKidsLinks ? 'bg-purple-50 text-purple-700 hover:bg-purple-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}" title="Link kids groups">
 						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
 						Kids
 					</button>
@@ -544,7 +622,7 @@
 
 		<!-- Course toggle dropdown -->
 		{#if courseToggleGroupId === group.id}
-			<div class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+			<div data-course-toggle-dropdown class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
 				<p class="text-xs font-medium text-blue-800 mb-2">Toggle courses for this group:</p>
 				<div class="flex flex-wrap gap-1.5">
 					{#each menuCategories as course}
@@ -562,21 +640,24 @@
 
 		<!-- Kids link dropdown -->
 		{#if kidsLinkGroupId === group.id}
-			<div class="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-				<p class="text-xs font-medium text-purple-800 mb-2">Link a kids menu group:</p>
+			<div data-kids-link-dropdown class="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+				<p class="text-xs font-medium text-purple-800 mb-2">Link kids menu groups (multi-select):</p>
 				<div class="flex flex-wrap gap-1.5">
-					{#if group.kids_group_id}
+					{#each menuGroups.filter(g => {
+						// Exclude the current group itself
+						if (g.id === group.id) return false;
+						// Include if already linked to this group
+						if (group.kids_group_ids?.includes(g.id)) return true;
+						// Exclude if linked to any other group
+						const isLinkedToOther = menuGroups.some(other =>
+							other.id !== group.id && other.kids_group_ids?.includes(g.id)
+						);
+						return !isLinkedToOther;
+					}) as candidate}
+						{@const isLinked = group.kids_group_ids?.includes(candidate.id)}
 						<button
-							onclick={() => handleLinkKids(group.id, null)}
-							class="px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-						>
-							Unlink
-						</button>
-					{/if}
-					{#each menuGroups.filter(g => g.id !== group.id) as candidate}
-						<button
-							onclick={() => handleLinkKids(group.id, candidate.id)}
-							class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {group.kids_group_id === candidate.id ? 'bg-purple-600 text-white' : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-100'}"
+							onclick={() => handleToggleKidsLink(group.id, candidate.id)}
+							class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {isLinked ? 'bg-purple-600 text-white' : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-100'}"
 						>
 							{candidate.name}
 						</button>
@@ -929,7 +1010,7 @@
 		onUpdateDisplayTitle={(title) => { onUpdateGroup(activeGroup!.id, { display_title: title }); }}
 		onToggleCourse={handleToggleCourse}
 		onReorderCourses={handleReorderCourses}
-		onLinkKidsGroup={(kidsGroupId) => { onUpdateGroup(activeGroup!.id, { kids_group_id: kidsGroupId }); }}
+		onLinkKidsGroup={(kidsGroupId) => { activeKidsGroupId = kidsGroupId; }}
 		onDeleteMenu={handleDeleteMenuFromTree}
 		onClose={() => { activeGroupId = null; }}
 	/>
