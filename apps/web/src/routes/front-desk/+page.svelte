@@ -1073,7 +1073,7 @@
 							? 'bg-emerald-600 text-white'
 							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
 					>
-						滞在中 ({stats.checkedIn})
+						在館中 ({stats.checkedIn})
 					</button>
 					<button
 						onclick={() => (filterStatus = 'checked_out')}
