@@ -509,7 +509,9 @@
 	});
 
 	// Filter out groups that are linked as kids groups
-	const previewableMenuGroups = $derived(menuGroups.filter(g => !menuGroups.some(mg => mg.kids_group_id === g.id)));
+	const previewableMenuGroups = $derived.by(() => {
+		return menuGroups.filter(g => !menuGroups.some(mg => mg.kids_group_id === g.id));
+	});
 
 	// Tree config callbacks (wrappers that reload data after mutations)
 	async function treeCreateSeason(data: import('$lib/api').CreateSeasonalMenuData) {

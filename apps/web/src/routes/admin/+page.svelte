@@ -47,6 +47,12 @@
 	let newRolePermissions: Set<string> = $state(new Set());
 	let roleSaving = $state(false);
 
+	// Permission search and collapse
+	let permissionSearch = $state('');
+	let newRolePermissionSearch = $state('');
+	let collapsedSections: Set<string> = $state(new Set());
+	let newRoleCollapsedSections: Set<string> = $state(new Set());
+
 	// Staff detail modal
 	let selectedStaff: StaffMember | null = $state(null);
 	let staffDetailSaving = $state(false);
@@ -272,6 +278,50 @@
 			newSet.add(perm);
 		}
 		editingPermissions = newSet;
+	}
+
+	function toggleSection(sectionKey: string) {
+		const newSet = new Set(collapsedSections);
+		if (newSet.has(sectionKey)) {
+			newSet.delete(sectionKey);
+		} else {
+			newSet.add(sectionKey);
+		}
+		collapsedSections = newSet;
+	}
+
+	function toggleNewRoleSection(sectionKey: string) {
+		const newSet = new Set(newRoleCollapsedSections);
+		if (newSet.has(sectionKey)) {
+			newSet.delete(sectionKey);
+		} else {
+			newSet.add(sectionKey);
+		}
+		newRoleCollapsedSections = newSet;
+	}
+
+	// Filter permissions based on search
+	function filterPermissions(page: PageSection, searchTerm: string): PageSection | null {
+		if (!searchTerm) return page;
+
+		const search = searchTerm.toLowerCase();
+		const filteredGroups: Record<string, PermGroup> = {};
+
+		for (const [groupKey, group] of Object.entries(page.groups)) {
+			const matchingPerms = group.permissions.filter(p =>
+				p.label.toLowerCase().includes(search) ||
+				p.key.toLowerCase().includes(search) ||
+				group.label.toLowerCase().includes(search)
+			);
+
+			if (matchingPerms.length > 0) {
+				filteredGroups[groupKey] = { ...group, permissions: matchingPerms };
+			}
+		}
+
+		if (Object.keys(filteredGroups).length === 0) return null;
+
+		return { ...page, groups: filteredGroups };
 	}
 
 	async function saveRoleChanges() {
@@ -646,36 +696,75 @@
 								</div>
 							</div>
 
-							<div class="space-y-4">
+							<!-- Search permissions -->
+							<div class="mb-4">
+								<div class="relative">
+									<span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+									<input
+										type="text"
+										bind:value={permissionSearch}
+										placeholder="Search permissions..."
+										class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+									/>
+									{#if permissionSearch}
+										<button
+											onclick={() => permissionSearch = ''}
+											class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded"
+										>
+											<span class="material-symbols-rounded text-lg">close</span>
+										</button>
+									{/if}
+								</div>
+							</div>
+
+							<div class="space-y-2 max-h-[500px] overflow-y-auto pr-2">
 								{#each Object.entries(permissionPages) as [pageKey, page]}
-									<div>
-										<div class="flex items-center gap-1.5 mb-3">
-											<span class="material-symbols-rounded text-base text-gray-400">{page.icon}</span>
-											<p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">{page.label}</p>
-										</div>
-										<div class="space-y-3 pl-1">
-											{#each Object.entries(page.groups) as [groupKey, group]}
-												<div>
-													<p class="text-xs font-medium text-gray-500 mb-1.5">{group.label}</p>
-													<div class="flex flex-wrap gap-2">
-														{#each group.permissions as perm}
-															<button
-																type="button"
-																onclick={() => togglePermission(perm.key)}
-																class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
-																	{editingPermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
-															>
-																<span class="material-symbols-rounded text-sm">
-																	{editingPermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
-																</span>
-																<span class="text-sm">{perm.label}</span>
-															</button>
-														{/each}
-													</div>
+									{@const filtered = filterPermissions(page, permissionSearch)}
+									{#if filtered}
+										<div class="border border-gray-200 rounded-lg bg-white">
+											<button
+												type="button"
+												onclick={() => toggleSection(pageKey)}
+												class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+											>
+												<div class="flex items-center gap-2">
+													<span class="material-symbols-rounded text-base text-gray-400">{page.icon}</span>
+													<p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">{page.label}</p>
+													<span class="text-xs text-gray-500">
+														({Object.values(filtered.groups).reduce((sum, g) => sum + g.permissions.length, 0)} permissions)
+													</span>
 												</div>
-											{/each}
+												<span class="material-symbols-rounded text-gray-400 transition-transform {collapsedSections.has(pageKey) ? '' : 'rotate-180'}">
+													expand_more
+												</span>
+											</button>
+
+											{#if !collapsedSections.has(pageKey)}
+												<div class="px-4 pb-3 space-y-3">
+													{#each Object.entries(filtered.groups) as [groupKey, group]}
+														<div>
+															<p class="text-xs font-medium text-gray-500 mb-2">{group.label}</p>
+															<div class="flex flex-wrap gap-2">
+																{#each group.permissions as perm}
+																	<button
+																		type="button"
+																		onclick={() => togglePermission(perm.key)}
+																		class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
+																			{editingPermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
+																	>
+																		<span class="material-symbols-rounded text-sm">
+																			{editingPermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
+																		</span>
+																		<span class="text-sm">{perm.label}</span>
+																	</button>
+																{/each}
+															</div>
+														</div>
+													{/each}
+												</div>
+											{/if}
 										</div>
-									</div>
+									{/if}
 								{/each}
 							</div>
 
@@ -708,43 +797,82 @@
 									/>
 								</div>
 								<button
-									onclick={() => { showNewRole = false; newRoleName = ''; newRoleDescription = ''; newRolePermissions = new Set(); }}
+									onclick={() => { showNewRole = false; newRoleName = ''; newRoleDescription = ''; newRolePermissions = new Set(); newRolePermissionSearch = ''; }}
 									class="px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 rounded-lg shrink-0"
 								>
 									Cancel
 								</button>
 							</div>
 
-							<div class="space-y-4">
+							<!-- Search permissions -->
+							<div class="mb-4">
+								<div class="relative">
+									<span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+									<input
+										type="text"
+										bind:value={newRolePermissionSearch}
+										placeholder="Search permissions..."
+										class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+									/>
+									{#if newRolePermissionSearch}
+										<button
+											onclick={() => newRolePermissionSearch = ''}
+											class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded"
+										>
+											<span class="material-symbols-rounded text-lg">close</span>
+										</button>
+									{/if}
+								</div>
+							</div>
+
+							<div class="space-y-2 max-h-[500px] overflow-y-auto pr-2">
 								{#each Object.entries(permissionPages) as [pageKey, page]}
-									<div>
-										<div class="flex items-center gap-1.5 mb-3">
-											<span class="material-symbols-rounded text-base text-gray-400">{page.icon}</span>
-											<p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">{page.label}</p>
-										</div>
-										<div class="space-y-3 pl-1">
-											{#each Object.entries(page.groups) as [, group]}
-												<div>
-													<p class="text-xs font-medium text-gray-500 mb-1.5">{group.label}</p>
-													<div class="flex flex-wrap gap-2">
-														{#each group.permissions as perm}
-															<button
-																type="button"
-																onclick={() => toggleNewRolePermission(perm.key)}
-																class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
-																	{newRolePermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
-															>
-																<span class="material-symbols-rounded text-sm">
-																	{newRolePermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
-																</span>
-																<span class="text-sm">{perm.label}</span>
-															</button>
-														{/each}
-													</div>
+									{@const filtered = filterPermissions(page, newRolePermissionSearch)}
+									{#if filtered}
+										<div class="border border-gray-200 rounded-lg bg-white">
+											<button
+												type="button"
+												onclick={() => toggleNewRoleSection(pageKey)}
+												class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+											>
+												<div class="flex items-center gap-2">
+													<span class="material-symbols-rounded text-base text-gray-400">{page.icon}</span>
+													<p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">{page.label}</p>
+													<span class="text-xs text-gray-500">
+														({Object.values(filtered.groups).reduce((sum, g) => sum + g.permissions.length, 0)} permissions)
+													</span>
 												</div>
-											{/each}
+												<span class="material-symbols-rounded text-gray-400 transition-transform {newRoleCollapsedSections.has(pageKey) ? '' : 'rotate-180'}">
+													expand_more
+												</span>
+											</button>
+
+											{#if !newRoleCollapsedSections.has(pageKey)}
+												<div class="px-4 pb-3 space-y-3">
+													{#each Object.entries(filtered.groups) as [, group]}
+														<div>
+															<p class="text-xs font-medium text-gray-500 mb-2">{group.label}</p>
+															<div class="flex flex-wrap gap-2">
+																{#each group.permissions as perm}
+																	<button
+																		type="button"
+																		onclick={() => toggleNewRolePermission(perm.key)}
+																		class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
+																			{newRolePermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
+																	>
+																		<span class="material-symbols-rounded text-sm">
+																			{newRolePermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
+																		</span>
+																		<span class="text-sm">{perm.label}</span>
+																	</button>
+																{/each}
+															</div>
+														</div>
+													{/each}
+												</div>
+											{/if}
 										</div>
-									</div>
+									{/if}
 								{/each}
 							</div>
 

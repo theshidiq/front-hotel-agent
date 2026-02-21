@@ -77,7 +77,9 @@
 	});
 
 	// Filter out groups that are linked as kids groups
-	const previewableMenuGroups = $derived(menuGroups.filter(g => !menuGroups.some(mg => mg.kids_group_id === g.id)));
+	const previewableMenuGroups = $derived.by(() => {
+		return menuGroups.filter(g => !menuGroups.some(mg => mg.kids_group_id === g.id));
+	});
 
 	// Sidebar
 	let sidebarCollapsed = $state(false);
@@ -690,8 +692,8 @@
 				>
 					<span class="material-symbols-rounded text-xl">menu</span>
 				</button>
-				<h2 class="text-lg font-bold text-gray-900">{headerTitle()}</h2>
-				<span class="text-sm text-gray-500 hidden sm:inline">{todayFormatted()}</span>
+				<h2 class="text-lg font-bold text-gray-900">{headerTitle}</h2>
+				<span class="text-sm text-gray-500 hidden sm:inline">{todayFormatted}</span>
 				<!-- Date Filter Dropdown -->
 				<div class="relative">
 					<button
@@ -974,23 +976,23 @@
 			<div class="grid grid-cols-5 gap-4 mb-6">
 				<div class="bg-white rounded-lg border border-gray-200 p-4">
 					<p class="text-sm text-gray-500">予約数</p>
-					<p class="text-2xl font-bold text-gray-900 mt-1">{stats().total}</p>
+					<p class="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
 				</div>
 				<div class="bg-blue-50 rounded-lg border border-blue-300 p-4">
 					<p class="text-sm text-blue-700">到着待ち</p>
-					<p class="text-2xl font-bold text-blue-700 mt-1">{stats().pending}</p>
+					<p class="text-2xl font-bold text-blue-700 mt-1">{stats.pending}</p>
 				</div>
 				<div class="bg-emerald-50 rounded-lg border border-emerald-300 p-4">
 					<p class="text-sm text-emerald-700">滞在中</p>
-					<p class="text-2xl font-bold text-emerald-700 mt-1">{stats().checkedIn}</p>
+					<p class="text-2xl font-bold text-emerald-700 mt-1">{stats.checkedIn}</p>
 				</div>
 				<div class="bg-gray-100 rounded-lg border border-gray-300 p-4">
 					<p class="text-sm text-gray-600">チェックアウト済</p>
-					<p class="text-2xl font-bold text-gray-600 mt-1">{stats().checkedOut}</p>
+					<p class="text-2xl font-bold text-gray-600 mt-1">{stats.checkedOut}</p>
 				</div>
 				<div class="bg-white rounded-lg border border-gray-200 p-4">
 					<p class="text-sm text-gray-500">空室</p>
-					<p class="text-2xl font-bold text-gray-900 mt-1">{stats().availableRooms}</p>
+					<p class="text-2xl font-bold text-gray-900 mt-1">{stats.availableRooms}</p>
 				</div>
 			</div>
 
@@ -1003,7 +1005,7 @@
 							? 'bg-gray-900 text-white'
 							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
 					>
-						全て ({stats().total})
+						全て ({stats.total})
 					</button>
 					<button
 						onclick={() => (filterStatus = 'confirmed')}
@@ -1011,7 +1013,7 @@
 							? 'bg-blue-600 text-white'
 							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
 					>
-						到着待ち ({stats().pending})
+						到着待ち ({stats.pending})
 					</button>
 					<button
 						onclick={() => (filterStatus = 'checked_in')}
@@ -1020,7 +1022,7 @@
 							? 'bg-emerald-600 text-white'
 							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
 					>
-						滞在中 ({stats().checkedIn})
+						滞在中 ({stats.checkedIn})
 					</button>
 					<button
 						onclick={() => (filterStatus = 'checked_out')}
@@ -1029,7 +1031,7 @@
 							? 'bg-gray-600 text-white'
 							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
 					>
-						チェックアウト済 ({stats().checkedOut})
+						チェックアウト済 ({stats.checkedOut})
 					</button>
 				</div>
 
@@ -1076,7 +1078,7 @@
 							</tr>
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-200">
-							{#each filteredReservations() as reservation (reservation.id)}
+							{#each filteredReservations as reservation (reservation.id)}
 								<tr class="hover:bg-gray-50">
 									<td class="px-4 py-4 whitespace-nowrap">
 										<div class="font-medium text-gray-900">{reservation.room_number}</div>
@@ -1468,7 +1470,7 @@
 						<!-- Allergen list -->
 						<div class="max-h-36 overflow-y-auto border border-gray-200 rounded-lg">
 							<div class="flex flex-wrap gap-2 p-3">
-								{#each filteredAllergens() as allergen (allergen.id)}
+								{#each filteredAllergens as allergen (allergen.id)}
 									<button
 										type="button"
 										onclick={() => toggleAllergen(allergen.id)}
