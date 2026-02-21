@@ -28,13 +28,17 @@ async function createDummyReservations() {
 
   const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Get today's date
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Get today's date - force to current local date
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 
   // Helper function to format date as ISO string (YYYY-MM-DD)
+  // Use local date components to avoid timezone shift
   const formatDate = (date: Date): string => {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   // Helper function to add days to a date
