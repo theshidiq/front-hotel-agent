@@ -211,6 +211,17 @@
 		return allergens.filter((a) => a.name.toLowerCase().includes(query));
 	});
 
+	// Dashi restriction tracking (allergen ID → dashi also NG boolean)
+	let dashiRestrictions = $state<Record<string, boolean>>({});
+
+	// Allergens that support dashi option (seafood-based)
+	const DASHI_CAPABLE_ALLERGENS = ['魚', 'かに', 'えび', 'いか', 'たこ', '貝類'];
+
+	// Helper to check if allergen supports dashi option
+	function supportsDashiOption(allergenName: string): boolean {
+		return DASHI_CAPABLE_ALLERGENS.some(name => allergenName.includes(name));
+	}
+
 	// Dinner time dropdown state
 	let showDinnerTimeDropdown = $state(false);
 	const dinnerTimeOptions = [
@@ -424,6 +435,7 @@
 		checkInStep = 1;
 		allergenSearchQuery = '';
 		showDinnerTimeDropdown = false;
+		dashiRestrictions = {};
 	}
 
 	// Step 1: Search by QR
@@ -497,11 +509,23 @@
 		const ids = checkInForm.allergen_ids || [];
 		if (ids.includes(allergenId)) {
 			checkInForm.allergen_ids = ids.filter((id) => id !== allergenId);
+			// Remove dashi restriction when allergen is removed
+			const newRestrictions = { ...dashiRestrictions };
+			delete newRestrictions[allergenId];
+			dashiRestrictions = newRestrictions;
 		} else {
 			checkInForm.allergen_ids = [...ids, allergenId];
 			// Clear search after selecting an allergen
 			allergenSearchQuery = '';
 		}
+	}
+
+	// Toggle dashi restriction for a specific allergen
+	function toggleDashiRestriction(allergenId: string) {
+		dashiRestrictions = {
+			...dashiRestrictions,
+			[allergenId]: !dashiRestrictions[allergenId]
+		};
 	}
 
 	// Step 3: Complete check-in
@@ -512,11 +536,27 @@
 		// Save guest name before closing wizard (which sets foundReservation to null)
 		const guestName = foundReservation.guest_name;
 		try {
+			// Build dashi restriction notes
+			const dashiNotes: string[] = [];
+			for (const allergenId of checkInForm.allergen_ids || []) {
+				const allergen = allergens.find(a => a.id === allergenId);
+				if (allergen && dashiRestrictions[allergenId]) {
+					dashiNotes.push(`${allergen.name}（出汁もNG）`);
+				}
+			}
+
+			// Combine dashi notes with existing dietary notes
+			let combinedNotes = checkInForm.dietary_notes || '';
+			if (dashiNotes.length > 0) {
+				const dashiText = `出汁制限: ${dashiNotes.join('、')}`;
+				combinedNotes = combinedNotes ? `${combinedNotes}\n${dashiText}` : dashiText;
+			}
+
 			// Build check-in data, excluding empty breakfast_time
 			const data: CheckInData = {
 				dinner_time: checkInForm.dinner_time || undefined,
 				allergen_ids: checkInForm.allergen_ids,
-				dietary_notes: checkInForm.dietary_notes || undefined,
+				dietary_notes: combinedNotes || undefined,
 				special_requests: checkInForm.special_requests || undefined,
 			};
 
@@ -1437,20 +1477,35 @@
 						<p class="text-sm font-semibold text-gray-900">アレルギー・食事制限</p>
 						<p class="text-xs text-gray-500">該当するものを選択してください</p>
 
-						<!-- Selected allergens -->
+						<!-- Selected allergens with dashi option -->
 						{#if (checkInForm.allergen_ids || []).length > 0}
-							<div class="flex flex-wrap gap-2 p-3 bg-red-50 rounded-lg border border-red-200">
+							<div class="space-y-2 p-3 bg-red-50 rounded-lg border border-red-200">
 								{#each checkInForm.allergen_ids || [] as allergenId}
 									{@const allergen = allergens.find((a) => a.id === allergenId)}
 									{#if allergen}
-										<button
-											type="button"
-											onclick={() => toggleAllergen(allergenId)}
-											class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-700"
-										>
-											{allergen.name}
-											<span class="material-symbols-rounded text-sm" style="font-weight: 500">close</span>
-										</button>
+										<div class="flex items-center gap-2">
+											<button
+												type="button"
+												onclick={() => toggleAllergen(allergenId)}
+												class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+											>
+												{allergen.name}
+												<span class="material-symbols-rounded text-sm" style="font-weight: 500">close</span>
+											</button>
+
+											{#if supportsDashiOption(allergen.name)}
+												<button
+													type="button"
+													onclick={() => toggleDashiRestriction(allergenId)}
+													class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors {dashiRestrictions[allergenId] ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}"
+												>
+													<span class="material-symbols-rounded text-sm">
+														{dashiRestrictions[allergenId] ? 'check_box' : 'check_box_outline_blank'}
+													</span>
+													出汁もNG
+												</button>
+											{/if}
+										</div>
 									{/if}
 								{/each}
 							</div>
