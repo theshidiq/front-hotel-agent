@@ -32,11 +32,12 @@
 		availableCourses: AvailableCourse[];
 		kidsGroup: KidsGroupInfo | null;
 		linkableGroups: LinkableGroup[];
-		onUpdateDisplayTitle: (title: string) => void;
-		onToggleCourse: (groupId: string, courseId: string) => Promise<void>;
-		onReorderCourses: (groupId: string, courseIds: string[]) => Promise<void>;
-		onLinkKidsGroup: (kidsGroupId: string | null) => void;
-		onDeleteMenu: (menuId: string) => void;
+		readonly?: boolean;
+		onUpdateDisplayTitle?: (title: string) => void;
+		onToggleCourse?: (groupId: string, courseId: string) => Promise<void>;
+		onReorderCourses?: (groupId: string, courseIds: string[]) => Promise<void>;
+		onLinkKidsGroup?: (kidsGroupId: string | null) => void;
+		onDeleteMenu?: (menuId: string) => void;
 		onClose: () => void;
 	}
 
@@ -49,6 +50,7 @@
 		availableCourses,
 		kidsGroup,
 		linkableGroups,
+		readonly = false,
 		onUpdateDisplayTitle,
 		onToggleCourse,
 		onReorderCourses,
@@ -119,13 +121,13 @@
 	// Composed title
 	const composedTitle = $derived(`${eraInfo.era}${eraInfo.kanjiYear}年　${selectedSeason}メニュー　${titleSuffix}`);
 
-	// Auto-save when composition changes
+	// Auto-save when composition changes (only in edit mode)
 	let lastSavedTitle = $state(displayTitle ?? '');
 
 	$effect(() => {
-		if (composedTitle !== lastSavedTitle) {
+		if (!readonly && composedTitle !== lastSavedTitle) {
 			lastSavedTitle = composedTitle;
-			onUpdateDisplayTitle(composedTitle);
+			onUpdateDisplayTitle?.(composedTitle);
 		}
 	});
 
@@ -150,6 +152,11 @@
 	// Kids group dropdown
 	let showKidsDropdown = $state(false);
 	let kidsDropdownEl: HTMLDivElement | undefined = $state(undefined);
+
+	// Print
+	function handlePrint() {
+		window.print();
+	}
 	const headerTextClass = $derived(isCompact ? 'text-base tracking-[0.3em]' : 'text-xl tracking-[0.4em]');
 	const menuTextClass = $derived(isCompact ? 'text-sm tracking-[0.2em]' : 'text-base tracking-[0.3em]');
 	const menuDescClass = $derived(isCompact ? 'text-[10px] tracking-[0.15em]' : 'text-xs tracking-[0.2em]');
@@ -165,11 +172,13 @@
 	}
 
 	async function handleAddCourse(courseId: string) {
+		if (readonly || !onToggleCourse) return;
 		await onToggleCourse(groupId, courseId);
 		showAddCourseDropdown = false;
 	}
 
 	function handleDragStart(e: DragEvent, index: number) {
+		if (readonly) return;
 		dragIndex = index;
 		if (e.dataTransfer) {
 			e.dataTransfer.effectAllowed = 'move';
@@ -190,7 +199,7 @@
 	}
 
 	async function handleDrop(index: number) {
-		if (dragIndex === null || dragIndex === index) {
+		if (readonly || !onReorderCourses || dragIndex === null || dragIndex === index) {
 			dragIndex = null;
 			dropIndex = null;
 			return;
@@ -228,11 +237,11 @@
 <!-- Fullscreen overlay -->
 <div class="fixed inset-0 bg-stone-100 z-[55] flex flex-col overflow-hidden">
 	<!-- Header -->
-	<header class="border-b border-stone-200 px-6 py-3 flex justify-between items-center bg-white flex-shrink-0">
+	<header class="border-b border-stone-200 px-6 py-3 flex justify-between items-center bg-white flex-shrink-0 print:hidden">
 		<div class="flex items-center gap-5">
 			<div class="flex items-center gap-2">
 				<div class="w-1 h-5 bg-accent"></div>
-				<h1 class="font-serif-jp text-lg tracking-[0.15em]">お品書き編集</h1>
+				<h1 class="font-serif-jp text-lg tracking-[0.15em]">{readonly ? 'お品書きプレビュー' : 'お品書き編集'}</h1>
 			</div>
 			<div class="h-6 w-px bg-stone-200"></div>
 			<div class="flex flex-col">
@@ -241,6 +250,7 @@
 			</div>
 		</div>
 		<div class="flex items-center gap-2">
+			{#if !readonly}
 			<div class="relative" bind:this={addCourseEl}>
 				<button
 					onclick={(e) => { e.stopPropagation(); showAddCourseDropdown = !showAddCourseDropdown; }}
@@ -267,7 +277,9 @@
 					</div>
 				{/if}
 			</div>
+			{/if}
 			<!-- Kids group link -->
+			{#if !readonly}
 			<div class="relative" bind:this={kidsDropdownEl}>
 				<button
 					onclick={(e) => { e.stopPropagation(); showKidsDropdown = !showKidsDropdown; }}
@@ -283,7 +295,7 @@
 						<p class="px-3 py-1.5 text-[8px] uppercase tracking-widest text-stone-400 font-bold border-b border-stone-100">子供メニューグループ</p>
 						{#if kidsGroup}
 							<button
-								onclick={() => { onLinkKidsGroup(null); showKidsDropdown = false; }}
+								onclick={() => { onLinkKidsGroup?.(null); showKidsDropdown = false; }}
 								class="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
 							>
 								リンク解除
@@ -292,7 +304,7 @@
 						{/if}
 						{#each linkableGroups as g}
 							<button
-								onclick={() => { onLinkKidsGroup(g.id); showKidsDropdown = false; }}
+								onclick={() => { onLinkKidsGroup?.(g.id); showKidsDropdown = false; }}
 								class="w-full text-left px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 transition-colors {kidsGroup?.id === g.id ? 'bg-orange-50 font-medium' : ''}"
 							>
 								{g.name}
@@ -307,9 +319,21 @@
 					</div>
 				{/if}
 			</div>
+			{/if}
+			{#if !readonly}
+			<button
+				onclick={handlePrint}
+				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden"
+			>
+				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+				</svg>
+				Print
+			</button>
+			{/if}
 			<button
 				onclick={onClose}
-				class="px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium"
+				class="px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden"
 			>
 				Close
 			</button>
@@ -317,8 +341,8 @@
 	</header>
 
 	<!-- A4 Landscape paper area -->
-	<div class="flex-1 flex items-center justify-center p-6 overflow-hidden">
-		<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative">
+	<div class="flex-1 flex items-center justify-center p-6 overflow-hidden print:p-0">
+		<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative print:shadow-none print:border-0" data-print-area>
 			<!-- Paper content -->
 			<div class="flex-1 flex overflow-hidden" dir="rtl">
 
@@ -326,9 +350,11 @@
 				<div class="flex-none flex flex-col border-l border-stone-200 relative paper-title-col" dir="ltr">
 					<!-- Title preview (vertical text) — clickable -->
 					<button
-						class="title-column flex-1 flex items-start justify-center pt-4 pb-3 px-1 relative group transition-colors {showTitleConfig ? 'bg-orange-50/40' : 'hover:bg-stone-50/50'}"
-						onclick={() => { showTitleConfig = !showTitleConfig; }}
+						class="title-column flex-1 flex items-start justify-center pt-4 pb-3 px-1 relative group transition-colors {showTitleConfig ? 'bg-orange-50/40' : readonly ? '' : 'hover:bg-stone-50/50'} {readonly ? 'cursor-default' : ''}"
+						onclick={() => { if (!readonly) showTitleConfig = !showTitleConfig; }}
+					disabled={readonly}
 					>
+				{#if !readonly}
 						<!-- Edit hint badge (top) -->
 						<div class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone-100 text-stone-400 text-[8px] tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity {showTitleConfig ? '!opacity-100 !bg-orange-100 !text-orange-500' : ''}">
 							<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,6 +362,7 @@
 							</svg>
 							編集
 						</div>
+				{/if}
 
 						<div class="tategaki font-serif-jp {titleTextClass} font-light text-stone-800 leading-loose h-fit mt-1">
 							{composedTitle}
@@ -409,13 +436,13 @@
 				{#each reversedCourses as course, i}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
-						class="flex-1 min-w-0 border-l flex flex-col transition-all cursor-grab {activeCourseId === course.courseId ? 'bg-orange-50/20' : 'hover:bg-stone-50/20'} {dragIndex === i ? 'opacity-30 scale-[0.97]' : ''} {dropIndex === i && dragIndex !== null && dragIndex !== i ? 'bg-orange-50/30 border-l-orange-400 border-l-2' : 'border-stone-100'}"
-						onclick={() => { activeCourseId = course.courseId; }}
-						onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') activeCourseId = course.courseId; }}
+						class="flex-1 min-w-0 border-l flex flex-col transition-all {readonly ? 'cursor-default' : 'cursor-grab'} {activeCourseId === course.courseId ? 'bg-orange-50/20' : readonly ? '' : 'hover:bg-stone-50/20'} {dragIndex === i ? 'opacity-30 scale-[0.97]' : ''} {dropIndex === i && dragIndex !== null && dragIndex !== i ? 'bg-orange-50/30 border-l-orange-400 border-l-2' : 'border-stone-100'}"
+						onclick={() => { if (!readonly) activeCourseId = course.courseId; }}
+						onkeydown={(e) => { if (!readonly && (e.key === 'Enter' || e.key === ' ')) activeCourseId = course.courseId; }}
 						role="button"
 						tabindex="0"
 						dir="ltr"
-						draggable="true"
+						draggable={!readonly}
 						ondragstart={(e) => handleDragStart(e, i)}
 						ondragover={(e) => handleDragOver(e, i)}
 						ondragleave={(e) => handleDragLeave(e, e.currentTarget as HTMLElement)}
@@ -445,8 +472,9 @@
 												{menu.description}
 											</div>
 										{/if}
+									{#if !readonly}
 										<button
-											onclick={(e) => { e.stopPropagation(); onDeleteMenu(menu.id); }}
+											onclick={(e) => { e.stopPropagation(); onDeleteMenu?.(menu.id); }}
 											class="mt-1 opacity-0 group-hover:opacity-100 text-stone-300 hover:text-red-500 transition-all"
 											title="Delete"
 										>
@@ -454,6 +482,7 @@
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 											</svg>
 										</button>
+									{/if}
 									</div>
 								{/each}
 
@@ -540,5 +569,59 @@
 	.custom-scroll::-webkit-scrollbar-thumb {
 		background: #e7e5e4;
 		border-radius: 2px;
+	}
+
+	/* Print styles */
+	@media print {
+		@page {
+			size: A4 landscape;
+			margin: 10mm;
+		}
+
+		:global(body *) {
+			visibility: hidden;
+		}
+
+		/* Show only the preview overlay and its contents */
+		:global(body [data-print-area]),
+		:global(body [data-print-area] *) {
+			visibility: visible;
+		}
+
+		:global(body [data-print-area]) {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100vw;
+			height: 100vh;
+		}
+
+		/* Hide interactive buttons (delete, dropdown, etc.) but NOT the title column button */
+		:global([data-print-area] .group .opacity-0),
+		:global([data-print-area] .group-hover\:opacity-100) {
+			display: none !important;
+		}
+
+		/* Hide title config popover */
+		:global([data-print-area] .absolute.z-30) {
+			display: none !important;
+		}
+
+		/* Hide the edit hint badge inside the title column */
+		:global([data-print-area] .title-column .opacity-0) {
+			display: none !important;
+		}
+
+		/* Hide dashed border hints (decorative only, not kids-box) */
+		:global([data-print-area] .title-column .border-dashed) {
+			border-color: transparent !important;
+		}
+
+		/* Ensure kids box border prints with exact colors */
+		:global([data-print-area] .kids-box) {
+			-webkit-print-color-adjust: exact;
+			print-color-adjust: exact;
+			border-color: #a8a29e !important;
+		}
 	}
 </style>

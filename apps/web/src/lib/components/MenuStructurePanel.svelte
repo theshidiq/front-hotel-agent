@@ -73,6 +73,9 @@
 	// Course toggle dropdown
 	let courseToggleGroupId: string | null = $state(null);
 
+	// Kids link dropdown
+	let kidsLinkGroupId: string | null = $state(null);
+
 	// Active group for preview panel
 	let activeGroupId: string | null = $state(null);
 
@@ -98,6 +101,7 @@
 	let isSubmitting = $state(false);
 
 	// Add course
+	let showCoursesDropdown = $state(false);
 	let showAddCourse = $state(false);
 	let newCourseName = $state('');
 	let isAddingCourse = $state(false);
@@ -203,6 +207,48 @@
 	}
 
 	const unassignedGroups = $derived(menuGroups.filter(g => !g.seasonal_menu_id));
+
+	// Build grouped structure: parent groups with their linked kids nested underneath
+	// Kids groups that are linked to a parent are hidden from the top-level list
+	interface GroupCluster {
+		parent: MenuGroup;
+		children: MenuGroup[]; // linked kids groups
+	}
+
+	function buildGroupClusters(groups: MenuGroup[]): GroupCluster[] {
+		// Find all group IDs that are kids (linked to by some parent)
+		const kidsIds = new Set<string>();
+		for (const g of groups) {
+			if (g.kids_group_id) {
+				const kid = groups.find(k => k.id === g.kids_group_id);
+				if (kid) kidsIds.add(kid.id);
+			}
+		}
+
+		// Top-level = groups that are NOT kids of another group in this list
+		const clusters: GroupCluster[] = [];
+		for (const g of groups) {
+			if (kidsIds.has(g.id)) continue; // skip, will be nested under parent
+			const children: MenuGroup[] = [];
+			if (g.kids_group_id) {
+				const kid = groups.find(k => k.id === g.kids_group_id);
+				if (kid) children.push(kid);
+			}
+			clusters.push({ parent: g, children });
+		}
+
+		// Also add any orphaned kids (kids whose parent isn't in this group list)
+		for (const g of groups) {
+			if (kidsIds.has(g.id)) {
+				const hasParentInList = groups.some(p => p.kids_group_id === g.id);
+				if (!hasParentInList) {
+					clusters.push({ parent: g, children: [] });
+				}
+			}
+		}
+
+		return clusters;
+	}
 
 	// Active group data for preview
 	const activeGroup = $derived(menuGroups.find(g => g.id === activeGroupId) ?? null);
@@ -347,6 +393,12 @@
 		await onUpdateGroup(groupId, { course_ids: courseIds });
 	}
 
+	function handleLinkKids(groupId: string, kidsGroupId: string | null) {
+		onUpdateGroup(groupId, { kids_group_id: kidsGroupId });
+		kidsLinkGroupId = null;
+		showToast(kidsGroupId ? 'Kids group linked' : 'Kids group unlinked');
+	}
+
 	function handleOpenCourseDetail(courseId: string, groupId: string, courseValue: string, courseName: string) {
 		detailContext = { courseId, groupId, courseValue, courseName };
 	}
@@ -392,8 +444,20 @@
 	}
 
 	function handleWindowClick(e: MouseEvent) {
-		if (!editingSeasonId && !editingGroupId && !renamingCourseId) return;
 		const target = e.target as HTMLElement;
+
+		// Close course editor when clicking outside it
+		if (detailContext && !target.closest('[data-course-editor]') && !target.closest('[data-course-chip]')) {
+			detailContext = null;
+		}
+
+		// Close courses dropdown when clicking outside it
+		if (showCoursesDropdown && !target.closest('[data-courses-dropdown]')) {
+			showCoursesDropdown = false;
+			showAddCourse = false;
+		}
+
+		if (!editingSeasonId && !editingGroupId && !renamingCourseId) return;
 		if (target.closest('[data-edit-form]')) return;
 		if (editingSeasonId) submitEditSeason(editingSeasonId);
 		if (editingGroupId) submitEditGroup(editingGroupId);
@@ -402,6 +466,151 @@
 </script>
 
 <svelte:window onclick={handleWindowClick} />
+
+{#snippet groupCard(group: MenuGroup, isChild: boolean)}
+	{@const courseCount = group.allowed_courses?.length || 0}
+	<div class="bg-white rounded-lg border p-4 {isChild ? 'border-purple-200 ml-6' : 'border-gray-200'}">
+		<!-- Group header -->
+		<div class="flex items-center gap-3 mb-3">
+			<div class="w-1.5 h-6 rounded-full flex-shrink-0 {isChild ? 'bg-purple-400' : 'bg-indigo-500'}"></div>
+			{#if isChild}
+				<span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 font-medium flex-shrink-0">子供</span>
+			{/if}
+			{#if editingGroupId === group.id}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="flex items-center gap-2" data-edit-form onclick={(e) => e.stopPropagation()}>
+					<input
+						type="text"
+						bind:value={editGroupName}
+						class="font-medium text-gray-900 bg-white border border-indigo-300 rounded px-2 py-1 text-sm w-40 focus:ring-2 focus:ring-indigo-400"
+						onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
+						autofocus
+					/>
+					<button onclick={() => submitEditGroup(group.id)} class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Save</button>
+					<button onclick={() => { editingGroupId = null; }} class="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
+				</div>
+			{:else}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<span
+					class="font-medium text-gray-900 text-sm cursor-pointer hover:underline hover:text-indigo-700"
+					ondblclick={() => startEditGroup(group)}
+					title="Double-click to edit"
+				>{group.name}</span>
+			{/if}
+			<span class="text-xs text-gray-400">{courseCount} course{courseCount !== 1 ? 's' : ''}</span>
+			{#if kidsGroupNameMap.get(group.id)}
+				<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
+					<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+					子供: {kidsGroupNameMap.get(group.id)?.name}
+				</span>
+			{/if}
+			{#if parentGroupNameMap.get(group.id)}
+				<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
+					<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+					親: {parentGroupNameMap.get(group.id)?.name}
+				</span>
+			{/if}
+			<div class="ml-auto flex items-center gap-1">
+				{#if !isChild}
+					<button onclick={() => { activeGroupId = group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium hover:bg-orange-100 transition-colors" title="Preview お品書き">
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+						Preview
+					</button>
+				{/if}
+				<button onclick={() => { courseToggleGroupId = courseToggleGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors" title="Manage courses">
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+					Courses
+				</button>
+				{#if !isChild}
+					<button onclick={() => { kidsLinkGroupId = kidsLinkGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors {group.kids_group_id ? 'bg-purple-50 text-purple-700 hover:bg-purple-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}" title="Link kids group">
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
+						Kids
+					</button>
+				{/if}
+				<button onclick={(e) => { e.stopPropagation(); startEditGroup(group); }} class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Rename">
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+				</button>
+				{#if confirmDeleteId === group.id && confirmDeleteType === 'group'}
+					<span class="text-xs text-red-600 font-medium">削除?</span>
+					<button onclick={() => confirmDelete()} class="text-red-500 hover:text-red-700 text-xs font-bold">Yes</button>
+					<button onclick={() => cancelDelete()} class="text-gray-400 hover:text-gray-600 text-xs">No</button>
+				{:else}
+					<button onclick={() => requestDelete(group.id, 'group')} class="p-1.5 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors" title="Delete group">
+						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Course toggle dropdown -->
+		{#if courseToggleGroupId === group.id}
+			<div class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+				<p class="text-xs font-medium text-blue-800 mb-2">Toggle courses for this group:</p>
+				<div class="flex flex-wrap gap-1.5">
+					{#each menuCategories as course}
+						{@const isAssigned = group.allowed_courses.some(c => c.category_id === course.id)}
+						<button
+							onclick={() => handleToggleCourse(group.id, course.id)}
+							class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {isAssigned ? 'bg-blue-600 text-white' : 'bg-white border border-blue-200 text-blue-700 hover:bg-blue-100'}"
+						>
+							{course.label}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Kids link dropdown -->
+		{#if kidsLinkGroupId === group.id}
+			<div class="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+				<p class="text-xs font-medium text-purple-800 mb-2">Link a kids menu group:</p>
+				<div class="flex flex-wrap gap-1.5">
+					{#if group.kids_group_id}
+						<button
+							onclick={() => handleLinkKids(group.id, null)}
+							class="px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+						>
+							Unlink
+						</button>
+					{/if}
+					{#each menuGroups.filter(g => g.id !== group.id) as candidate}
+						<button
+							onclick={() => handleLinkKids(group.id, candidate.id)}
+							class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {group.kids_group_id === candidate.id ? 'bg-purple-600 text-white' : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-100'}"
+						>
+							{candidate.name}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+
+		<!-- Course chips -->
+		{#if courseCount > 0}
+			<div class="flex flex-wrap gap-2">
+				{#each group.allowed_courses as ac}
+					{@const count = getMenuCount(group.id, ac.category_value)}
+					{@const linkedCount = getLinkedMenuCount(group.id, ac.category_value)}
+					{@const isActiveCourse = detailContext?.courseId === ac.category_id && detailContext?.groupId === group.id}
+					<button
+						data-course-chip
+						onclick={() => handleOpenCourseDetail(ac.category_id, group.id, ac.category_value, getCourseName(ac.category_id, ac.category_name))}
+						class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:shadow-sm {isActiveCourse ? 'bg-amber-200 border-amber-500 text-amber-900 ring-2 ring-amber-400 ring-offset-1' : count > 0 || linkedCount > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
+					>
+						<span class="font-medium">{getCourseName(ac.category_id, ac.category_name)}</span>
+						{#if linkedCount > 0 && count === 0}
+							<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-700" title="Inherited from {parentGroupNameMap.get(group.id)?.name}">{linkedCount}</span>
+						{:else}
+							<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold {count > 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'}">{count}</span>
+						{/if}
+					</button>
+				{/each}
+			</div>
+		{:else}
+			<p class="text-xs text-gray-400">No courses assigned — click <strong>Courses</strong> to add</p>
+		{/if}
+	</div>
+{/snippet}
 
 <!-- Full-screen overlay -->
 <div class="fixed inset-0 bg-gray-50 z-50 flex flex-col">
@@ -412,6 +621,87 @@
 			<p class="text-sm text-gray-500">Organize seasonal menus, groups, and courses</p>
 		</div>
 		<div class="flex items-center gap-2">
+			<!-- Manage Courses dropdown -->
+			<div class="relative" data-courses-dropdown>
+				<button
+					onclick={(e) => { e.stopPropagation(); showCoursesDropdown = !showCoursesDropdown; if (!showCoursesDropdown) { showAddCourse = false; } }}
+					class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors {showCoursesDropdown ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}"
+					title="Manage courses"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+					</svg>
+					Courses
+					<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{menuCategories.length}</span>
+				</button>
+				{#if showCoursesDropdown}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-[55] p-4" onclick={(e) => e.stopPropagation()}>
+						<div class="flex items-center justify-between mb-3">
+							<h3 class="text-sm font-semibold text-gray-900">Available Courses</h3>
+							<button onclick={() => { showAddCourse = !showAddCourse; newCourseName = ''; addCourseError = ''; }} class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+								{showAddCourse ? 'Cancel' : '+ Add'}
+							</button>
+						</div>
+
+						{#if showAddCourse}
+							<div class="flex gap-2 mb-3">
+								<input type="text" bind:value={newCourseName} placeholder="Course name" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400" onkeydown={(e) => e.key === 'Enter' && !e.isComposing && submitNewCourse()} />
+								<button onclick={submitNewCourse} disabled={isAddingCourse || !newCourseName.trim()} class="bg-blue-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+									{isAddingCourse ? '...' : 'Add'}
+								</button>
+							</div>
+							{#if addCourseError}
+								<p class="text-xs text-red-500 mb-2">{addCourseError}</p>
+							{/if}
+						{/if}
+
+						<div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+							{#each menuCategories as course}
+								{#if confirmDeleteId === course.id && confirmDeleteType === 'course'}
+									<div class="flex items-center gap-1.5 bg-red-50 border border-red-300 rounded-full px-3 py-1 animate-pulse">
+										<span class="text-sm text-red-700">Delete?</span>
+										<button onclick={() => confirmDelete()} class="text-red-500 hover:text-red-700 font-bold text-xs">Yes</button>
+										<span class="text-red-200">|</span>
+										<button onclick={() => cancelDelete()} class="text-gray-400 hover:text-gray-600 text-xs">No</button>
+									</div>
+								{:else if renamingCourseId === course.id}
+									<div class="flex items-center gap-1.5 bg-blue-100 border border-blue-400 rounded-full px-1.5 py-0.5" data-edit-form>
+										<input
+											type="text"
+											bind:value={renameCourseValue}
+											class="bg-transparent border-none text-sm text-blue-900 font-medium w-24 focus:outline-none focus:ring-0 px-1"
+											onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitRenameCourse(course.id); if (e.key === 'Escape') renamingCourseId = null; }}
+											autofocus
+										/>
+										<button onclick={() => submitRenameCourse(course.id)} class="text-blue-600 hover:text-blue-800 transition-colors" title="Save">
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+										</button>
+										<button onclick={() => { renamingCourseId = null; }} class="text-gray-400 hover:text-gray-600 transition-colors" title="Cancel">
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+										</button>
+									</div>
+								{:else}
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
+										<span
+											class="text-sm text-blue-800 cursor-pointer hover:underline"
+											ondblclick={() => startRenameCourse(course)}
+											title="Double-click to rename"
+										>{course.label}</span>
+										<button onclick={() => requestDelete(course.id, 'course')} class="text-blue-400 hover:text-red-500 transition-colors" title="Delete course">
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+										</button>
+									</div>
+								{/if}
+							{/each}
+							{#if menuCategories.length === 0}
+								<p class="text-sm text-gray-400">No courses yet. Add one above.</p>
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
 			<button
 				onclick={onSwitchToTree}
 				class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -434,9 +724,11 @@
 		</div>
 	</div>
 
-	<!-- Content (scrollable) -->
-	<div class="flex-1 overflow-y-auto px-6 py-5">
-		<div class="max-w-4xl mx-auto space-y-4">
+	<!-- Two-column content -->
+	<div class="flex-1 flex flex-row overflow-hidden">
+		<!-- Left panel: Accordion + Available Courses -->
+		<div class="flex-1 overflow-y-auto px-6 py-5">
+			<div class="max-w-4xl mx-auto space-y-4">
 
 			<!-- Add Seasonal Menu button -->
 			{#if !showAddSeason}
@@ -475,6 +767,7 @@
 			<!-- Seasonal Menus -->
 			{#each seasonalMenus as season}
 				{@const groups = menuGroups.filter(g => g.seasonal_menu_id === season.id)}
+				{@const clusters = buildGroupClusters(groups)}
 				<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 					<!-- Season header (clickable accordion) -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -546,110 +839,12 @@
 					<!-- Groups (expanded) -->
 					{#if expandedSeasons.has(season.id)}
 						<div class="border-t border-gray-100 px-5 py-3 space-y-3 bg-gray-50/50">
-							{#each groups as group}
-								{@const courseCount = group.allowed_courses?.length || 0}
-								<div class="bg-white rounded-lg border border-gray-200 p-4">
-									<!-- Group header -->
-									<div class="flex items-center gap-3 mb-3">
-										<div class="w-1.5 h-6 bg-indigo-500 rounded-full flex-shrink-0"></div>
-										{#if editingGroupId === group.id}
-											<!-- svelte-ignore a11y_no_static_element_interactions -->
-											<div class="flex items-center gap-2" data-edit-form onclick={(e) => e.stopPropagation()}>
-												<input
-													type="text"
-													bind:value={editGroupName}
-													class="font-medium text-gray-900 bg-white border border-indigo-300 rounded px-2 py-1 text-sm w-40 focus:ring-2 focus:ring-indigo-400"
-													onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
-													autofocus
-												/>
-												<button onclick={() => submitEditGroup(group.id)} class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Save</button>
-												<button onclick={() => { editingGroupId = null; }} class="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
-											</div>
-										{:else}
-											<!-- svelte-ignore a11y_no_static_element_interactions -->
-											<span
-												class="font-medium text-gray-900 text-sm cursor-pointer hover:underline hover:text-indigo-700"
-												ondblclick={() => startEditGroup(group)}
-												title="Double-click to edit"
-											>{group.name}</span>
-										{/if}
-										<span class="text-xs text-gray-400">{courseCount} course{courseCount !== 1 ? 's' : ''}</span>
-										{#if kidsGroupNameMap.get(group.id)}
-											<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
-												<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-												子供: {kidsGroupNameMap.get(group.id)?.name}
-											</span>
-										{/if}
-										{#if parentGroupNameMap.get(group.id)}
-											<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
-												<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-												親: {parentGroupNameMap.get(group.id)?.name}
-											</span>
-										{/if}
-										<div class="ml-auto flex items-center gap-1">
-											<button onclick={() => { activeGroupId = group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium hover:bg-orange-100 transition-colors" title="Preview お品書き">
-												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-												Preview
-											</button>
-											<button onclick={() => { courseToggleGroupId = courseToggleGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors" title="Manage courses">
-												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-												Courses
-											</button>
-											<button onclick={() => startEditGroup(group)} class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Rename">
-												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-											</button>
-											{#if confirmDeleteId === group.id && confirmDeleteType === 'group'}
-												<span class="text-xs text-red-600 font-medium">削除?</span>
-												<button onclick={() => confirmDelete()} class="text-red-500 hover:text-red-700 text-xs font-bold">Yes</button>
-												<button onclick={() => cancelDelete()} class="text-gray-400 hover:text-gray-600 text-xs">No</button>
-											{:else}
-												<button onclick={() => requestDelete(group.id, 'group')} class="p-1.5 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors" title="Delete group">
-													<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-												</button>
-											{/if}
-										</div>
-									</div>
-
-									<!-- Course toggle dropdown -->
-									{#if courseToggleGroupId === group.id}
-										<div class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-											<p class="text-xs font-medium text-blue-800 mb-2">Toggle courses for this group:</p>
-											<div class="flex flex-wrap gap-1.5">
-												{#each menuCategories as course}
-													{@const isAssigned = group.allowed_courses.some(c => c.category_id === course.id)}
-													<button
-														onclick={() => handleToggleCourse(group.id, course.id)}
-														class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {isAssigned ? 'bg-blue-600 text-white' : 'bg-white border border-blue-200 text-blue-700 hover:bg-blue-100'}"
-													>
-														{course.label}
-													</button>
-												{/each}
-											</div>
-										</div>
-									{/if}
-
-									<!-- Course chips -->
-									{#if courseCount > 0}
-										<div class="flex flex-wrap gap-2">
-											{#each group.allowed_courses as ac}
-												{@const count = getMenuCount(group.id, ac.category_value)}
-												{@const linkedCount = getLinkedMenuCount(group.id, ac.category_value)}
-												<button
-													onclick={() => handleOpenCourseDetail(ac.category_id, group.id, ac.category_value, getCourseName(ac.category_id, ac.category_name))}
-													class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:shadow-sm {count > 0 || linkedCount > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
-												>
-													<span class="font-medium">{getCourseName(ac.category_id, ac.category_name)}</span>
-													{#if linkedCount > 0 && count === 0}
-														<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-700" title="Inherited from {parentGroupNameMap.get(group.id)?.name}">{linkedCount}</span>
-													{:else}
-														<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold {count > 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'}">{count}</span>
-													{/if}
-												</button>
-											{/each}
-										</div>
-									{:else}
-										<p class="text-xs text-gray-400">No courses assigned — click <strong>Courses</strong> to add</p>
-									{/if}
+							{#each clusters as cluster}
+								<div class="space-y-1">
+									{@render groupCard(cluster.parent, false)}
+									{#each cluster.children as child}
+										{@render groupCard(child, true)}
+									{/each}
 								</div>
 							{/each}
 
@@ -663,6 +858,7 @@
 
 			<!-- Unassigned groups -->
 			{#if unassignedGroups.length > 0}
+				{@const unassignedClusters = buildGroupClusters(unassignedGroups)}
 				<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 					<div class="px-5 py-4 flex items-center gap-3 border-b border-gray-100">
 						<div class="w-2 h-8 bg-gray-400 rounded-full flex-shrink-0"></div>
@@ -670,184 +866,51 @@
 						<span class="text-xs text-gray-400">{unassignedGroups.length}</span>
 					</div>
 					<div class="px-5 py-3 space-y-3 bg-gray-50/50">
-						{#each unassignedGroups as group}
-							{@const courseCount = group.allowed_courses?.length || 0}
-							<div class="bg-white rounded-lg border border-gray-200 p-4">
-								<div class="flex items-center gap-3 mb-3">
-									<div class="w-1.5 h-6 bg-gray-400 rounded-full flex-shrink-0"></div>
-									{#if editingGroupId === group.id}
-										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<div class="flex items-center gap-2" data-edit-form onclick={(e) => e.stopPropagation()}>
-											<input
-												type="text"
-												bind:value={editGroupName}
-												class="font-medium text-gray-900 bg-white border border-gray-300 rounded px-2 py-1 text-sm w-40 focus:ring-2 focus:ring-indigo-400"
-												onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitEditGroup(group.id); if (e.key === 'Escape') editingGroupId = null; }}
-												autofocus
-											/>
-											<button onclick={() => submitEditGroup(group.id)} class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Save</button>
-											<button onclick={() => { editingGroupId = null; }} class="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
-										</div>
-									{:else}
-										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<span
-											class="font-medium text-gray-900 text-sm cursor-pointer hover:underline hover:text-indigo-700"
-											ondblclick={() => startEditGroup(group)}
-											title="Double-click to edit"
-										>{group.name}</span>
-									{/if}
-									<span class="text-xs text-gray-400">{courseCount} course{courseCount !== 1 ? 's' : ''}</span>
-									{#if kidsGroupNameMap.get(group.id)}
-										<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
-											<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-											子供: {kidsGroupNameMap.get(group.id)?.name}
-										</span>
-									{/if}
-									{#if parentGroupNameMap.get(group.id)}
-										<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
-											<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
-											親: {parentGroupNameMap.get(group.id)?.name}
-										</span>
-									{/if}
-									<div class="ml-auto flex items-center gap-1">
-										<button onclick={() => { activeGroupId = group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium hover:bg-orange-100 transition-colors">
-											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-											Preview
-										</button>
-										<button onclick={() => { courseToggleGroupId = courseToggleGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors">
-											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-											Courses
-										</button>
-										<button onclick={() => startEditGroup(group)} class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Rename">
-											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-										</button>
-										{#if confirmDeleteId === group.id && confirmDeleteType === 'group'}
-											<span class="text-xs text-red-600 font-medium">削除?</span>
-											<button onclick={() => confirmDelete()} class="text-red-500 hover:text-red-700 text-xs font-bold">Yes</button>
-											<button onclick={() => cancelDelete()} class="text-gray-400 hover:text-gray-600 text-xs">No</button>
-										{:else}
-											<button onclick={() => requestDelete(group.id, 'group')} class="p-1.5 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors" title="Delete group">
-												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-											</button>
-										{/if}
-									</div>
-								</div>
-
-								{#if courseToggleGroupId === group.id}
-									<div class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-										<p class="text-xs font-medium text-blue-800 mb-2">Toggle courses for this group:</p>
-										<div class="flex flex-wrap gap-1.5">
-											{#each menuCategories as course}
-												{@const isAssigned = group.allowed_courses.some(c => c.category_id === course.id)}
-												<button
-													onclick={() => handleToggleCourse(group.id, course.id)}
-													class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {isAssigned ? 'bg-blue-600 text-white' : 'bg-white border border-blue-200 text-blue-700 hover:bg-blue-100'}"
-												>
-													{course.label}
-												</button>
-											{/each}
-										</div>
-									</div>
-								{/if}
-
-								{#if courseCount > 0}
-									<div class="flex flex-wrap gap-2">
-										{#each group.allowed_courses as ac}
-											{@const count = getMenuCount(group.id, ac.category_value)}
-											{@const linkedCount = getLinkedMenuCount(group.id, ac.category_value)}
-											<button
-												onclick={() => handleOpenCourseDetail(ac.category_id, group.id, ac.category_value, getCourseName(ac.category_id, ac.category_name))}
-												class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:shadow-sm {count > 0 || linkedCount > 0 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}"
-											>
-												<span class="font-medium">{getCourseName(ac.category_id, ac.category_name)}</span>
-												{#if linkedCount > 0 && count === 0}
-													<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-700" title="Inherited from {parentGroupNameMap.get(group.id)?.name}">{linkedCount}</span>
-												{:else}
-													<span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold {count > 0 ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'}">{count}</span>
-												{/if}
-											</button>
-										{/each}
-									</div>
-								{:else}
-									<p class="text-xs text-gray-400">No courses assigned — click <strong>Courses</strong> to add</p>
-								{/if}
+						{#each unassignedClusters as cluster}
+							<div class="space-y-1">
+								{@render groupCard(cluster.parent, false)}
+								{#each cluster.children as child}
+									{@render groupCard(child, true)}
+								{/each}
 							</div>
 						{/each}
 					</div>
 				</div>
 			{/if}
+
 		</div>
-	</div>
+		</div>
 
-	<!-- Available Courses footer -->
-	<div class="bg-white border-t border-gray-200 px-6 py-4 flex-shrink-0">
-		<div class="max-w-4xl mx-auto">
-			<div class="flex items-center justify-between mb-2">
-				<div>
-					<h3 class="text-sm font-semibold text-gray-900">Available Courses</h3>
-					<p class="text-xs text-gray-500">Courses available for assignment to menu groups</p>
+		<!-- Right panel: Course Editor -->
+		<div class="w-[450px] flex-shrink-0 border-l border-gray-200 flex flex-col bg-white" data-course-editor>
+			{#if detailContext}
+				<CourseDetailSidebar
+					embedded={true}
+					courseId={detailContext.courseId}
+					courseName={detailContext.courseName}
+					courseCategory={detailCategory}
+					menus={detailMenus}
+					{products}
+					{productAlternates}
+					{onAddAlternate}
+					{onRemoveAlternate}
+					groupId={detailContext.groupId}
+					seasonalMenuId={menuGroups.find(g => g.id === detailContext?.groupId)?.seasonal_menu_id}
+					onUpdateCourseDetails={(id, data) => onUpdateCourseDetails(id, data)}
+					onRenameCourse={(id, name) => onUpdateCourse(id, name)}
+					onCreateMenu={handleCreateMenuFromSidebar}
+					onDeleteMenu={(id) => { onDeleteMenu(id); showToast('Menu item deleted'); }}
+					onClose={() => { detailContext = null; }}
+				/>
+			{:else}
+				<div class="flex-1 flex flex-col items-center justify-center text-gray-400">
+					<svg class="w-16 h-16 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+					</svg>
+					<p class="text-sm font-medium">Select a course to edit</p>
+					<p class="text-xs mt-1">Click on a course chip in the panel</p>
 				</div>
-				<button onclick={() => { showAddCourse = !showAddCourse; newCourseName = ''; addCourseError = ''; }} class="text-sm text-blue-600 hover:text-blue-800 font-medium">
-					{showAddCourse ? 'Cancel' : '+ Add Course'}
-				</button>
-			</div>
-
-			{#if showAddCourse}
-				<div class="flex gap-2 mb-3">
-					<input type="text" bind:value={newCourseName} placeholder="Course name (e.g., Appetizer)" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400" onkeydown={(e) => e.key === 'Enter' && !e.isComposing && submitNewCourse()} />
-					<button onclick={submitNewCourse} disabled={isAddingCourse || !newCourseName.trim()} class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-						{isAddingCourse ? 'Adding...' : 'Add'}
-					</button>
-				</div>
-				{#if addCourseError}
-					<p class="text-xs text-red-500 mb-2">{addCourseError}</p>
-				{/if}
 			{/if}
-
-			<div class="flex flex-wrap gap-2">
-				{#each menuCategories as course}
-					{#if confirmDeleteId === course.id && confirmDeleteType === 'course'}
-						<div class="flex items-center gap-1.5 bg-red-50 border border-red-300 rounded-full px-3 py-1 animate-pulse">
-							<span class="text-sm text-red-700">削除?</span>
-							<button onclick={() => confirmDelete()} class="text-red-500 hover:text-red-700 font-bold text-xs">Yes</button>
-							<span class="text-red-200">|</span>
-							<button onclick={() => cancelDelete()} class="text-gray-400 hover:text-gray-600 text-xs">No</button>
-						</div>
-					{:else if renamingCourseId === course.id}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div class="flex items-center gap-1.5 bg-blue-100 border border-blue-400 rounded-full px-1.5 py-0.5" data-edit-form onclick={(e) => e.stopPropagation()}>
-							<input
-								type="text"
-								bind:value={renameCourseValue}
-								class="bg-transparent border-none text-sm text-blue-900 font-medium w-24 focus:outline-none focus:ring-0 px-1"
-								onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitRenameCourse(course.id); if (e.key === 'Escape') renamingCourseId = null; }}
-								autofocus
-							/>
-							<button onclick={() => submitRenameCourse(course.id)} class="text-blue-600 hover:text-blue-800 transition-colors" title="Save">
-								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-							</button>
-							<button onclick={() => { renamingCourseId = null; }} class="text-gray-400 hover:text-gray-600 transition-colors" title="Cancel">
-								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-							</button>
-						</div>
-					{:else}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
-							<span
-								class="text-sm text-blue-800 cursor-pointer hover:underline"
-								ondblclick={() => startRenameCourse(course)}
-								title="Double-click to rename"
-							>{course.label}</span>
-							<button onclick={() => requestDelete(course.id, 'course')} class="text-blue-400 hover:text-red-500 transition-colors" title="Delete course">
-								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-							</button>
-						</div>
-					{/if}
-				{/each}
-				{#if menuCategories.length === 0}
-					<p class="text-sm text-gray-400">No courses defined yet. Add one above.</p>
-				{/if}
-			</div>
 		</div>
 	</div>
 </div>
@@ -879,27 +942,6 @@
 		{products}
 		onSubmit={handleCreateMenuFromSidebar}
 		onClose={() => { sidebarContext = null; }}
-	/>
-{/if}
-
-<!-- Course Detail Sidebar -->
-{#if detailContext}
-	<CourseDetailSidebar
-		courseId={detailContext.courseId}
-		courseName={detailContext.courseName}
-		courseCategory={detailCategory}
-		menus={detailMenus}
-		{products}
-		{productAlternates}
-		{onAddAlternate}
-		{onRemoveAlternate}
-		groupId={detailContext.groupId}
-		seasonalMenuId={menuGroups.find(g => g.id === detailContext?.groupId)?.seasonal_menu_id}
-		onUpdateCourseDetails={(id, data) => onUpdateCourseDetails(id, data)}
-		onRenameCourse={(id, name) => onUpdateCourse(id, name)}
-		onCreateMenu={handleCreateMenuFromSidebar}
-		onDeleteMenu={(id) => { onDeleteMenu(id); showToast('Menu item deleted'); }}
-		onClose={() => { detailContext = null; }}
 	/>
 {/if}
 

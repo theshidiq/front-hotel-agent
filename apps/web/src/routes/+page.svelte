@@ -5,6 +5,7 @@
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import MenuStructurePanel from '$lib/components/MenuStructurePanel.svelte';
+	import MenuPreviewPanel from '$lib/components/flow/MenuPreviewPanel.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { authState, can } from '$lib/auth.svelte';
 
@@ -399,6 +400,10 @@
 
 	const sidebarSections = $derived.by(() => {
 		const foodItems: { icon: string; label: string; badge?: number; active: boolean; onclick?: () => void; href?: string }[] = [];
+		// Menu preview requires menus.preview permission
+		if (can('menus.preview')) {
+			foodItems.push({ icon: 'menu_book', label: 'お品書きプレビュー', active: showMenuPreview, onclick: () => { showMenuPreview = true; } });
+		}
 		if (canViewProducts) {
 			foodItems.push({ icon: 'inventory_2', label: '商品管理', badge: products.length, active: mainTab === 'products', onclick: () => mainTab = 'products' });
 		}
@@ -462,11 +467,49 @@
 	let showMenuTreeConfig = $state(false);
 	let menuStructureView: 'panel' | 'tree' = $state('panel');
 
+	// Menu Preview (read-only, available to all roles)
+	let showMenuPreview = $state(false);
+	let selectedMenuGroupId = $state<string | null>(null);
+
 	// Seasonal Menus
 	let seasonalMenus: SeasonalMenu[] = $state([]);
 
 	// Menu Groups
 	let menuGroups: MenuGroup[] = $state([]);
+
+	// Derived data for menu preview
+	const activeMenuGroup = $derived(menuGroups.find(g => g.id === selectedMenuGroupId) ?? null);
+	const activeGroupCourses = $derived.by(() => {
+		if (!activeMenuGroup) return [];
+		return (activeMenuGroup.allowed_courses || []).map(ac => ({
+			courseId: ac.id,
+			courseName: ac.category_name,
+			courseValue: ac.category_value,
+			menus: menus
+				.filter(m => m.menu_group_id === activeMenuGroup.id && m.category === ac.category_value)
+				.map(m => ({ id: m.id, name: m.name, price: m.price, description: m.description }))
+		}));
+	});
+	const activeGroupSeasonName = $derived(
+		activeMenuGroup?.seasonal_menu_id
+			? seasonalMenus.find(s => s.id === activeMenuGroup.seasonal_menu_id)?.name ?? null
+			: null
+	);
+	const activeKidsGroup = $derived.by(() => {
+		if (!activeMenuGroup?.kids_group_id) return null;
+		const kg = menuGroups.find(g => g.id === activeMenuGroup.kids_group_id);
+		if (!kg) return null;
+		const mainCourseIds = new Set((activeMenuGroup.allowed_courses || []).map(c => c.category_id));
+		const kidsCourses = (kg.allowed_courses || []).filter(c => mainCourseIds.has(c.category_id));
+		return {
+			id: kg.id,
+			name: kg.name,
+			courseNames: kidsCourses.map(c => c.category_name)
+		};
+	});
+
+	// Filter out groups that are linked as kids groups
+	const previewableMenuGroups = $derived(menuGroups.filter(g => !menuGroups.some(mg => mg.kids_group_id === g.id)));
 
 	// Tree config callbacks (wrappers that reload data after mutations)
 	async function treeCreateSeason(data: import('$lib/api').CreateSeasonalMenuData) {
@@ -565,7 +608,7 @@
 	);
 
 	// Get available products for alternates (exclude the main product and already selected alternates)
-	const availableAlternates = $derived(() => {
+	const availableAlternates = $derived.by(() => {
 		if (!alternatesForProductId) return [];
 		const currentAlternates = productAlternates[alternatesForProductId] || [];
 		return products.filter(p =>
@@ -576,7 +619,7 @@
 	});
 
 	// Get selected alternates for current product
-	const selectedAlternates = $derived(() => {
+	const selectedAlternates = $derived.by(() => {
 		if (!alternatesForProductId) return [];
 		const alternateIds = productAlternates[alternatesForProductId] || [];
 		return products.filter(p => alternateIds.includes(p.id));
@@ -2624,5 +2667,63 @@ ${coursesHtml}
 			onSwitchToPanel={() => { menuStructureView = 'panel'; }}
 			onClose={() => showMenuTreeConfig = false}
 		/>
+	{/if}
+
+	<!-- Menu Preview Group Selector Modal -->
+	{#if showMenuPreview && !selectedMenuGroupId}
+	<div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+		<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+			<div class="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+				<h2 class="text-lg font-semibold text-gray-900">お品書きを選択</h2>
+				<button onclick={() => { showMenuPreview = false; }} class="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+					<span class="material-symbols-rounded text-xl">close</span>
+				</button>
+			</div>
+			<div class="flex-1 overflow-y-auto p-6">
+				{#if previewableMenuGroups.length === 0}
+					<div class="flex flex-col items-center justify-center py-12 text-gray-400">
+						<span class="material-symbols-rounded text-5xl mb-3">menu_book</span>
+						<p class="text-sm">メニューグループがありません</p>
+					</div>
+				{:else}
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+						{#each previewableMenuGroups as group}
+							<button
+								onclick={() => { selectedMenuGroupId = group.id; }}
+								class="flex flex-col items-start p-4 border-2 border-gray-200 rounded-lg hover:border-orange-400 hover:bg-orange-50/30 transition-all text-left group"
+							>
+								<div class="flex items-center gap-2 mb-2">
+									<span class="material-symbols-rounded text-orange-600 text-xl">restaurant_menu</span>
+									<span class="font-semibold text-gray-900 group-hover:text-orange-700 transition-colors">{group.name}</span>
+								</div>
+								{#if group.display_title}
+									<p class="text-xs text-gray-500">{group.display_title}</p>
+								{/if}
+								<div class="mt-2 text-xs text-gray-400">
+									{(group.allowed_courses || []).length} コース
+								</div>
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+	{/if}
+
+	<!-- Menu Preview Panel -->
+	{#if showMenuPreview && selectedMenuGroupId && activeMenuGroup}
+	<MenuPreviewPanel
+		groupId={activeMenuGroup.id}
+		groupName={activeMenuGroup.name}
+		seasonName={activeGroupSeasonName}
+		displayTitle={activeMenuGroup.display_title ?? null}
+		courses={activeGroupCourses}
+		availableCourses={[]}
+		kidsGroup={activeKidsGroup}
+		linkableGroups={[]}
+		readonly={true}
+		onClose={() => { showMenuPreview = false; selectedMenuGroupId = null; }}
+	/>
 	{/if}
 </div>

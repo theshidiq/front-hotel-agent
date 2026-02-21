@@ -14,6 +14,7 @@ export const ALL_PERMISSIONS = [
   'products.delete',
   'products.scan',
   'menus.view',
+  'menus.preview',
   'menus.create',
   'menus.edit',
   'menus.delete',

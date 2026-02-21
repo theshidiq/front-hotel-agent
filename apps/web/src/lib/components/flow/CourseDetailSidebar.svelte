@@ -18,9 +18,10 @@
 		onCreateMenu: (data: CreateMenuData) => Promise<void>;
 		onDeleteMenu: (id: string) => void;
 		onClose: () => void;
+		embedded?: boolean;
 	}
 
-	let { courseId, courseName, courseCategory, menus, products, productAlternates, onAddAlternate, onRemoveAlternate, groupId, seasonalMenuId, onUpdateCourseDetails, onRenameCourse, onCreateMenu, onDeleteMenu, onClose }: Props = $props();
+	let { courseId, courseName, courseCategory, menus, products, productAlternates, onAddAlternate, onRemoveAlternate, groupId, seasonalMenuId, onUpdateCourseDetails, onRenameCourse, onCreateMenu, onDeleteMenu, onClose, embedded = false }: Props = $props();
 
 	// Course name
 	let courseNameInput = $state(courseName);
@@ -305,12 +306,14 @@
 
 </style>
 
-<!-- Backdrop -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="fixed inset-0 bg-black/20 z-50" onclick={onClose}></div>
+{#if !embedded}
+	<!-- Backdrop -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 bg-black/20 z-50" onclick={onClose}></div>
+{/if}
 
-<!-- Sidebar -->
-<div class="fixed right-0 top-0 h-full w-[450px] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-100">
+<!-- Sidebar / Embedded panel -->
+<div class="{embedded ? 'h-full flex flex-col bg-white' : 'fixed right-0 top-0 h-full w-[450px] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-100'}">
 	<!-- Sticky title bar -->
 	<div class="flex-none px-6 pt-6 pb-3 bg-white border-b border-gray-100 z-20">
 		<div class="flex justify-between items-center">

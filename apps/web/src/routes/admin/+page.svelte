@@ -18,11 +18,15 @@
 		type CreateStaffData,
 	} from '$lib/api';
 
+	// ── Navigation State ──
+	type AdminSection = 'menu' | 'staff' | 'roles';
+	let activeSection: AdminSection = $state('menu');
+
 	// ── State ──
 	let staffList: StaffMember[] = $state([]);
 	let roles: Role[] = $state([]);
 	let allPermissions: string[] = $state([]);
-	let loading = $state(true);
+	let loading = $state(false);
 	let error = $state('');
 
 	// Staff form
@@ -70,6 +74,7 @@
 					label: 'Menus',
 					permissions: [
 						{ key: 'menus.view', label: 'View' },
+						{ key: 'menus.preview', label: 'Preview' },
 						{ key: 'menus.create', label: 'Create' },
 						{ key: 'menus.edit', label: 'Edit' },
 						{ key: 'menus.delete', label: 'Delete' },
@@ -147,12 +152,23 @@
 	}
 
 	// ── Load data ──
-	async function loadAll() {
+	async function loadStaffData() {
 		loading = true;
 		error = '';
 		try {
-			const [s, r, p] = await Promise.all([getStaffs(), getRoles(), getRolePermissionsList()]);
-			staffList = s;
+			staffList = await getStaffs();
+		} catch (e: any) {
+			error = e.message;
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function loadRolesData() {
+		loading = true;
+		error = '';
+		try {
+			const [r, p] = await Promise.all([getRoles(), getRolePermissionsList()]);
 			roles = r;
 			allPermissions = p;
 		} catch (e: any) {
@@ -161,6 +177,17 @@
 			loading = false;
 		}
 	}
+
+	// Load data when section changes
+	$effect(() => {
+		if (activeSection === 'staff') {
+			// Staff section needs both staff data AND roles data (for the role dropdown)
+			if (staffList.length === 0) loadStaffData();
+			if (roles.length === 0) loadRolesData();
+		} else if (activeSection === 'roles' && roles.length === 0) {
+			loadRolesData();
+		}
+	});
 
 	let initialized = $state(false);
 
@@ -171,7 +198,7 @@
 			window.location.href = '/';
 			return;
 		}
-		loadAll();
+		// Don't auto-load data - let user choose section
 	});
 
 	// ── Staff actions ──
@@ -188,7 +215,7 @@
 			newStaffEmail = '';
 			newStaffPosition = '';
 			showAddStaff = false;
-			await loadAll();
+			await loadStaffData(); await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		} finally {
@@ -199,7 +226,7 @@
 	async function handleChangeRole(staffId: string, roleId: string) {
 		try {
 			await updateStaffRole(staffId, roleId || null);
-			await loadAll();
+			await loadStaffData(); await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		}
@@ -209,7 +236,7 @@
 		staffDetailSaving = true;
 		try {
 			await updateStaffAdmin(staff.id, !staff.is_admin);
-			await loadAll();
+			await loadStaffData(); await loadRolesData();
 			selectedStaff = null;
 		} catch (e: any) {
 			error = e.message;
@@ -260,7 +287,7 @@
 			}
 			// Save permissions
 			await updateRolePermissions(editingRole.id, [...editingPermissions]);
-			await loadAll();
+			await loadStaffData(); await loadRolesData();
 			editingRole = null;
 		} catch (e: any) {
 			error = e.message;
@@ -296,7 +323,7 @@
 			newRoleDescription = '';
 			newRolePermissions = new Set();
 			showNewRole = false;
-			await loadAll();
+			await loadStaffData(); await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		} finally {
@@ -311,7 +338,7 @@
 			} else {
 				await setRoleAsDefault(role.id);
 			}
-			await loadAll();
+			await loadStaffData(); await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		}
@@ -322,7 +349,7 @@
 		try {
 			await deleteRole(id);
 			if (editingRole?.id === id) editingRole = null;
-			await loadAll();
+			await loadStaffData(); await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		}
@@ -367,14 +394,65 @@
 			</div>
 		{/if}
 
-		{#if loading}
-			<div class="flex items-center justify-center py-20">
+		{#if authState.loading}
+			<div class="flex flex-col items-center justify-center py-20 gap-3">
 				<svg class="w-8 h-8 animate-spin text-blue-600" viewBox="0 0 24 24">
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
 					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 				</svg>
+				<p class="text-sm text-gray-500">Authenticating...</p>
 			</div>
-		{:else}
+		{:else if activeSection === 'menu'}
+			<!-- Admin Menu -->
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-8">
+				<button
+					onclick={() => activeSection = 'staff'}
+					class="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-blue-300 transition-all text-left"
+				>
+					<div class="flex items-center gap-4">
+						<div class="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+							<span class="material-symbols-rounded text-2xl text-blue-600">group</span>
+						</div>
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900">Staff Management</h3>
+							<p class="text-sm text-gray-500 mt-1">Manage staff accounts and permissions</p>
+						</div>
+					</div>
+				</button>
+
+				<button
+					onclick={() => activeSection = 'roles'}
+					class="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-300 transition-all text-left"
+				>
+					<div class="flex items-center gap-4">
+						<div class="w-12 h-12 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+							<span class="material-symbols-rounded text-2xl text-purple-600">shield</span>
+						</div>
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900">Role Management</h3>
+							<p class="text-sm text-gray-500 mt-1">Configure roles and permissions</p>
+						</div>
+					</div>
+				</button>
+			</div>
+		{:else if activeSection === 'staff'}
+			<!-- Back button -->
+			<button
+				onclick={() => activeSection = 'menu'}
+				class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+			>
+				<span class="material-symbols-rounded text-xl">arrow_back</span>
+				<span class="text-sm">Back to Menu</span>
+			</button>
+
+			{#if loading}
+				<div class="flex items-center justify-center py-20">
+					<svg class="w-8 h-8 animate-spin text-blue-600" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+					</svg>
+				</div>
+			{:else}
 			<!-- ══════ STAFF MANAGEMENT ══════ -->
 			<section class="bg-white rounded-xl shadow-sm border border-gray-200">
 				<div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -471,6 +549,26 @@
 					{/each}
 				</div>
 			</section>
+			{/if}
+
+		{:else if activeSection === 'roles'}
+			<!-- Back button -->
+			<button
+				onclick={() => activeSection = 'menu'}
+				class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+			>
+				<span class="material-symbols-rounded text-xl">arrow_back</span>
+				<span class="text-sm">Back to Menu</span>
+			</button>
+
+			{#if loading}
+				<div class="flex items-center justify-center py-20">
+					<svg class="w-8 h-8 animate-spin text-blue-600" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+					</svg>
+				</div>
+			{:else}
 
 			<!-- ══════ ROLE MANAGEMENT ══════ -->
 			<section class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -663,10 +761,8 @@
 					{/if}
 				</div>
 			</section>
+			{/if}
 		{/if}
-	</main>
-</div>
-{/if}
 
 <!-- Staff detail modal -->
 {#if selectedStaff}
@@ -742,4 +838,8 @@
 			</div>
 		</div>
 	</div>
+{/if}
+
+	</main>
+</div>
 {/if}
