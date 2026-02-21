@@ -1480,12 +1480,17 @@
 							<span class="text-sm font-semibold text-gray-900 font-['Plus_Jakarta_Sans']">
 								{formatDateFull(foundReservation.check_in_date)} - {formatDateFull(
 									foundReservation.check_out_date
-								).slice(5)}（{calculateNights(
-									foundReservation.check_in_date,
-									foundReservation.check_out_date
-								)}泊）
+								).slice(5)}（{foundReservation.total_nights}泊）
 							</span>
 						</div>
+						{#if foundReservation.meal_plan === '2meals'}
+						<div class="flex justify-between">
+							<span class="text-xs text-gray-500">滞在</span>
+							<span class="text-sm font-semibold text-gray-900">
+								{foundReservation.total_nights}泊{foundReservation.total_nights + 1}食付き - 本日: {foundReservation.current_stay_night}泊目
+							</span>
+						</div>
+						{/if}
 						<div class="flex justify-between">
 							<span class="text-xs text-gray-500">人数</span>
 							<span class="text-sm font-semibold text-gray-900">{foundReservation.party_size}名</span>

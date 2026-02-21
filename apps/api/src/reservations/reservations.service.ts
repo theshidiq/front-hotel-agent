@@ -327,15 +327,47 @@ export class ReservationsService {
   }
 
   private async enrichWithAllergens(reservation: any): Promise<ReservationResponse> {
-    if (!reservation.allergen_ids || reservation.allergen_ids.length === 0) {
-      return { ...reservation, allergens: [] };
+    // Calculate stay period metrics
+    const checkInDate = new Date(reservation.check_in_date);
+    const checkOutDate = new Date(reservation.check_out_date);
+    const today = new Date();
+
+    // Set all dates to start of day for accurate day counting
+    checkInDate.setHours(0, 0, 0, 0);
+    checkOutDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    // Calculate total nights
+    const total_nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Calculate current stay night (1-indexed)
+    // If today is before check-in, it's 0 (not yet arrived)
+    // If today is check-in day, it's 1 (first night)
+    // If today is after check-out, cap at total_nights
+    let current_stay_night = 0;
+    if (today >= checkInDate) {
+      current_stay_night = Math.ceil((today.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // Cap at total nights
+      if (current_stay_night > total_nights) {
+        current_stay_night = total_nights;
+      }
     }
 
-    try {
-      const allergens = await this.allergensService.findByIds(reservation.allergen_ids);
-      return { ...reservation, allergens };
-    } catch {
-      return { ...reservation, allergens: [] };
+    // Enrich with allergens
+    let allergens: any[] = [];
+    if (reservation.allergen_ids && reservation.allergen_ids.length > 0) {
+      try {
+        allergens = await this.allergensService.findByIds(reservation.allergen_ids);
+      } catch {
+        allergens = [];
+      }
     }
+
+    return {
+      ...reservation,
+      allergens,
+      total_nights,
+      current_stay_night,
+    };
   }
 }

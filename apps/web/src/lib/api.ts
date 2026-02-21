@@ -397,9 +397,14 @@ export interface UpdateMenuGroupData {
 	course_ids?: string[];
 }
 
-export async function getMenuGroups(seasonalMenuId?: string): Promise<MenuGroup[]> {
-	const params = seasonalMenuId ? `?seasonal_menu_id=${seasonalMenuId}` : '';
-	const response = await fetch(`${API_URL}/menu-groups${params}`);
+export async function getMenuGroups(seasonalMenuId?: string, stayPeriodNights?: number): Promise<MenuGroup[]> {
+	const params = new URLSearchParams();
+	if (seasonalMenuId) params.append('seasonal_menu_id', seasonalMenuId);
+	if (stayPeriodNights !== undefined) params.append('stay_period_nights', stayPeriodNights.toString());
+
+	const queryString = params.toString();
+	const url = queryString ? `${API_URL}/menu-groups?${queryString}` : `${API_URL}/menu-groups`;
+	const response = await fetch(url);
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch menu groups');
@@ -643,6 +648,8 @@ export interface Reservation {
 	checked_in_by: string | null;
 	created_at: string;
 	updated_at: string;
+	total_nights: number;
+	current_stay_night: number;
 }
 
 export interface CheckInData {

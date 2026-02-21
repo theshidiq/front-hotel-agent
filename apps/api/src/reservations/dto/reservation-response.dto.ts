@@ -87,4 +87,10 @@ export class ReservationResponse {
 
   @ApiProperty()
   updated_at: string;
+
+  @ApiProperty({ description: 'Total number of nights for this reservation' })
+  total_nights: number;
+
+  @ApiProperty({ description: 'Current night of stay (1-indexed, based on today)' })
+  current_stay_night: number;
 }
