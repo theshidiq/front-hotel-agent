@@ -10,6 +10,7 @@
 		getReservationByQR,
 		searchReservations,
 		createReservation,
+		deleteAllReservations,
 		getMenuGroups,
 		getMenus,
 		getSeasonalMenus,
@@ -613,6 +614,7 @@
 
 	// Generate dummy reservations
 	let generatingDummy = $state(false);
+	let deletingDummy = $state(false);
 
 	async function generateDummyReservations() {
 		generatingDummy = true;
@@ -678,6 +680,23 @@
 			notify(e instanceof Error ? e.message : 'ダミーデータの作成に失敗しました', 'error');
 		} finally {
 			generatingDummy = false;
+		}
+	}
+
+	async function deleteDummyReservations() {
+		if (!confirm('すべての予約データを削除しますか？この操作は取り消せません。')) {
+			return;
+		}
+
+		deletingDummy = true;
+		try {
+			const result = await deleteAllReservations();
+			await loadData();
+			notify(`${result.deleted}件の予約を削除しました`, 'success');
+		} catch (e) {
+			notify(e instanceof Error ? e.message : '削除に失敗しました', 'error');
+		} finally {
+			deletingDummy = false;
 		}
 	}
 
@@ -884,6 +903,14 @@
 				>
 					<span class="material-symbols-rounded text-lg">add_circle</span>
 					{generatingDummy ? '作成中...' : 'ダミー作成'}
+				</button>
+				<button
+					onclick={deleteDummyReservations}
+					disabled={deletingDummy}
+					class="inline-flex items-center gap-2 px-4 py-2 border border-dashed border-red-400 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50"
+				>
+					<span class="material-symbols-rounded text-lg">delete_sweep</span>
+					{deletingDummy ? '削除中...' : '全削除'}
 				</button>
 				{/if}
 				<button

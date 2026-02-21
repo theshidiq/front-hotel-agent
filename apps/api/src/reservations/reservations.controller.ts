@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -97,5 +98,12 @@ export class ReservationsController {
   @ApiParam({ name: 'id', description: 'Reservation UUID' })
   async checkOut(@Param('id') id: string): Promise<ReservationResponse> {
     return this.reservationsService.checkOut(id);
+  }
+
+  @Delete('test-data')
+  @RequireStaff()
+  @ApiOperation({ summary: 'Delete all test reservations (danger: clears all reservations for this restaurant)' })
+  async deleteTestData(): Promise<{ deleted: number }> {
+    return this.reservationsService.deleteAllReservations();
   }
 }

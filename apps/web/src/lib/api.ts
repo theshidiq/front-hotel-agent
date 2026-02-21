@@ -789,6 +789,20 @@ export async function checkOutReservation(id: string): Promise<Reservation> {
 	return response.json();
 }
 
+export async function deleteAllReservations(): Promise<{ deleted: number }> {
+	const response = await fetch(`${API_URL}/reservations/test-data`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete all reservations failed');
+	}
+
+	return response.json();
+}
+
 export interface GuestUpdateData {
 	allergen_ids?: string[];
 	dietary_notes?: string;

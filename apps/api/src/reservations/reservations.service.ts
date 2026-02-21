@@ -307,6 +307,30 @@ export class ReservationsService {
     return this.enrichWithAllergens(data);
   }
 
+  async deleteAllReservations(): Promise<{ deleted: number }> {
+    // First, clear any current_reservation_id references in rooms table
+    await this.supabaseService
+      .getClient()
+      .from('rooms')
+      .update({ current_reservation_id: null })
+      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .not('current_reservation_id', 'is', null);
+
+    // Now delete all reservations
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .delete()
+      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .select();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    return { deleted: data?.length || 0 };
+  }
+
   private async createCheckInAlert(reservation: any, allergenIds: string[]): Promise<void> {
     await this.supabaseService
       .getClient()
