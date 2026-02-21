@@ -287,6 +287,7 @@ export class ReservationsService {
           party_size: reservation.party_size,
           dinner_time: reservation.dinner_time,
           allergen_ids: dto.allergen_ids,
+          dietary_notes: dto.dietary_notes || null,
           message: 'ゲストがアレルギー情報を更新しました',
           status: 'new',
         })
@@ -309,6 +310,7 @@ export class ReservationsService {
         party_size: reservation.party_size,
         dinner_time: reservation.dinner_time,
         allergen_ids: allergenIds,
+        dietary_notes: reservation.dietary_notes || null,
         message: null,
         status: 'new',
       });

@@ -37,4 +37,9 @@ export class CreateGuestAlertDto {
   @IsOptional()
   @IsString()
   message?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  dietary_notes?: string;
 }

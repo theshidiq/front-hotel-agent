@@ -818,6 +818,7 @@ export interface GuestAlert {
 	dinner_time: string | null;
 	allergen_ids: string[];
 	allergens?: Allergen[];
+	dietary_notes: string | null;
 	message: string | null;
 	status: 'new' | 'acknowledged' | 'resolved';
 	acknowledged_by: string | null;

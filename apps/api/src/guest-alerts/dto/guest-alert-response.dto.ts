@@ -31,6 +31,9 @@ export class GuestAlertResponse {
   @ApiProperty({ required: false })
   message?: string;
 
+  @ApiProperty({ required: false })
+  dietary_notes?: string;
+
   @ApiProperty({ enum: ['new', 'acknowledged', 'resolved'] })
   status: string;
 

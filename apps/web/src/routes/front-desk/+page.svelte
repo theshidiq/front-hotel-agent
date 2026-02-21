@@ -918,6 +918,17 @@
 												</div>
 											{/if}
 
+											<!-- Dietary Notes (including dashi restrictions) -->
+											{#if alert.dietary_notes}
+												<div class="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+													<p class="text-xs font-semibold text-orange-800 mb-1">
+														<span class="material-symbols-rounded text-sm align-middle mr-1">info</span>
+														食事制限
+													</p>
+													<p class="text-sm text-orange-900 whitespace-pre-wrap">{alert.dietary_notes}</p>
+												</div>
+											{/if}
+
 											<!-- Message -->
 											{#if alert.message}
 												<p class="text-sm text-gray-600 bg-gray-50 rounded p-2 mt-2">
