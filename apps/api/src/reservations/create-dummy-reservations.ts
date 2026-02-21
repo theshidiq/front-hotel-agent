@@ -28,12 +28,15 @@ async function createDummyReservations() {
 
   const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Configuration
+  const DAYS_TO_GENERATE = 7;
+  const RESERVATIONS_PER_DAY = 10;
+
   // Get today's date - force to current local date
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 
   // Helper function to format date as ISO string (YYYY-MM-DD)
-  // Use local date components to avoid timezone shift
   const formatDate = (date: Date): string => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -48,201 +51,177 @@ async function createDummyReservations() {
     return result;
   };
 
-  // Create 10 dummy reservations
-  const reservations: DummyReservation[] = [
-    // 1 night reservations (6 guests)
-    {
-      booking_source: 'rakuten',
-      guest_name: '田中 太郎',
-      guest_name_kana: 'タナカ タロウ',
-      phone: '090-1234-5678',
-      email: 'tanaka@example.com',
-      party_size: 2,
-      room_number: '101',
-      room_name: '桜',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 1)),
-      plan_name: '和牛懐石プラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-    {
-      booking_source: 'jalan',
-      guest_name: '佐藤 花子',
-      guest_name_kana: 'サトウ ハナコ',
-      phone: '080-9876-5432',
-      email: 'sato@example.com',
-      party_size: 4,
-      room_number: '102',
-      room_name: '紅葉',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 1)),
-      plan_name: '記念日スペシャル',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-    {
-      booking_source: 'booking_com',
-      guest_name: '鈴木 一郎',
-      guest_name_kana: 'スズキ イチロウ',
-      phone: '070-5555-1111',
-      email: 'suzuki@example.com',
-      party_size: 3,
-      room_number: '201',
-      room_name: '松',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 1)),
-      plan_name: 'ファミリープラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-    {
-      booking_source: 'direct',
-      guest_name: '高橋 美咲',
-      guest_name_kana: 'タカハシ ミサキ',
-      phone: '090-7777-8888',
-      email: 'takahashi@example.com',
-      party_size: 2,
-      room_number: '202',
-      room_name: '竹',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 1)),
-      plan_name: 'カップルプラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-    {
-      booking_source: 'expedia',
-      guest_name: '伊藤 健太',
-      guest_name_kana: 'イトウ ケンタ',
-      phone: '080-3333-4444',
-      email: 'ito@example.com',
-      party_size: 1,
-      room_number: '301',
-      room_name: '梅',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 1)),
-      plan_name: 'ビジネスプラン',
-      meal_plan: 'breakfast_only',
-      status: 'confirmed',
-    },
-    {
-      booking_source: 'agoda',
-      guest_name: '渡辺 由美',
-      guest_name_kana: 'ワタナベ ユミ',
-      phone: '070-6666-7777',
-      email: 'watanabe@example.com',
-      party_size: 2,
-      room_number: '302',
-      room_name: '椿',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 1)),
-      plan_name: 'リラックスプラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-
-    // 2 night reservations (3 guests)
-    {
-      booking_source: 'rakuten',
-      guest_name: '山本 健一',
-      guest_name_kana: 'ヤマモト ケンイチ',
-      phone: '090-2222-3333',
-      email: 'yamamoto@example.com',
-      party_size: 3,
-      room_number: '103',
-      room_name: '桔梗',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 2)),
-      plan_name: '温泉満喫プラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-    {
-      booking_source: 'jalan',
-      guest_name: '中村 愛',
-      guest_name_kana: 'ナカムラ アイ',
-      phone: '080-4444-5555',
-      email: 'nakamura@example.com',
-      party_size: 2,
-      room_number: '203',
-      room_name: '藤',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 2)),
-      plan_name: 'アニバーサリープラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-    {
-      booking_source: 'direct',
-      guest_name: '小林 拓也',
-      guest_name_kana: 'コバヤシ タクヤ',
-      phone: '090-8888-9999',
-      email: 'kobayashi@example.com',
-      party_size: 4,
-      room_number: '303',
-      room_name: '蓮',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 2)),
-      plan_name: 'グループプラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
-
-    // 3 night reservation (1 guest)
-    {
-      booking_source: 'booking_com',
-      guest_name: '加藤 雅人',
-      guest_name_kana: 'カトウ マサト',
-      phone: '070-1111-2222',
-      email: 'kato@example.com',
-      party_size: 2,
-      room_number: '104',
-      room_name: '菊',
-      check_in_date: formatDate(today),
-      check_out_date: formatDate(addDays(today, 3)),
-      plan_name: 'ロングステイプラン',
-      meal_plan: '2meals',
-      status: 'confirmed',
-    },
+  // Data pools
+  const guestNames = [
+    { name: '田中 太郎', kana: 'タナカ タロウ' },
+    { name: '佐藤 花子', kana: 'サトウ ハナコ' },
+    { name: '鈴木 一郎', kana: 'スズキ イチロウ' },
+    { name: '高橋 美咲', kana: 'タカハシ ミサキ' },
+    { name: '伊藤 健太', kana: 'イトウ ケンタ' },
+    { name: '渡辺 由美', kana: 'ワタナベ ユミ' },
+    { name: '山本 健一', kana: 'ヤマモト ケンイチ' },
+    { name: '中村 愛', kana: 'ナカムラ アイ' },
+    { name: '小林 拓也', kana: 'コバヤシ タクヤ' },
+    { name: '加藤 雅人', kana: 'カトウ マサト' },
+    { name: '吉田 真理', kana: 'ヨシダ マリ' },
+    { name: '山田 大輔', kana: 'ヤマダ ダイスケ' },
+    { name: '佐々木 恵', kana: 'ササキ メグミ' },
+    { name: '松本 拓海', kana: 'マツモト タクミ' },
+    { name: '井上 直樹', kana: 'イノウエ ナオキ' },
   ];
 
-  console.log('Creating 10 dummy reservations...\n');
+  const rooms = [
+    { number: '101', name: '桜' },
+    { number: '102', name: '紅葉' },
+    { number: '103', name: '桔梗' },
+    { number: '104', name: '菊' },
+    { number: '201', name: '松' },
+    { number: '202', name: '竹' },
+    { number: '203', name: '藤' },
+    { number: '301', name: '梅' },
+    { number: '302', name: '椿' },
+    { number: '303', name: '蓮' },
+  ];
+
+  const bookingSources = ['rakuten', 'jalan', 'booking_com', 'direct', 'expedia', 'agoda', 'phone'];
+
+  const plans = [
+    '和牛懐石プラン',
+    '記念日スペシャル',
+    'ファミリープラン',
+    'カップルプラン',
+    'ビジネスプラン',
+    'リラックスプラン',
+    '温泉満喫プラン',
+    'アニバーサリープラン',
+    'グループプラン',
+    'ロングステイプラン',
+    'シニアプラン',
+    'レディースプラン',
+  ];
+
+  const mealPlans = ['2meals', 'dinner_only', 'breakfast_only', 'room_only'];
+
+  // Random helper
+  const random = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+
+  // Generate random phone number
+  const randomPhone = (): string => {
+    const prefixes = ['090', '080', '070'];
+    const prefix = random(prefixes);
+    const part1 = String(randomInt(1000, 9999));
+    const part2 = String(randomInt(1000, 9999));
+    return `${prefix}-${part1}-${part2}`;
+  };
+
+  // Generate random stay duration distribution for a day
+  // More realistic: weighted towards 1-2 nights
+  const generateStayDistribution = (): number[] => {
+    const distribution: number[] = [];
+    const remaining = RESERVATIONS_PER_DAY;
+
+    // Randomly decide distribution with realistic weights
+    // 1 night: 40-70%
+    // 2 nights: 20-40%
+    // 3+ nights: 10-30%
+
+    const oneNightPercent = randomInt(40, 70) / 100;
+    const twoNightPercent = randomInt(20, 40) / 100;
+
+    const oneNightCount = Math.floor(remaining * oneNightPercent);
+    const twoNightCount = Math.floor(remaining * twoNightPercent);
+    const threeNightCount = remaining - oneNightCount - twoNightCount;
+
+    for (let i = 0; i < oneNightCount; i++) distribution.push(1);
+    for (let i = 0; i < twoNightCount; i++) distribution.push(2);
+    for (let i = 0; i < threeNightCount; i++) distribution.push(randomInt(3, 5)); // 3-5 nights
+
+    // Shuffle array
+    return distribution.sort(() => Math.random() - 0.5);
+  };
+
+  console.log(`Creating ${DAYS_TO_GENERATE * RESERVATIONS_PER_DAY} dummy reservations across ${DAYS_TO_GENERATE} days...\n`);
+
+  const allReservations: DummyReservation[] = [];
+  let guestIndex = 0;
+
+  // Generate reservations for each day
+  for (let dayOffset = 0; dayOffset < DAYS_TO_GENERATE; dayOffset++) {
+    const checkInDate = addDays(today, dayOffset);
+    const stayDistribution = generateStayDistribution();
+
+    console.log(`📅 Day ${dayOffset + 1} (${formatDate(checkInDate)}): ${stayDistribution.filter(n => n === 1).length}×1泊, ${stayDistribution.filter(n => n === 2).length}×2泊, ${stayDistribution.filter(n => n >= 3).length}×3+泊`);
+
+    for (let i = 0; i < RESERVATIONS_PER_DAY; i++) {
+      const guest = guestNames[guestIndex % guestNames.length];
+      const room = rooms[i % rooms.length];
+      const stayNights = stayDistribution[i];
+
+      // Suffix to ensure unique guest names
+      const dayNum = dayOffset + 1;
+      const guestNum = (guestIndex % guestNames.length) + 1;
+      const uniqueSuffix = dayOffset > 0 || guestIndex >= guestNames.length ? `${guestNum}` : '';
+
+      allReservations.push({
+        booking_source: random(bookingSources),
+        guest_name: `${guest.name}${uniqueSuffix}`,
+        guest_name_kana: `${guest.kana}${uniqueSuffix}`,
+        phone: randomPhone(),
+        email: `guest${guestIndex + 1}@example.com`,
+        party_size: randomInt(1, 4),
+        room_number: room.number,
+        room_name: room.name,
+        check_in_date: formatDate(checkInDate),
+        check_out_date: formatDate(addDays(checkInDate, stayNights)),
+        plan_name: random(plans),
+        meal_plan: random(mealPlans),
+        status: 'confirmed',
+      });
+
+      guestIndex++;
+    }
+  }
+
+  console.log('\n💾 Inserting reservations into database...\n');
 
   let successCount = 0;
   let errorCount = 0;
+  const nightsCount: Record<number, number> = {};
 
-  for (const reservation of reservations) {
+  for (const reservation of allReservations) {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('reservations')
         .insert({
           restaurant_id: restaurantId,
           ...reservation,
-          allergen_ids: [], // Empty array as per requirements
+          allergen_ids: [],
         })
         .select()
         .single();
 
       if (error) {
-        console.error(`❌ Error creating reservation for ${reservation.guest_name}:`, error.message);
+        console.error(`❌ Error: ${reservation.guest_name}:`, error.message);
         errorCount++;
       } else {
         const nights = calculateNights(reservation.check_in_date, reservation.check_out_date);
-        console.log(`✅ Created: ${reservation.guest_name} (${reservation.room_number}) - ${nights}泊`);
+        nightsCount[nights] = (nightsCount[nights] || 0) + 1;
         successCount++;
       }
     } catch (err) {
-      console.error(`❌ Exception creating reservation for ${reservation.guest_name}:`, err);
+      console.error(`❌ Exception: ${reservation.guest_name}:`, err);
       errorCount++;
     }
   }
 
-  console.log(`\n📊 Summary: ${successCount} successful, ${errorCount} failed`);
-  console.log('\nBreakdown:');
-  console.log('- 1 night: 6 reservations');
-  console.log('- 2 nights: 3 reservations');
-  console.log('- 3 nights: 1 reservation');
+  console.log(`\n📊 Summary: ${successCount} successful, ${errorCount} failed\n`);
+  console.log('Breakdown by stay duration:');
+  Object.keys(nightsCount)
+    .sort((a, b) => parseInt(a) - parseInt(b))
+    .forEach(nights => {
+      console.log(`  ${nights} night${parseInt(nights) > 1 ? 's' : ''}: ${nightsCount[parseInt(nights)]} reservations`);
+    });
 }
 
 function calculateNights(checkIn: string, checkOut: string): number {
