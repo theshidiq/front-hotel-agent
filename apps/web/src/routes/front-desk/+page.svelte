@@ -1124,6 +1124,7 @@
 								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">予約元</th>
 								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">宿泊期間</th>
 								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">プラン</th>
+								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">アレルギー</th>
 								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ステータス</th>
 								<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
 							</tr>
@@ -1164,6 +1165,28 @@
 											<div class="text-xs text-gray-500">{mealPlanLabels[reservation.meal_plan] || reservation.meal_plan}</div>
 										{/if}
 									</td>
+									<td class="px-4 py-4">
+										{#if reservation.allergens && reservation.allergens.length > 0}
+											<div class="flex flex-wrap gap-1 max-w-[200px]">
+												{#each reservation.allergens as allergen}
+													<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+														{allergen.name}
+													</span>
+												{/each}
+											</div>
+											{#if reservation.dietary_notes}
+												<div class="mt-1.5 text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded border border-orange-200 whitespace-pre-wrap max-w-[200px]">
+													{reservation.dietary_notes}
+												</div>
+											{/if}
+										{:else if reservation.dietary_notes}
+											<div class="text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded border border-orange-200 whitespace-pre-wrap max-w-[200px]">
+												{reservation.dietary_notes}
+											</div>
+										{:else}
+											<span class="text-sm text-gray-400">-</span>
+										{/if}
+									</td>
 									<td class="px-4 py-4 whitespace-nowrap">
 										<span
 											class="inline-flex px-2 py-1 text-xs font-medium rounded-full {statusColors[
@@ -1195,7 +1218,7 @@
 								</tr>
 							{:else}
 								<tr>
-									<td colspan="8" class="px-4 py-12 text-center text-gray-500">
+									<td colspan="9" class="px-4 py-12 text-center text-gray-500">
 										予約が見つかりませんでした
 									</td>
 								</tr>
