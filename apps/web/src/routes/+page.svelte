@@ -12,15 +12,18 @@
 	const isStaff = $derived(authState.isStaff);
 
 	// Main Tab (Products vs Menu)
-	let mainTab: 'products' | 'menu' = $state('products');
+	let mainTab: 'products' | 'menu' = $state('menu');
 
-	// Redirect to an accessible tab when permissions load (both staff and guests)
+	// Auto-select first permitted tab when permissions load
+	let tabInitialized = $state(false);
 	$effect(() => {
-		if (!authState.loading) {
-			if (mainTab === 'products' && !canViewProducts) {
-				if (canViewMenus) mainTab = 'menu';
-			} else if (mainTab === 'menu' && !canViewMenus) {
-				if (canViewProducts) mainTab = 'products';
+		if (!authState.loading && !tabInitialized) {
+			tabInitialized = true;
+			// Default to menu first, then products if menu not available
+			if (can('menus.view')) {
+				mainTab = 'menu';
+			} else if (can('products.view')) {
+				mainTab = 'products';
 			}
 		}
 	});

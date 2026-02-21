@@ -13,7 +13,17 @@ export class MenuGroupsController {
   @Get()
   @ApiOperation({ summary: 'Get all menu groups' })
   @ApiQuery({ name: 'seasonal_menu_id', required: false })
-  async findAll(@Query('seasonal_menu_id') seasonalMenuId?: string): Promise<MenuGroup[]> {
+  @ApiQuery({ name: 'stay_period_nights', required: false, description: 'Filter by stay duration in nights' })
+  async findAll(
+    @Query('seasonal_menu_id') seasonalMenuId?: string,
+    @Query('stay_period_nights') stayPeriodNights?: string,
+  ): Promise<MenuGroup[]> {
+    if (stayPeriodNights) {
+      const nights = parseInt(stayPeriodNights, 10);
+      if (!isNaN(nights)) {
+        return this.menuGroupsService.findByStayPeriod(nights, seasonalMenuId);
+      }
+    }
     return this.menuGroupsService.findAll(seasonalMenuId);
   }
 

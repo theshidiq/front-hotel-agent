@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsInt } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMenuGroupDto {
@@ -27,4 +27,10 @@ export class CreateMenuGroupDto {
   @IsString({ each: true })
   @IsOptional()
   kids_group_ids?: string[];
+
+  @ApiPropertyOptional({ description: 'Array of night counts this menu group applies to. Example: [1] for 新規 (one night), [2,3,4] for 滞在 (2-4 nights). NULL/undefined means no restriction.', type: [Number] })
+  @IsArray()
+  @IsInt({ each: true })
+  @IsOptional()
+  stay_period_nights?: number[];
 }

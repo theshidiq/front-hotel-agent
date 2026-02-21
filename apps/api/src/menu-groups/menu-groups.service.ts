@@ -15,6 +15,7 @@ export interface MenuGroup {
   display_title: string | null;
   seasonal_menu_id: string | null;
   kids_group_ids: string[];
+  stay_period_nights: number[] | null;
   sort_order: number;
   created_at: string;
   allowed_courses: AllowedCourse[];
@@ -132,7 +133,7 @@ export class MenuGroupsService {
     return { ...created, allowed_courses: coursesMap[created.id] || [] };
   }
 
-  async update(id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; kids_group_ids?: string[]; course_ids?: string[] }): Promise<MenuGroup> {
+  async update(id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; kids_group_ids?: string[]; stay_period_nights?: number[] | null; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
 
     const updateData: Record<string, unknown> = {};
@@ -140,6 +141,7 @@ export class MenuGroupsService {
     if (data.display_title !== undefined) updateData.display_title = data.display_title || null;
     if (data.seasonal_menu_id !== undefined) updateData.seasonal_menu_id = data.seasonal_menu_id || null;
     if (data.kids_group_ids !== undefined) updateData.kids_group_ids = data.kids_group_ids;
+    if (data.stay_period_nights !== undefined) updateData.stay_period_nights = data.stay_period_nights;
 
     if (Object.keys(updateData).length > 0) {
       const { error } = await supabase
@@ -202,5 +204,46 @@ export class MenuGroupsService {
       this.logger.error(`Failed to delete menu group: ${error.message}`);
       throw new InternalServerErrorException(`Failed to delete menu group: ${error.message}`);
     }
+  }
+
+  async findByStayPeriod(nights: number, seasonalMenuId?: string): Promise<MenuGroup[]> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    let query = supabase
+      .from('menu_groups')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .order('sort_order')
+      .order('name');
+
+    if (seasonalMenuId) {
+      query = query.eq('seasonal_menu_id', seasonalMenuId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      this.logger.error(`Failed to fetch menu groups: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to fetch menu groups: ${error.message}`);
+    }
+
+    const groups = data || [];
+    const coursesMap = await this.loadAllowedCourses(groups.map(g => g.id));
+
+    // Filter groups by stay period
+    const filtered = groups.filter(g => {
+      // If stay_period_nights is null or empty, it applies to all durations
+      if (!g.stay_period_nights || g.stay_period_nights.length === 0) {
+        return true;
+      }
+      // Check if the nights count is in the stay_period_nights array
+      return g.stay_period_nights.includes(nights);
+    });
+
+    return filtered.map(g => ({
+      ...g,
+      allowed_courses: coursesMap[g.id] || [],
+    }));
   }
 }

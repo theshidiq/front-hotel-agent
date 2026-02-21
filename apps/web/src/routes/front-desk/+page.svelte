@@ -22,10 +22,11 @@
 		type Menu,
 		type SeasonalMenu,
 	} from '$lib/api';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import MenuPreviewPanel from '$lib/components/flow/MenuPreviewPanel.svelte';
 	import { authState, can } from '$lib/auth.svelte';
+	import { supabase } from '$lib/supabase';
 
 	const isStaff = $derived(authState.isStaff);
 
@@ -130,7 +131,7 @@
 	let dateFilter = $state<DateFilter>('today');
 
 	// Filters
-	let filterStatus = $state<'all' | 'confirmed' | 'checked_in' | 'checked_out'>('all');
+	let filterStatus = $state<'all' | 'confirmed' | 'checked_in' | 'checked_out'>('confirmed');
 	let tableSearchQuery = $state('');
 
 	// Date utilities
@@ -701,8 +702,112 @@
 		else if (canViewNotifications) { activeNav = 'notifications'; }
 	});
 
+	// Supabase realtime subscription (single channel, optimized for free tier)
+	let realtimeChannel: any = null;
+
+	function setupRealtimeSubscriptions() {
+		// Get restaurant ID from environment
+		const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
+
+		// Use a single channel with multiple event listeners to minimize connections
+		realtimeChannel = supabase
+			.channel('front-desk-realtime')
+			// Listen to reservations changes
+			.on(
+				'postgres_changes',
+				{
+					event: '*',
+					schema: 'public',
+					table: 'reservations',
+					filter: `restaurant_id=eq.${restaurantId}`
+				},
+				(payload) => {
+					console.log('Reservation change:', payload.eventType);
+					// Reload reservations to keep in sync with current date filter
+					loadReservations();
+				}
+			)
+			// Listen to guest_alerts changes
+			.on(
+				'postgres_changes',
+				{
+					event: '*',
+					schema: 'public',
+					table: 'guest_alerts',
+					filter: `restaurant_id=eq.${restaurantId}`
+				},
+				async (payload) => {
+					console.log('Alert change:', payload.eventType);
+					// Reload alerts
+					try {
+						const newAlerts = await getNewGuestAlerts();
+						alerts = newAlerts;
+					} catch (e) {
+						console.error('Failed to reload alerts:', e);
+					}
+				}
+			)
+			// Listen to rooms changes
+			.on(
+				'postgres_changes',
+				{
+					event: '*',
+					schema: 'public',
+					table: 'rooms',
+					filter: `restaurant_id=eq.${restaurantId}`
+				},
+				async (payload) => {
+					console.log('Room change:', payload.eventType);
+					// Reload rooms
+					try {
+						const newRooms = await getRooms();
+						rooms = newRooms;
+					} catch (e) {
+						console.error('Failed to reload rooms:', e);
+					}
+				}
+			)
+			.subscribe();
+	}
+
+	async function loadReservations() {
+		try {
+			const dateRange = getDateRange(dateFilter);
+			const dateParam = dateFilter === 'today' ? dateRange?.startDate : undefined;
+			const reservationsData = await getReservations(dateParam);
+
+			// Filter by date range on client side for multi-day ranges
+			if (dateRange && dateFilter !== 'today') {
+				const startDate = new Date(dateRange.startDate);
+				startDate.setHours(0, 0, 0, 0);
+				const endDate = new Date(dateRange.endDate);
+				endDate.setHours(23, 59, 59, 999);
+				reservations = reservationsData.filter((r) => {
+					const checkInDate = new Date(r.check_in_date);
+					return checkInDate >= startDate && checkInDate <= endDate;
+				});
+			} else {
+				reservations = reservationsData;
+			}
+		} catch (e) {
+			console.error('Failed to reload reservations:', e);
+		}
+	}
+
+	function cleanupRealtimeSubscriptions() {
+		if (realtimeChannel) {
+			supabase.removeChannel(realtimeChannel);
+			realtimeChannel = null;
+		}
+	}
+
 	onMount(() => {
 		loadData();
+		setupRealtimeSubscriptions();
+	});
+
+	onDestroy(() => {
+		cleanupRealtimeSubscriptions();
 	});
 </script>
 
@@ -1034,7 +1139,7 @@
 					<p class="text-2xl font-bold text-blue-700 mt-1">{stats.pending}</p>
 				</div>
 				<div class="bg-emerald-50 rounded-lg border border-emerald-300 p-4">
-					<p class="text-sm text-emerald-700">滞在中</p>
+					<p class="text-sm text-emerald-700">在館中</p>
 					<p class="text-2xl font-bold text-emerald-700 mt-1">{stats.checkedIn}</p>
 				</div>
 				<div class="bg-gray-100 rounded-lg border border-gray-300 p-4">
@@ -1050,14 +1155,6 @@
 			<!-- Filters Row -->
 			<div class="flex items-center justify-between mb-4">
 				<div class="flex gap-2">
-					<button
-						onclick={() => (filterStatus = 'all')}
-						class="px-4 py-2 rounded-md text-sm font-medium transition-colors {filterStatus === 'all'
-							? 'bg-gray-900 text-white'
-							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
-					>
-						全て ({stats.total})
-					</button>
 					<button
 						onclick={() => (filterStatus = 'confirmed')}
 						class="px-4 py-2 rounded-md text-sm font-medium transition-colors {filterStatus === 'confirmed'
@@ -1083,6 +1180,14 @@
 							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
 					>
 						チェックアウト済 ({stats.checkedOut})
+					</button>
+					<button
+						onclick={() => (filterStatus = 'all')}
+						class="px-4 py-2 rounded-md text-sm font-medium transition-colors {filterStatus === 'all'
+							? 'bg-gray-900 text-white'
+							: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
+					>
+						全て ({stats.total})
 					</button>
 				</div>
 

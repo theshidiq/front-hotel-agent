@@ -38,7 +38,12 @@ export class ReservationsService {
       throw new InternalServerErrorException(error.message);
     }
 
-    return data || [];
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // Enrich all reservations with allergen details
+    return Promise.all(data.map(reservation => this.enrichWithAllergens(reservation)));
   }
 
   async findToday(): Promise<ReservationResponse[]> {
@@ -110,7 +115,12 @@ export class ReservationsService {
       throw new InternalServerErrorException(error.message);
     }
 
-    return data || [];
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // Enrich all reservations with allergen details
+    return Promise.all(data.map(reservation => this.enrichWithAllergens(reservation)));
   }
 
   async create(dto: CreateReservationDto): Promise<ReservationResponse> {

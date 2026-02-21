@@ -76,6 +76,9 @@
 	// Kids link dropdown
 	let kidsLinkGroupId: string | null = $state(null);
 
+	// Stay period dropdown
+	let stayDropdownGroupId: string | null = $state(null);
+
 	// Active group for preview panel
 	let activeGroupId: string | null = $state(null);
 
@@ -455,6 +458,23 @@
 		showToast(currentIds.includes(kidsGroupId) ? 'Kids group unlinked' : 'Kids group linked');
 	}
 
+	function handleStayPeriodChange(groupId: string, value: string) {
+		if (value === '') {
+			// No restriction
+			onUpdateGroup(groupId, { stay_period_nights: null });
+			showToast('Stay period: Any duration');
+		} else if (value === '1') {
+			onUpdateGroup(groupId, { stay_period_nights: [1] });
+			showToast('Stay period: 1 night');
+		} else if (value === '2') {
+			onUpdateGroup(groupId, { stay_period_nights: [2] });
+			showToast('Stay period: 2 nights');
+		} else if (value === '3+') {
+			onUpdateGroup(groupId, { stay_period_nights: [3, 4, 5, 6, 7] });
+			showToast('Stay period: 3+ nights');
+		}
+	}
+
 	function handleOpenCourseDetail(courseId: string, groupId: string, courseValue: string, courseName: string) {
 		detailContext = { courseId, groupId, courseValue, courseName };
 	}
@@ -532,6 +552,12 @@
 			kidsLinkGroupId = null;
 		}
 
+	// Close stay dropdown when clicking outside it
+	if (stayDropdownGroupId && !target.closest('[data-stay-dropdown-menu]') && !target.closest('[data-stay-dropdown-button]')) {
+		stayDropdownGroupId = null;
+	}
+
+
 		if (!editingSeasonId && !editingGroupId && !renamingCourseId) return;
 		if (target.closest('[data-edit-form]')) return;
 		if (editingSeasonId) submitEditSeason(editingSeasonId);
@@ -581,6 +607,16 @@
 					子供: {kidsGroups?.map(k => k.name).join(', ')}
 				</span>
 			{/if}
+			{#if group.stay_period_nights && group.stay_period_nights.length > 0}
+				{@const below3 = group.stay_period_nights.filter(n => n < 3).sort((a, b) => a - b)}
+				{@const above2 = group.stay_period_nights.filter(n => n >= 3).sort((a, b) => a - b)}
+				{@const has3Plus = above2.length >= 5}
+				{@const displayText = [...below3.map(n => `${n}`), ...(has3Plus ? ['3+'] : above2.map(n => `${n}`))].join(', ')}
+				<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-[10px] text-teal-700 font-medium">
+					<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+					{displayText}泊
+				</span>
+			{/if}
 			{#if parentGroupNameMap.get(group.id)}
 				<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-[10px] text-purple-700 font-medium">
 					<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
@@ -604,6 +640,49 @@
 						<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" /></svg>
 						Kids
 					</button>
+{@const currentValue = !group.stay_period_nights || group.stay_period_nights.length === 0 ? '' : group.stay_period_nights.includes(1) && group.stay_period_nights.length === 1 ? '1' : group.stay_period_nights.includes(2) && group.stay_period_nights.length === 1 ? '2' : '3+'}
+					{@const displayLabel = currentValue === '' ? 'Stay' : currentValue === '1' ? '1泊' : currentValue === '2' ? '2泊' : '3+泊'}
+					{@const isStayOpen = stayDropdownGroupId === group.id}
+					<div class="relative inline-block">
+						<button
+							data-stay-dropdown-button
+							onclick={() => { stayDropdownGroupId = stayDropdownGroupId === group.id ? null : group.id; }}
+							class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 {currentValue ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100 focus:ring-teal-500' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 focus:ring-blue-500'}"
+							title="Stay period"
+						>
+							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+							{displayLabel}
+							<svg class="w-2.5 h-2.5 transition-transform {isStayOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+						</button>
+						{#if isStayOpen}
+							<div data-stay-dropdown-menu class="absolute z-10 mt-1 left-0 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]">
+								<button
+									onclick={() => { handleStayPeriodChange(group.id, ''); stayDropdownGroupId = null; }}
+									class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors {currentValue === '' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}"
+								>
+									Any duration
+								</button>
+								<button
+									onclick={() => { handleStayPeriodChange(group.id, '1'); stayDropdownGroupId = null; }}
+									class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors {currentValue === '1' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}"
+								>
+									1泊 (1 night)
+								</button>
+								<button
+									onclick={() => { handleStayPeriodChange(group.id, '2'); stayDropdownGroupId = null; }}
+									class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors {currentValue === '2' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}"
+								>
+									2泊 (2 nights)
+								</button>
+								<button
+									onclick={() => { handleStayPeriodChange(group.id, '3+'); stayDropdownGroupId = null; }}
+									class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors {currentValue === '3+' ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}"
+								>
+									3+泊 (3+ nights)
+								</button>
+							</div>
+						{/if}
+					</div>
 				{/if}
 				<button onclick={(e) => { e.stopPropagation(); startEditGroup(group); }} class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Rename">
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -665,6 +744,7 @@
 				</div>
 			</div>
 		{/if}
+
 
 		<!-- Course chips -->
 		{#if courseCount > 0}
