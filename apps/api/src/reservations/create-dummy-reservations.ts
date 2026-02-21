@@ -30,7 +30,8 @@ async function createDummyReservations() {
 
   // Configuration
   const DAYS_TO_GENERATE = 7;
-  const RESERVATIONS_PER_DAY = 10;
+  // Decreasing reservation count per day: [20, 15, 12, 10, 8, 6, 4]
+  const RESERVATIONS_BY_DAY = [20, 15, 12, 10, 8, 6, 4];
 
   // Get today's date - force to current local date
   const now = new Date();
@@ -117,9 +118,8 @@ async function createDummyReservations() {
 
   // Generate random stay duration distribution for a day
   // More realistic: weighted towards 1-2 nights
-  const generateStayDistribution = (): number[] => {
+  const generateStayDistribution = (reservationCount: number): number[] => {
     const distribution: number[] = [];
-    const remaining = RESERVATIONS_PER_DAY;
 
     // Randomly decide distribution with realistic weights
     // 1 night: 40-70%
@@ -129,9 +129,9 @@ async function createDummyReservations() {
     const oneNightPercent = randomInt(40, 70) / 100;
     const twoNightPercent = randomInt(20, 40) / 100;
 
-    const oneNightCount = Math.floor(remaining * oneNightPercent);
-    const twoNightCount = Math.floor(remaining * twoNightPercent);
-    const threeNightCount = remaining - oneNightCount - twoNightCount;
+    const oneNightCount = Math.floor(reservationCount * oneNightPercent);
+    const twoNightCount = Math.floor(reservationCount * twoNightPercent);
+    const threeNightCount = reservationCount - oneNightCount - twoNightCount;
 
     for (let i = 0; i < oneNightCount; i++) distribution.push(1);
     for (let i = 0; i < twoNightCount; i++) distribution.push(2);
@@ -141,7 +141,8 @@ async function createDummyReservations() {
     return distribution.sort(() => Math.random() - 0.5);
   };
 
-  console.log(`Creating ${DAYS_TO_GENERATE * RESERVATIONS_PER_DAY} dummy reservations across ${DAYS_TO_GENERATE} days...\n`);
+  const totalReservations = RESERVATIONS_BY_DAY.reduce((sum, count) => sum + count, 0);
+  console.log(`Creating ${totalReservations} dummy reservations across ${DAYS_TO_GENERATE} days...\n`);
 
   const allReservations: DummyReservation[] = [];
   let guestIndex = 0;
@@ -149,11 +150,12 @@ async function createDummyReservations() {
   // Generate reservations for each day
   for (let dayOffset = 0; dayOffset < DAYS_TO_GENERATE; dayOffset++) {
     const checkInDate = addDays(today, dayOffset);
-    const stayDistribution = generateStayDistribution();
+    const reservationCount = RESERVATIONS_BY_DAY[dayOffset];
+    const stayDistribution = generateStayDistribution(reservationCount);
 
-    console.log(`📅 Day ${dayOffset + 1} (${formatDate(checkInDate)}): ${stayDistribution.filter(n => n === 1).length}×1泊, ${stayDistribution.filter(n => n === 2).length}×2泊, ${stayDistribution.filter(n => n >= 3).length}×3+泊`);
+    console.log(`📅 Day ${dayOffset + 1} (${formatDate(checkInDate)}): ${reservationCount} reservations - ${stayDistribution.filter(n => n === 1).length}×1泊, ${stayDistribution.filter(n => n === 2).length}×2泊, ${stayDistribution.filter(n => n >= 3).length}×3+泊`);
 
-    for (let i = 0; i < RESERVATIONS_PER_DAY; i++) {
+    for (let i = 0; i < reservationCount; i++) {
       const guest = guestNames[guestIndex % guestNames.length];
       const room = rooms[i % rooms.length];
       const stayNights = stayDistribution[i];

@@ -2,18 +2,26 @@
 
 ## Overview
 
-This script creates **70 dummy reservations** (10 per day × 7 days) with randomized stay durations for realistic testing of the reservation system and date filtering features.
+This script creates **75 dummy reservations** with decreasing volume across 7 days to simulate realistic booking patterns where today has the most reservations and future days have progressively fewer.
 
 ## Reservation Breakdown
 
-- **Total**: 70 reservations across 7 days
+- **Total**: 75 reservations across 7 days
 - **Date Range**: Today + next 6 days (7 days total)
-- **Per Day**: 10 reservations with randomized distribution:
+- **Distribution by Day**: Decreasing volume `[20, 15, 12, 10, 8, 6, 4]`
+  - **Day 1 (today)**: 20 reservations (highest)
+  - **Day 2**: 15 reservations
+  - **Day 3**: 12 reservations
+  - **Day 4**: 10 reservations
+  - **Day 5**: 8 reservations
+  - **Day 6**: 6 reservations
+  - **Day 7**: 4 reservations (lowest)
+- **Per Day Stay Duration**: Random distribution
   - **40-70%** are 1 night stays
   - **20-40%** are 2 night stays
   - **10-30%** are 3-5 night stays
 
-Each day gets a different random distribution, making the data more realistic and useful for testing calendar views and date filtering.
+This creates a realistic booking pattern where today is busiest (20 guests checking in), with gradually decreasing volume for future dates. Perfect for testing calendar views and date filtering.
 
 ## Usage
 
@@ -46,9 +54,15 @@ npx tsx src/reservations/create-dummy-reservations.ts
 You can modify the generation parameters by editing the script constants:
 
 ```typescript
-const DAYS_TO_GENERATE = 7;        // Number of days to generate
-const RESERVATIONS_PER_DAY = 10;   // Reservations per day
+const DAYS_TO_GENERATE = 7;
+// Decreasing reservation count per day: [20, 15, 12, 10, 8, 6, 4]
+const RESERVATIONS_BY_DAY = [20, 15, 12, 10, 8, 6, 4];
 ```
+
+To change the distribution pattern, modify the `RESERVATIONS_BY_DAY` array. For example:
+- Equal distribution: `[10, 10, 10, 10, 10, 10, 10]`
+- Front-loaded: `[30, 20, 10, 5, 5, 3, 2]`
+- Back-loaded: `[5, 5, 10, 15, 15, 15, 10]`
 
 ## Requirements
 
@@ -75,26 +89,26 @@ The script requires the following environment variables to be set in the root `.
 ## Output Example
 
 ```
-Creating 70 dummy reservations across 7 days...
+Creating 75 dummy reservations across 7 days...
 
-📅 Day 1 (2026-02-22): 5×1泊, 2×2泊, 3×3+泊
-📅 Day 2 (2026-02-23): 6×1泊, 3×2泊, 1×3+泊
-📅 Day 3 (2026-02-24): 5×1泊, 2×2泊, 3×3+泊
-📅 Day 4 (2026-02-25): 4×1泊, 2×2泊, 4×3+泊
-📅 Day 5 (2026-02-26): 6×1泊, 2×2泊, 2×3+泊
-📅 Day 6 (2026-02-27): 6×1泊, 2×2泊, 2×3+泊
-📅 Day 7 (2026-02-28): 6×1泊, 4×2泊, 0×3+泊
+📅 Day 1 (2026-02-22): 20 reservations - 13×1泊, 5×2泊, 2×3+泊
+📅 Day 2 (2026-02-23): 15 reservations - 6×1泊, 5×2泊, 4×3+泊
+📅 Day 3 (2026-02-24): 12 reservations - 4×1泊, 3×2泊, 5×3+泊
+📅 Day 4 (2026-02-25): 10 reservations - 4×1泊, 3×2泊, 3×3+泊
+📅 Day 5 (2026-02-26): 8 reservations - 4×1泊, 2×2泊, 2×3+泊
+📅 Day 6 (2026-02-27): 6 reservations - 2×1泊, 1×2泊, 3×3+泊
+📅 Day 7 (2026-02-28): 4 reservations - 2×1泊, 1×2泊, 1×3+泊
 
 💾 Inserting reservations into database...
 
-📊 Summary: 70 successful, 0 failed
+📊 Summary: 75 successful, 0 failed
 
 Breakdown by stay duration:
-  1 night: 38 reservations
-  2 nights: 17 reservations
-  3 nights: 7 reservations
-  4 nights: 5 reservations
-  5 nights: 3 reservations
+  1 night: 35 reservations
+  2 nights: 20 reservations
+  3 nights: 6 reservations
+  4 nights: 9 reservations
+  5 nights: 5 reservations
 
 ✨ Done!
 ```
