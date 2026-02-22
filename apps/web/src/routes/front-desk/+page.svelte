@@ -87,7 +87,7 @@
 	let sidebarCollapsed = $state(false);
 	let sidebarMobileOpen = $state(false);
 	const sidebarSections = $derived.by(() => {
-		const frontDeskItems: { icon: string; label: string; active: boolean; onclick: () => void; badge?: number; badgeVariant?: 'alert' }[] = [];
+		const frontDeskItems: { icon: string; label: string; active: boolean; href?: string; onclick?: () => void; badge?: number; badgeVariant?: 'alert' }[] = [];
 		if (canViewReservations) {
 			frontDeskItems.push({ icon: 'calendar_today', label: '予約管理', active: activeNav === 'reservations', onclick: () => activeNav = 'reservations' });
 		}
@@ -97,6 +97,8 @@
 		if (canViewNotifications) {
 			frontDeskItems.push({ icon: 'notifications', label: '通知', badge: alerts.length > 0 ? alerts.length : undefined, badgeVariant: 'alert' as const, active: activeNav === 'notifications', onclick: () => activeNav = 'notifications' });
 		}
+		// Kitchen production link
+		frontDeskItems.push({ icon: 'restaurant', label: '厨房生産', href: '/kitchen-production', active: false });
 
 		const sections: { label: string; items: any[] }[] = [];
 		if (frontDeskItems.length > 0) {
@@ -785,6 +787,8 @@
 		// Get restaurant ID from environment
 		const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
 
+		console.log('🔌 Setting up real-time subscriptions for restaurant:', restaurantId);
+
 		// Use a single channel with multiple event listeners to minimize connections
 		realtimeChannel = supabase
 			.channel('front-desk-realtime')
@@ -798,7 +802,7 @@
 					filter: `restaurant_id=eq.${restaurantId}`
 				},
 				(payload) => {
-					console.log('Reservation change:', payload.eventType);
+					console.log('🔔 Reservation change detected:', payload.eventType, payload);
 					// Reload reservations to keep in sync with current date filter
 					loadReservations();
 				}
@@ -843,10 +847,16 @@
 					}
 				}
 			)
-			.subscribe();
+			.subscribe((status, err) => {
+				console.log('📡 Front-desk realtime status:', status, err);
+				if (status === 'CHANNEL_ERROR') {
+					console.error('❌ Channel error - you may have too many connections open. Supabase free tier allows only 2 concurrent real-time connections. Close other tabs or upgrade plan.');
+				}
+			});
 	}
 
 	async function loadReservations() {
+		console.log('🔄 Reloading reservations...');
 		try {
 			const dateRange = getDateRange(dateFilter);
 			const dateParam = dateFilter === 'today' ? dateRange?.startDate : undefined;
@@ -865,6 +875,7 @@
 			} else {
 				reservations = reservationsData;
 			}
+			console.log(`✅ Loaded ${reservations.length} reservations`);
 		} catch (e) {
 			console.error('Failed to reload reservations:', e);
 		}
@@ -1014,6 +1025,11 @@
 					{deletingDummy ? '削除中...' : '全削除'}
 				</button>
 				{/if}
+				<!-- Real-time indicator -->
+				<div class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-md bg-gray-50">
+					<span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+					<span class="text-xs text-gray-600">リアルタイム</span>
+				</div>
 				<button
 					onclick={() => loadData()}
 					class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
