@@ -196,11 +196,68 @@
 
 	// Date filter dropdown state
 	let showDateDropdown = $state(false);
+	let selectedDate = $state<string | null>(null);
 
 	function selectDateFilter(filter: DateFilter) {
 		dateFilter = filter;
+		selectedDate = null;
 		showDateDropdown = false;
 		loadData();
+	}
+
+	function selectSpecificDate(dateStr: string) {
+		selectedDate = dateStr;
+		dateFilter = 'today'; // Use 'today' but with custom date
+		showDateDropdown = false;
+		loadData();
+	}
+
+	// Generate calendar days for current month
+	function getCalendarDays() {
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = now.getMonth();
+
+		const firstDay = new Date(year, month, 1);
+		const lastDay = new Date(year, month + 1, 0);
+		const startPadding = firstDay.getDay(); // 0 = Sunday
+
+		const days: Array<{ date: Date; dateStr: string; isToday: boolean; isPast: boolean; count?: number }> = [];
+
+		// Add padding for days before month starts
+		for (let i = 0; i < startPadding; i++) {
+			const d = new Date(year, month, -(startPadding - i - 1));
+			days.push({
+				date: d,
+				dateStr: formatDateISO(d),
+				isToday: false,
+				isPast: true,
+			});
+		}
+
+		// Add days of current month
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		for (let day = 1; day <= lastDay.getDate(); day++) {
+			const d = new Date(year, month, day);
+			d.setHours(0, 0, 0, 0);
+			days.push({
+				date: d,
+				dateStr: formatDateISO(d),
+				isToday: d.getTime() === today.getTime(),
+				isPast: d < today,
+			});
+		}
+
+		return days;
+	}
+
+	function formatDateISO(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
 	}
 
 	// Allergen search state
@@ -364,8 +421,8 @@
 
 		try {
 			const dateRange = getDateRange(dateFilter);
-			// For 'today', pass the date to API. For ranges, fetch all and filter client-side
-			const dateParam = dateFilter === 'today' ? dateRange?.startDate : undefined;
+			// If a specific date is selected, use that instead of the filter range
+			const dateParam = selectedDate || (dateFilter === 'today' ? dateRange?.startDate : undefined);
 
 			const [reservationsData, roomsData, alertsData, allergensData, menuGroupsData, menusData, seasonalMenusData] = await Promise.all([
 				getReservations(dateParam),
@@ -858,14 +915,14 @@
 				</button>
 				<h2 class="text-lg font-bold text-gray-900">{headerTitle}</h2>
 				<span class="text-sm text-gray-500 hidden sm:inline">{todayFormatted}</span>
-				<!-- Date Filter Dropdown -->
+				<!-- Calendar Date Picker -->
 				<div class="relative">
 					<button
 						onclick={() => (showDateDropdown = !showDateDropdown)}
 						class="inline-flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
 					>
 						<span class="material-symbols-rounded text-base text-gray-500">calendar_month</span>
-						{dateFilterLabels[dateFilter]}
+						{selectedDate ? new Date(selectedDate).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' }) : dateFilterLabels[dateFilter]}
 						<span class="material-symbols-rounded text-base text-gray-400 transition-transform {showDateDropdown ? 'rotate-180' : ''}">expand_more</span>
 					</button>
 
@@ -877,19 +934,63 @@
 							aria-label="Close dropdown"
 						></button>
 
-						<!-- Dropdown menu -->
-						<div class="absolute top-full left-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-							{#each (['today', 'past3', 'past7', 'past30', 'all'] as const) as filter}
+						<!-- Calendar View -->
+						<div class="absolute top-full left-0 mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-20">
+							<!-- Quick filters -->
+							<div class="flex gap-2 mb-3 pb-3 border-b">
 								<button
-									onclick={() => selectDateFilter(filter)}
-									class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between {dateFilter === filter ? 'text-blue-600 font-medium bg-blue-50' : 'text-gray-700'}"
+									onclick={() => selectDateFilter('today')}
+									class="flex-1 px-3 py-1.5 text-xs rounded {!selectedDate && dateFilter === 'today' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 								>
-									{dateFilterLabels[filter]}
-									{#if dateFilter === filter}
-										<span class="material-symbols-rounded text-base text-blue-600">check</span>
-									{/if}
+									本日
 								</button>
-							{/each}
+								<button
+									onclick={() => selectDateFilter('past7')}
+									class="flex-1 px-3 py-1.5 text-xs rounded {!selectedDate && dateFilter === 'past7' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+								>
+									過去7日
+								</button>
+								<button
+									onclick={() => selectDateFilter('all')}
+									class="flex-1 px-3 py-1.5 text-xs rounded {!selectedDate && dateFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+								>
+									全期間
+								</button>
+							</div>
+
+							<!-- Month header -->
+							<div class="text-center mb-3">
+								<span class="text-sm font-semibold text-gray-900">
+									{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })}
+								</span>
+							</div>
+
+							<!-- Day headers -->
+							<div class="grid grid-cols-7 gap-1 mb-2">
+								{#each ['日', '月', '火', '水', '木', '金', '土'] as day}
+									<div class="text-center text-xs font-medium text-gray-500 py-1">
+										{day}
+									</div>
+								{/each}
+							</div>
+
+							<!-- Calendar days -->
+							<div class="grid grid-cols-7 gap-1">
+								{#each getCalendarDays() as { date, dateStr, isToday, isPast }}
+									{@const isSelected = selectedDate === dateStr}
+									<button
+										onclick={() => selectSpecificDate(dateStr)}
+										class="aspect-square p-1 text-xs rounded-lg transition-colors relative
+											{isSelected ? 'bg-blue-500 text-white font-semibold' :
+											isToday ? 'bg-blue-100 text-blue-700 font-semibold' :
+											isPast && date.getMonth() !== new Date().getMonth() ? 'text-gray-300' :
+											isPast ? 'text-gray-400 hover:bg-gray-100' :
+											'text-gray-900 hover:bg-gray-100'}"
+									>
+										{date.getDate()}
+									</button>
+								{/each}
+							</div>
 						</div>
 					{/if}
 				</div>
