@@ -118,6 +118,12 @@
 		if (foodItems.length > 0) {
 			sections.push({ label: '食材管理', items: foodItems });
 		}
+		sections.push({
+			label: 'スタッフ',
+			items: [
+				{ icon: 'calendar_month', label: 'シフトカレンダー', href: '/staff/calendar', active: false },
+			]
+		});
 		return sections;
 	});
 
