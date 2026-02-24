@@ -2159,18 +2159,18 @@ ${coursesHtml}
 		<!-- Menu Tab Content -->
 		<!-- Allergen Report Table -->
 		{#if menus.length > 0}
-		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-			<div class="flex items-center justify-between mb-3">
-				<div class="flex items-center gap-3">
-					<h2 class="text-lg font-semibold text-gray-900">アレルゲン一覧表</h2>
-					<span class="text-sm text-gray-500">Allergen Report</span>
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-5">
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+				<div class="flex items-center gap-2 sm:gap-3">
+					<h2 class="text-base sm:text-lg font-semibold text-gray-900">アレルゲン一覧表</h2>
+					<span class="text-xs sm:text-sm text-gray-500">Allergen Report</span>
 				</div>
 				<div class="flex items-center gap-2">
 					<input
 						type="text"
 						bind:value={allergenReportSearch}
-						placeholder="Search course, product, allergen..."
-						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+						placeholder="Search..."
+						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
 					/>
 					{#if can('reports.print')}
 					<button
@@ -2200,11 +2200,11 @@ ${coursesHtml}
 			{:else if filteredAllergenTableByCourse.length === 0}
 				<p class="text-center text-gray-400 py-6 text-sm">No results for "{allergenReportSearch}"</p>
 			{:else}
-				<div class="space-y-4">
+				<div class="space-y-3 sm:space-y-4">
 					{#each filteredAllergenTableByCourse as course}
-						<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm flex">
+						<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col sm:flex-row">
 							<!-- Large course image on the left -->
-							<div class="w-40 flex-shrink-0 bg-slate-800 relative">
+							<div class="aspect-[16/9] sm:aspect-auto sm:h-auto sm:w-36 flex-shrink-0 bg-slate-800 relative">
 								{#if course.courseImage}
 									<img src={course.courseImage} alt={course.courseName} class="w-full h-full object-cover" />
 								{:else}
@@ -2216,8 +2216,8 @@ ${coursesHtml}
 							<!-- Right side: course name + product rows -->
 							<div class="flex-1 min-w-0">
 								<!-- Course name header -->
-								<div class="bg-white px-4 py-2.5 flex items-center justify-between border-b border-gray-200">
-									<h3 class="text-gray-900 text-lg font-bold tracking-wide">{course.courseName}</h3>
+								<div class="bg-white px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between border-b border-gray-200">
+									<h3 class="text-gray-900 text-base sm:text-lg font-bold tracking-wide truncate">{course.courseName}</h3>
 									<span class="text-gray-400 text-xs">{course.menus.reduce((sum, g) => sum + g.products.length, 0)} products</span>
 								</div>
 								<!-- Product rows -->
@@ -2225,24 +2225,24 @@ ${coursesHtml}
 									{#each course.menus as group, gi}
 										{#each group.products as product, pi}
 											<!-- Main product row -->
-											<div class="flex items-center gap-3 px-3 py-2 {pi % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} {pi === 0 && gi > 0 ? 'border-t-2 border-slate-200' : ''}">
+											<div class="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-2 {pi % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} {pi === 0 && gi > 0 ? 'border-t-2 border-slate-200' : ''}">
 												{#if product.image_url}
-													<img src={product.image_url} alt={product.name} class="w-9 h-9 rounded object-cover flex-shrink-0" />
+													<img src={product.image_url} alt={product.name} class="w-7 h-7 sm:w-9 sm:h-9 rounded object-cover flex-shrink-0" />
 												{:else}
-													<div class="w-9 h-9 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+													<div class="w-7 h-7 sm:w-9 sm:h-9 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
 														<svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
 													</div>
 												{/if}
-												<span class="text-sm text-gray-800 font-medium w-36 truncate flex-shrink-0" title={product.name}>{product.name}</span>
+												<span class="text-xs sm:text-sm text-gray-800 font-medium w-20 sm:w-36 truncate flex-shrink-0" title={product.name}>{product.name}</span>
 												<div class="flex flex-wrap gap-1 flex-1 min-w-0">
 													{#each product.allergens as allergen}
-														<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
+														<span class="inline-block px-1.5 sm:px-2 py-0.5 text-white text-[9px] sm:text-[10px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
 													{/each}
 												</div>
 											</div>
 											<!-- Alternate product rows -->
 											{#each getAlternatesForProduct(product.id) as alt}
-												<div class="flex items-center gap-3 px-3 py-1.5 bg-orange-50/40 pl-8">
+												<div class="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 bg-orange-50/40 pl-5 sm:pl-8">
 													<svg class="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
 													</svg>
@@ -2253,7 +2253,7 @@ ${coursesHtml}
 															<svg class="w-3 h-3 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
 														</div>
 													{/if}
-													<span class="text-xs text-orange-700 font-medium w-36 truncate flex-shrink-0" title={alt.name}>{alt.name}</span>
+													<span class="text-xs text-orange-700 font-medium w-20 sm:w-36 truncate flex-shrink-0" title={alt.name}>{alt.name}</span>
 													<div class="flex flex-wrap gap-1 flex-1 min-w-0">
 														{#each alt.allergens || [] as allergen}
 															<span class="inline-block px-1.5 py-0.5 text-white text-[9px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
