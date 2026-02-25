@@ -638,7 +638,12 @@ export interface Reservation {
 	meal_plan: string | null;
 	dinner_time: string | null;
 	breakfast_time: string | null;
-	allergen_ids: string[];
+	allergen_ids: string[]; // DEPRECATED: Use allergen_details instead
+	allergen_details?: Array<{
+		allergen_id: string;
+		person_count: number;
+		allergen?: Allergen;
+	}>;
 	allergens?: Allergen[];
 	dietary_notes: string | null;
 	special_requests: string | null;
@@ -652,10 +657,16 @@ export interface Reservation {
 	current_stay_night: number;
 }
 
+export interface AllergenWithCount {
+	allergen_id: string;
+	person_count: number;
+}
+
 export interface CheckInData {
 	dinner_time?: string;
 	breakfast_time?: string;
-	allergen_ids?: string[];
+	allergen_ids?: string[]; // DEPRECATED: Use allergen_details instead
+	allergen_details?: AllergenWithCount[];
 	dietary_notes?: string;
 	special_requests?: string;
 	checked_in_by?: string;
@@ -682,6 +693,7 @@ export interface CreateReservationData {
 	plan_name?: string;
 	meal_plan?: string;
 	status?: string;
+	allergen_details?: AllergenWithCount[];
 }
 
 export async function getReservations(date?: string, status?: string): Promise<Reservation[]> {

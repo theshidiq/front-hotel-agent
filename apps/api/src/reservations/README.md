@@ -84,7 +84,10 @@ The script requires the following environment variables to be set in the root `.
   - Phone numbers: Random Japanese mobile numbers
 - **Room rotation**: Uses 10 rooms (101-104, 201-203, 301-303)
 - **Status**: All reservations set to 'confirmed' (ready for check-in)
-- **Allergens**: Empty array `allergen_ids = []`
+- **Allergens**: 30% of reservations have pre-filled allergen data
+  - Random 1-3 allergens per reservation
+  - Individual person counts (1 to party_size)
+  - Uses `allergen_details` format with backward-compatible `allergen_ids`
 
 ## Output Example
 
@@ -109,6 +112,10 @@ Breakdown by stay duration:
   3 nights: 6 reservations
   4 nights: 9 reservations
   5 nights: 5 reservations
+
+Allergen data:
+  23 reservations with allergens (30.7%)
+  52 reservations without allergens
 
 ✨ Done!
 ```
