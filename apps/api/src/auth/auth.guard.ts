@@ -84,6 +84,7 @@ export class StaffAuthGuard implements CanActivate {
       roleId: staff.role_id,
       roleName,
       permissions,
+      restaurant_id: restaurantId,
     };
 
     return true;
