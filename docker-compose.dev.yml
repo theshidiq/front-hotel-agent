@@ -1,0 +1,33 @@
+version: '3.8'
+
+# Development overrides - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # Only run OR-Tools in Docker during development
+  # NestJS and SvelteKit run locally with hot reload
+  ortools:
+    build:
+      context: ./services/ortools
+      dockerfile: Dockerfile
+    ports:
+      - "5050:5000"
+    environment:
+      - FLASK_ENV=development
+    volumes:
+      - ./services/ortools:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
+# Usage:
+# 1. Start OR-Tools only:
+#    docker-compose -f docker-compose.dev.yml up ortools
+#
+# 2. In another terminal, run NestJS:
+#    pnpm dev:api
+#
+# 3. In another terminal, run SvelteKit:
+#    pnpm dev:web

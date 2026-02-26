@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # NestJS API Server
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - RESTAURANT_ID=${RESTAURANT_ID}
+      - ORTOOLS_URL=http://ortools:5000
+    depends_on:
+      ortools:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OR-Tools Optimizer Service
+  ortools:
+    build:
+      context: ./services/ortools
+      dockerfile: Dockerfile
+    ports:
+      - "5050:5000"
+    environment:
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+
+  # SvelteKit Frontend (for production)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://api:3002
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    depends_on:
+      - api
+
+# Development override: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
