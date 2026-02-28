@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { uploadImage, compressImage, compressImageForOCR } from '$lib/supabase';
-	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
+	import { scanProduct, scanExtract, scanExtractUpload, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import MenuStructurePanel from '$lib/components/MenuStructurePanel.svelte';
@@ -41,6 +41,9 @@
 	let selectedFile: File | null = $state(null);
 	let previewUrl: string | null = $state(null);
 	let isScanning = $state(false);
+	let scanProgress: 'uploading' | 'analyzing' | null = $state(null);
+	let scanElapsed = $state(0);
+	let scanTimerInterval: ReturnType<typeof setInterval> | null = $state(null);
 	let scanResult: { product: Product; existing_product?: { id: string; name: string; brand: string | null; image_url: string | null } } | null = $state(null);
 	let scanError: string | null = $state(null);
 
@@ -1054,6 +1057,8 @@ ${coursesHtml}
 		scanExtractData = null;
 		scanSaveSuccess = false;
 		scanSaveError = null;
+		scanProgress = null;
+		stopScanTimer();
 	}
 
 	async function openCamera() {
@@ -1117,6 +1122,20 @@ ${coursesHtml}
 		};
 	});
 
+	function startScanTimer() {
+		scanElapsed = 0;
+		scanTimerInterval = setInterval(() => { scanElapsed += 1; }, 1000);
+	}
+
+	function stopScanTimer() {
+		if (scanTimerInterval) {
+			clearInterval(scanTimerInterval);
+			scanTimerInterval = null;
+		}
+	}
+
+	const SCAN_TIMEOUT_MS = 90_000; // 90 seconds
+
 	async function startScan() {
 		if (!selectedFile) return;
 		isScanning = true;
@@ -1124,16 +1143,19 @@ ${coursesHtml}
 		scanExtractData = null;
 		scanSaveSuccess = false;
 		scanSaveError = null;
+		scanProgress = 'uploading';
+		startScanTimer();
+
+		const abortController = new AbortController();
+		const timeoutId = setTimeout(() => abortController.abort(), SCAN_TIMEOUT_MS);
 
 		try {
-			// 1. Upload image to Supabase storage
-			const imageUrl = await uploadImage(selectedFile);
-
-			// 2. Call extract-only API (no auto-save)
-			const result = await scanExtract(imageUrl);
+			// Send file directly to backend (handles upload + OCR in one request)
+			scanProgress = 'analyzing';
+			const result = await scanExtractUpload(selectedFile, abortController.signal);
 			scanExtractData = result;
 
-			// 3. Populate review form with extracted data
+			// Populate review form with extracted data
 			const d = result.extracted_data;
 			scanReviewProduct = {
 				name: d.product_name || '',
@@ -1150,9 +1172,16 @@ ${coursesHtml}
 				image_url: result.image_url,
 			};
 		} catch (e: any) {
-			scanError = e.message || 'Scan failed';
+			if (e.name === 'AbortError') {
+				scanError = 'Scan timed out. Please try again with a clearer image.';
+			} else {
+				scanError = e.message || 'Scan failed';
+			}
 		} finally {
+			clearTimeout(timeoutId);
+			stopScanTimer();
 			isScanning = false;
+			scanProgress = null;
 		}
 	}
 
@@ -1402,11 +1431,17 @@ ${coursesHtml}
 				<div>
 					{#if isScanning}
 						<div class="flex flex-col items-center justify-center h-full py-8 text-center">
-							<svg class="w-8 h-8 text-blue-600 animate-pulse mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-8 h-8 text-blue-600 animate-pulse mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
 							</svg>
-							<p class="text-gray-600 text-sm">Analyzing image...</p>
-							<p class="text-gray-400 text-xs mt-1">This may take a few seconds</p>
+							<div class="flex items-center gap-2 text-blue-600 font-medium text-sm mb-3">
+								<svg class="w-4 h-4 animate-spin shrink-0" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+								Uploading & analyzing...
+							</div>
+							<p class="text-gray-400 text-xs tabular-nums">{scanElapsed}s elapsed</p>
+							{#if scanElapsed > 15}
+								<p class="text-gray-400 text-xs mt-1">Large images take longer...</p>
+							{/if}
 						</div>
 					{:else if scanSaveSuccess}
 						<div class="space-y-4 py-4">

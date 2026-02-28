@@ -279,6 +279,100 @@ export class ScanService {
     }
   }
 
+  async extractFromFile(file: Express.Multer.File): Promise<ScanExtractResponse> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    // 1. Upload to Supabase Storage (backend → Supabase is fast, server-to-server)
+    const ext = file.originalname.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+    const filePath = `scans/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file.buffer, { contentType: file.mimetype });
+
+    if (uploadError) {
+      throw new Error(`Failed to upload image: ${uploadError.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+    const imageUrl = urlData.publicUrl;
+
+    // 2. Create scan session
+    const { data: scanSession, error: scanError } = await supabase
+      .from('scan_sessions')
+      .insert({
+        restaurant_id: restaurantId,
+        image_url: imageUrl,
+        status: 'processing',
+      })
+      .select()
+      .single();
+
+    if (scanError) {
+      throw new Error(`Failed to create scan session: ${scanError.message}`);
+    }
+
+    try {
+      // 3. Call Qwen Vision API directly from buffer (no re-download needed)
+      const { extractedData, rawResponse } =
+        await this.qwenVisionService.extractProductDataFromBuffer(file.buffer, file.mimetype);
+
+      // 4. Save raw response + match allergens in parallel
+      const [, matchedAllergens] = await Promise.all([
+        supabase
+          .from('scan_sessions')
+          .update({ raw_response: rawResponse })
+          .eq('id', scanSession.id),
+        this.matchAllergens(
+          extractedData.allergens,
+          extractedData.ingredients_raw,
+        ),
+      ]);
+
+      // 5. Update scan session as completed
+      const { data: updatedSession } = await supabase
+        .from('scan_sessions')
+        .update({ status: 'completed' })
+        .eq('id', scanSession.id)
+        .select()
+        .single();
+
+      return {
+        scan_session: updatedSession,
+        extracted_data: {
+          product_name: extractedData.product_name,
+          brand: extractedData.brand,
+          category: extractedData.category,
+          ingredients_raw: extractedData.ingredients_raw,
+          nutrition_per_100g: extractedData.nutrition_per_100g,
+          storage_instructions: extractedData.storage_instructions,
+          preparation_instructions: extractedData.preparation_instructions,
+          is_vegetarian: extractedData.is_vegetarian,
+          is_vegan: extractedData.is_vegan,
+          is_halal: extractedData.is_halal,
+          is_gluten_free: extractedData.is_gluten_free,
+        },
+        matched_allergens: matchedAllergens,
+        image_url: imageUrl,
+      };
+    } catch (error) {
+      await supabase
+        .from('scan_sessions')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+        })
+        .eq('id', scanSession.id);
+
+      this.logger.error(`Scan extract from file failed: ${error.message}`);
+      throw error;
+    }
+  }
+
   private async matchAllergens(
     allergenNames: string[],
     ingredientsRaw: string | null,

@@ -485,10 +485,27 @@
 		searchError = null;
 		allergenSearchQuery = '';
 		showDinnerTimeDropdown = false;
+
+		// Initialize allergen_details from either new or old format
+		let allergenDetails: Array<{ allergen_id: string; person_count: number }> = [];
+		if (reservation?.allergen_details && reservation.allergen_details.length > 0) {
+			allergenDetails = reservation.allergen_details.map(a => ({
+				allergen_id: a.allergen_id,
+				person_count: a.person_count
+			}));
+		} else if (reservation?.allergen_ids && reservation.allergen_ids.length > 0) {
+			// Convert old format to new format (assume all party members)
+			allergenDetails = reservation.allergen_ids.map(allergen_id => ({
+				allergen_id,
+				person_count: reservation.party_size
+			}));
+		}
+
 		checkInForm = {
 			dinner_time: reservation?.dinner_time || '',
 			breakfast_time: reservation?.breakfast_time || '',
-			allergen_ids: reservation?.allergen_ids || [],
+			allergen_ids: reservation?.allergen_ids || [], // Keep for backward compatibility
+			allergen_details: allergenDetails,
 			dietary_notes: reservation?.dietary_notes || '',
 			special_requests: reservation?.special_requests || '',
 		};
@@ -571,20 +588,42 @@
 		checkInStep = 3;
 	}
 
-	// Step 3: Toggle allergen
-	function toggleAllergen(allergenId: string) {
-		const ids = checkInForm.allergen_ids || [];
-		if (ids.includes(allergenId)) {
-			checkInForm.allergen_ids = ids.filter((id) => id !== allergenId);
-			// Remove dashi restriction when allergen is removed
-			const newRestrictions = { ...dashiRestrictions };
-			delete newRestrictions[allergenId];
-			dashiRestrictions = newRestrictions;
-		} else {
-			checkInForm.allergen_ids = [...ids, allergenId];
-			// Clear search after selecting an allergen
-			allergenSearchQuery = '';
-		}
+	// Step 3: Add allergen with person count
+	function addAllergen(allergenId: string) {
+		const details = checkInForm.allergen_details || [];
+		// Don't add if already exists
+		if (details.some(d => d.allergen_id === allergenId)) return;
+
+		// Add with default person count of 1
+		checkInForm.allergen_details = [...details, { allergen_id: allergenId, person_count: 1 }];
+
+		// Also update allergen_ids for backward compatibility
+		checkInForm.allergen_ids = [...(checkInForm.allergen_ids || []), allergenId];
+
+		// Clear search after selecting an allergen
+		allergenSearchQuery = '';
+	}
+
+	// Update person count for an allergen
+	function updateAllergenCount(allergenId: string, count: number) {
+		const details = checkInForm.allergen_details || [];
+		checkInForm.allergen_details = details.map(d =>
+			d.allergen_id === allergenId ? { ...d, person_count: count } : d
+		);
+	}
+
+	// Remove allergen
+	function removeAllergen(allergenId: string) {
+		const details = checkInForm.allergen_details || [];
+		checkInForm.allergen_details = details.filter(d => d.allergen_id !== allergenId);
+
+		// Also update allergen_ids for backward compatibility
+		checkInForm.allergen_ids = (checkInForm.allergen_ids || []).filter(id => id !== allergenId);
+
+		// Remove dashi restriction when allergen is removed
+		const newRestrictions = { ...dashiRestrictions };
+		delete newRestrictions[allergenId];
+		dashiRestrictions = newRestrictions;
 	}
 
 	// Toggle dashi restriction for a specific allergen
@@ -605,7 +644,8 @@
 		try {
 			// Build dashi restriction notes
 			const dashiNotes: string[] = [];
-			for (const allergenId of checkInForm.allergen_ids || []) {
+			const allergenIds = (checkInForm.allergen_details || []).map(d => d.allergen_id);
+			for (const allergenId of allergenIds) {
 				const allergen = allergens.find(a => a.id === allergenId);
 				if (allergen && dashiRestrictions[allergenId]) {
 					dashiNotes.push(`${allergen.name}（出汁もNG）`);
@@ -619,10 +659,12 @@
 				combinedNotes = combinedNotes ? `${combinedNotes}\n${dashiText}` : dashiText;
 			}
 
-			// Build check-in data, excluding empty breakfast_time
+			// Build check-in data with allergen_details (new format)
 			const data: CheckInData = {
 				dinner_time: checkInForm.dinner_time || undefined,
-				allergen_ids: checkInForm.allergen_ids,
+				allergen_details: checkInForm.allergen_details && checkInForm.allergen_details.length > 0
+					? checkInForm.allergen_details
+					: undefined,
 				dietary_notes: combinedNotes || undefined,
 				special_requests: checkInForm.special_requests || undefined,
 			};
@@ -685,62 +727,147 @@
 		generatingDummy = true;
 
 		const today = new Date();
-		const tomorrow = new Date(today);
-		tomorrow.setDate(tomorrow.getDate() + 1);
-
+		today.setHours(0, 0, 0, 0);
 		const formatDateISO = (date: Date) => date.toISOString().split('T')[0];
+		const addDays = (date: Date, days: number): Date => {
+			const result = new Date(date);
+			result.setDate(result.getDate() + days);
+			return result;
+		};
 
-		const dummyData = [
-			{
-				booking_source: 'rakuten',
-				guest_name: '田中 太郎',
-				guest_name_kana: 'タナカ タロウ',
-				phone: '090-1234-5678',
-				email: 'tanaka@example.com',
-				party_size: 2,
-				room_number: '101',
-				room_name: '桜',
-				check_in_date: formatDateISO(today),
-				check_out_date: formatDateISO(tomorrow),
-				plan_name: '和牛懐石プラン',
-				meal_plan: '2meals',
-			},
-			{
-				booking_source: 'jalan',
-				guest_name: '佐藤 花子',
-				guest_name_kana: 'サトウ ハナコ',
-				phone: '080-9876-5432',
-				email: 'sato@example.com',
-				party_size: 4,
-				room_number: '205',
-				room_name: '紅葉',
-				check_in_date: formatDateISO(today),
-				check_out_date: formatDateISO(tomorrow),
-				plan_name: '記念日スペシャル',
-				meal_plan: '2meals',
-			},
-			{
-				booking_source: 'direct',
-				guest_name: '山本 健一',
-				guest_name_kana: 'ヤマモト ケンイチ',
-				phone: '070-5555-1234',
-				email: 'yamamoto@example.com',
-				party_size: 1,
-				room_number: '302',
-				room_name: '竹',
-				check_in_date: formatDateISO(today),
-				check_out_date: formatDateISO(tomorrow),
-				plan_name: 'ビジネスプラン',
-				meal_plan: 'breakfast_only',
-			},
+		// Guest data pools
+		const guestNames = [
+			{ name: '田中 太郎', kana: 'タナカ タロウ' },
+			{ name: '佐藤 花子', kana: 'サトウ ハナコ' },
+			{ name: '鈴木 一郎', kana: 'スズキ イチロウ' },
+			{ name: '高橋 美咲', kana: 'タカハシ ミサキ' },
+			{ name: '伊藤 健太', kana: 'イトウ ケンタ' },
+			{ name: '渡辺 由美', kana: 'ワタナベ ユミ' },
+			{ name: '山本 健一', kana: 'ヤマモト ケンイチ' },
+			{ name: '中村 愛', kana: 'ナカムラ アイ' },
+			{ name: '小林 拓也', kana: 'コバヤシ タクヤ' },
+			{ name: '加藤 雅人', kana: 'カトウ マサト' },
 		];
 
+		const rooms = [
+			{ number: '101', name: '桜' },
+			{ number: '102', name: '紅葉' },
+			{ number: '103', name: '桔梗' },
+			{ number: '104', name: '菊' },
+			{ number: '201', name: '松' },
+			{ number: '202', name: '竹' },
+			{ number: '203', name: '藤' },
+			{ number: '301', name: '梅' },
+			{ number: '302', name: '椿' },
+			{ number: '303', name: '蓮' },
+		];
+
+		const bookingSources = ['rakuten', 'jalan', 'booking_com', 'direct', 'expedia', 'agoda', 'phone'];
+		const plans = [
+			'和牛懐石プラン', '記念日スペシャル', 'ファミリープラン', 'カップルプラン',
+			'ビジネスプラン', 'リラックスプラン', '温泉満喫プラン', 'アニバーサリープラン',
+			'グループプラン', 'ロングステイプラン', 'シニアプラン', 'レディースプラン'
+		];
+		const mealPlans = ['2meals', 'dinner_only', 'breakfast_only', 'room_only'];
+
+		const random = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+		const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+		const randomPhone = (): string => {
+			const prefixes = ['090', '080', '070'];
+			const prefix = random(prefixes);
+			const part1 = String(randomInt(1000, 9999));
+			const part2 = String(randomInt(1000, 9999));
+			return `${prefix}-${part1}-${part2}`;
+		};
+
+		// Generate 7 days of data with decreasing volume
+		const DAYS_TO_GENERATE = 7;
+		const RESERVATIONS_BY_DAY = [20, 15, 12, 10, 8, 6, 4]; // Decreasing pattern
+
+		// Generate stay duration distribution for a day
+		const generateStayDistribution = (reservationCount: number): number[] => {
+			const distribution: number[] = [];
+			const oneNightPercent = randomInt(40, 70) / 100;
+			const twoNightPercent = randomInt(20, 40) / 100;
+			const oneNightCount = Math.floor(reservationCount * oneNightPercent);
+			const twoNightCount = Math.floor(reservationCount * twoNightPercent);
+			const threeNightCount = reservationCount - oneNightCount - twoNightCount;
+
+			for (let i = 0; i < oneNightCount; i++) distribution.push(1);
+			for (let i = 0; i < twoNightCount; i++) distribution.push(2);
+			for (let i = 0; i < threeNightCount; i++) distribution.push(randomInt(3, 5));
+
+			return distribution.sort(() => Math.random() - 0.5);
+		};
+
+		// Generate random allergen details for a reservation (30% chance)
+		const generateAllergenDetails = (partySize: number): Array<{ allergen_id: string; person_count: number }> | undefined => {
+			if (allergens.length === 0 || Math.random() > 0.3) return undefined;
+
+			const allergenCount = randomInt(1, Math.min(3, allergens.length));
+			const selectedAllergens = new Set<string>();
+			const allergenDetails: Array<{ allergen_id: string; person_count: number }> = [];
+
+			while (selectedAllergens.size < allergenCount) {
+				const allergen = random(allergens);
+				selectedAllergens.add(allergen.id);
+			}
+
+			selectedAllergens.forEach(allergenId => {
+				allergenDetails.push({
+					allergen_id: allergenId,
+					person_count: randomInt(1, partySize)
+				});
+			});
+
+			return allergenDetails;
+		};
+
+		const allReservations: any[] = [];
+		let guestIndex = 0;
+
+		// Generate reservations for each day
+		for (let dayOffset = 0; dayOffset < DAYS_TO_GENERATE; dayOffset++) {
+			const checkInDate = addDays(today, dayOffset);
+			const reservationCount = RESERVATIONS_BY_DAY[dayOffset];
+			const stayDistribution = generateStayDistribution(reservationCount);
+
+			for (let i = 0; i < reservationCount; i++) {
+				const guest = guestNames[guestIndex % guestNames.length];
+				const room = rooms[i % rooms.length];
+				const stayNights = stayDistribution[i];
+				const uniqueSuffix = dayOffset > 0 || guestIndex >= guestNames.length ? `${(guestIndex % guestNames.length) + 1}` : '';
+				const partySize = randomInt(1, 4);
+				const allergenDetails = generateAllergenDetails(partySize);
+
+				allReservations.push({
+					booking_source: random(bookingSources),
+					guest_name: `${guest.name}${uniqueSuffix}`,
+					guest_name_kana: `${guest.kana}${uniqueSuffix}`,
+					phone: randomPhone(),
+					email: `guest${guestIndex + 1}@example.com`,
+					party_size: partySize,
+					room_number: room.number,
+					room_name: room.name,
+					check_in_date: formatDateISO(checkInDate),
+					check_out_date: formatDateISO(addDays(checkInDate, stayNights)),
+					plan_name: random(plans),
+					meal_plan: random(mealPlans),
+					allergen_details: allergenDetails,
+				});
+
+				guestIndex++;
+			}
+		}
+
 		try {
-			for (const data of dummyData) {
+			let successCount = 0;
+			for (const data of allReservations) {
 				await createReservation(data);
+				successCount++;
 			}
 			await loadData();
-			notify('3件のダミー予約を作成しました', 'success');
+			notify(`${successCount}件のダミー予約を作成しました（7日間）`, 'success');
 		} catch (e) {
 			notify(e instanceof Error ? e.message : 'ダミーデータの作成に失敗しました', 'error');
 		} finally {
@@ -1411,8 +1538,15 @@
 											{sourceLabels[reservation.booking_source] || reservation.booking_source}
 										</span>
 									</td>
-									<td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-										{formatDate(reservation.check_in_date)} - {formatDate(reservation.check_out_date)}
+									<td class="px-4 py-4 whitespace-nowrap">
+										<div class="text-sm text-gray-900">
+											{formatDate(reservation.check_in_date)} - {formatDate(reservation.check_out_date)}
+										</div>
+										{#if reservation.total_nights && reservation.current_stay_night}
+											<div class="text-xs text-gray-600 mt-0.5">
+												{reservation.current_stay_night} - {reservation.total_nights}
+											</div>
+										{/if}
 									</td>
 									<td class="px-4 py-4 whitespace-nowrap">
 										<div class="text-sm text-gray-900">{reservation.plan_name || '-'}</div>
@@ -1421,7 +1555,24 @@
 										{/if}
 									</td>
 									<td class="px-4 py-4">
-										{#if reservation.allergens && reservation.allergens.length > 0}
+										{#if reservation.allergen_details && reservation.allergen_details.length > 0}
+											<div class="flex flex-wrap gap-1 max-w-[200px]">
+												{#each reservation.allergen_details as detail}
+													{#if detail.allergen}
+														<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+															{detail.allergen.name}
+															<span class="text-[10px] font-semibold bg-red-100 px-1 rounded">{detail.person_count}名</span>
+														</span>
+													{/if}
+												{/each}
+											</div>
+											{#if reservation.dietary_notes}
+												<div class="mt-1.5 text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded border border-orange-200 whitespace-pre-wrap max-w-[200px]">
+													{reservation.dietary_notes}
+												</div>
+											{/if}
+										{:else if reservation.allergens && reservation.allergens.length > 0}
+											<!-- Fallback for old format without person counts -->
 											<div class="flex flex-wrap gap-1 max-w-[200px]">
 												{#each reservation.allergens as allergen}
 													<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
@@ -1769,36 +1920,63 @@
 					<!-- Allergen Section -->
 					<div class="space-y-3">
 						<p class="text-sm font-semibold text-gray-900">アレルギー・食事制限</p>
-						<p class="text-xs text-gray-500">該当するものを選択してください</p>
+						<p class="text-xs text-gray-500">該当するものを選択し、人数を入力してください</p>
 
-						<!-- Selected allergens with dashi option -->
-						{#if (checkInForm.allergen_ids || []).length > 0}
-							<div class="space-y-2 p-3 bg-red-50 rounded-lg border border-red-200">
-								{#each checkInForm.allergen_ids || [] as allergenId}
-									{@const allergen = allergens.find((a) => a.id === allergenId)}
+						<!-- Selected allergens with person count and dashi option -->
+						{#if (checkInForm.allergen_details || []).length > 0}
+							<div class="space-y-3 p-3 bg-red-50 rounded-lg border border-red-200">
+								{#each checkInForm.allergen_details || [] as allergenDetail}
+									{@const allergen = allergens.find((a) => a.id === allergenDetail.allergen_id)}
 									{#if allergen}
-										<div class="flex items-center gap-2">
-											<button
-												type="button"
-												onclick={() => toggleAllergen(allergenId)}
-												class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-											>
-												{allergen.name}
-												<span class="material-symbols-rounded text-sm" style="font-weight: 500">close</span>
-											</button>
+										<div class="flex items-center gap-2 flex-wrap">
+											<div class="flex items-center gap-2 flex-1 min-w-0">
+												<span class="text-sm font-medium text-red-900">{allergen.name}</span>
 
-											{#if supportsDashiOption(allergen.name)}
+												<!-- Person count selector -->
+												<div class="flex items-center gap-1 bg-white rounded-md border border-gray-300 px-2 py-1">
+													<button
+														type="button"
+														onclick={() => updateAllergenCount(allergenDetail.allergen_id, Math.max(1, allergenDetail.person_count - 1))}
+														disabled={allergenDetail.person_count <= 1}
+														class="text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+													>
+														<span class="material-symbols-rounded text-base">remove</span>
+													</button>
+													<span class="text-sm font-semibold text-gray-900 min-w-[2ch] text-center">{allergenDetail.person_count}</span>
+													<button
+														type="button"
+														onclick={() => updateAllergenCount(allergenDetail.allergen_id, Math.min(foundReservation?.party_size || 10, allergenDetail.person_count + 1))}
+														disabled={allergenDetail.person_count >= (foundReservation?.party_size || 10)}
+														class="text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+													>
+														<span class="material-symbols-rounded text-base">add</span>
+													</button>
+													<span class="text-xs text-gray-500 ml-1">名</span>
+												</div>
+											</div>
+
+											<div class="flex items-center gap-2">
+												{#if supportsDashiOption(allergen.name)}
+													<button
+														type="button"
+														onclick={() => toggleDashiRestriction(allergenDetail.allergen_id)}
+														class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors {dashiRestrictions[allergenDetail.allergen_id] ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}"
+													>
+														<span class="material-symbols-rounded text-sm">
+															{dashiRestrictions[allergenDetail.allergen_id] ? 'check_box' : 'check_box_outline_blank'}
+														</span>
+														出汁もNG
+													</button>
+												{/if}
+
 												<button
 													type="button"
-													onclick={() => toggleDashiRestriction(allergenId)}
-													class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors {dashiRestrictions[allergenId] ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}"
+													onclick={() => removeAllergen(allergenDetail.allergen_id)}
+													class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
 												>
-													<span class="material-symbols-rounded text-sm">
-														{dashiRestrictions[allergenId] ? 'check_box' : 'check_box_outline_blank'}
-													</span>
-													出汁もNG
+													<span class="material-symbols-rounded text-sm" style="font-weight: 500">close</span>
 												</button>
-											{/if}
+											</div>
 										</div>
 									{/if}
 								{/each}
@@ -1820,16 +1998,17 @@
 						<div class="max-h-36 overflow-y-auto border border-gray-200 rounded-lg">
 							<div class="flex flex-wrap gap-2 p-3">
 								{#each filteredAllergens as allergen (allergen.id)}
+									{@const isSelected = (checkInForm.allergen_details || []).some(d => d.allergen_id === allergen.id)}
 									<button
 										type="button"
-										onclick={() => toggleAllergen(allergen.id)}
-										class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors {(checkInForm.allergen_ids ||
-											[]).includes(allergen.id)
-											? 'bg-red-100 text-red-700 border border-red-300'
+										onclick={() => addAllergen(allergen.id)}
+										disabled={isSelected}
+										class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors {isSelected
+											? 'bg-red-100 text-red-700 border border-red-300 cursor-not-allowed'
 											: 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 									>
 										{allergen.name}
-										{#if (checkInForm.allergen_ids || []).includes(allergen.id)}
+										{#if isSelected}
 											<span class="material-symbols-rounded text-sm" style="font-weight: 500">check</span>
 										{/if}
 									</button>

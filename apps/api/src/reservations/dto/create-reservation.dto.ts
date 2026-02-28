@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsInt, IsOptional, IsEmail, IsIn, Min, IsDateString } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsEmail, IsIn, Min, IsDateString, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { AllergenWithCount } from './check-in.dto';
 
 export class CreateReservationDto {
   @ApiProperty({ enum: ['rakuten', 'jalan', 'booking_com', 'expedia', 'agoda', 'direct', 'phone', 'walk_in'] })
@@ -69,4 +71,15 @@ export class CreateReservationDto {
   @IsInt()
   @Min(0)
   total_price?: number;
+
+  @ApiPropertyOptional({
+    description: 'Array of allergens with person counts',
+    type: [AllergenWithCount],
+    example: [{ allergen_id: '123e4567-e89b-12d3-a456-426614174000', person_count: 2 }]
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AllergenWithCount)
+  allergen_details?: AllergenWithCount[];
 }

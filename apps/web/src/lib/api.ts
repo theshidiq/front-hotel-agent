@@ -83,11 +83,31 @@ export interface ScanExtractResult {
 	image_url: string;
 }
 
-export async function scanExtract(imageUrl: string): Promise<ScanExtractResult> {
+export async function scanExtract(imageUrl: string, signal?: AbortSignal): Promise<ScanExtractResult> {
 	const response = await fetch(`${API_URL}/scan/extract`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ imageUrl }),
+		signal,
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Scan failed');
+	}
+
+	return response.json();
+}
+
+export async function scanExtractUpload(file: File, signal?: AbortSignal): Promise<ScanExtractResult> {
+	const formData = new FormData();
+	formData.append('file', file);
+
+	const response = await fetch(`${API_URL}/scan/extract-upload`, {
+		method: 'POST',
+		headers: authHeaders(),
+		body: formData,
+		signal,
 	});
 
 	if (!response.ok) {
@@ -638,7 +658,12 @@ export interface Reservation {
 	meal_plan: string | null;
 	dinner_time: string | null;
 	breakfast_time: string | null;
-	allergen_ids: string[];
+	allergen_ids: string[]; // DEPRECATED: Use allergen_details instead
+	allergen_details?: Array<{
+		allergen_id: string;
+		person_count: number;
+		allergen?: Allergen;
+	}>;
 	allergens?: Allergen[];
 	dietary_notes: string | null;
 	special_requests: string | null;
@@ -652,10 +677,16 @@ export interface Reservation {
 	current_stay_night: number;
 }
 
+export interface AllergenWithCount {
+	allergen_id: string;
+	person_count: number;
+}
+
 export interface CheckInData {
 	dinner_time?: string;
 	breakfast_time?: string;
-	allergen_ids?: string[];
+	allergen_ids?: string[]; // DEPRECATED: Use allergen_details instead
+	allergen_details?: AllergenWithCount[];
 	dietary_notes?: string;
 	special_requests?: string;
 	checked_in_by?: string;
@@ -682,6 +713,7 @@ export interface CreateReservationData {
 	plan_name?: string;
 	meal_plan?: string;
 	status?: string;
+	allergen_details?: AllergenWithCount[];
 }
 
 export async function getReservations(date?: string, status?: string): Promise<Reservation[]> {

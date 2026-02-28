@@ -77,9 +77,9 @@ export async function compressImage(
 	});
 }
 
-/** Higher quality compression optimized for OCR text recognition (e.g. Japanese product labels) */
+/** Compression optimized for OCR text recognition (e.g. Japanese product labels) */
 export async function compressImageForOCR(file: File): Promise<File> {
-	return compressImage(file, 2560, 0.95);
+	return compressImage(file, 1600, 0.85);
 }
 
 export async function uploadImage(file: File): Promise<string> {
@@ -87,9 +87,15 @@ export async function uploadImage(file: File): Promise<string> {
 	const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 	const filePath = `scans/${fileName}`;
 
-	const { error } = await supabase.storage
+	const uploadPromise = supabase.storage
 		.from('product-images')
 		.upload(filePath, file);
+
+	const timeoutPromise = new Promise<never>((_, reject) =>
+		setTimeout(() => reject(new Error('Upload timed out. Check your network connection.')), 30000)
+	);
+
+	const { error } = await Promise.race([uploadPromise, timeoutPromise]);
 
 	if (error) {
 		throw new Error(`Upload failed: ${error.message}`);
