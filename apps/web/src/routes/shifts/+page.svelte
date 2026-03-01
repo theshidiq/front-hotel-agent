@@ -622,6 +622,32 @@
 				{#if loadingSchedule}
 					<TableSkeleton rows={staff.length || 12} columns={Math.min(dateRange.length || 15, 20)} />
 				{:else}
+					{@const hasScheduleData = Object.keys(scheduleData).some(k => k !== '_staff_members' && Object.keys(scheduleData[k] || {}).length > 0)}
+					{#if !hasScheduleData && staff.length > 0}
+						<!-- Empty schedule notice -->
+						<div class="p-8 text-center">
+							<span class="material-symbols-rounded text-5xl text-gray-300 mb-4">event_busy</span>
+							<h3 class="text-lg font-medium text-gray-700 mb-2">この期間のスケジュールデータはありません</h3>
+							<p class="text-sm text-gray-500 mb-4">
+								{#if selectedPeriod}
+									{selectedPeriod.start_date.split('-')[0]}年 {selectedPeriod.label} のスケジュールはまだ作成されていません。
+								{:else}
+									スケジュールはまだ作成されていません。
+								{/if}
+							</p>
+							<div class="flex items-center justify-center gap-3">
+								<button
+									class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+									onclick={handleOptimize}
+									disabled={optimizing || !optimizerHealthy}
+								>
+									<span class="material-symbols-rounded text-sm">auto_fix_high</span>
+									自動生成する
+								</button>
+								<span class="text-sm text-gray-400">または手動でセルをクリックして入力</span>
+							</div>
+						</div>
+					{/if}
 					<ScheduleTable
 						{staff}
 						{dateRange}
