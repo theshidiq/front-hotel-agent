@@ -239,11 +239,43 @@ export class ShiftsService {
 
     let schedule = scheduleForPeriod;
 
-    // If no period-specific schedule exists, return null
-    // A new schedule will be created when user edits a cell (via getOrCreateSchedule)
+    // If no metadata-linked schedule exists, try to find a legacy schedule (without metadata)
+    // by checking if any schedule has data matching the period's date range
     if (periodError) {
-      this.logger.log(`No schedule found for period ${period.label} (${period.start_date} to ${period.end_date})`);
-      schedule = null;
+      this.logger.log(`No metadata-linked schedule found for period ${period.label}, searching legacy schedules...`);
+
+      // Query legacy schedules (those with metadata_id = null)
+      const { data: legacySchedules, error: legacyError } = await this.supabase
+        .from('schedules')
+        .select('*')
+        .is('metadata_id', null);
+
+      if (!legacyError && legacySchedules && legacySchedules.length > 0) {
+        // Find the schedule that has data matching this period's date range
+        for (const legacySchedule of legacySchedules) {
+          const scheduleData = legacySchedule.schedule_data || {};
+          // Get all date keys from the first staff member's schedule
+          const staffIds = Object.keys(scheduleData).filter(k => k !== '_staff_members');
+          if (staffIds.length > 0) {
+            const firstStaffSchedule = scheduleData[staffIds[0]];
+            const dateKeys = Object.keys(firstStaffSchedule || {}).sort();
+            if (dateKeys.length > 0) {
+              const firstDate = dateKeys[0];
+              const lastDate = dateKeys[dateKeys.length - 1];
+              // Check if this schedule's date range matches the period
+              if (firstDate >= period.start_date && firstDate <= period.end_date) {
+                this.logger.log(`Found legacy schedule matching period ${period.label}: dates ${firstDate} to ${lastDate}`);
+                schedule = legacySchedule;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (!schedule) {
+        this.logger.log(`No schedule found for period ${period.label} (${period.start_date} to ${period.end_date})`);
+      }
     }
 
     // Detailed debugging
