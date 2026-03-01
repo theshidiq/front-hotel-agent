@@ -23,6 +23,7 @@
 	} from '$lib/shifts/types';
 	import { SHIFT_SYMBOLS, SHIFT_LABELS } from '$lib/shifts/types';
 	import ScheduleTable from '$lib/shifts/components/ScheduleTable.svelte';
+	import PeriodPicker from '$lib/shifts/components/PeriodPicker.svelte';
 
 	// ── Navigation State ──
 	type ShiftSection = 'schedule' | 'settings';
@@ -578,26 +579,12 @@
 		<div class="p-4">
 			<!-- Toolbar -->
 			<div class="bg-white rounded-lg shadow p-4 mb-4 flex flex-wrap items-center gap-4">
-				<!-- Period selector -->
-				<div class="flex items-center gap-2">
-					<label class="text-sm font-medium text-gray-700">期間:</label>
-					<select
-						class="border rounded-lg px-3 py-2 text-sm"
-						value={selectedPeriodId || ''}
-						onchange={(e) => handlePeriodChange((e.target as HTMLSelectElement).value)}
-					>
-						{#each periods as period}
-							<option value={period.id}>{formatPeriodLabel(period)}</option>
-						{/each}
-					</select>
-					<button
-						class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-						onclick={openAddPeriodModal}
-						title="新しい期間を追加"
-					>
-						<span class="material-symbols-rounded">add</span>
-					</button>
-				</div>
+				<!-- Period Picker -->
+				<PeriodPicker
+					{periods}
+					{selectedPeriodId}
+					onSelect={handlePeriodChange}
+				/>
 
 				<div class="flex-1"></div>
 
