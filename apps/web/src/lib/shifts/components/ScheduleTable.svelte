@@ -547,9 +547,8 @@
 					e.preventDefault();
 					handleQuickAction('early');
 				}}
-				class="px-2 py-1 hover:bg-gray-100 rounded font-black text-blue-600"
+				class="px-2 py-1 hover:bg-gray-100 rounded font-medium text-blue-600"
 				title="Early Shift (Press 1)"
-				style="font-weight: 900;"
 			>
 				△
 			</button>
@@ -715,7 +714,7 @@
 											s.status
 										)}"
 										style={cellValue === '△'
-											? 'text-shadow: 0 0 1px currentColor; font-weight: 900;'
+											? 'font-weight: 500; font-size: 1.5rem;'
 											: cellValue === '×'
 												? 'font-size: 2rem; line-height: 2rem;'
 												: ''}
@@ -873,10 +872,10 @@
 			</button>
 			<button
 				type="button"
-				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-blue-600 font-black flex items-center gap-2"
+				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-blue-600 font-medium flex items-center gap-2"
 				onclick={() => handleQuickAction('early')}
 			>
-				<span>△</span>
+				<span class="text-lg">△</span>
 				Early Shift
 			</button>
 			<button
