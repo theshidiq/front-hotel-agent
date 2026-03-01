@@ -20,6 +20,12 @@ import {
   UpdateSolverConfigDto,
   UpdateDailyLimitsDto,
   UpdateMonthlyLimitsDto,
+  CreatePriorityRuleDto,
+  UpdatePriorityRuleDto,
+  CreateEarlyShiftPreferenceDto,
+  UpdateEarlyShiftPreferenceDto,
+  BulkEarlyShiftPreferenceDto,
+  UpdatePeriodConfigurationDto,
 } from './dto/settings.dto';
 
 @Injectable()
@@ -39,7 +45,7 @@ export class ShiftsService {
 
   async getStaff(restaurantId: string): Promise<ScheduleStaff[]> {
     const { data, error } = await this.supabase
-      .from('schedule_staff')
+      .from('staff')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true)
@@ -55,7 +61,7 @@ export class ShiftsService {
 
   async getStaffById(restaurantId: string, id: string): Promise<ScheduleStaff> {
     const { data, error } = await this.supabase
-      .from('schedule_staff')
+      .from('staff')
       .select('*')
       .eq('id', id)
       .eq('restaurant_id', restaurantId)
@@ -71,7 +77,7 @@ export class ShiftsService {
   async createStaff(restaurantId: string, dto: CreateStaffDto): Promise<ScheduleStaff> {
     // Get max staff_order
     const { data: maxOrder } = await this.supabase
-      .from('schedule_staff')
+      .from('staff')
       .select('staff_order')
       .eq('restaurant_id', restaurantId)
       .order('staff_order', { ascending: false })
@@ -81,7 +87,7 @@ export class ShiftsService {
     const newOrder = (maxOrder?.staff_order || 0) + 1;
 
     const { data, error } = await this.supabase
-      .from('schedule_staff')
+      .from('staff')
       .insert({
         ...dto,
         restaurant_id: restaurantId,
@@ -101,7 +107,7 @@ export class ShiftsService {
 
   async updateStaff(restaurantId: string, id: string, dto: UpdateStaffDto): Promise<ScheduleStaff> {
     const { data, error } = await this.supabase
-      .from('schedule_staff')
+      .from('staff')
       .update({ ...dto, updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('restaurant_id', restaurantId)
@@ -119,7 +125,7 @@ export class ShiftsService {
   async deleteStaff(restaurantId: string, id: string): Promise<void> {
     // Soft delete - just mark as inactive
     const { error } = await this.supabase
-      .from('schedule_staff')
+      .from('staff')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('restaurant_id', restaurantId);
@@ -139,7 +145,7 @@ export class ShiftsService {
 
     for (const update of updates) {
       const { error } = await this.supabase
-        .from('schedule_staff')
+        .from('staff')
         .update({ staff_order: update.staff_order, updated_at: update.updated_at })
         .eq('id', update.id)
         .eq('restaurant_id', restaurantId);
@@ -155,7 +161,7 @@ export class ShiftsService {
 
   async getPeriods(restaurantId: string): Promise<SchedulePeriod[]> {
     const { data, error } = await this.supabase
-      .from('schedule_periods')
+      .from('periods')
       .select('*')
       .order('start_date', { ascending: false });
 
@@ -169,7 +175,7 @@ export class ShiftsService {
 
   async getPeriodById(restaurantId: string, id: string): Promise<SchedulePeriod> {
     const { data, error } = await this.supabase
-      .from('schedule_periods')
+      .from('periods')
       .select('*')
       .eq('id', id)
       .single();
@@ -183,7 +189,7 @@ export class ShiftsService {
 
   async createPeriod(restaurantId: string, dto: CreatePeriodDto): Promise<SchedulePeriod> {
     const { data, error } = await this.supabase
-      .from('schedule_periods')
+      .from('periods')
       .insert({
         label: dto.label,
         start_date: dto.start_date,
@@ -202,7 +208,7 @@ export class ShiftsService {
 
   async deletePeriod(restaurantId: string, id: string): Promise<void> {
     const { error } = await this.supabase
-      .from('schedule_periods')
+      .from('periods')
       .delete()
       .eq('id', id);
 
@@ -222,14 +228,53 @@ export class ShiftsService {
     const period = await this.getPeriodById(restaurantId, periodId);
     const staff = await this.getStaff(restaurantId);
 
-    // Find schedule for this period
-    const { data: schedules } = await this.supabase
+    // Load schedule for the specific period by matching period dates
+    // This ensures each period has its own schedule data
+    const { data: scheduleForPeriod, error: periodError } = await this.supabase
       .from('schedules')
-      .select('*, schedule_metadata(*)')
-      .gte('schedule_metadata.schedule_period_start', period.start_date)
-      .lte('schedule_metadata.schedule_period_end', period.end_date);
+      .select('*, schedule_metadata!inner(*)')
+      .eq('schedule_metadata.schedule_period_start', period.start_date)
+      .eq('schedule_metadata.schedule_period_end', period.end_date)
+      .single();
 
-    const schedule = schedules?.[0] || null;
+    let schedule = scheduleForPeriod;
+
+    // If no period-specific schedule exists, return null
+    // A new schedule will be created when user edits a cell (via getOrCreateSchedule)
+    if (periodError) {
+      this.logger.log(`No schedule found for period ${period.label} (${period.start_date} to ${period.end_date})`);
+      schedule = null;
+    }
+
+    // Detailed debugging
+    const scheduleDataKeys = schedule?.schedule_data
+      ? Object.keys(schedule.schedule_data).filter(k => k !== '_staff_members')
+      : [];
+    const staffTableIds = staff.map(s => s.id);
+
+    this.logger.log(`getSchedule: period=${period.label} (${period.start_date} to ${period.end_date})`);
+    this.logger.log(`getSchedule: schedule_data has ${scheduleDataKeys.length} staff entries`);
+    this.logger.log(`getSchedule: staff table has ${staff.length} staff`);
+
+    // Check if IDs match
+    const matchingIds = scheduleDataKeys.filter(id => staffTableIds.includes(id));
+    const missingFromStaff = scheduleDataKeys.filter(id => !staffTableIds.includes(id));
+
+    this.logger.log(`getSchedule: ${matchingIds.length} staff IDs match between schedule_data and staff table`);
+    if (missingFromStaff.length > 0) {
+      this.logger.warn(`getSchedule: ${missingFromStaff.length} staff IDs in schedule_data but NOT in staff table: ${missingFromStaff.slice(0, 3).join(', ')}...`);
+    }
+
+    // Sample date keys from first staff with data
+    if (scheduleDataKeys.length > 0) {
+      const firstStaffId = scheduleDataKeys[0];
+      const firstStaffSchedule = schedule.schedule_data[firstStaffId];
+      const dateKeys = Object.keys(firstStaffSchedule || {});
+      this.logger.log(`getSchedule: sample staff ${firstStaffId} has ${dateKeys.length} date entries`);
+      if (dateKeys.length > 0) {
+        this.logger.log(`getSchedule: sample dates: ${dateKeys.slice(0, 5).join(', ')}...`);
+      }
+    }
 
     return { period, schedule, staff };
   }
@@ -808,7 +853,7 @@ export class ShiftsService {
 
   async getStaffGroups(restaurantId: string): Promise<ScheduleStaffGroup[]> {
     const { data, error } = await this.supabase
-      .from('schedule_staff_groups')
+      .from('staff_groups')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true);
@@ -828,7 +873,7 @@ export class ShiftsService {
     const versionId = await this.getOrCreateConfigVersion(restaurantId);
 
     const { data, error } = await this.supabase
-      .from('schedule_staff_groups')
+      .from('staff_groups')
       .insert({
         restaurant_id: restaurantId,
         version_id: versionId,
@@ -855,7 +900,7 @@ export class ShiftsService {
     dto: UpdateStaffGroupDto,
   ): Promise<ScheduleStaffGroup> {
     const { data, error } = await this.supabase
-      .from('schedule_staff_groups')
+      .from('staff_groups')
       .update({ ...dto, updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('restaurant_id', restaurantId)
@@ -872,7 +917,7 @@ export class ShiftsService {
 
   async deleteStaffGroup(restaurantId: string, id: string): Promise<void> {
     const { error } = await this.supabase
-      .from('schedule_staff_groups')
+      .from('staff_groups')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('restaurant_id', restaurantId);
@@ -888,9 +933,10 @@ export class ShiftsService {
     groupId: string,
   ): Promise<Array<{ staff_id: string; group_id: string }>> {
     const { data, error } = await this.supabase
-      .from('schedule_staff_group_members')
-      .select('*')
-      .eq('group_id', groupId);
+      .from('staff_backup_assignments')
+      .select('staff_id, group_id')
+      .eq('group_id', groupId)
+      .eq('is_active', true);
 
     if (error) {
       this.logger.error('Failed to fetch staff group members', error);
@@ -905,15 +951,22 @@ export class ShiftsService {
     groupId: string,
     staffIds: string[],
   ): Promise<void> {
-    // Delete existing members
-    await this.supabase.from('schedule_staff_group_members').delete().eq('group_id', groupId);
+    // Soft delete existing members
+    await this.supabase
+      .from('staff_backup_assignments')
+      .update({ is_active: false })
+      .eq('group_id', groupId);
 
     // Insert new members
     if (staffIds.length > 0) {
-      const { error } = await this.supabase.from('schedule_staff_group_members').insert(
+      const versionId = await this.getOrCreateConfigVersion(restaurantId);
+      const { error } = await this.supabase.from('staff_backup_assignments').insert(
         staffIds.map((staffId) => ({
+          restaurant_id: restaurantId,
+          version_id: versionId,
           group_id: groupId,
           staff_id: staffId,
+          is_active: true,
         })),
       );
 
@@ -935,6 +988,329 @@ export class ShiftsService {
 
     if (error) {
       this.logger.error('Failed to fetch priority rules', error);
+    }
+
+    return data || [];
+  }
+
+  async createPriorityRule(
+    restaurantId: string,
+    dto: CreatePriorityRuleDto,
+  ): Promise<any> {
+    const versionId = await this.getOrCreateConfigVersion(restaurantId);
+
+    const ruleDefinition = {
+      staff_ids: dto.staff_ids || [],
+      rule_type: dto.rule_type,
+      shift_type: dto.shift_type,
+      days_of_week: dto.days_of_week,
+      allowed_shifts: dto.allowed_shifts || [],
+    };
+
+    const { data, error } = await this.supabase
+      .from('priority_rules')
+      .insert({
+        restaurant_id: restaurantId,
+        version_id: versionId,
+        name: dto.name,
+        description: dto.description,
+        priority_level: dto.priority_level || 1,
+        rule_definition: ruleDefinition,
+        penalty_weight: dto.penalty_weight || 1.0,
+        is_hard_constraint: dto.is_hard_constraint ?? false,
+        effective_from: dto.effective_from,
+        effective_until: dto.effective_until,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error('Failed to create priority rule', error);
+      throw new BadRequestException('Failed to create priority rule');
+    }
+
+    return data;
+  }
+
+  async updatePriorityRule(
+    restaurantId: string,
+    id: string,
+    dto: UpdatePriorityRuleDto,
+  ): Promise<any> {
+    const updateData: any = { updated_at: new Date().toISOString() };
+
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.priority_level !== undefined) updateData.priority_level = dto.priority_level;
+    if (dto.is_hard_constraint !== undefined) updateData.is_hard_constraint = dto.is_hard_constraint;
+    if (dto.penalty_weight !== undefined) updateData.penalty_weight = dto.penalty_weight;
+    if (dto.effective_from !== undefined) updateData.effective_from = dto.effective_from;
+    if (dto.effective_until !== undefined) updateData.effective_until = dto.effective_until;
+    if (dto.is_active !== undefined) updateData.is_active = dto.is_active;
+
+    // Update rule_definition if any related fields changed
+    if (dto.staff_ids || dto.rule_type || dto.shift_type || dto.days_of_week || dto.allowed_shifts) {
+      const { data: existing } = await this.supabase
+        .from('priority_rules')
+        .select('rule_definition')
+        .eq('id', id)
+        .single();
+
+      updateData.rule_definition = {
+        ...(existing?.rule_definition || {}),
+        ...(dto.staff_ids && { staff_ids: dto.staff_ids }),
+        ...(dto.rule_type && { rule_type: dto.rule_type }),
+        ...(dto.shift_type && { shift_type: dto.shift_type }),
+        ...(dto.days_of_week && { days_of_week: dto.days_of_week }),
+        ...(dto.allowed_shifts && { allowed_shifts: dto.allowed_shifts }),
+      };
+    }
+
+    const { data, error } = await this.supabase
+      .from('priority_rules')
+      .update(updateData)
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error('Failed to update priority rule', error);
+      throw new BadRequestException('Failed to update priority rule');
+    }
+
+    return data;
+  }
+
+  async deletePriorityRule(restaurantId: string, id: string): Promise<void> {
+    // Soft delete
+    const { error } = await this.supabase
+      .from('priority_rules')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId);
+
+    if (error) {
+      this.logger.error('Failed to delete priority rule', error);
+      throw new BadRequestException('Failed to delete priority rule');
+    }
+  }
+
+  // ==================== SETTINGS: Early Shift Preferences ====================
+
+  async getEarlyShiftPreferences(restaurantId: string): Promise<any[]> {
+    const { data, error } = await this.supabase
+      .from('staff_early_shift_preferences')
+      .select('*')
+      .eq('restaurant_id', restaurantId);
+
+    if (error) {
+      this.logger.error('Failed to fetch early shift preferences', error);
+      throw new BadRequestException('Failed to fetch early shift preferences');
+    }
+
+    return data || [];
+  }
+
+  async createEarlyShiftPreference(
+    restaurantId: string,
+    dto: CreateEarlyShiftPreferenceDto,
+  ): Promise<any> {
+    const { data, error } = await this.supabase
+      .from('staff_early_shift_preferences')
+      .insert({
+        restaurant_id: restaurantId,
+        staff_id: dto.staff_id,
+        can_do_early_shift: dto.can_do_early_shift,
+        applies_to_date: dto.applies_to_date,
+        preference_source: dto.preference_source || 'individual',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error('Failed to create early shift preference', error);
+      throw new BadRequestException('Failed to create early shift preference');
+    }
+
+    return data;
+  }
+
+  async updateEarlyShiftPreference(
+    restaurantId: string,
+    id: string,
+    dto: UpdateEarlyShiftPreferenceDto,
+  ): Promise<any> {
+    const { data, error } = await this.supabase
+      .from('staff_early_shift_preferences')
+      .update({
+        ...dto,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error('Failed to update early shift preference', error);
+      throw new BadRequestException('Failed to update early shift preference');
+    }
+
+    return data;
+  }
+
+  async bulkUpsertEarlyShiftPreferences(
+    restaurantId: string,
+    dto: BulkEarlyShiftPreferenceDto,
+  ): Promise<void> {
+    // Delete existing preferences for these staff members
+    const staffIds = dto.preferences.map((p) => p.staff_id);
+
+    await this.supabase
+      .from('staff_early_shift_preferences')
+      .delete()
+      .eq('restaurant_id', restaurantId)
+      .in('staff_id', staffIds)
+      .is('applies_to_date', null); // Only delete general preferences, not date-specific
+
+    // Insert new preferences
+    const inserts = dto.preferences.map((p) => ({
+      restaurant_id: restaurantId,
+      staff_id: p.staff_id,
+      can_do_early_shift: p.can_do_early_shift,
+      applies_to_date: p.applies_to_date || null,
+      preference_source: 'bulk_assignment',
+    }));
+
+    const { error } = await this.supabase
+      .from('staff_early_shift_preferences')
+      .insert(inserts);
+
+    if (error) {
+      this.logger.error('Failed to bulk upsert early shift preferences', error);
+      throw new BadRequestException('Failed to bulk upsert early shift preferences');
+    }
+  }
+
+  async deleteEarlyShiftPreference(restaurantId: string, id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('staff_early_shift_preferences')
+      .delete()
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId);
+
+    if (error) {
+      this.logger.error('Failed to delete early shift preference', error);
+      throw new BadRequestException('Failed to delete early shift preference');
+    }
+  }
+
+  // ==================== SETTINGS: Period Configuration ====================
+
+  async getPeriodConfiguration(restaurantId: string): Promise<any | null> {
+    const { data, error } = await this.supabase
+      .from('period_configuration')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      this.logger.error('Failed to fetch period configuration', error);
+    }
+
+    return data;
+  }
+
+  async updatePeriodConfiguration(
+    restaurantId: string,
+    dto: UpdatePeriodConfigurationDto,
+  ): Promise<any> {
+    const existing = await this.getPeriodConfiguration(restaurantId);
+
+    if (existing) {
+      const { data, error } = await this.supabase
+        .from('period_configuration')
+        .update({
+          ...dto,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new BadRequestException('Failed to update period configuration');
+      }
+
+      return data;
+    } else {
+      const { data, error } = await this.supabase
+        .from('period_configuration')
+        .insert({
+          restaurant_id: restaurantId,
+          start_day: dto.start_day || 21,
+          end_day: dto.end_day || 20,
+          period_length_days: dto.period_length_days || 30,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw new BadRequestException('Failed to create period configuration');
+      }
+
+      return data;
+    }
+  }
+
+  async regeneratePeriods(restaurantId: string): Promise<SchedulePeriod[]> {
+    const config = await this.getPeriodConfiguration(restaurantId);
+    if (!config) {
+      throw new BadRequestException('Period configuration not found');
+    }
+
+    const startDay = config.start_day || 21;
+    const endDay = config.end_day || 20;
+
+    // Generate periods for 12 months
+    const periods: { label: string; start_date: string; end_date: string }[] = [];
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth(); // 0-indexed
+
+    for (let i = -2; i < 10; i++) {
+      const startMonth = (currentMonth + i + 12) % 12;
+      const startYear = currentYear + Math.floor((currentMonth + i) / 12);
+
+      const endMonth = (startMonth + 1) % 12;
+      const endYear = startYear + (startMonth === 11 ? 1 : 0);
+
+      const startDate = new Date(startYear, startMonth, startDay);
+      const endDate = new Date(endYear, endMonth, endDay);
+
+      const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+      const label = `${monthNames[startMonth]}・${monthNames[endMonth]}`;
+
+      periods.push({
+        label,
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+      });
+    }
+
+    // Delete existing periods and insert new ones
+    await this.supabase.from('periods').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+    const { data, error } = await this.supabase
+      .from('periods')
+      .insert(periods)
+      .select();
+
+    if (error) {
+      this.logger.error('Failed to regenerate periods', error);
+      throw new BadRequestException('Failed to regenerate periods');
     }
 
     return data || [];

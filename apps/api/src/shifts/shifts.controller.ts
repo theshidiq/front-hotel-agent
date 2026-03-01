@@ -45,6 +45,12 @@ import {
   CreateCalendarRuleDto,
   CreateStaffGroupDto,
   UpdateStaffGroupDto,
+  CreatePriorityRuleDto,
+  UpdatePriorityRuleDto,
+  CreateEarlyShiftPreferenceDto,
+  UpdateEarlyShiftPreferenceDto,
+  BulkEarlyShiftPreferenceDto,
+  UpdatePeriodConfigurationDto,
 } from './dto/settings.dto';
 
 @ApiTags('shifts')
@@ -300,5 +306,116 @@ export class ShiftsController {
     @Body() body: { staffIds: string[] },
   ) {
     return this.shiftsService.setStaffGroupMembers(user.restaurant_id, groupId, body.staffIds);
+  }
+
+  // ==================== PRIORITY RULES ====================
+
+  @Get('settings/priority-rules')
+  @ApiOperation({ summary: 'Get priority rules' })
+  @ApiResponse({ status: 200, description: 'List of priority rules' })
+  async getPriorityRules(@GetUser() user: any) {
+    return this.shiftsService.getPriorityRules(user.restaurant_id);
+  }
+
+  @Post('settings/priority-rules')
+  @ApiOperation({ summary: 'Create a priority rule' })
+  @ApiResponse({ status: 201, description: 'Priority rule created' })
+  async createPriorityRule(@GetUser() user: any, @Body() createDto: CreatePriorityRuleDto) {
+    return this.shiftsService.createPriorityRule(user.restaurant_id, createDto);
+  }
+
+  @Patch('settings/priority-rules/:id')
+  @ApiOperation({ summary: 'Update a priority rule' })
+  @ApiParam({ name: 'id', description: 'Priority rule ID' })
+  @ApiResponse({ status: 200, description: 'Priority rule updated' })
+  async updatePriorityRule(
+    @GetUser() user: any,
+    @Param('id') id: string,
+    @Body() updateDto: UpdatePriorityRuleDto,
+  ) {
+    return this.shiftsService.updatePriorityRule(user.restaurant_id, id, updateDto);
+  }
+
+  @Delete('settings/priority-rules/:id')
+  @ApiOperation({ summary: 'Delete a priority rule' })
+  @ApiParam({ name: 'id', description: 'Priority rule ID' })
+  @ApiResponse({ status: 200, description: 'Priority rule deleted' })
+  async deletePriorityRule(@GetUser() user: any, @Param('id') id: string) {
+    return this.shiftsService.deletePriorityRule(user.restaurant_id, id);
+  }
+
+  // ==================== EARLY SHIFT PREFERENCES ====================
+
+  @Get('settings/early-shift-preferences')
+  @ApiOperation({ summary: 'Get early shift preferences' })
+  @ApiResponse({ status: 200, description: 'List of early shift preferences' })
+  async getEarlyShiftPreferences(@GetUser() user: any) {
+    return this.shiftsService.getEarlyShiftPreferences(user.restaurant_id);
+  }
+
+  @Post('settings/early-shift-preferences')
+  @ApiOperation({ summary: 'Create an early shift preference' })
+  @ApiResponse({ status: 201, description: 'Early shift preference created' })
+  async createEarlyShiftPreference(
+    @GetUser() user: any,
+    @Body() createDto: CreateEarlyShiftPreferenceDto,
+  ) {
+    return this.shiftsService.createEarlyShiftPreference(user.restaurant_id, createDto);
+  }
+
+  @Put('settings/early-shift-preferences/bulk')
+  @ApiOperation({ summary: 'Bulk upsert early shift preferences' })
+  @ApiResponse({ status: 200, description: 'Early shift preferences updated' })
+  async bulkUpsertEarlyShiftPreferences(
+    @GetUser() user: any,
+    @Body() bulkDto: BulkEarlyShiftPreferenceDto,
+  ) {
+    return this.shiftsService.bulkUpsertEarlyShiftPreferences(user.restaurant_id, bulkDto);
+  }
+
+  @Patch('settings/early-shift-preferences/:id')
+  @ApiOperation({ summary: 'Update an early shift preference' })
+  @ApiParam({ name: 'id', description: 'Early shift preference ID' })
+  @ApiResponse({ status: 200, description: 'Early shift preference updated' })
+  async updateEarlyShiftPreference(
+    @GetUser() user: any,
+    @Param('id') id: string,
+    @Body() updateDto: UpdateEarlyShiftPreferenceDto,
+  ) {
+    return this.shiftsService.updateEarlyShiftPreference(user.restaurant_id, id, updateDto);
+  }
+
+  @Delete('settings/early-shift-preferences/:id')
+  @ApiOperation({ summary: 'Delete an early shift preference' })
+  @ApiParam({ name: 'id', description: 'Early shift preference ID' })
+  @ApiResponse({ status: 200, description: 'Early shift preference deleted' })
+  async deleteEarlyShiftPreference(@GetUser() user: any, @Param('id') id: string) {
+    return this.shiftsService.deleteEarlyShiftPreference(user.restaurant_id, id);
+  }
+
+  // ==================== PERIOD CONFIGURATION ====================
+
+  @Get('settings/period-configuration')
+  @ApiOperation({ summary: 'Get period configuration' })
+  @ApiResponse({ status: 200, description: 'Period configuration' })
+  async getPeriodConfiguration(@GetUser() user: any) {
+    return this.shiftsService.getPeriodConfiguration(user.restaurant_id);
+  }
+
+  @Patch('settings/period-configuration')
+  @ApiOperation({ summary: 'Update period configuration' })
+  @ApiResponse({ status: 200, description: 'Period configuration updated' })
+  async updatePeriodConfiguration(
+    @GetUser() user: any,
+    @Body() updateDto: UpdatePeriodConfigurationDto,
+  ) {
+    return this.shiftsService.updatePeriodConfiguration(user.restaurant_id, updateDto);
+  }
+
+  @Post('settings/periods/regenerate')
+  @ApiOperation({ summary: 'Regenerate periods based on configuration' })
+  @ApiResponse({ status: 200, description: 'Periods regenerated' })
+  async regeneratePeriods(@GetUser() user: any) {
+    return this.shiftsService.regeneratePeriods(user.restaurant_id);
   }
 }

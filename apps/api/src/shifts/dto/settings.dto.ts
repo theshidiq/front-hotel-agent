@@ -193,3 +193,191 @@ export class UpdateStaffGroupDto {
   @IsBoolean()
   is_active?: boolean;
 }
+
+// ==================== PRIORITY RULES ====================
+
+export class CreatePriorityRuleDto {
+  @ApiProperty({ description: 'Rule name' })
+  @IsString()
+  name: string;
+
+  @ApiPropertyOptional({ description: 'Rule description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Array of staff IDs this rule applies to' })
+  @IsOptional()
+  staff_ids?: string[];
+
+  @ApiProperty({ description: 'Rule type: preferred_shift, avoid_shift, required_off, avoid_shift_with_exceptions' })
+  @IsString()
+  rule_type: 'preferred_shift' | 'avoid_shift' | 'required_off' | 'avoid_shift_with_exceptions';
+
+  @ApiProperty({ description: 'Shift type: early, late, off, any' })
+  @IsString()
+  shift_type: 'early' | 'late' | 'off' | 'any';
+
+  @ApiProperty({ description: 'Days of week (0=Sun to 6=Sat)' })
+  days_of_week: number[];
+
+  @ApiPropertyOptional({ description: 'Exception shifts allowed (for avoid_shift_with_exceptions)' })
+  @IsOptional()
+  allowed_shifts?: string[];
+
+  @ApiPropertyOptional({ description: 'Priority level 1-5' })
+  @IsOptional()
+  @IsNumber()
+  priority_level?: number;
+
+  @ApiPropertyOptional({ description: 'Is this a hard constraint?' })
+  @IsOptional()
+  @IsBoolean()
+  is_hard_constraint?: boolean;
+
+  @ApiPropertyOptional({ description: 'Penalty weight for violations' })
+  @IsOptional()
+  @IsNumber()
+  penalty_weight?: number;
+
+  @ApiPropertyOptional({ description: 'Effective from date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  effective_from?: string;
+
+  @ApiPropertyOptional({ description: 'Effective until date (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  effective_until?: string;
+}
+
+export class UpdatePriorityRuleDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  staff_ids?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  rule_type?: 'preferred_shift' | 'avoid_shift' | 'required_off' | 'avoid_shift_with_exceptions';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  shift_type?: 'early' | 'late' | 'off' | 'any';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  days_of_week?: number[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  allowed_shifts?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  priority_level?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  is_hard_constraint?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  penalty_weight?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  effective_from?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  effective_until?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  is_active?: boolean;
+}
+
+// ==================== EARLY SHIFT PREFERENCES ====================
+
+export class CreateEarlyShiftPreferenceDto {
+  @ApiProperty({ description: 'Staff ID' })
+  @IsString()
+  staff_id: string;
+
+  @ApiProperty({ description: 'Can do early shift' })
+  @IsBoolean()
+  can_do_early_shift: boolean;
+
+  @ApiPropertyOptional({ description: 'Date this applies to (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  applies_to_date?: string;
+
+  @ApiPropertyOptional({ description: 'Source: individual or bulk_assignment' })
+  @IsOptional()
+  @IsString()
+  preference_source?: 'individual' | 'bulk_assignment';
+}
+
+export class UpdateEarlyShiftPreferenceDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  can_do_early_shift?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  applies_to_date?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  preference_source?: 'individual' | 'bulk_assignment';
+}
+
+export class BulkEarlyShiftPreferenceDto {
+  @ApiProperty({ description: 'Array of staff preferences' })
+  preferences: Array<{
+    staff_id: string;
+    can_do_early_shift: boolean;
+    applies_to_date?: string;
+  }>;
+}
+
+// ==================== PERIOD CONFIGURATION ====================
+
+export class UpdatePeriodConfigurationDto {
+  @ApiPropertyOptional({ description: 'Start day of month (1-31)' })
+  @IsOptional()
+  @IsNumber()
+  start_day?: number;
+
+  @ApiPropertyOptional({ description: 'End day of month (1-31)' })
+  @IsOptional()
+  @IsNumber()
+  end_day?: number;
+
+  @ApiPropertyOptional({ description: 'Period length in days' })
+  @IsOptional()
+  @IsNumber()
+  period_length_days?: number;
+}
