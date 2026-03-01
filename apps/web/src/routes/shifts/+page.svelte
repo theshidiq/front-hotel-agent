@@ -24,6 +24,8 @@
 	import { SHIFT_SYMBOLS, SHIFT_LABELS } from '$lib/shifts/types';
 	import ScheduleTable from '$lib/shifts/components/ScheduleTable.svelte';
 	import PeriodPicker from '$lib/shifts/components/PeriodPicker.svelte';
+	import ScheduleSkeleton from '$lib/shifts/components/ScheduleSkeleton.svelte';
+	import TableSkeleton from '$lib/shifts/components/TableSkeleton.svelte';
 
 	// ── Navigation State ──
 	type ShiftSection = 'schedule' | 'settings';
@@ -36,6 +38,7 @@
 	let scheduleData: Record<string, Record<string, string>> = $state({});
 	let dateRange: string[] = $state([]);
 	let loading = $state(true);
+	let loadingSchedule = $state(false);
 	let saving = $state(false);
 	let error = $state('');
 	let successMessage = $state('');
@@ -240,7 +243,7 @@
 
 	async function loadSchedule(periodId: string) {
 		try {
-			loading = true;
+			loadingSchedule = true;
 			const response = await getSchedule(periodId);
 
 			// Generate date range from period
@@ -258,7 +261,7 @@
 			console.error('Failed to load schedule:', e);
 			error = e instanceof Error ? e.message : 'Failed to load schedule';
 		} finally {
-			loading = false;
+			loadingSchedule = false;
 		}
 	}
 
@@ -571,8 +574,9 @@
 			</div>
 		</div>
 	{:else if loading && staff.length === 0}
-		<div class="flex items-center justify-center h-64">
-			<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+		<!-- Skeleton Loading State -->
+		<div class="p-4">
+			<ScheduleSkeleton rows={12} columns={15} />
 		</div>
 	{:else if activeSection === 'schedule'}
 		<!-- Schedule Section -->
@@ -615,15 +619,19 @@
 
 			<!-- Schedule Table (Transposed: dates as rows, staff as columns) -->
 			<div class="bg-white rounded-lg shadow">
-				<ScheduleTable
-					{staff}
-					{dateRange}
-					{scheduleData}
-					onCellUpdate={handleCellUpdate}
-					onBulkUpdate={handleBulkUpdate}
-					onStaffEdit={openEditStaffModal}
-					onStaffDelete={handleDeleteStaff}
-				/>
+				{#if loadingSchedule}
+					<TableSkeleton rows={staff.length || 12} columns={Math.min(dateRange.length || 15, 20)} />
+				{:else}
+					<ScheduleTable
+						{staff}
+						{dateRange}
+						{scheduleData}
+						onCellUpdate={handleCellUpdate}
+						onBulkUpdate={handleBulkUpdate}
+						onStaffEdit={openEditStaffModal}
+						onStaffDelete={handleDeleteStaff}
+					/>
+				{/if}
 			</div>
 
 			<!-- Legend -->
