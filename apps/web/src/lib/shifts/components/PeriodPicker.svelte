@@ -12,6 +12,19 @@
 	// State for dropdown/picker
 	let isOpen = $state(false);
 	let selectedYear = $state(new Date().getFullYear());
+	let buttonRef: HTMLButtonElement | null = $state(null);
+	let dropdownPosition = $state({ top: 0, left: 0 });
+
+	// Calculate dropdown position when opened
+	function updateDropdownPosition() {
+		if (buttonRef) {
+			const rect = buttonRef.getBoundingClientRect();
+			dropdownPosition = {
+				top: rect.bottom + window.scrollY + 8,
+				left: rect.left + window.scrollX
+			};
+		}
+	}
 
 	// Get unique years from periods
 	let availableYears = $derived(() => {
@@ -126,8 +139,9 @@
 	<!-- Period Display Button (opens picker) -->
 	<button
 		type="button"
+		bind:this={buttonRef}
 		class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors min-w-[180px] justify-center"
-		onclick={(e) => { e.stopPropagation(); isOpen = !isOpen; }}
+		onclick={(e) => { e.stopPropagation(); updateDropdownPosition(); isOpen = !isOpen; }}
 	>
 		<span class="material-symbols-rounded text-gray-500 text-lg">calendar_month</span>
 		<span class="font-medium text-gray-900">
@@ -152,10 +166,11 @@
 		</svg>
 	</button>
 
-	<!-- Dropdown Picker -->
+	<!-- Dropdown Picker (using fixed positioning to escape overflow containers) -->
 	{#if isOpen}
 		<div
-			class="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-50 min-w-[320px]"
+			class="fixed bg-white rounded-lg shadow-xl border border-gray-200 min-w-[320px]"
+			style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px; z-index: 9999;"
 			onclick={(e) => e.stopPropagation()}
 		>
 			<!-- Year Navigation -->
