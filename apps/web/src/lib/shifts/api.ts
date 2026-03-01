@@ -13,6 +13,177 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
+// ==================== CACHE LAYER ====================
+
+interface CacheEntry<T> {
+	data: T;
+	timestamp: number;
+	expiresAt: number;
+}
+
+interface CacheConfig {
+	ttl: number; // Time to live in ms
+	staleWhileRevalidate?: boolean;
+}
+
+const DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
+const SCHEDULE_TTL = 2 * 60 * 1000; // 2 minutes for schedule data
+const STATIC_TTL = 10 * 60 * 1000; // 10 minutes for static data like settings
+
+class APICache {
+	private cache = new Map<string, CacheEntry<unknown>>();
+	private pendingRequests = new Map<string, Promise<unknown>>();
+	private prefetchQueue: string[] = [];
+
+	get<T>(key: string): T | null {
+		const entry = this.cache.get(key);
+		if (!entry) return null;
+
+		const now = Date.now();
+		if (now > entry.expiresAt) {
+			this.cache.delete(key);
+			return null;
+		}
+
+		return entry.data as T;
+	}
+
+	set<T>(key: string, data: T, ttl: number = DEFAULT_TTL): void {
+		const now = Date.now();
+		this.cache.set(key, {
+			data,
+			timestamp: now,
+			expiresAt: now + ttl
+		});
+	}
+
+	invalidate(pattern?: string): void {
+		if (!pattern) {
+			this.cache.clear();
+			return;
+		}
+
+		for (const key of this.cache.keys()) {
+			if (key.includes(pattern)) {
+				this.cache.delete(key);
+			}
+		}
+	}
+
+	invalidateSchedule(periodId?: string): void {
+		if (periodId) {
+			this.cache.delete(`schedule:${periodId}`);
+		} else {
+			this.invalidate('schedule:');
+		}
+	}
+
+	// Deduplicate concurrent requests
+	async dedupe<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+		const pending = this.pendingRequests.get(key);
+		if (pending) {
+			return pending as Promise<T>;
+		}
+
+		const promise = fetcher().finally(() => {
+			this.pendingRequests.delete(key);
+		});
+
+		this.pendingRequests.set(key, promise);
+		return promise;
+	}
+
+	// Get cache stats for debugging
+	getStats(): { size: number; keys: string[] } {
+		return {
+			size: this.cache.size,
+			keys: Array.from(this.cache.keys())
+		};
+	}
+}
+
+export const apiCache = new APICache();
+
+// ==================== PREFETCH MANAGER ====================
+
+class PrefetchManager {
+	private prefetchedPeriods = new Set<string>();
+	private prefetching = false;
+
+	async prefetchAllPeriodSchedules(periods: SchedulePeriod[]): Promise<void> {
+		if (this.prefetching) return;
+		this.prefetching = true;
+
+		try {
+			// Sort periods by start_date descending (most recent first)
+			const sortedPeriods = [...periods].sort((a, b) =>
+				b.start_date.localeCompare(a.start_date)
+			);
+
+			// Prefetch in batches of 3 for network efficiency
+			const batchSize = 3;
+			for (let i = 0; i < sortedPeriods.length; i += batchSize) {
+				const batch = sortedPeriods.slice(i, i + batchSize);
+				const promises = batch
+					.filter((p) => !this.prefetchedPeriods.has(p.id))
+					.map(async (period) => {
+						try {
+							// Only prefetch if not already cached
+							if (!apiCache.get(`schedule:${period.id}`)) {
+								await getSchedule(period.id);
+								this.prefetchedPeriods.add(period.id);
+							}
+						} catch {
+							// Silently fail prefetch - it's just optimization
+						}
+					});
+
+				await Promise.all(promises);
+			}
+		} finally {
+			this.prefetching = false;
+		}
+	}
+
+	// Prefetch adjacent periods (prev/next) for quick navigation
+	async prefetchAdjacentPeriods(
+		currentPeriodId: string,
+		periods: SchedulePeriod[]
+	): Promise<void> {
+		const sortedPeriods = [...periods].sort((a, b) =>
+			a.start_date.localeCompare(b.start_date)
+		);
+		const currentIndex = sortedPeriods.findIndex((p) => p.id === currentPeriodId);
+
+		if (currentIndex === -1) return;
+
+		const adjacentIds: string[] = [];
+		if (currentIndex > 0) adjacentIds.push(sortedPeriods[currentIndex - 1].id);
+		if (currentIndex < sortedPeriods.length - 1)
+			adjacentIds.push(sortedPeriods[currentIndex + 1].id);
+
+		await Promise.all(
+			adjacentIds.map(async (periodId) => {
+				if (!apiCache.get(`schedule:${periodId}`)) {
+					try {
+						await getSchedule(periodId);
+					} catch {
+						// Silently fail
+					}
+				}
+			})
+		);
+	}
+
+	clear(): void {
+		this.prefetchedPeriods.clear();
+	}
+}
+
+export const prefetchManager = new PrefetchManager();
+
+// ==================== HELPERS ====================
+
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
 	return { ...extra, ...getAuthHeaders() };
 }
@@ -25,13 +196,33 @@ async function handleResponse<T>(response: Response): Promise<T> {
 	return response.json();
 }
 
+// Cached fetch wrapper
+async function cachedFetch<T>(
+	cacheKey: string,
+	fetcher: () => Promise<T>,
+	ttl: number = DEFAULT_TTL
+): Promise<T> {
+	// Check cache first
+	const cached = apiCache.get<T>(cacheKey);
+	if (cached) {
+		return cached;
+	}
+
+	// Deduplicate concurrent requests and fetch
+	const data = await apiCache.dedupe(cacheKey, fetcher);
+	apiCache.set(cacheKey, data, ttl);
+	return data;
+}
+
 // ==================== STAFF ====================
 
 export async function getShiftStaff(): Promise<ScheduleStaff[]> {
-	const response = await fetch(`${API_URL}/shifts/staff`, {
-		headers: authHeaders()
-	});
-	return handleResponse(response);
+	return cachedFetch('staff:all', async () => {
+		const response = await fetch(`${API_URL}/shifts/staff`, {
+			headers: authHeaders()
+		});
+		return handleResponse(response);
+	}, STATIC_TTL);
 }
 
 export interface CreateShiftStaffData {
@@ -51,7 +242,10 @@ export async function createShiftStaff(data: CreateShiftStaffData): Promise<Sche
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
 	});
-	return handleResponse(response);
+	const result = await handleResponse<ScheduleStaff>(response);
+	// Invalidate staff cache on create
+	apiCache.invalidate('staff:');
+	return result;
 }
 
 export interface UpdateShiftStaffData {
@@ -72,7 +266,10 @@ export async function updateShiftStaff(id: string, data: UpdateShiftStaffData): 
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
 	});
-	return handleResponse(response);
+	const result = await handleResponse<ScheduleStaff>(response);
+	// Invalidate staff cache on update
+	apiCache.invalidate('staff:');
+	return result;
 }
 
 export async function deleteShiftStaff(id: string): Promise<void> {
@@ -84,6 +281,8 @@ export async function deleteShiftStaff(id: string): Promise<void> {
 		const error = await response.json().catch(() => ({ message: 'Delete failed' }));
 		throw new Error(error.message);
 	}
+	// Invalidate staff cache on delete
+	apiCache.invalidate('staff:');
 }
 
 export async function reorderShiftStaff(staffIds: string[]): Promise<void> {
@@ -96,15 +295,19 @@ export async function reorderShiftStaff(staffIds: string[]): Promise<void> {
 		const error = await response.json().catch(() => ({ message: 'Reorder failed' }));
 		throw new Error(error.message);
 	}
+	// Invalidate staff cache on reorder
+	apiCache.invalidate('staff:');
 }
 
 // ==================== PERIODS ====================
 
 export async function getShiftPeriods(): Promise<SchedulePeriod[]> {
-	const response = await fetch(`${API_URL}/shifts/periods`, {
-		headers: authHeaders()
-	});
-	return handleResponse(response);
+	return cachedFetch('periods:all', async () => {
+		const response = await fetch(`${API_URL}/shifts/periods`, {
+			headers: authHeaders()
+		});
+		return handleResponse(response);
+	}, STATIC_TTL);
 }
 
 export interface CreatePeriodData {
@@ -119,7 +322,11 @@ export async function createShiftPeriod(data: CreatePeriodData): Promise<Schedul
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
 	});
-	return handleResponse(response);
+	const result = await handleResponse<SchedulePeriod>(response);
+	// Invalidate periods cache on create
+	apiCache.invalidate('periods:');
+	prefetchManager.clear();
+	return result;
 }
 
 export async function deleteShiftPeriod(id: string): Promise<void> {
@@ -131,15 +338,27 @@ export async function deleteShiftPeriod(id: string): Promise<void> {
 		const error = await response.json().catch(() => ({ message: 'Delete failed' }));
 		throw new Error(error.message);
 	}
+	// Invalidate periods and schedule cache
+	apiCache.invalidate('periods:');
+	apiCache.invalidateSchedule(id);
+	prefetchManager.clear();
 }
 
 // ==================== SCHEDULE ====================
 
 export async function getSchedule(periodId: string): Promise<ScheduleResponse> {
-	const response = await fetch(`${API_URL}/shifts/schedule/${periodId}`, {
-		headers: authHeaders()
-	});
-	return handleResponse(response);
+	return cachedFetch(`schedule:${periodId}`, async () => {
+		const response = await fetch(`${API_URL}/shifts/schedule/${periodId}`, {
+			headers: authHeaders()
+		});
+		return handleResponse(response);
+	}, SCHEDULE_TTL);
+}
+
+// Force refresh schedule (bypass cache)
+export async function getScheduleForce(periodId: string): Promise<ScheduleResponse> {
+	apiCache.invalidateSchedule(periodId);
+	return getSchedule(periodId);
 }
 
 export interface CellUpdate {
@@ -149,14 +368,42 @@ export interface CellUpdate {
 }
 
 export async function bulkUpdateCells(periodId: string, updates: CellUpdate[]): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/schedule/${periodId}/cells`, {
-		method: 'PATCH',
-		headers: authHeaders({ 'Content-Type': 'application/json' }),
-		body: JSON.stringify({ updates })
-	});
-	if (!response.ok) {
-		const error = await response.json().catch(() => ({ message: 'Update failed' }));
-		throw new Error(error.message);
+	// Apply optimistic update to cache immediately
+	const cachedSchedule = apiCache.get<ScheduleResponse>(`schedule:${periodId}`);
+	if (cachedSchedule && cachedSchedule.schedule) {
+		const optimisticData: ScheduleResponse = {
+			...cachedSchedule,
+			schedule: {
+				...cachedSchedule.schedule,
+				schedule_data: { ...cachedSchedule.schedule.schedule_data }
+			}
+		};
+		for (const update of updates) {
+			if (!optimisticData.schedule!.schedule_data[update.staffId]) {
+				optimisticData.schedule!.schedule_data[update.staffId] = {};
+			}
+			optimisticData.schedule!.schedule_data[update.staffId][update.date] = update.symbol;
+		}
+		// Update cache with optimistic data
+		apiCache.set(`schedule:${periodId}`, optimisticData, SCHEDULE_TTL);
+	}
+
+	try {
+		const response = await fetch(`${API_URL}/shifts/schedule/${periodId}/cells`, {
+			method: 'PATCH',
+			headers: authHeaders({ 'Content-Type': 'application/json' }),
+			body: JSON.stringify({ updates })
+		});
+		if (!response.ok) {
+			// Revert optimistic update on error
+			apiCache.invalidateSchedule(periodId);
+			const error = await response.json().catch(() => ({ message: 'Update failed' }));
+			throw new Error(error.message);
+		}
+	} catch (error) {
+		// Revert optimistic update on any error
+		apiCache.invalidateSchedule(periodId);
+		throw error;
 	}
 }
 
@@ -175,7 +422,10 @@ export async function optimizeSchedule(options: OptimizeOptions): Promise<Optimi
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(options)
 	});
-	return handleResponse(response);
+	const result = await handleResponse<OptimizeResponse>(response);
+	// Invalidate schedule cache after optimization
+	apiCache.invalidateSchedule(options.periodId);
+	return result;
 }
 
 export async function checkOptimizerHealth(): Promise<{ healthy: boolean; url: string }> {

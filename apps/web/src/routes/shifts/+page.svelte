@@ -14,6 +14,8 @@
 		reorderShiftStaff,
 		optimizeSchedule,
 		checkOptimizerHealth,
+		prefetchManager,
+		apiCache,
 		type CellUpdate
 	} from '$lib/shifts/api';
 	import type {
@@ -162,6 +164,12 @@
 				console.log('📊 [loadInitialData] Selected period:', selectedPeriod?.label, selectedPeriod?.id);
 				selectedPeriodId = selectedPeriod.id;
 				await loadSchedule(selectedPeriod.id);
+
+				// Start prefetching all period schedules in background (non-blocking)
+				// This enables instant period switching like React's caching
+				prefetchManager.prefetchAllPeriodSchedules(periodsResult).catch(() => {
+					// Silently handle prefetch errors - it's just an optimization
+				});
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load data';
@@ -282,6 +290,11 @@
 	async function handlePeriodChange(periodId: string) {
 		selectedPeriodId = periodId;
 		await loadSchedule(periodId);
+
+		// Prefetch adjacent periods for instant navigation (non-blocking)
+		prefetchManager.prefetchAdjacentPeriods(periodId, periods).catch(() => {
+			// Silently handle prefetch errors
+		});
 	}
 
 	// ── Cell Update Handler ──
