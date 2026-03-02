@@ -32,7 +32,7 @@
     const categories = [
         {
             id: "front",
-            icon: "concierge_bell",
+            icon: "room_service",
             title: "フロント",
             titleEn: "Front Desk",
             description: "チェックイン・チェックアウト、予約管理、ゲスト対応",
@@ -218,9 +218,6 @@
                     >
                 {/if}
             </h2>
-            <p class="text-gray-500 mt-2">
-                今日もよろしくお願いします。どこに移動しますか？
-            </p>
         </div>
 
         <!-- Category cards grid -->
