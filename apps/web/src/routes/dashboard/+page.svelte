@@ -154,6 +154,15 @@
             linkHover: "hover:bg-purple-50 hover:text-purple-700",
             badge: "bg-purple-100 text-purple-700",
         },
+        amber: {
+            bg: "bg-amber-50",
+            iconBg: "bg-amber-100",
+            iconText: "text-amber-600",
+            border: "border-amber-300",
+            hover: "hover:border-amber-500 hover:shadow-amber-100",
+            linkHover: "hover:bg-amber-50 hover:text-amber-700",
+            badge: "bg-amber-100 text-amber-700",
+        },
     };
 </script>
 
@@ -295,6 +304,68 @@
                 </div>
             {/each}
         </div>
+
+        <!-- Admin card — only for admins -->
+        {#if authState.isAdmin}
+            {@const c = colorMap["amber"]}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <div
+                class="mt-5 bg-white rounded-2xl border {c.border} shadow-sm {c.hover} hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer"
+                onclick={(e) => {
+                    if (!(e.target as Element).closest("a")) goto("/admin");
+                }}
+            >
+                <div class="px-6 pt-6 pb-4 flex items-start gap-4">
+                    <div
+                        class="w-14 h-14 rounded-xl {c.iconBg} flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200"
+                    >
+                        <span
+                            class="material-symbols-rounded text-3xl {c.iconText}"
+                            >admin_panel_settings</span
+                        >
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-lg font-bold text-gray-900">
+                                管理者設定
+                            </h3>
+                            <span
+                                class="text-xs font-medium px-2 py-0.5 rounded-full {c.badge}"
+                                >Admin</span
+                            >
+                        </div>
+                        <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">
+                            スタッフ管理、権限設定、システム設定
+                        </p>
+                    </div>
+                </div>
+                <div class="mx-6 border-t border-gray-100"></div>
+                <div class="px-4 py-3 space-y-1">
+                    <a
+                        href="/admin"
+                        class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-700 {c.linkHover} transition-colors group/link"
+                    >
+                        <span
+                            class="material-symbols-rounded text-xl text-gray-400 transition-colors"
+                            >manage_accounts</span
+                        >
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold">
+                                管理者ダッシュボード
+                            </p>
+                            <p class="text-xs text-gray-400 truncate">
+                                スタッフ・権限・システム設定
+                            </p>
+                        </div>
+                        <span
+                            class="material-symbols-rounded text-sm text-gray-300 group-hover/link:text-gray-500 transition-colors"
+                            >chevron_right</span
+                        >
+                    </a>
+                </div>
+            </div>
+        {/if}
 
         <!-- Footer -->
         <p class="text-center text-xs text-gray-400 mt-12">
