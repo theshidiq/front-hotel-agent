@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
     import { authState, signOut } from "$lib/auth.svelte";
 
     const isStaff = $derived(authState.isStaff);
@@ -36,6 +37,7 @@
             titleEn: "Front Desk",
             description: "チェックイン・チェックアウト、予約管理、ゲスト対応",
             color: "blue",
+            primaryHref: "/front-desk",
             links: [
                 {
                     icon: "calendar_today",
@@ -52,11 +54,12 @@
             titleEn: "Kitchen & Menu",
             description: "メニュー設計、食材管理、アレルギー情報、厨房生産管理",
             color: "orange",
+            primaryHref: "/?tab=menu",
             links: [
                 {
                     icon: "restaurant_menu",
                     label: "メニュー管理",
-                    href: "/",
+                    href: "/?tab=menu",
                     description: "メニュー・商品の登録・編集",
                 },
                 {
@@ -74,6 +77,7 @@
             titleEn: "Staff",
             description: "シフト管理、スタッフカレンダー",
             color: "green",
+            primaryHref: "/staff/calendar",
             links: [
                 {
                     icon: "calendar_month",
@@ -90,6 +94,7 @@
             titleEn: "Documentation",
             description: "操作マニュアル・システム仕様・開発者向け情報",
             color: "purple",
+            primaryHref: "/docs",
             links: [
                 {
                     icon: "code",
@@ -222,8 +227,14 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             {#each categories as cat}
                 {@const c = colorMap[cat.color]}
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <div
-                    class="bg-white rounded-2xl border {c.border} shadow-sm {c.hover} hover:shadow-lg transition-all duration-200 overflow-hidden group"
+                    class="bg-white rounded-2xl border {c.border} shadow-sm {c.hover} hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer"
+                    onclick={(e) => {
+                        if (!(e.target as Element).closest("a"))
+                            goto(cat.primaryHref);
+                    }}
                 >
                     <!-- Card header -->
                     <div class="px-6 pt-6 pb-4 flex items-start gap-4">
