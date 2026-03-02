@@ -163,14 +163,34 @@ async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | 
 	};
 }
 
-async function handleSignedIn(email: string): Promise<void> {
-	authState.loading = true;
-	const staff = await checkStaffStatus(email);
+let signingInProgress = false;
 
-	const pendingEmail = getPendingStaffEmail();
-	if (pendingEmail) {
-		if (email.toLowerCase() !== pendingEmail.toLowerCase()) {
-			authState.error = `${pendingEmail} のGoogleアカウントでログインしてください（現在: ${email}）`;
+async function handleSignedIn(email: string): Promise<void> {
+	// Guard against concurrent calls (getSession + onAuthStateChange both fire on OAuth redirect)
+	if (signingInProgress) return;
+	signingInProgress = true;
+	authState.loading = true;
+
+	try {
+		const staff = await checkStaffStatus(email);
+
+		const pendingEmail = getPendingStaffEmail();
+		if (pendingEmail) {
+			if (email.toLowerCase() !== pendingEmail.toLowerCase()) {
+				authState.error = `${pendingEmail} のGoogleアカウントでログインしてください（現在: ${email}）`;
+				authState.isStaff = false;
+				authState.staff = null;
+				authState.loading = false;
+				setTimeout(async () => {
+					await supabase.auth.signOut();
+				}, 4000);
+				return;
+			}
+			clearPendingStaffEmail();
+		}
+
+		if (!staff) {
+			authState.error = 'このアカウントはスタッフとして登録されていません';
 			authState.isStaff = false;
 			authState.staff = null;
 			authState.loading = false;
@@ -179,61 +199,50 @@ async function handleSignedIn(email: string): Promise<void> {
 			}, 4000);
 			return;
 		}
-		clearPendingStaffEmail();
-	}
 
-	if (!staff) {
-		authState.error = 'このアカウントはスタッフとして登録されていません';
-		authState.isStaff = false;
-		authState.staff = null;
-		authState.loading = false;
-		setTimeout(async () => {
-			await supabase.auth.signOut();
-		}, 4000);
-		return;
-	}
-
-	// Check if within active period
-	if (!isWithinActivePeriod(staff.start_period, staff.end_period)) {
-		authState.error = '勤務期間外です。管理者にお問い合わせください。';
-		authState.isStaff = false;
-		authState.staff = null;
-		authState.loading = false;
-		clearStaffPeriod();
-		setTimeout(async () => {
-			await supabase.auth.signOut();
-		}, 4000);
-		return;
-	}
-
-	// Save end period for local expiry checks
-	saveStaffPeriod(staff.end_period);
-
-	authState.staff = { id: staff.id, name: staff.name, email: staff.email, position: staff.position };
-	authState.isStaff = true;
-	authState.isAdmin = staff.is_admin ?? false;
-	authState.error = null;
-
-	// Load role and permissions
-	if (staff.is_admin) {
-		// Admins have all permissions, but still load role name for display
-		if (staff.role_id) {
-			const { role } = await loadRolePermissions(staff.role_id);
-			authState.role = role;
+		// Check if within active period
+		if (!isWithinActivePeriod(staff.start_period, staff.end_period)) {
+			authState.error = '勤務期間外です。管理者にお問い合わせください。';
+			authState.isStaff = false;
+			authState.staff = null;
+			authState.loading = false;
+			clearStaffPeriod();
+			setTimeout(async () => {
+				await supabase.auth.signOut();
+			}, 4000);
+			return;
 		}
-		authState.permissions = [];
-	} else if (staff.role_id) {
-		const { role, permissions } = await loadRolePermissions(staff.role_id);
-		authState.role = role;
-		authState.permissions = permissions;
-	} else {
-		authState.role = null;
-		authState.permissions = [];
+
+		// Save end period for local expiry checks
+		saveStaffPeriod(staff.end_period);
+
+		authState.staff = { id: staff.id, name: staff.name, email: staff.email, position: staff.position };
+		authState.isStaff = true;
+		authState.isAdmin = staff.is_admin ?? false;
+		authState.error = null;
+
+		// Load role and permissions
+		if (staff.is_admin) {
+			// Admins have all permissions, but still load role name for display
+			if (staff.role_id) {
+				const { role } = await loadRolePermissions(staff.role_id);
+				authState.role = role;
+			}
+			authState.permissions = [];
+		} else if (staff.role_id) {
+			const { role, permissions } = await loadRolePermissions(staff.role_id);
+			authState.role = role;
+			authState.permissions = permissions;
+		} else {
+			authState.role = null;
+			authState.permissions = [];
+		}
+
+		authState.loading = false;
+	} finally {
+		signingInProgress = false;
 	}
-
-	authState.loading = false;
 }
-
 async function loadGuestPermissions(): Promise<void> {
 	try {
 		const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';

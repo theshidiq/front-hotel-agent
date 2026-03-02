@@ -547,10 +547,12 @@
 					e.preventDefault();
 					handleQuickAction('early');
 				}}
-				class="px-2 py-1 hover:bg-gray-100 rounded font-medium text-blue-600"
+				class="px-2 py-1 hover:bg-gray-100 rounded text-blue-600 flex items-center"
 				title="Early Shift (Press 1)"
 			>
-				△
+				<svg width="16" height="14" viewBox="0 0 22 20" style="display:inline-block">
+					<polygon points="11,2 21,18 1,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+				</svg>
 			</button>
 			<button
 				type="button"
@@ -708,19 +710,20 @@
 										</div>
 									{:else}
 									<!-- Show shift symbol only when no period label -->
-									<span
-										class="text-2xl font-bold select-none {!isActive ? 'text-gray-400' : getSymbolColor(
-											cellValue,
-											s.status
-										)}"
-										style={cellValue === '△'
-											? 'font-weight: 500; font-size: 1.5rem;'
-											: cellValue === '×'
-												? 'font-size: 2rem; line-height: 2rem;'
-												: ''}
-									>
-										{!isActive ? '-' : getCellDisplayValue(cellValue, s.status)}
-									</span>
+									{#if !isActive}
+										<span class="text-2xl font-bold select-none text-gray-400">-</span>
+									{:else if getCellDisplayValue(cellValue, s.status) === '△'}
+										<svg width="22" height="20" viewBox="0 0 22 20" class="select-none {getSymbolColor(cellValue, s.status)}" style="display:inline-block">
+											<polygon points="11,2 21,18 1,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" />
+										</svg>
+									{:else}
+										<span
+											class="text-2xl font-bold select-none {getSymbolColor(cellValue, s.status)}"
+											style={cellValue === '×' ? 'font-size: 2rem; line-height: 2rem;' : ''}
+										>
+											{getCellDisplayValue(cellValue, s.status)}
+										</span>
+									{/if}
 								{/if}
 
 									<!-- Pending changes indicator -->
@@ -872,10 +875,12 @@
 			</button>
 			<button
 				type="button"
-				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-blue-600 font-medium flex items-center gap-2"
+				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-blue-600 flex items-center gap-2"
 				onclick={() => handleQuickAction('early')}
 			>
-				<span class="text-lg">△</span>
+				<svg width="14" height="13" viewBox="0 0 22 20" style="display:inline-block">
+					<polygon points="11,2 21,18 1,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+				</svg>
 				Early Shift
 			</button>
 			<button
