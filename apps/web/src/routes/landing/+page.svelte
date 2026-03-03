@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import ConstellationCanvas from "$lib/components/ConstellationCanvas.svelte";
 
     let emailInput = $state("");
     let submitted = $state(false);
@@ -121,6 +122,7 @@
 <!-- HERO -->
 <section class="hero">
     <div class="hero-glow"></div>
+    <ConstellationCanvas />
     <div class="hero-inner">
         <div class="hero-left">
             <p class="hero-eyebrow">
