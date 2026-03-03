@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { authState, signInWithGoogle } from '$lib/auth.svelte';
+	import { authState, signInWithGoogle, isTokenExpiringSoon, refreshAuthToken } from '$lib/auth.svelte';
 	import {
 		getDailyLimits,
 		getMonthlyLimits,
@@ -71,6 +71,17 @@
 
 		initialized = true;
 		loadAllSettings();
+
+		// Proactively refresh the token when the page becomes visible again
+		function handleVisibilityChange() {
+			if (document.visibilityState === 'visible' && authState.session) {
+				if (isTokenExpiringSoon(300)) {
+					refreshAuthToken();
+				}
+			}
+		}
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
 	});
 
 	async function loadAllSettings() {
@@ -111,12 +122,14 @@
 
 	// ── Callback Functions for Components ──
 	async function handleLimitsSave() {
-		const [daily, monthly] = await Promise.all([
+		const [daily, monthly, solver] = await Promise.all([
 			getDailyLimits(),
-			getMonthlyLimits()
+			getMonthlyLimits(),
+			getSolverConfig(),
 		]);
 		dailyLimits = daily;
 		monthlyLimits = monthly;
+		solverConfig = solver;
 	}
 
 	async function handleSolverSave() {
@@ -262,6 +275,7 @@
 							<LimitsTab
 								{dailyLimits}
 								{monthlyLimits}
+								{solverConfig}
 								onSave={handleLimitsSave}
 							/>
 

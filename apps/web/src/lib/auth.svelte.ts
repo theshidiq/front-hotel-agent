@@ -344,3 +344,29 @@ export function getAuthHeaders(): Record<string, string> {
 	}
 	return {};
 }
+
+/**
+ * Force a Supabase token refresh and update authState.session.
+ * Returns true if a fresh session was obtained, false if it failed or there was no session.
+ */
+export async function refreshAuthToken(): Promise<boolean> {
+	try {
+		const { data, error } = await supabase.auth.refreshSession();
+		if (error || !data.session) return false;
+		authState.session = data.session;
+		authState.user = data.session.user;
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Returns true if the current session token expires within the given number of seconds.
+ * Useful to proactively reload data before the token goes stale.
+ */
+export function isTokenExpiringSoon(withinSeconds = 300): boolean {
+	const expiresAt = authState.session?.expires_at; // Unix timestamp in seconds
+	if (!expiresAt) return false;
+	return expiresAt - Math.floor(Date.now() / 1000) < withinSeconds;
+}

@@ -150,10 +150,20 @@ export interface ORToolsSolverConfig {
 		dailyLimitMax: number;
 		dailyLimitMin: number;
 		adjacentConflict: number;
+		staffStatusShift?: number;
 	};
 	solver_settings: {
 		timeout: number;
 		numWorkers: number;
+		// Staff status shift restrictions
+		disableStaffStatusShiftRestrictions?: boolean;
+		// Post-period (day-after-closure) constraints
+		postPeriodEnabled?: boolean;
+		postPeriodDays?: number;
+		postPeriodIsHard?: boolean;
+		postPeriodMinLength?: number;
+		// Adjacent conflict
+		disableAdjacentConflict?: boolean;
 	};
 	hard_constraints: {
 		dailyLimits: boolean;

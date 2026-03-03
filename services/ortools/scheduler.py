@@ -267,6 +267,7 @@ class ShiftScheduleOptimizer:
             '5_day_rest': custom_weights.get('fiveDayRest', self.DEFAULT_PENALTY_WEIGHTS['5_day_rest']),
             'staff_type_limit': custom_weights.get('staffTypeLimit', self.DEFAULT_PENALTY_WEIGHTS['staff_type_limit']),
             'backup_coverage': custom_weights.get('backupCoverage', self.DEFAULT_PENALTY_WEIGHTS['backup_coverage']),
+            'staff_status_shift': custom_weights.get('staffStatusShift', self.DEFAULT_PENALTY_WEIGHTS.get('staff_status_shift', 150)),
         }
 
         # Load solver settings
@@ -297,7 +298,10 @@ class ShiftScheduleOptimizer:
             self._compute_priority_rule_off_equivalent()    # Pre-compute priority rule consumption (MUST be before monthly limits)
             self._add_monthly_limits()                       # Phase 6.6 monthly MIN/MAX (uses priority rule consumption)
             self._add_monthly_early_shift_limits()           # Max 3 early shifts per month for 社員
-            self._add_adjacent_conflict_prevention()         # No xx, sx, xs
+            if not self.constraints_config.get('disableAdjacentConflict', False):
+                self._add_adjacent_conflict_prevention()     # No xx, sx, xs
+            else:
+                logger.info("[OR-TOOLS] Adjacent conflict prevention DISABLED by configuration")
             self._add_5_day_rest_constraint()               # PHASE 4
             self._add_post_period_constraints()              # Post day-off period constraints
             self._add_priority_rules()                       # PHASE 1 (soft constraints)
@@ -2196,52 +2200,73 @@ class ShiftScheduleOptimizer:
 
     def _add_monthly_early_shift_limits(self):
         """
-        Limit monthly early shifts (△) for 社員 staff type to maximum 3 per month.
+        Limit monthly early shifts (△) per staff type, configurable via staffTypeLimits.maxMonthlyEarlyShifts.
 
-        This is a HARD constraint to ensure no 社員 gets more than 3 early shifts
-        in a given month, preventing overload of early morning duties.
+        Reads maxMonthlyEarlyShifts from constraints_config.staffTypeLimits for each staff type.
+        Falls back to default values if not configured (3 for 社員, 5 for 派遣/パート).
+        Applies to all staff types that have a limit configured (not just 社員).
         """
-        MAX_EARLY_PER_MONTH = 3
-        STAFF_TYPE_SHAIN = '社員'
+        # Default fallbacks per staff type
+        DEFAULT_MAX_EARLY = {
+            '社員': 3,
+            '派遣': 5,
+            'パート': 5,
+        }
+
+        # Read from constraints_config.staffTypeLimits
+        staff_type_limits = self.constraints_config.get('staffTypeLimits', {})
 
         # Debug: Log all staff types
         logger.info(f"[OR-TOOLS] Staff types in data:")
         for s in self.staff_members:
             logger.info(f"    {s.get('name', 'Unknown')}: type='{s.get('type')}', status='{s.get('status')}'")
 
-        # Get all 社員 staff members - check both 'type' and 'status' fields
-        shain_staff = [s for s in self.staff_members if s.get('type') == STAFF_TYPE_SHAIN or s.get('status') == STAFF_TYPE_SHAIN]
+        # Group staff by their type/status
+        staff_by_type: dict = {}
+        for s in self.staff_members:
+            staff_type = s.get('status') or s.get('type') or '社員'
+            if staff_type not in staff_by_type:
+                staff_by_type[staff_type] = []
+            staff_by_type[staff_type].append(s)
 
-        if not shain_staff:
-            logger.info(f"[OR-TOOLS] No {STAFF_TYPE_SHAIN} staff found - skipping monthly early limit")
-            return
-
-        logger.info(f"[OR-TOOLS] Adding monthly early shift limit (max {MAX_EARLY_PER_MONTH}) for {len(shain_staff)} {STAFF_TYPE_SHAIN} staff...")
         constraint_count = 0
 
-        for staff in shain_staff:
-            staff_id = staff['id']
-            staff_name = staff.get('name', staff_id)
+        for staff_type, type_staff in staff_by_type.items():
+            # Get the configured limit for this type, fall back to default
+            type_config = staff_type_limits.get(staff_type, {})
+            max_early = type_config.get('maxMonthlyEarlyShifts', DEFAULT_MAX_EARLY.get(staff_type))
 
-            # Get all dates this staff works (before end_period)
-            working_dates = [d for d in self.date_range if self._staff_works_on_date(staff_id, d)]
-
-            if not working_dates:
+            # Skip if no limit applies to this type
+            if max_early is None:
                 continue
 
-            # Sum all early shift variables for this staff across the month
-            # FIX: Only include dates where shift variable exists
-            early_vars = [self.shifts[(staff_id, date, self.SHIFT_EARLY)]
-                         for date in working_dates
-                         if (staff_id, date, self.SHIFT_EARLY) in self.shifts]
-            total_early = sum(early_vars)
+            logger.info(f"[OR-TOOLS] Adding monthly early shift limit (max {max_early}) for {len(type_staff)} {staff_type} staff...")
 
-            # HARD constraint: max 3 early shifts per month
-            self.model.Add(total_early <= MAX_EARLY_PER_MONTH)
-            constraint_count += 1
-            logger.info(f"    {staff_name}: max {MAX_EARLY_PER_MONTH} early shifts across {len(working_dates)} days")
+            for staff in type_staff:
+                staff_id = staff['id']
+                staff_name = staff.get('name', staff_id)
 
-        logger.info(f"[OR-TOOLS] Added {constraint_count} monthly early shift limit constraints for {STAFF_TYPE_SHAIN}")
+                # Get all dates this staff works (before end_period)
+                working_dates = [d for d in self.date_range if self._staff_works_on_date(staff_id, d)]
+
+                if not working_dates:
+                    continue
+
+                # Sum all early shift variables for this staff across the month
+                early_vars = [self.shifts[(staff_id, date, self.SHIFT_EARLY)]
+                             for date in working_dates
+                             if (staff_id, date, self.SHIFT_EARLY) in self.shifts]
+                if not early_vars:
+                    continue
+
+                total_early = sum(early_vars)
+
+                # HARD constraint: max early shifts per month
+                self.model.Add(total_early <= max_early)
+                constraint_count += 1
+                logger.info(f"    {staff_name} ({staff_type}): max {max_early} early shifts across {len(working_dates)} days")
+
+        logger.info(f"[OR-TOOLS] Added {constraint_count} monthly early shift limit constraints")
 
     def _add_adjacent_conflict_prevention(self):
         """

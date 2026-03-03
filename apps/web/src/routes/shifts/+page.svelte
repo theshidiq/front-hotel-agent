@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
-	import { authState, signInWithGoogle } from "$lib/auth.svelte";
+	import { authState, signInWithGoogle, isTokenExpiringSoon, refreshAuthToken } from "$lib/auth.svelte";
 	import {
 		getShiftStaff,
 		getShiftPeriods,
@@ -184,11 +184,18 @@
 		// Re-fetch data when the tab becomes visible again after being hidden.
 		// Supabase free tier pauses the DB after inactivity — coming back to the
 		// tab can leave the page stuck on skeletons. This triggers a fresh load.
-		function handleVisibilityChange() {
+		async function handleVisibilityChange() {
 			if (document.visibilityState === 'hidden') {
 				hiddenAt = Date.now();
 			} else if (document.visibilityState === 'visible' && authState.session) {
 				const wasHiddenMs = hiddenAt ? Date.now() - hiddenAt : 0;
+				hiddenAt = null;
+
+				// Proactively refresh the token if it's expiring soon (within 5 min)
+				if (isTokenExpiringSoon(300)) {
+					await refreshAuthToken();
+				}
+
 				if (wasHiddenMs >= RELOAD_AFTER_HIDDEN_MS) {
 					// Clear cache so we get fresh data, not stale cached data
 					apiCache.clear();
@@ -198,7 +205,6 @@
 						.then((health) => { optimizerHealthy = health.healthy; })
 						.catch(() => { optimizerHealthy = false; });
 				}
-				hiddenAt = null;
 			}
 		}
 

@@ -433,6 +433,7 @@ export class ShiftsService {
       solverConfig,
       staffGroups,
       priorityRules,
+      earlyShiftPreferences,
     ] = await Promise.all([
       this.getCalendarRules(restaurantId),
       this.getDailyLimits(restaurantId),
@@ -440,6 +441,7 @@ export class ShiftsService {
       this.getSolverConfig(restaurantId),
       this.getStaffGroups(restaurantId),
       this.getPriorityRules(restaurantId),
+      this.getEarlyShiftPreferences(restaurantId),
     ]);
 
     // Staff groups: members stored in group_config.members JSONB
@@ -524,6 +526,34 @@ export class ShiftsService {
 
     const dateRange = this.generateDateRange(period.start_date, period.end_date);
 
+    // Early shift preferences: build dict { staffId: { dateString: boolean, 'default': boolean } }
+    // Expected format by scheduler.py _add_calendar_rules()
+    const earlyShiftPrefsDict: Record<string, Record<string, boolean>> = {};
+    for (const pref of earlyShiftPreferences) {
+      const staffId = pref.staff_id;
+      if (!earlyShiftPrefsDict[staffId]) {
+        earlyShiftPrefsDict[staffId] = {};
+      }
+      if (pref.applies_to_date) {
+        earlyShiftPrefsDict[staffId][pref.applies_to_date] = pref.can_do_early_shift;
+      } else {
+        // No specific date → treat as default for all dates
+        earlyShiftPrefsDict[staffId]['default'] = pref.can_do_early_shift;
+      }
+    }
+
+    // Extract additional solver_settings fields for OR-Tools
+    const ss = solverConfig?.solver_settings as any;
+    const postPeriodConfig = ss?.postPeriodEnabled ? {
+      enabled: true,
+      isHardConstraint: ss.postPeriodIsHard ?? true,
+      minPeriodLength: ss.postPeriodMinLength ?? 3,
+      postPeriodDays: ss.postPeriodDays ?? 2,
+      avoidDayOffForShain: true,
+      avoidDayOffForHaken: true,
+      allowEarlyForShain: true,
+    } : { enabled: false };
+
     const ortoolsRequest: any = {
       staffMembers: staff.map((s) => ({
         id: s.id,
@@ -540,9 +570,20 @@ export class ShiftsService {
         ...(staffTypeLimits && { staffTypeLimits }),
         ...(monthlyLimitsArray.length && { monthlyLimitsArray }),
         ...(normalizedPriorityRules.length && { priorityRules: normalizedPriorityRules }),
+        ...(Object.keys(earlyShiftPrefsDict).length && { earlyShiftPreferences: earlyShiftPrefsDict }),
         ...(dto.preservePrefilled && schedule?.schedule_data && {
           prefilledSchedule: schedule.schedule_data,
         }),
+        // Staff status restrictions toggle (#4)
+        ...(ss?.disableStaffStatusShiftRestrictions && {
+          disableStaffStatusShiftRestrictions: true,
+        }),
+        // Adjacent conflict toggle (#8)
+        ...(ss?.disableAdjacentConflict && {
+          disableAdjacentConflict: true,
+        }),
+        // Post-period constraints (#6, #7)
+        earlyShiftConfig: { postPeriodConstraint: postPeriodConfig },
         ortoolsConfig: {
           penaltyWeights,
           hardConstraints,
@@ -881,11 +922,20 @@ export class ShiftsService {
       };
     }
 
-    if (dto.timeout || dto.numWorkers) {
+    const solverSettingsFields: Record<string, unknown> = {};
+    if (dto.timeout) solverSettingsFields.timeout = dto.timeout;
+    if (dto.numWorkers) solverSettingsFields.numWorkers = dto.numWorkers;
+    if (dto.disableStaffStatusShiftRestrictions !== undefined) solverSettingsFields.disableStaffStatusShiftRestrictions = dto.disableStaffStatusShiftRestrictions;
+    if (dto.postPeriodEnabled !== undefined) solverSettingsFields.postPeriodEnabled = dto.postPeriodEnabled;
+    if (dto.postPeriodDays !== undefined) solverSettingsFields.postPeriodDays = dto.postPeriodDays;
+    if (dto.postPeriodIsHard !== undefined) solverSettingsFields.postPeriodIsHard = dto.postPeriodIsHard;
+    if (dto.postPeriodMinLength !== undefined) solverSettingsFields.postPeriodMinLength = dto.postPeriodMinLength;
+    if (dto.disableAdjacentConflict !== undefined) solverSettingsFields.disableAdjacentConflict = dto.disableAdjacentConflict;
+
+    if (Object.keys(solverSettingsFields).length > 0) {
       updateData.solver_settings = {
         ...(existing?.solver_settings || {}),
-        ...(dto.timeout && { timeout: dto.timeout }),
-        ...(dto.numWorkers && { numWorkers: dto.numWorkers }),
+        ...solverSettingsFields,
       };
     }
 
@@ -1154,7 +1204,19 @@ export class ShiftsService {
       this.logger.error('Failed to fetch priority rules', error);
     }
 
-    return data || [];
+    // Flatten rule_definition JSONB into top-level fields expected by the frontend
+    return (data || []).map((row: any) => {
+      const rd = row.rule_definition || {};
+      return {
+        ...row,
+        // Normalise both camelCase (new) and snake_case (legacy) keys in rule_definition
+        staff_ids: rd.staff_ids ?? rd.staffIds ?? [],
+        rule_type: rd.rule_type ?? rd.ruleType ?? row.rule_type ?? 'preferred_shift',
+        shift_type: rd.shift_type ?? rd.shiftType ?? row.shift_type ?? 'any',
+        days_of_week: rd.days_of_week ?? rd.daysOfWeek ?? [],
+        allowed_shifts: rd.allowed_shifts ?? rd.allowedShifts ?? [],
+      };
+    });
   }
 
   async createPriorityRule(

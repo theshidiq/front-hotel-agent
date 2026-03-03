@@ -35,7 +35,7 @@ export class UpdateDailyLimitsDto {
   @ApiPropertyOptional({ description: 'Staff type limits stored in limit_config.staffTypeLimits' })
   @IsOptional()
   @IsObject()
-  staffTypeLimits?: Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; isHard?: boolean }>;
+  staffTypeLimits?: Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; maxMonthlyEarlyShifts?: number; isHard?: boolean }>;
 }
 
 export class UpdateMonthlyLimitsDto {
@@ -90,6 +90,11 @@ export class UpdatePenaltyWeightsDto {
   @IsOptional()
   @IsNumber()
   adjacentConflict?: number;
+
+  @ApiPropertyOptional({ description: 'Penalty for 派遣/パート forbidden shift violations' })
+  @IsOptional()
+  @IsNumber()
+  staffStatusShift?: number;
 }
 
 export class UpdateHardConstraintsDto {
@@ -134,6 +139,36 @@ export class UpdateSolverConfigDto {
   @IsOptional()
   @IsNumber()
   numWorkers?: number;
+
+  @ApiPropertyOptional({ description: 'Disable shift restrictions for 派遣/パート staff types' })
+  @IsOptional()
+  @IsBoolean()
+  disableStaffStatusShiftRestrictions?: boolean;
+
+  @ApiPropertyOptional({ description: 'Enable post-period (day-after-closure) constraints' })
+  @IsOptional()
+  @IsBoolean()
+  postPeriodEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Number of days after a closure block to protect' })
+  @IsOptional()
+  @IsNumber()
+  postPeriodDays?: number;
+
+  @ApiPropertyOptional({ description: 'Enforce post-period constraint as hard vs soft' })
+  @IsOptional()
+  @IsBoolean()
+  postPeriodIsHard?: boolean;
+
+  @ApiPropertyOptional({ description: 'Minimum consecutive closure days to trigger post-period constraint' })
+  @IsOptional()
+  @IsNumber()
+  postPeriodMinLength?: number;
+
+  @ApiPropertyOptional({ description: 'Disable adjacent conflict prevention' })
+  @IsOptional()
+  @IsBoolean()
+  disableAdjacentConflict?: boolean;
 }
 
 export class CreateCalendarRuleDto {

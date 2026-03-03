@@ -1,4 +1,4 @@
-import { getAuthHeaders } from '$lib/auth.svelte';
+import { getAuthHeaders, refreshAuthToken } from '$lib/auth.svelte';
 import type {
 	ScheduleStaff,
 	ScheduleStaffGroup,
@@ -199,13 +199,33 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 /**
+ * Drop-in replacement for `fetch` that automatically retries once on 401
+ * by refreshing the Supabase access token. All mutation calls (POST/PATCH/DELETE)
+ * should use this instead of raw `fetch` so they benefit from token refresh.
+ */
+async function apiFetch(url: string, options: RequestInit): Promise<Response> {
+	const response = await fetch(url, options);
+	if (response.status === 401) {
+		const refreshed = await refreshAuthToken();
+		if (refreshed) {
+			return fetch(url, {
+				...options,
+				headers: { ...(options.headers as Record<string, string>), ...getAuthHeaders() }
+			});
+		}
+	}
+	return response;
+}
+
+/**
  * Fetch with automatic retry + exponential backoff.
  * Handles Supabase free-tier cold starts: the DB pauses after inactivity and
  * the first request after wake-up can fail or time out. Retrying transparently
  * means the user sees a brief delay instead of a broken skeleton forever.
  *
  * Retries on: network errors (TypeError), 502/503/504 gateway errors.
- * Does NOT retry on 4xx client errors.
+ * On 401: attempts one token refresh then retries the request with the new token.
+ * Does NOT retry on other 4xx client errors.
  */
 export async function fetchWithRetry(
 	url: string,
@@ -214,14 +234,34 @@ export async function fetchWithRetry(
 	baseDelayMs = 1500
 ): Promise<Response> {
 	let lastError: unknown;
+	let tokenRefreshed = false;
+
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		try {
 			const response = await fetch(url, options);
+
+			// On 401: refresh token once and retry with fresh headers
+			if (response.status === 401 && !tokenRefreshed) {
+				tokenRefreshed = true;
+				const refreshed = await refreshAuthToken();
+				if (refreshed) {
+					// Rebuild options with the new Authorization header
+					options = {
+						...options,
+						headers: { ...(options.headers as Record<string, string>), ...getAuthHeaders() }
+					};
+					continue; // retry immediately, don't count as a gateway-error attempt
+				}
+				// Could not refresh — return the 401 so callers can handle it
+				return response;
+			}
+
 			// Retry on gateway errors (Supabase/NestJS waking up)
 			if (attempt < maxAttempts && (response.status === 502 || response.status === 503 || response.status === 504)) {
 				await new Promise((r) => setTimeout(r, baseDelayMs * attempt));
 				continue;
 			}
+
 			return response;
 		} catch (err) {
 			lastError = err;
@@ -274,7 +314,7 @@ export interface CreateShiftStaffData {
 }
 
 export async function createShiftStaff(data: CreateShiftStaffData): Promise<ScheduleStaff> {
-	const response = await fetch(`${API_URL}/shifts/staff`, {
+	const response = await apiFetch(`${API_URL}/shifts/staff`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -298,7 +338,7 @@ export interface UpdateShiftStaffData {
 }
 
 export async function updateShiftStaff(id: string, data: UpdateShiftStaffData): Promise<ScheduleStaff> {
-	const response = await fetch(`${API_URL}/shifts/staff/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/staff/${id}`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -310,7 +350,7 @@ export async function updateShiftStaff(id: string, data: UpdateShiftStaffData): 
 }
 
 export async function deleteShiftStaff(id: string): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/staff/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/staff/${id}`, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});
@@ -323,7 +363,7 @@ export async function deleteShiftStaff(id: string): Promise<void> {
 }
 
 export async function reorderShiftStaff(staffIds: string[]): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/staff/reorder`, {
+	const response = await apiFetch(`${API_URL}/shifts/staff/reorder`, {
 		method: 'PUT',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ staffIds })
@@ -354,7 +394,7 @@ export interface CreatePeriodData {
 }
 
 export async function createShiftPeriod(data: CreatePeriodData): Promise<SchedulePeriod> {
-	const response = await fetch(`${API_URL}/shifts/periods`, {
+	const response = await apiFetch(`${API_URL}/shifts/periods`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -367,7 +407,7 @@ export async function createShiftPeriod(data: CreatePeriodData): Promise<Schedul
 }
 
 export async function deleteShiftPeriod(id: string): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/periods/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/periods/${id}`, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});
@@ -426,7 +466,7 @@ export async function bulkUpdateCells(periodId: string, updates: CellUpdate[]): 
 	}
 
 	try {
-		const response = await fetch(`${API_URL}/shifts/schedule/${periodId}/cells`, {
+		const response = await apiFetch(`${API_URL}/shifts/schedule/${periodId}/cells`, {
 			method: 'PATCH',
 			headers: authHeaders({ 'Content-Type': 'application/json' }),
 			body: JSON.stringify({ updates })
@@ -454,7 +494,7 @@ export interface OptimizeOptions {
 }
 
 export async function optimizeSchedule(options: OptimizeOptions): Promise<OptimizeResponse> {
-	const response = await fetch(`${API_URL}/shifts/optimize`, {
+	const response = await apiFetch(`${API_URL}/shifts/optimize`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(options)
@@ -466,7 +506,7 @@ export async function optimizeSchedule(options: OptimizeOptions): Promise<Optimi
 }
 
 export async function checkOptimizerHealth(): Promise<{ healthy: boolean; url: string }> {
-	const response = await fetch(`${API_URL}/shifts/optimize/health`, {
+	const response = await apiFetch(`${API_URL}/shifts/optimize/health`, {
 		headers: authHeaders()
 	});
 	return handleResponse(response);
@@ -496,7 +536,7 @@ export interface CreateCalendarRuleData {
 }
 
 export async function createCalendarRule(data: CreateCalendarRuleData): Promise<CalendarRule> {
-	const response = await fetch(`${API_URL}/shifts/settings/calendar-rules`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/calendar-rules`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -505,7 +545,7 @@ export async function createCalendarRule(data: CreateCalendarRuleData): Promise<
 }
 
 export async function deleteCalendarRule(id: string): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/settings/calendar-rules/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/calendar-rules/${id}`, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});
@@ -518,7 +558,7 @@ export async function deleteCalendarRule(id: string): Promise<void> {
 // ==================== DAILY LIMITS ====================
 
 export async function getDailyLimits(): Promise<DailyLimits | null> {
-	const response = await fetch(`${API_URL}/shifts/settings/daily-limits`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/daily-limits`, {
 		headers: authHeaders()
 	});
 	if (response.status === 404) return null;
@@ -532,11 +572,11 @@ export interface UpdateDailyLimitsData {
 	maxEarlyPerDay?: number;
 	minWorkingStaffPerDay?: number;
 	is_hard_constraint?: boolean;
-	staffTypeLimits?: Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; isHard?: boolean }>;
+	staffTypeLimits?: Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; maxMonthlyEarlyShifts?: number; isHard?: boolean }>;
 }
 
 export async function updateDailyLimits(data: UpdateDailyLimitsData): Promise<DailyLimits> {
-	const response = await fetch(`${API_URL}/shifts/settings/daily-limits`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/daily-limits`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -547,7 +587,7 @@ export async function updateDailyLimits(data: UpdateDailyLimitsData): Promise<Da
 // ==================== MONTHLY LIMITS ====================
 
 export async function getMonthlyLimits(): Promise<MonthlyLimits | null> {
-	const response = await fetch(`${API_URL}/shifts/settings/monthly-limits`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits`, {
 		headers: authHeaders()
 	});
 	if (response.status === 404) return null;
@@ -562,7 +602,7 @@ export interface UpdateMonthlyLimitsData {
 }
 
 export async function updateMonthlyLimits(data: UpdateMonthlyLimitsData): Promise<MonthlyLimits> {
-	const response = await fetch(`${API_URL}/shifts/settings/monthly-limits`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -573,7 +613,7 @@ export async function updateMonthlyLimits(data: UpdateMonthlyLimitsData): Promis
 // ==================== SOLVER CONFIG ====================
 
 export async function getSolverConfig(): Promise<ORToolsSolverConfig | null> {
-	const response = await fetch(`${API_URL}/shifts/settings/solver-config`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/solver-config`, {
 		headers: authHeaders()
 	});
 	if (response.status === 404) return null;
@@ -588,6 +628,7 @@ export interface UpdateSolverConfigData {
 		dailyLimitMax?: number;
 		dailyLimitMin?: number;
 		adjacentConflict?: number;
+		staffStatusShift?: number;
 	};
 	hard_constraints?: {
 		dailyLimits?: boolean;
@@ -597,10 +638,19 @@ export interface UpdateSolverConfigData {
 	};
 	timeout?: number;
 	numWorkers?: number;
+	// Staff status shift restrictions
+	disableStaffStatusShiftRestrictions?: boolean;
+	// Post-period constraints
+	postPeriodEnabled?: boolean;
+	postPeriodDays?: number;
+	postPeriodIsHard?: boolean;
+	postPeriodMinLength?: number;
+	// Adjacent conflict
+	disableAdjacentConflict?: boolean;
 }
 
 export async function updateSolverConfig(data: UpdateSolverConfigData): Promise<ORToolsSolverConfig> {
-	const response = await fetch(`${API_URL}/shifts/settings/solver-config`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/solver-config`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -611,7 +661,7 @@ export async function updateSolverConfig(data: UpdateSolverConfigData): Promise<
 // ==================== STAFF GROUPS ====================
 
 export async function getStaffGroups(): Promise<ScheduleStaffGroup[]> {
-	const response = await fetch(`${API_URL}/shifts/settings/staff-groups`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups`, {
 		headers: authHeaders()
 	});
 	return handleResponse(response);
@@ -625,7 +675,7 @@ export interface CreateStaffGroupData {
 }
 
 export async function createStaffGroup(data: CreateStaffGroupData): Promise<ScheduleStaffGroup> {
-	const response = await fetch(`${API_URL}/shifts/settings/staff-groups`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -642,7 +692,7 @@ export interface UpdateStaffGroupData {
 }
 
 export async function updateStaffGroup(id: string, data: UpdateStaffGroupData): Promise<ScheduleStaffGroup> {
-	const response = await fetch(`${API_URL}/shifts/settings/staff-groups/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups/${id}`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -651,7 +701,7 @@ export async function updateStaffGroup(id: string, data: UpdateStaffGroupData): 
 }
 
 export async function deleteStaffGroup(id: string): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/settings/staff-groups/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups/${id}`, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});
@@ -662,14 +712,14 @@ export async function deleteStaffGroup(id: string): Promise<void> {
 }
 
 export async function getStaffGroupMembers(groupId: string): Promise<Array<{ staff_id: string; group_id: string }>> {
-	const response = await fetch(`${API_URL}/shifts/settings/staff-groups/${groupId}/members`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups/${groupId}/members`, {
 		headers: authHeaders()
 	});
 	return handleResponse(response);
 }
 
 export async function setStaffGroupMembers(groupId: string, staffIds: string[]): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/settings/staff-groups/${groupId}/members`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups/${groupId}/members`, {
 		method: 'PUT',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ staffIds })
@@ -703,7 +753,7 @@ export interface PriorityRule {
 }
 
 export async function getPriorityRules(): Promise<PriorityRule[]> {
-	const response = await fetch(`${API_URL}/shifts/settings/priority-rules`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/priority-rules`, {
 		headers: authHeaders()
 	});
 	return handleResponse(response);
@@ -725,7 +775,7 @@ export interface CreatePriorityRuleData {
 }
 
 export async function createPriorityRule(data: CreatePriorityRuleData): Promise<PriorityRule> {
-	const response = await fetch(`${API_URL}/shifts/settings/priority-rules`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/priority-rules`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -750,7 +800,7 @@ export interface UpdatePriorityRuleData {
 }
 
 export async function updatePriorityRule(id: string, data: UpdatePriorityRuleData): Promise<PriorityRule> {
-	const response = await fetch(`${API_URL}/shifts/settings/priority-rules/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/priority-rules/${id}`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -759,7 +809,7 @@ export async function updatePriorityRule(id: string, data: UpdatePriorityRuleDat
 }
 
 export async function deletePriorityRule(id: string): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/settings/priority-rules/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/priority-rules/${id}`, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});
@@ -783,7 +833,7 @@ export interface EarlyShiftPreference {
 }
 
 export async function getEarlyShiftPreferences(): Promise<EarlyShiftPreference[]> {
-	const response = await fetch(`${API_URL}/shifts/settings/early-shift-preferences`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/early-shift-preferences`, {
 		headers: authHeaders()
 	});
 	return handleResponse(response);
@@ -797,7 +847,7 @@ export interface CreateEarlyShiftPreferenceData {
 }
 
 export async function createEarlyShiftPreference(data: CreateEarlyShiftPreferenceData): Promise<EarlyShiftPreference> {
-	const response = await fetch(`${API_URL}/shifts/settings/early-shift-preferences`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/early-shift-preferences`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -814,7 +864,7 @@ export interface BulkEarlyShiftPreferenceData {
 }
 
 export async function bulkUpsertEarlyShiftPreferences(data: BulkEarlyShiftPreferenceData): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/settings/early-shift-preferences/bulk`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/early-shift-preferences/bulk`, {
 		method: 'PUT',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -832,7 +882,7 @@ export interface UpdateEarlyShiftPreferenceData {
 }
 
 export async function updateEarlyShiftPreference(id: string, data: UpdateEarlyShiftPreferenceData): Promise<EarlyShiftPreference> {
-	const response = await fetch(`${API_URL}/shifts/settings/early-shift-preferences/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/early-shift-preferences/${id}`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -841,7 +891,7 @@ export async function updateEarlyShiftPreference(id: string, data: UpdateEarlySh
 }
 
 export async function deleteEarlyShiftPreference(id: string): Promise<void> {
-	const response = await fetch(`${API_URL}/shifts/settings/early-shift-preferences/${id}`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/early-shift-preferences/${id}`, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});
@@ -864,7 +914,7 @@ export interface PeriodConfiguration {
 }
 
 export async function getPeriodConfiguration(): Promise<PeriodConfiguration | null> {
-	const response = await fetch(`${API_URL}/shifts/settings/period-configuration`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/period-configuration`, {
 		headers: authHeaders()
 	});
 	if (response.status === 404) return null;
@@ -878,7 +928,7 @@ export interface UpdatePeriodConfigurationData {
 }
 
 export async function updatePeriodConfiguration(data: UpdatePeriodConfigurationData): Promise<PeriodConfiguration> {
-	const response = await fetch(`${API_URL}/shifts/settings/period-configuration`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/period-configuration`, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -887,7 +937,7 @@ export async function updatePeriodConfiguration(data: UpdatePeriodConfigurationD
 }
 
 export async function regeneratePeriods(): Promise<SchedulePeriod[]> {
-	const response = await fetch(`${API_URL}/shifts/settings/periods/regenerate`, {
+	const response = await apiFetch(`${API_URL}/shifts/settings/periods/regenerate`, {
 		method: 'POST',
 		headers: authHeaders()
 	});
