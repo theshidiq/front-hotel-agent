@@ -77,8 +77,14 @@
             titleEn: "Staff",
             description: "シフト管理、スタッフカレンダー",
             color: "green",
-            primaryHref: "/staff/calendar",
+            primaryHref: "/shifts",
             links: [
+                {
+                    icon: "edit_calendar",
+                    label: "シフト管理",
+                    href: "/shifts",
+                    description: "シフトの作成・自動最適化",
+                },
                 {
                     icon: "calendar_month",
                     label: "シフトカレンダー",
