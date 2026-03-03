@@ -33,7 +33,36 @@
 	// ── Sidebar State ──
 	let sidebarCollapsed = $state(false);
 	let sidebarMobileOpen = $state(false);
-	const sidebarSections: any[] = [];
+	const sidebarSections = [
+		{
+			label: "ホーム",
+			items: [
+				{
+					icon: "dashboard",
+					label: "ダッシュボード",
+					href: "/dashboard",
+					active: false,
+				},
+			],
+		},
+		{
+			label: "スタッフ",
+			items: [
+				{
+					icon: "edit_calendar",
+					label: "シフト管理",
+					href: "/shifts",
+					active: true,
+				},
+				{
+					icon: "calendar_month",
+					label: "シフトカレンダー",
+					href: "/staff/calendar",
+					active: false,
+				},
+			],
+		},
+	];
 
 	// ── Navigation State ──
 	type ShiftSection = "schedule" | "settings";
