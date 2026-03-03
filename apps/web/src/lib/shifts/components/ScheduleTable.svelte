@@ -1,16 +1,25 @@
 <script lang="ts">
-	import type { ScheduleStaff, ShiftSymbol } from '$lib/shifts/types';
-	import { SHIFT_SYMBOLS, SHIFT_LABELS } from '$lib/shifts/types';
-	import { createSelectionStore, setSelectionContext } from '../stores/scheduleSelection.svelte';
-	import { getOrderedStaffMembers, isDateWithinStaffWorkPeriod, getStaffPeriodLabel } from '../staffUtils';
-	import { Copy, Clipboard, X, Check, Trash2, Edit } from 'lucide-svelte';
+	import type { ScheduleStaff, ShiftSymbol } from "$lib/shifts/types";
+	import { SHIFT_SYMBOLS, SHIFT_LABELS } from "$lib/shifts/types";
+	import {
+		createSelectionStore,
+		setSelectionContext,
+	} from "../stores/scheduleSelection.svelte";
+	import {
+		getOrderedStaffMembers,
+		isDateWithinStaffWorkPeriod,
+		getStaffPeriodLabel,
+	} from "../staffUtils";
+	import { Copy, Clipboard, X, Check, Trash2, Edit } from "lucide-svelte";
 
 	interface Props {
 		staff: ScheduleStaff[];
 		dateRange: string[];
 		scheduleData: Record<string, Record<string, string>>;
 		onCellUpdate: (staffId: string, date: string, symbol: string) => void;
-		onBulkUpdate?: (updates: Array<{ staffId: string; date: string; symbol: string }>) => void;
+		onBulkUpdate?: (
+			updates: Array<{ staffId: string; date: string; symbol: string }>,
+		) => void;
 		onStaffEdit?: (staff: ScheduleStaff) => void;
 		onStaffDelete?: (staff: ScheduleStaff) => void;
 		// Connection and offline queue state
@@ -31,7 +40,7 @@
 		pendingCells = new Set(),
 		hasPendingChanges = false,
 		isConnected = true,
-		offlineQueueSize = 0
+		offlineQueueSize = 0,
 	}: Props = $props();
 
 	// Derived: Ordered staff members (社員 > 派遣 > パート, sorted by start date, 中田 at end)
@@ -51,24 +60,36 @@
 			onCellUpdate,
 			onBulkUpdate
 				? (schedule) => {
-						const updates: Array<{ staffId: string; date: string; symbol: string }> = [];
-						for (const [staffId, dates] of Object.entries(schedule)) {
-							for (const [date, symbol] of Object.entries(dates)) {
+						const updates: Array<{
+							staffId: string;
+							date: string;
+							symbol: string;
+						}> = [];
+						for (const [staffId, dates] of Object.entries(
+							schedule,
+						)) {
+							for (const [date, symbol] of Object.entries(
+								dates,
+							)) {
 								updates.push({ staffId, date, symbol });
 							}
 						}
 						onBulkUpdate(updates);
 					}
-				: undefined
+				: undefined,
 		);
 	});
 
 	// Local state
 	let showDropdown = $state<string | null>(null);
-	let customInputText = $state('');
-	let contextMenu = $state<{ x: number; y: number; cellKey: string } | null>(null);
+	let customInputText = $state("");
+	let contextMenu = $state<{ x: number; y: number; cellKey: string } | null>(
+		null,
+	);
 	let isDragging = $state(false);
-	let dragStartCell = $state<{ staffId: string; dateKey: string } | null>(null);
+	let dragStartCell = $state<{ staffId: string; dateKey: string } | null>(
+		null,
+	);
 	let tableRef = $state<HTMLDivElement | null>(null);
 
 	// Computed: Show bulk toolbar when multiple cells selected
@@ -76,76 +97,92 @@
 
 	// Shift symbols - matches React shiftConstants.js
 	const shiftSymbols = {
-		early: { symbol: '△', label: '早番', color: 'text-blue-600' },
-		normal: { symbol: '', label: '出勤（空白）', color: 'text-gray-600' },
-		late: { symbol: '◇', label: '遅番', color: 'text-purple-600' },
-		special: { symbol: '●', label: '特別', color: 'text-green-600' },
-		medamayaki: { symbol: '◎', label: '目玉焼き', color: 'text-orange-600' },
-		zensai: { symbol: '▣', label: '前菜', color: 'text-teal-600' },
-		off: { symbol: '×', label: '休み', color: 'text-red-600' },
-		holiday: { symbol: '★', label: '指定休', color: 'text-yellow-600' },
-		unavailable: { symbol: '⊘', label: '不可', color: 'text-red-800' }
+		early: { symbol: "△", label: "早番", color: "text-blue-600" },
+		normal: { symbol: "", label: "出勤（空白）", color: "text-gray-600" },
+		late: { symbol: "◇", label: "遅番", color: "text-purple-600" },
+		special: { symbol: "●", label: "特別", color: "text-green-600" },
+		medamayaki: {
+			symbol: "◎",
+			label: "目玉焼き",
+			color: "text-orange-600",
+		},
+		zensai: { symbol: "▣", label: "前菜", color: "text-teal-600" },
+		off: { symbol: "×", label: "休み", color: "text-red-600" },
+		holiday: { symbol: "★", label: "指定休", color: "text-yellow-600" },
+		unavailable: { symbol: "⊘", label: "不可", color: "text-red-800" },
 	};
 
 	// Get available shifts based on staff status
 	function getAvailableShifts(status?: string): string[] {
-		if (!status) status = '派遣';
+		if (!status) status = "派遣";
 
-		if (status === '社員') {
+		if (status === "社員") {
 			// 社員 staff get late shift + special options
-			return ['normal', 'off', 'early', 'late', 'medamayaki', 'zensai', 'holiday'];
-		} else if (status === 'パート') {
+			return [
+				"normal",
+				"off",
+				"early",
+				"late",
+				"medamayaki",
+				"zensai",
+				"holiday",
+			];
+		} else if (status === "パート") {
 			// パート staff get limited options
-			return ['unavailable', 'normal', 'off'];
+			return ["unavailable", "normal", "off"];
 		} else {
 			// 派遣 staff get standard options
-			return ['normal', 'off', 'early', 'holiday'];
+			return ["normal", "off", "early", "holiday"];
 		}
 	}
 
 	// Convert shift keys to dropdown options
 	function getShiftOptions(status?: string) {
 		const keys = getAvailableShifts(status);
-		return keys.map(key => ({
+		return keys.map((key) => ({
 			key,
-			...shiftSymbols[key as keyof typeof shiftSymbols]
+			...shiftSymbols[key as keyof typeof shiftSymbols],
 		}));
 	}
 
 	// Format date for display
-	function formatDate(dateStr: string): { day: number; weekday: string; isWeekend: boolean } {
+	function formatDate(dateStr: string): {
+		day: number;
+		weekday: string;
+		isWeekend: boolean;
+	} {
 		const date = new Date(dateStr);
-		const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+		const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 		const dayOfWeek = date.getDay();
 		return {
 			day: date.getDate(),
 			weekday: weekdays[dayOfWeek],
-			isWeekend: dayOfWeek === 0 || dayOfWeek === 6
+			isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
 		};
 	}
 
 	// Get cell value
 	function getCellValue(staffId: string, date: string): string {
-		return scheduleData[staffId]?.[date] || '';
+		return scheduleData[staffId]?.[date] || "";
 	}
 
 	// Get symbol color class - matches React getSymbolColor
 	function getSymbolColor(value: string, staffStatus?: string): string {
 		// For パート staff, if value is empty, default to unavailable color
-		if (staffStatus === 'パート' && (!value || value === '')) {
+		if (staffStatus === "パート" && (!value || value === "")) {
 			return shiftSymbols.unavailable.color;
 		}
 
-		if (!value) return 'text-gray-400'; // Empty/blank cells
+		if (!value) return "text-gray-400"; // Empty/blank cells
 
 		// Handle 'late' specially
-		if (value === 'late') {
+		if (value === "late") {
 			return shiftSymbols.late.color;
 		}
 
 		// Find the shift type by symbol
 		const shiftEntry = Object.entries(shiftSymbols).find(
-			([_, shift]) => shift.symbol === value
+			([_, shift]) => shift.symbol === value,
 		);
 
 		if (shiftEntry) {
@@ -153,26 +190,30 @@
 		}
 
 		// For custom text (not a predefined symbol)
-		return 'text-gray-700';
+		return "text-gray-700";
 	}
 
 	// Get display value for cell - matches React getCellDisplayValue
 	function getCellDisplayValue(value: string, staffStatus?: string): string {
 		// For パート staff, if value is empty, default to unavailable symbol
-		if (staffStatus === 'パート' && (!value || value === '')) {
+		if (staffStatus === "パート" && (!value || value === "")) {
 			return shiftSymbols.unavailable.symbol;
 		}
 
 		// For late shift, don't display symbol (show as background color only)
-		if (value === 'late') {
-			return '';
+		if (value === "late") {
+			return "";
 		}
 
 		return value;
 	}
 
 	// Handle cell click
-	function handleCellClick(staffId: string, dateKey: string, event: MouseEvent) {
+	function handleCellClick(
+		staffId: string,
+		dateKey: string,
+		event: MouseEvent,
+	) {
 		event.preventDefault();
 		event.stopPropagation();
 
@@ -201,7 +242,11 @@
 	}
 
 	// Handle cell double-click (enter custom text mode)
-	function handleCellDoubleClick(staffId: string, dateKey: string, event: MouseEvent) {
+	function handleCellDoubleClick(
+		staffId: string,
+		dateKey: string,
+		event: MouseEvent,
+	) {
 		event.preventDefault();
 		const cellKey = selection.getCellKey(staffId, dateKey);
 		const currentValue = getCellValue(staffId, dateKey);
@@ -210,7 +255,11 @@
 	}
 
 	// Handle mouse down for drag selection
-	function handleCellMouseDown(staffId: string, dateKey: string, event: MouseEvent) {
+	function handleCellMouseDown(
+		staffId: string,
+		dateKey: string,
+		event: MouseEvent,
+	) {
 		if (event.button !== 0) return; // Left button only
 		if (event.shiftKey || event.ctrlKey || event.metaKey) return;
 
@@ -220,11 +269,18 @@
 	}
 
 	// Handle mouse move for drag selection
-	function handleCellMouseMove(staffId: string, dateKey: string, event: MouseEvent) {
+	function handleCellMouseMove(
+		staffId: string,
+		dateKey: string,
+		event: MouseEvent,
+	) {
 		if (dragStartCell && !isDragging) {
 			// Started moving - begin drag selection
 			isDragging = true;
-			selection.startDragSelection(dragStartCell.staffId, dragStartCell.dateKey);
+			selection.startDragSelection(
+				dragStartCell.staffId,
+				dragStartCell.dateKey,
+			);
 			showDropdown = null;
 		}
 	}
@@ -246,7 +302,11 @@
 	}
 
 	// Handle right-click context menu
-	function handleContextMenu(staffId: string, dateKey: string, event: MouseEvent) {
+	function handleContextMenu(
+		staffId: string,
+		dateKey: string,
+		event: MouseEvent,
+	) {
 		event.preventDefault();
 
 		if (!selection.isCellSelected(staffId, dateKey)) {
@@ -256,28 +316,32 @@
 		contextMenu = {
 			x: event.clientX,
 			y: event.clientY,
-			cellKey: selection.getCellKey(staffId, dateKey)
+			cellKey: selection.getCellKey(staffId, dateKey),
 		};
 	}
 
 	// Handle shift selection from dropdown - matches React handleShiftSelect logic
-	function handleShiftSelect(staffId: string, dateKey: string, shiftKeyOrSymbol: string) {
-		const staffMember = orderedStaff.find(s => s.id === staffId);
+	function handleShiftSelect(
+		staffId: string,
+		dateKey: string,
+		shiftKeyOrSymbol: string,
+	) {
+		const staffMember = orderedStaff.find((s) => s.id === staffId);
 		let shiftValue: string;
 
 		// Handle different shift types
-		if (shiftKeyOrSymbol === '') {
+		if (shiftKeyOrSymbol === "") {
 			// Normal/blank shift
-			if (staffMember?.status === 'パート') {
+			if (staffMember?.status === "パート") {
 				// For パート staff, normal shift shows circle symbol
-				shiftValue = '○';
+				shiftValue = "○";
 			} else {
 				// Normal shift shows as blank for other staff
-				shiftValue = '';
+				shiftValue = "";
 			}
-		} else if (shiftKeyOrSymbol === 'late') {
+		} else if (shiftKeyOrSymbol === "late") {
 			// Late shift stores as 'late' key, not symbol
-			shiftValue = 'late';
+			shiftValue = "late";
 		} else {
 			// Other shifts show their symbols directly
 			shiftValue = shiftKeyOrSymbol;
@@ -285,7 +349,7 @@
 
 		onCellUpdate(staffId, dateKey, shiftValue);
 		showDropdown = null;
-		customInputText = '';
+		customInputText = "";
 	}
 
 	// Handle custom text save
@@ -293,38 +357,38 @@
 		const finalText = customInputText.trim();
 		onCellUpdate(staffId, dateKey, finalText);
 		showDropdown = null;
-		customInputText = '';
+		customInputText = "";
 	}
 
 	// Handle custom text cancel
 	function handleCustomTextCancel() {
-		customInputText = '';
+		customInputText = "";
 		showDropdown = null;
 	}
 
 	// Quick action handler for bulk operations
 	function handleQuickAction(action: string) {
 		switch (action) {
-			case 'copy':
+			case "copy":
 				selection.copySelected();
 				break;
-			case 'paste':
+			case "paste":
 				selection.pasteToSelected();
 				break;
-			case 'clear':
+			case "clear":
 				selection.clearSelected();
 				break;
-			case 'early':
-				selection.applyToSelected('△');
+			case "early":
+				selection.applyToSelected("△");
 				break;
-			case 'normal':
-				selection.applyToSelected('○');
+			case "normal":
+				selection.applyToSelected("○");
 				break;
-			case 'off':
-				selection.applyToSelected('×');
+			case "off":
+				selection.applyToSelected("×");
 				break;
-			case 'star':
-				selection.applyToSelected('★');
+			case "star":
+				selection.applyToSelected("★");
 				break;
 		}
 		contextMenu = null;
@@ -337,20 +401,34 @@
 
 		// Don't handle when typing in an input
 		const target = event.target as HTMLElement;
-		if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+		if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
 		// Navigation and shortcuts
 		const result = selection.handleKeyboardShortcut(
 			event.key,
 			event.ctrlKey || event.metaKey,
-			event.shiftKey
+			event.shiftKey,
 		);
 
 		// Prevent default for handled keys
 		const handledKeys = [
-			'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-			' ', 'Delete', 'Backspace', 'Escape', 'Enter',
-			'1', '2', '3', '4', 's', 'S', 'x', 'X'
+			"ArrowUp",
+			"ArrowDown",
+			"ArrowLeft",
+			"ArrowRight",
+			" ",
+			"Delete",
+			"Backspace",
+			"Escape",
+			"Enter",
+			"1",
+			"2",
+			"3",
+			"4",
+			"s",
+			"S",
+			"x",
+			"X",
 		];
 
 		if (result > 0 || handledKeys.includes(event.key)) {
@@ -358,17 +436,24 @@
 		}
 
 		// Ctrl shortcuts
-		if ((event.ctrlKey || event.metaKey) && ['c', 'v', 'a'].includes(event.key.toLowerCase())) {
+		if (
+			(event.ctrlKey || event.metaKey) &&
+			["c", "v", "a"].includes(event.key.toLowerCase())
+		) {
 			event.preventDefault();
 		}
 
 		// Scroll focused cell into view on navigation
-		if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+		if (
+			["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
+				event.key,
+			)
+		) {
 			scrollFocusedCellIntoView();
 		}
 
 		// Enter key opens dropdown for focused cell
-		if (event.key === 'Enter' && selection.focusedCell) {
+		if (event.key === "Enter" && selection.focusedCell) {
 			event.preventDefault();
 			showDropdown = selection.focusedCell;
 		}
@@ -380,9 +465,15 @@
 
 		// Small delay to allow state to update
 		requestAnimationFrame(() => {
-			const focusedElement = tableRef?.querySelector(`[data-cell-key="${selection.focusedCell}"]`);
+			const focusedElement = tableRef?.querySelector(
+				`[data-cell-key="${selection.focusedCell}"]`,
+			);
 			if (focusedElement) {
-				focusedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+				focusedElement.scrollIntoView({
+					behavior: "smooth",
+					block: "nearest",
+					inline: "nearest",
+				});
 			}
 		});
 	}
@@ -394,8 +485,8 @@
 		// Check if click is outside table
 		if (tableRef && !tableRef.contains(target)) {
 			// Check if not clicking on bulk toolbar or context menu
-			const bulkToolbar = document.querySelector('.bulk-toolbar');
-			const ctxMenu = document.querySelector('.context-menu');
+			const bulkToolbar = document.querySelector(".bulk-toolbar");
+			const ctxMenu = document.querySelector(".context-menu");
 
 			if (
 				(!bulkToolbar || !bulkToolbar.contains(target)) &&
@@ -421,16 +512,16 @@
 		let count = 0;
 
 		for (const date of dateRange) {
-			const value = staffSchedule[date] || '';
+			const value = staffSchedule[date] || "";
 
-			if (staffMember?.status === 'パート') {
-				if (value === '' || value === '⊘' || value === '×') {
+			if (staffMember?.status === "パート") {
+				if (value === "" || value === "⊘" || value === "×") {
 					count += 1;
 				}
 			} else {
-				if (value === '×') count += 1;
-				else if (value === '△') count += 0.5;
-				else if (value === '★') count += 1;
+				if (value === "×") count += 1;
+				else if (value === "△") count += 0.5;
+				else if (value === "★") count += 1;
 			}
 		}
 
@@ -440,14 +531,14 @@
 	// Get dropdown position
 	function getDropdownPosition(
 		staffIndex: number,
-		dateIndex: number
+		dateIndex: number,
 	): { top?: string; bottom?: string; left?: string; right?: string } {
 		const isNearBottom = dateIndex > dateRange.length - 5;
 		const isNearRight = staffIndex > orderedStaff.length - 3;
 
 		return {
-			...(isNearBottom ? { bottom: '100%' } : { top: '100%' }),
-			...(isNearRight ? { right: '0' } : { left: '0' })
+			...(isNearBottom ? { bottom: "100%" } : { top: "100%" }),
+			...(isNearRight ? { right: "0" } : { left: "0" }),
 		};
 	}
 
@@ -475,16 +566,22 @@
 <div class="relative">
 	<!-- Connection and Queue Status Indicator -->
 	{#if !isConnected || hasPendingChanges}
-		<div class="mb-2 flex items-center gap-2 px-3 py-2 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-md">
+		<div
+			class="mb-2 flex items-center gap-2 px-3 py-2 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-md"
+		>
 			{#if !isConnected}
 				<div class="flex items-center gap-2">
 					<div class="w-2 h-2 bg-red-500 rounded-full"></div>
-					<span class="text-sm font-medium text-red-700">オフライン</span>
+					<span class="text-sm font-medium text-red-700"
+						>オフライン</span
+					>
 				</div>
 			{/if}
 			{#if hasPendingChanges}
 				<div class="flex items-center gap-2">
-					<div class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+					<div
+						class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"
+					></div>
 					<span class="text-sm font-medium text-orange-700">
 						保存待ち: {offlineQueueSize}件
 					</span>
@@ -506,7 +603,7 @@
 				type="button"
 				onmousedown={(e) => {
 					e.preventDefault();
-					handleQuickAction('copy');
+					handleQuickAction("copy");
 				}}
 				class="p-2 hover:bg-gray-100 rounded focus:outline-none"
 				title="Copy (Ctrl+C)"
@@ -517,7 +614,7 @@
 				type="button"
 				onmousedown={(e) => {
 					e.preventDefault();
-					handleQuickAction('paste');
+					handleQuickAction("paste");
 				}}
 				class="p-2 hover:bg-gray-100 rounded focus:outline-none"
 				title="Paste (Ctrl+V)"
@@ -534,7 +631,7 @@
 				type="button"
 				onmousedown={(e) => {
 					e.preventDefault();
-					handleQuickAction('off');
+					handleQuickAction("off");
 				}}
 				class="px-2 py-1 hover:bg-gray-100 rounded font-bold text-red-600 text-2xl"
 				title="Day Off (Press 4)"
@@ -545,20 +642,31 @@
 				type="button"
 				onmousedown={(e) => {
 					e.preventDefault();
-					handleQuickAction('early');
+					handleQuickAction("early");
 				}}
 				class="px-2 py-1 hover:bg-gray-100 rounded text-blue-600 flex items-center"
 				title="Early Shift (Press 1)"
 			>
-				<svg width="16" height="14" viewBox="0 0 22 20" style="display:inline-block">
-					<polygon points="11,2 21,18 1,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+				<svg
+					width="16"
+					height="14"
+					viewBox="0 0 22 20"
+					style="display:inline-block"
+				>
+					<polygon
+						points="11,2 21,18 1,18"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="3"
+						stroke-linejoin="round"
+					/>
 				</svg>
 			</button>
 			<button
 				type="button"
 				onmousedown={(e) => {
 					e.preventDefault();
-					handleQuickAction('star');
+					handleQuickAction("star");
 				}}
 				class="px-2 py-1 hover:bg-gray-100 rounded font-bold text-yellow-600"
 				title="Star (Press S)"
@@ -570,7 +678,7 @@
 				type="button"
 				onmousedown={(e) => {
 					e.preventDefault();
-					handleQuickAction('clear');
+					handleQuickAction("clear");
 				}}
 				class="px-2 py-1 text-sm hover:bg-red-100 rounded text-red-600"
 				title="Clear (Delete)"
@@ -593,10 +701,16 @@
 
 	<!-- Table Container -->
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-	<div bind:this={tableRef} class="table-container overflow-x-auto" tabindex="0" role="grid">
+	<div
+		bind:this={tableRef}
+		class="table-container overflow-x-auto"
+		tabindex="0"
+		role="grid"
+	>
 		<table
 			class="w-full text-sm border-collapse"
-			style="table-layout: fixed; min-width: {40 + orderedStaff.length * 40}px;"
+			style="table-layout: fixed; min-width: {40 +
+				orderedStaff.length * 40}px;"
 		>
 			<!-- Header Row: Staff Names -->
 			<thead>
@@ -617,7 +731,9 @@
 							onclick={(e) => handleStaffHeaderClick(s.id, e)}
 							title="Click to select entire column for {s.name}"
 						>
-							<div class="flex flex-col items-center justify-center py-1 px-1 h-full">
+							<div
+								class="flex flex-col items-center justify-center py-1 px-1 h-full"
+							>
 								<span
 									class="text-sm font-bold cursor-pointer px-1 py-0.5 rounded transition-colors duration-200"
 									style="font-size: 14px; line-height: 16px; max-width: 80px; overflow: hidden; word-break: break-all; white-space: nowrap; text-overflow: ellipsis;"
@@ -643,7 +759,9 @@
 							onclick={(e) => handleDateHeaderClick(date, e)}
 							title="Click to select entire row"
 						>
-							<div class="py-1 px-1 flex items-center justify-center gap-0.5">
+							<div
+								class="py-1 px-1 flex items-center justify-center gap-0.5"
+							>
 								<span
 									class="text-xs font-bold {dateInfo.isWeekend
 										? 'text-red-600'
@@ -652,7 +770,9 @@
 									{dateInfo.day}
 								</span>
 								<span
-									class="text-xs opacity-75 {dateInfo.isWeekend ? 'text-red-600' : 'text-gray-700'}"
+									class="text-xs opacity-75 {dateInfo.isWeekend
+										? 'text-red-600'
+										: 'text-gray-700'}"
 								>
 									{dateInfo.weekday}
 								</span>
@@ -663,11 +783,20 @@
 						{#each orderedStaff as s, staffIndex}
 							{@const cellKey = selection.getCellKey(s.id, date)}
 							{@const cellValue = getCellValue(s.id, date)}
-							{@const isSelected = selection.isCellSelected(s.id, date)}
-							{@const isFocused = selection.isCellFocused(s.id, date)}
-							{@const isLateShift = cellValue === 'late'}
+							{@const isSelected = selection.isCellSelected(
+								s.id,
+								date,
+							)}
+							{@const isFocused = selection.isCellFocused(
+								s.id,
+								date,
+							)}
+							{@const isLateShift = cellValue === "late"}
 							{@const periodLabel = getStaffPeriodLabel(s, date)}
-							{@const isActive = isDateWithinStaffWorkPeriod(s, date)}
+							{@const isActive = isDateWithinStaffWorkPeriod(
+								s,
+								date,
+							)}
 							{@const isPending = isCellPending(s.id, date)}
 
 							<td
@@ -686,17 +815,33 @@
 										: 'cursor-pointer hover:bg-gray-100'}
 										{isActive && isSelected ? 'bg-blue-100 hover:bg-blue-200' : ''}
 										{isFocused ? 'ring-2 ring-blue-500 ring-inset' : ''}
-										{isPending ? 'ring-2 ring-orange-400 ring-inset bg-orange-50 hover:bg-orange-100' : ''}"
+										{isPending
+										? 'ring-2 ring-orange-400 ring-inset bg-orange-50 hover:bg-orange-100'
+										: ''}"
 									role="gridcell"
 									tabindex="-1"
-									onclick={(e) => isActive && handleCellClick(s.id, date, e)}
-									ondblclick={(e) => isActive && handleCellDoubleClick(s.id, date, e)}
-									onmousedown={(e) => isActive && handleCellMouseDown(s.id, date, e)}
-									onmousemove={(e) => isActive && handleCellMouseMove(s.id, date, e)}
-									onmouseenter={() => isActive && handleCellMouseEnter(s.id, date)}
-									oncontextmenu={(e) => isActive && handleContextMenu(s.id, date, e)}
+									onclick={(e) =>
+										isActive &&
+										handleCellClick(s.id, date, e)}
+									ondblclick={(e) =>
+										isActive &&
+										handleCellDoubleClick(s.id, date, e)}
+									onmousedown={(e) =>
+										isActive &&
+										handleCellMouseDown(s.id, date, e)}
+									onmousemove={(e) =>
+										isActive &&
+										handleCellMouseMove(s.id, date, e)}
+									onmouseenter={() =>
+										isActive &&
+										handleCellMouseEnter(s.id, date)}
+									oncontextmenu={(e) =>
+										isActive &&
+										handleContextMenu(s.id, date, e)}
 									data-cell-key={cellKey}
-									title="{s.name} - {date}{!isActive ? ' (Inactive)' : ''}{isSelected ? ' (Selected)' : ''}"
+									title="{s.name} - {date}{!isActive
+										? ' (Inactive)'
+										: ''}{isSelected ? ' (Selected)' : ''}"
 								>
 									<!-- Period Label (START/END) -->
 									{#if periodLabel}
@@ -709,22 +854,48 @@
 											{periodLabel}
 										</div>
 									{:else}
-									<!-- Show shift symbol only when no period label -->
-									{#if !isActive}
-										<span class="text-2xl font-bold select-none text-gray-400">-</span>
-									{:else if getCellDisplayValue(cellValue, s.status) === '△'}
-										<svg width="22" height="20" viewBox="0 0 22 20" class="select-none {getSymbolColor(cellValue, s.status)}" style="display:inline-block">
-											<polygon points="11,2 21,18 1,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" />
-										</svg>
-									{:else}
-										<span
-											class="text-2xl font-bold select-none {getSymbolColor(cellValue, s.status)}"
-											style={cellValue === '×' ? 'font-size: 2rem; line-height: 2rem;' : ''}
-										>
-											{getCellDisplayValue(cellValue, s.status)}
-										</span>
+										<!-- Show shift symbol only when no period label -->
+										{#if !isActive}
+											<span
+												class="text-2xl font-bold select-none text-gray-400"
+												>-</span
+											>
+										{:else if getCellDisplayValue(cellValue, s.status) === "△"}
+											<svg
+												width="22"
+												height="20"
+												viewBox="0 0 22 20"
+												class="select-none {getSymbolColor(
+													cellValue,
+													s.status,
+												)}"
+												style="display:inline-block"
+											>
+												<polygon
+													points="11,2 21,18 1,18"
+													fill="none"
+													stroke="currentColor"
+													stroke-width="3.5"
+													stroke-linejoin="round"
+												/>
+											</svg>
+										{:else}
+											<span
+												class="text-2xl font-bold select-none {getSymbolColor(
+													cellValue,
+													s.status,
+												)}"
+												style={cellValue === "×"
+													? "font-size: 2rem; line-height: 2rem;"
+													: ""}
+											>
+												{getCellDisplayValue(
+													cellValue,
+													s.status,
+												)}
+											</span>
+										{/if}
 									{/if}
-								{/if}
 
 									<!-- Pending changes indicator -->
 									{#if isPending}
@@ -744,14 +915,21 @@
 
 								<!-- Shift Dropdown -->
 								{#if showDropdown === cellKey}
-									{@const staffShiftOptions = getShiftOptions(s.status)}
+									{@const staffShiftOptions = getShiftOptions(
+										s.status,
+									)}
 									<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 									<!-- svelte-ignore a11y_click_events_have_key_events -->
 									<div
 										class="shift-dropdown absolute bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[140px]"
-										style={Object.entries(getDropdownPosition(staffIndex, dateIndex))
+										style={Object.entries(
+											getDropdownPosition(
+												staffIndex,
+												dateIndex,
+											),
+										)
 											.map(([k, v]) => `${k}: ${v}`)
-											.join('; ')}
+											.join("; ")}
 										onclick={(e) => e.stopPropagation()}
 										role="listbox"
 										tabindex="-1"
@@ -761,32 +939,52 @@
 												<button
 													type="button"
 													onclick={() =>
-														handleShiftSelect(s.id, date, shift.key === 'late' ? 'late' : shift.symbol)}
+														handleShiftSelect(
+															s.id,
+															date,
+															shift.key === "late"
+																? "late"
+																: shift.symbol,
+														)}
 													class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
 												>
-													<span class="font-bold {shift.color}" style="min-width: 20px;">
-														{shift.symbol || '-'}
+													<span
+														class="font-bold {shift.color}"
+														style="min-width: 20px;"
+													>
+														{shift.symbol || "-"}
 													</span>
-													<span class="text-gray-700">{shift.label}</span>
+													<span class="text-gray-700"
+														>{shift.label}</span
+													>
 												</button>
 											{/each}
 
 											<!-- Custom Text Input -->
-											<div class="border-t border-gray-100 p-2">
+											<div
+												class="border-t border-gray-100 p-2"
+											>
 												<input
 													type="text"
 													class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
 													placeholder="カスタムテキスト..."
 													bind:value={customInputText}
 													onkeydown={(e) => {
-														if (e.key === 'Enter') {
-															handleCustomTextSave(s.id, date);
-														} else if (e.key === 'Escape') {
+														if (e.key === "Enter") {
+															handleCustomTextSave(
+																s.id,
+																date,
+															);
+														} else if (
+															e.key === "Escape"
+														) {
 															handleCustomTextCancel();
 														}
 													}}
 												/>
-												<div class="flex items-center gap-1 mt-2">
+												<div
+													class="flex items-center gap-1 mt-2"
+												>
 													<button
 														type="button"
 														onclick={handleCustomTextCancel}
@@ -796,10 +994,16 @@
 													</button>
 													<button
 														type="button"
-														onclick={() => handleCustomTextSave(s.id, date)}
+														onclick={() =>
+															handleCustomTextSave(
+																s.id,
+																date,
+															)}
 														class="flex-1 px-2 py-1 text-sm text-white bg-green-600 hover:bg-green-700 rounded flex items-center justify-center"
 													>
-														<Check class="w-4 h-4" />
+														<Check
+															class="w-4 h-4"
+														/>
 													</button>
 												</div>
 											</div>
@@ -827,7 +1031,9 @@
 							class="text-center font-bold text-xs bg-yellow-100 text-red-600 py-2"
 							style="min-width: 40px; width: 40px; max-width: 40px;"
 						>
-							{dayOffCount % 1 === 0 ? dayOffCount : dayOffCount.toFixed(1)}
+							{dayOffCount % 1 === 0
+								? dayOffCount
+								: dayOffCount.toFixed(1)}
 						</td>
 					{/each}
 				</tr>
@@ -849,7 +1055,7 @@
 			<button
 				type="button"
 				class="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
-				onclick={() => handleQuickAction('copy')}
+				onclick={() => handleQuickAction("copy")}
 			>
 				<Copy class="w-4 h-4" />
 				Copy ({selection.selectedCells.size} cells)
@@ -858,7 +1064,7 @@
 				<button
 					type="button"
 					class="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
-					onclick={() => handleQuickAction('paste')}
+					onclick={() => handleQuickAction("paste")}
 				>
 					<Clipboard class="w-4 h-4" />
 					Paste
@@ -868,7 +1074,7 @@
 			<button
 				type="button"
 				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-red-600 font-bold flex items-center gap-2"
-				onclick={() => handleQuickAction('off')}
+				onclick={() => handleQuickAction("off")}
 			>
 				<span class="text-xl">×</span>
 				Day Off
@@ -876,17 +1082,28 @@
 			<button
 				type="button"
 				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-blue-600 flex items-center gap-2"
-				onclick={() => handleQuickAction('early')}
+				onclick={() => handleQuickAction("early")}
 			>
-				<svg width="14" height="13" viewBox="0 0 22 20" style="display:inline-block">
-					<polygon points="11,2 21,18 1,18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+				<svg
+					width="14"
+					height="13"
+					viewBox="0 0 22 20"
+					style="display:inline-block"
+				>
+					<polygon
+						points="11,2 21,18 1,18"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.5"
+						stroke-linejoin="round"
+					/>
 				</svg>
 				Early Shift
 			</button>
 			<button
 				type="button"
 				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-yellow-600 font-bold flex items-center gap-2"
-				onclick={() => handleQuickAction('star')}
+				onclick={() => handleQuickAction("star")}
 			>
 				<span>★</span>
 				Star
@@ -895,7 +1112,7 @@
 			<button
 				type="button"
 				class="w-full px-4 py-2 text-left hover:bg-red-100 text-red-600 text-sm"
-				onclick={() => handleQuickAction('clear')}
+				onclick={() => handleQuickAction("clear")}
 			>
 				Clear Selected
 			</button>
@@ -921,7 +1138,8 @@
 	}
 
 	/* All cells get borders */
-	th, td {
+	th,
+	td {
 		border: 1px solid #e5e7eb;
 	}
 
