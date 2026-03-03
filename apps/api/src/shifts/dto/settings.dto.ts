@@ -31,6 +31,11 @@ export class UpdateDailyLimitsDto {
   @IsOptional()
   @IsBoolean()
   is_hard_constraint?: boolean;
+
+  @ApiPropertyOptional({ description: 'Staff type limits stored in limit_config.staffTypeLimits' })
+  @IsOptional()
+  @IsObject()
+  staffTypeLimits?: Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; isHard?: boolean }>;
 }
 
 export class UpdateMonthlyLimitsDto {

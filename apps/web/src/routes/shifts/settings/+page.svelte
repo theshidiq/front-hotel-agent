@@ -38,7 +38,7 @@
 
 	// ── Tab Navigation ──
 	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods';
-	let activeTab: SettingsTab = $state('limits');
+	let activeTab: SettingsTab = $state('groups');
 
 	// ── Data State ──
 	let dailyLimits: DailyLimits | null = $state(null);
@@ -150,13 +150,13 @@
 
 	// Tab definitions
 	const tabs = [
-		{ id: 'limits', label: '制限設定', icon: 'tune', description: '日次・月次の人数制限' },
-		{ id: 'solver', label: 'ソルバー設定', icon: 'psychology', description: '最適化エンジンの設定' },
-		{ id: 'calendar', label: 'カレンダー', icon: 'event_note', description: '祝日・定休日の設定' },
 		{ id: 'groups', label: 'グループ', icon: 'group', description: 'スタッフグループ管理' },
+		{ id: 'limits', label: '制限設定', icon: 'tune', description: '日次・月次の人数制限' },
 		{ id: 'priority', label: '優先ルール', icon: 'priority_high', description: 'シフト優先度ルール' },
+		{ id: 'calendar', label: 'カレンダー', icon: 'event_note', description: '祝日・定休日の設定' },
 		{ id: 'early', label: '早番設定', icon: 'wb_sunny', description: '早番可能スタッフ' },
-		{ id: 'periods', label: '期間設定', icon: 'date_range', description: 'シフト期間の設定' }
+		{ id: 'periods', label: '期間設定', icon: 'date_range', description: 'シフト期間の設定' },
+		{ id: 'solver', label: 'ソルバー設定', icon: 'psychology', description: '最適化エンジンの設定' }
 	] as const;
 </script>
 

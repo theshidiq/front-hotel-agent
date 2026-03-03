@@ -10,6 +10,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -210,7 +211,9 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get daily limits configuration' })
   @ApiResponse({ status: 200, description: 'Daily limits configuration' })
   async getDailyLimits(@GetUser() user: any) {
-    return this.shiftsService.getDailyLimits(user.restaurant_id);
+    const result = await this.shiftsService.getDailyLimits(user.restaurant_id);
+    if (result === null) throw new NotFoundException('Daily limits not configured');
+    return result;
   }
 
   @Patch('settings/daily-limits')
@@ -225,7 +228,9 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get monthly limits configuration' })
   @ApiResponse({ status: 200, description: 'Monthly limits configuration' })
   async getMonthlyLimits(@GetUser() user: any) {
-    return this.shiftsService.getMonthlyLimits(user.restaurant_id);
+    const result = await this.shiftsService.getMonthlyLimits(user.restaurant_id);
+    if (result === null) throw new NotFoundException('Monthly limits not configured');
+    return result;
   }
 
   @Patch('settings/monthly-limits')
@@ -240,7 +245,9 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get solver configuration' })
   @ApiResponse({ status: 200, description: 'Solver configuration' })
   async getSolverConfig(@GetUser() user: any) {
-    return this.shiftsService.getSolverConfig(user.restaurant_id);
+    const result = await this.shiftsService.getSolverConfig(user.restaurant_id);
+    if (result === null) throw new NotFoundException('Solver config not configured');
+    return result;
   }
 
   @Patch('settings/solver-config')
@@ -397,7 +404,9 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get period configuration' })
   @ApiResponse({ status: 200, description: 'Period configuration' })
   async getPeriodConfiguration(@GetUser() user: any) {
-    return this.shiftsService.getPeriodConfiguration(user.restaurant_id);
+    const result = await this.shiftsService.getPeriodConfiguration(user.restaurant_id);
+    if (result === null) throw new NotFoundException('Period configuration not found');
+    return result;
   }
 
   @Patch('settings/period-configuration')

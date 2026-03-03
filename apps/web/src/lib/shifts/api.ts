@@ -193,7 +193,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
 		const error = await response.json().catch(() => ({ message: 'Request failed' }));
 		throw new Error(error.message || `HTTP ${response.status}`);
 	}
-	return response.json();
+	const text = await response.text();
+	if (!text) return null as T;
+	return JSON.parse(text);
 }
 
 // Cached fetch wrapper
@@ -495,6 +497,7 @@ export interface UpdateDailyLimitsData {
 	maxEarlyPerDay?: number;
 	minWorkingStaffPerDay?: number;
 	is_hard_constraint?: boolean;
+	staffTypeLimits?: Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; isHard?: boolean }>;
 }
 
 export async function updateDailyLimits(data: UpdateDailyLimitsData): Promise<DailyLimits> {

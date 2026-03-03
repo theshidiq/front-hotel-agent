@@ -429,32 +429,102 @@ export class ShiftsService {
     const [
       calendarRules,
       dailyLimits,
-      monthlyLimits,
+      allMonthlyLimits,
       solverConfig,
       staffGroups,
       priorityRules,
     ] = await Promise.all([
       this.getCalendarRules(restaurantId),
       this.getDailyLimits(restaurantId),
-      this.getMonthlyLimits(restaurantId),
+      this.getAllMonthlyLimits(restaurantId),
       this.getSolverConfig(restaurantId),
       this.getStaffGroups(restaurantId),
       this.getPriorityRules(restaurantId),
     ]);
 
-    // Build staff groups with members from group_config.members JSONB
+    // Staff groups: members stored in group_config.members JSONB
     const staffGroupsWithMembers = staffGroups.map((group) => ({
       id: group.id,
       name: group.name,
       members: (group.group_config?.members as string[]) || [],
-      config: group.group_config || {},
     }));
 
-    // Generate date range
+    // Daily limits: read from limit_config JSONB
+    const lc = dailyLimits?.limit_config as any;
+    const dailyLimitsRaw = lc ? {
+      minOffPerDay: lc.minOffPerDay ?? 1,
+      maxOffPerDay: lc.maxOffPerDay ?? 3,
+      minEarlyPerDay: lc.minEarlyPerDay ?? 0,
+      maxEarlyPerDay: lc.maxEarlyPerDay ?? 2,
+      minWorkingStaffPerDay: lc.minWorkingStaffPerDay ?? 0,
+      enabled: true,
+    } : undefined;
+
+    // Staff type limits: stored inside daily_limits.limit_config.staffTypeLimits
+    const staffTypeLimits = lc?.staffTypeLimits as Record<string, any> | undefined;
+
+    // Monthly limits: multiple rows, each has scope + targetIds + minCount/maxCount in limit_config
+    const monthlyLimitsArray = allMonthlyLimits.map((ml: any) => {
+      const mlc = ml.limit_config as any;
+      return {
+        id: ml.id,
+        name: ml.name,
+        scope: mlc?.scope || 'all',
+        targetIds: mlc?.targetIds || [],
+        minCount: mlc?.minCount ?? ml.min_count ?? 0,
+        maxCount: mlc?.maxCount ?? ml.max_count ?? 10,
+        excludeCalendarRules: ml.exclude_calendar_rules ?? mlc?.excludeCalendarRules ?? true,
+        isHardConstraint: ml.is_hard_constraint ?? false,
+      };
+    });
+
+    // Priority rules: normalize mixed snake/camelCase rule_definition
+    const normalizedPriorityRules = priorityRules.map((rule: any) => {
+      const rd = rule.rule_definition as any;
+      return {
+        id: rule.id,
+        name: rule.name,
+        ruleType: rd?.ruleType || rd?.type || 'preferred_shift',
+        staffIds: rd?.staffIds || (rd?.staff_id ? [rd.staff_id] : rd?.staff_ids || []),
+        shiftType: rd?.shiftType || rd?.shift_type || 'off',
+        daysOfWeek: rd?.daysOfWeek || rd?.days_of_week || [],
+        allowedShifts: rd?.allowedShifts || rd?.allowed_shifts || [],
+        priorityLevel: rule.priority_level ?? 2,
+        isHardConstraint: rule.is_hard_constraint ?? false,
+        isActive: rule.is_active ?? true,
+      };
+    });
+
+    // Solver config: columns are penalty_weights, hard_constraints, solver_settings (separate JSONB)
+    const penaltyWeights = dto.penaltyWeights || solverConfig?.penalty_weights || {
+      staffGroup: 100,
+      fiveDayRest: 200,
+      monthlyLimit: 80,
+      dailyLimitMax: 50,
+      dailyLimitMin: 50,
+      adjacentConflict: 30,
+    };
+    const hardConstraints = solverConfig?.hard_constraints || {
+      dailyLimits: false,
+      fiveDayRest: false,
+      staffGroups: false,
+      monthlyLimits: false,
+    };
+    const solverSettings = solverConfig?.solver_settings || { timeout: 30, numWorkers: 4 };
+    const timeout = dto.timeout || solverSettings.timeout || 30;
+
+    // Calendar rules: dict keyed by date
+    const calendarRulesDict: Record<string, { must_day_off: boolean; must_work: boolean }> = {};
+    for (const rule of calendarRules) {
+      calendarRulesDict[rule.date] = {
+        must_day_off: rule.rule_type === 'must_day_off',
+        must_work: rule.rule_type === 'must_work',
+      };
+    }
+
     const dateRange = this.generateDateRange(period.start_date, period.end_date);
 
-    // Build OR-Tools request
-    const ortoolsRequest = {
+    const ortoolsRequest: any = {
       staffMembers: staff.map((s) => ({
         id: s.id,
         name: s.name,
@@ -463,49 +533,29 @@ export class ShiftsService {
         staff_order: s.staff_order,
       })),
       dateRange,
-      existingSchedule: dto.preservePrefilled ? schedule?.schedule_data : {},
       constraints: {
-        calendarRules: calendarRules.map((r) => ({
-          date: r.date,
-          rule_type: r.rule_type,
-        })),
-        staffGroups: staffGroupsWithMembers,
-        dailyLimits: dailyLimits?.limit_config
-          ? {
-              minOffPerDay: dailyLimits.limit_config.minOffPerDay,
-              maxOffPerDay: dailyLimits.limit_config.maxOffPerDay,
-              minEarlyPerDay: dailyLimits.limit_config.minEarlyPerDay,
-              maxEarlyPerDay: dailyLimits.limit_config.maxEarlyPerDay,
-              minWorkingStaffPerDay: dailyLimits.limit_config.minWorkingStaffPerDay,
-              is_hard_constraint: dailyLimits.is_hard_constraint,
-            }
-          : undefined,
-        monthlyLimits: monthlyLimits
-          ? {
-              min_count: monthlyLimits.min_count,
-              max_count: monthlyLimits.max_count,
-              is_hard_constraint: monthlyLimits.is_hard_constraint,
-              exclude_calendar_rules: monthlyLimits.limit_config?.exclude_calendar_rules,
-              individual_overrides: monthlyLimits.limit_config?.individual_overrides,
-              staff_status_overrides: monthlyLimits.limit_config?.staff_status_overrides,
-            }
-          : undefined,
-        fiveDayRest: {
-          enabled: solverConfig?.hard_constraints?.fiveDayRest ?? true,
-          is_hard_constraint: solverConfig?.hard_constraints?.fiveDayRest ?? false,
+        ...(Object.keys(calendarRulesDict).length && { calendarRules: calendarRulesDict }),
+        ...(staffGroupsWithMembers.length && { staffGroups: staffGroupsWithMembers }),
+        ...(dailyLimitsRaw && { dailyLimitsRaw }),
+        ...(staffTypeLimits && { staffTypeLimits }),
+        ...(monthlyLimitsArray.length && { monthlyLimitsArray }),
+        ...(normalizedPriorityRules.length && { priorityRules: normalizedPriorityRules }),
+        ...(dto.preservePrefilled && schedule?.schedule_data && {
+          prefilledSchedule: schedule.schedule_data,
+        }),
+        ortoolsConfig: {
+          penaltyWeights,
+          hardConstraints,
+          solverSettings: { timeout, numWorkers: solverSettings.numWorkers || 4 },
         },
       },
-      penaltyWeights: dto.penaltyWeights || solverConfig?.penalty_weights,
-      hardConstraints: solverConfig?.hard_constraints,
-      timeout: dto.timeout || solverConfig?.solver_settings?.timeout || 30,
+      timeout,
       preservePrefilled: dto.preservePrefilled ?? true,
     };
 
-    // Call OR-Tools service
     const result = await this.ortoolsClient.optimize(ortoolsRequest);
 
     if (result.success && result.schedule) {
-      // Save optimized schedule
       await this.bulkUpdateCells(
         restaurantId,
         dto.periodId,
@@ -647,6 +697,7 @@ export class ShiftsService {
       ...(dto.minWorkingStaffPerDay !== undefined && {
         minWorkingStaffPerDay: dto.minWorkingStaffPerDay,
       }),
+      ...(dto.staffTypeLimits !== undefined && { staffTypeLimits: dto.staffTypeLimits }),
     };
 
     if (existing) {
@@ -706,6 +757,22 @@ export class ShiftsService {
     }
 
     return data;
+  }
+
+  async getAllMonthlyLimits(restaurantId: string): Promise<any[]> {
+    const { data, error } = await this.supabase
+      .from('monthly_limits')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      this.logger.error('Failed to fetch all monthly limits', error);
+      return [];
+    }
+
+    return data || [];
   }
 
   async updateMonthlyLimits(

@@ -51,8 +51,11 @@ export interface ScheduleStaffGroup {
 	version_id: string;
 	name: string;
 	description?: string;
-	color?: string;
-	group_config?: Record<string, unknown>;
+	group_config?: {
+		color?: string;
+		members?: string[];
+		[key: string]: unknown;
+	};
 	is_active: boolean;
 	created_at: string;
 	updated_at: string;

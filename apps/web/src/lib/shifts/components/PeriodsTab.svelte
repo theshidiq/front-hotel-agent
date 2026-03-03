@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { PeriodConfiguration } from '$lib/shifts/api';
 	import type { SchedulePeriod } from '$lib/shifts/types';
 	import { updatePeriodConfiguration, regeneratePeriods } from '$lib/shifts/api';
@@ -21,10 +22,13 @@
 
 	// Update local state when props change
 	$effect(() => {
-		if (periodConfig) {
-			startDay = periodConfig.start_day;
-			endDay = periodConfig.end_day;
-		}
+		const pc = periodConfig;
+		untrack(() => {
+			if (pc) {
+				startDay = pc.start_day;
+				endDay = pc.end_day;
+			}
+		});
 	});
 
 	// Common preset configurations

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { ORToolsSolverConfig } from '$lib/shifts/types';
 	import { updateSolverConfig } from '$lib/shifts/api';
 
@@ -99,20 +100,16 @@
 	let isSaving = $state(false);
 	let hasChanges = $state(false);
 
-	// Initialize from props
+	// Initialize from props — writes to localConfig wrapped in untrack to avoid reactive cycle
 	$effect(() => {
-		if (solverConfig) {
-			localConfig = JSON.parse(JSON.stringify(solverConfig));
-			// Detect current preset
-			detectPreset();
-		}
-	});
-
-	// Track changes
-	$effect(() => {
-		if (solverConfig && localConfig) {
-			hasChanges = JSON.stringify(solverConfig) !== JSON.stringify(localConfig);
-		}
+		const sc = solverConfig;
+		untrack(() => {
+			if (sc) {
+				localConfig = JSON.parse(JSON.stringify(sc));
+				detectPreset();
+				hasChanges = false;
+			}
+		});
 	});
 
 	function detectPreset() {

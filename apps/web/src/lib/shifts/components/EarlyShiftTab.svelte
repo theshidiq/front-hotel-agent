@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { EarlyShiftPreference } from '$lib/shifts/api';
 	import type { ScheduleStaff } from '$lib/shifts/types';
 	import { bulkUpsertEarlyShiftPreferences } from '$lib/shifts/api';
@@ -22,20 +23,15 @@
 
 	// Initialize preferences from props
 	$effect(() => {
-		const newPrefs = new Map<string, boolean>();
-
-		// First, set all staff to false by default
-		allStaff.forEach(staff => {
-			newPrefs.set(staff.id, false);
+		const staff = allStaff;
+		const prefs = earlyShiftPreferences;
+		untrack(() => {
+			const newPrefs = new Map<string, boolean>();
+			staff.forEach(s => newPrefs.set(s.id, false));
+			prefs.forEach(pref => newPrefs.set(pref.staff_id, pref.can_do_early_shift));
+			preferences = newPrefs;
+			hasChanges = false;
 		});
-
-		// Then override with actual preferences
-		earlyShiftPreferences.forEach(pref => {
-			newPrefs.set(pref.staff_id, pref.can_do_early_shift);
-		});
-
-		preferences = newPrefs;
-		hasChanges = false;
 	});
 
 	// Group staff by type

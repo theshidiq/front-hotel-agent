@@ -74,7 +74,7 @@
 	let selectedPeriodId: string | null = $state(null);
 	let scheduleData: Record<string, Record<string, string>> = $state({});
 	let dateRange: string[] = $state([]);
-	let loading = $state(true);
+	let loading = $state(false);
 	let loadingSchedule = $state(false);
 	let saving = $state(false);
 	let error = $state("");
@@ -723,7 +723,12 @@
 			{/if}
 
 			<!-- Main Content -->
-			{#if !authState.session && !authState.loading}
+			{#if authState.loading || (loading && staff.length === 0)}
+				<!-- Auth or data loading - show skeleton -->
+				<div class="p-4">
+					<ScheduleSkeleton rows={12} columns={15} />
+				</div>
+			{:else if !authState.session}
 				<!-- Not logged in - show login prompt -->
 				<div class="flex items-center justify-center h-64">
 					<div class="text-center">
@@ -763,11 +768,6 @@
 							Googleでログイン
 						</button>
 					</div>
-				</div>
-			{:else if loading && staff.length === 0}
-				<!-- Skeleton Loading State -->
-				<div class="p-4">
-					<ScheduleSkeleton rows={12} columns={15} />
 				</div>
 			{:else if activeSection === "schedule"}
 				<!-- Schedule Section -->

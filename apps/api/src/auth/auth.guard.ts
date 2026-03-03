@@ -7,11 +7,33 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
+interface CachedUser {
+  user: any;
+  expiresAt: number;
+}
+
+const CACHE_TTL_MS = 30_000; // 30 seconds
+
 @Injectable()
 export class StaffAuthGuard implements CanActivate {
   private readonly logger = new Logger(StaffAuthGuard.name);
+  private readonly cache = new Map<string, CachedUser>();
 
   constructor(private readonly supabaseService: SupabaseService) {}
+
+  private getCached(token: string): any | null {
+    const entry = this.cache.get(token);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(token);
+      return null;
+    }
+    return entry.user;
+  }
+
+  private setCached(token: string, user: any): void {
+    this.cache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -22,6 +44,14 @@ export class StaffAuthGuard implements CanActivate {
     }
 
     const token = authHeader.substring(7);
+
+    // Return cached user data to avoid redundant Supabase calls on parallel requests
+    const cached = this.getCached(token);
+    if (cached) {
+      request.user = cached;
+      return true;
+    }
+
     const supabase = this.supabaseService.getClient();
 
     // Verify the JWT with Supabase Auth
@@ -74,7 +104,7 @@ export class StaffAuthGuard implements CanActivate {
     }
 
     // Attach staff info to request for use in controllers
-    request.user = {
+    const userData = {
       authId: user.id,
       email: staff.email,
       staffId: staff.id,
@@ -86,6 +116,9 @@ export class StaffAuthGuard implements CanActivate {
       permissions,
       restaurant_id: restaurantId,
     };
+
+    this.setCached(token, userData);
+    request.user = userData;
 
     return true;
   }

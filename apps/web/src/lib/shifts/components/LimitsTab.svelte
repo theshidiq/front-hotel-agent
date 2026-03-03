@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { DailyLimits, MonthlyLimits } from '$lib/shifts/types';
-	import { getDailyLimits, updateDailyLimits, getMonthlyLimits, updateMonthlyLimits } from '$lib/shifts/api';
+	import { updateDailyLimits, updateMonthlyLimits } from '$lib/shifts/api';
 
 	interface Props {
 		dailyLimits: DailyLimits | null;
@@ -31,39 +32,63 @@
 		exclude_calendar_rules: true
 	});
 
-	// Staff type limits (future feature)
-	let staffTypeLimits = $state<Record<string, { minOff: number; maxOff: number }>>({
-		'社員': { minOff: 1, maxOff: 2 },
-		'派遣': { minOff: 1, maxOff: 2 },
-		'パート': { minOff: 1, maxOff: 2 }
-	});
+	// Staff type limits — stored in daily_limits.limit_config.staffTypeLimits
+	const DEFAULT_STAFF_TYPE_LIMITS = {
+		'社員': { minOff: 0, maxOff: 1, maxEarly: 2, isHard: false },
+		'派遣': { minOff: 0, maxOff: 1, maxEarly: 2, isHard: false },
+		'パート': { minOff: 0, maxOff: 2, maxEarly: 1, isHard: false }
+	};
+	let staffTypeLimits = $state<Record<string, { minOff: number; maxOff: number; maxEarly: number; isHard: boolean }>>(
+		structuredClone(DEFAULT_STAFF_TYPE_LIMITS)
+	);
 
 	// State
 	let isSaving = $state(false);
 	let hasChanges = $state(false);
 	let feedbackMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
 
-	// Initialize forms from props
+	// Initialize forms from props — only re-runs when dailyLimits/monthlyLimits props change.
+	// Writes to form state are wrapped in untrack so they don't create a reactive cycle.
 	$effect(() => {
-		if (dailyLimits) {
-			dailyForm = {
-				minOffPerDay: dailyLimits.limit_config.minOffPerDay ?? 2,
-				maxOffPerDay: dailyLimits.limit_config.maxOffPerDay ?? 4,
-				minEarlyPerDay: dailyLimits.limit_config.minEarlyPerDay ?? 1,
-				maxEarlyPerDay: dailyLimits.limit_config.maxEarlyPerDay ?? 3,
-				minWorkingStaffPerDay: dailyLimits.limit_config.minWorkingStaffPerDay ?? 5,
-				is_hard_constraint: dailyLimits.is_hard_constraint ?? false
-			};
-		}
-		if (monthlyLimits) {
-			monthlyForm = {
-				min_count: monthlyLimits.min_count ?? 6,
-				max_count: monthlyLimits.max_count ?? 10,
-				is_hard_constraint: monthlyLimits.is_hard_constraint ?? false,
-				exclude_calendar_rules: true
-			};
-		}
-		hasChanges = false;
+		const dl = dailyLimits;
+		const ml = monthlyLimits;
+		untrack(() => {
+			if (dl) {
+				const lc = dl.limit_config as Record<string, unknown>;
+				dailyForm = {
+					minOffPerDay: (lc.minOffPerDay as number) ?? 2,
+					maxOffPerDay: (lc.maxOffPerDay as number) ?? 4,
+					minEarlyPerDay: (lc.minEarlyPerDay as number) ?? 1,
+					maxEarlyPerDay: (lc.maxEarlyPerDay as number) ?? 3,
+					minWorkingStaffPerDay: (lc.minWorkingStaffPerDay as number) ?? 5,
+					is_hard_constraint: dl.is_hard_constraint ?? false
+				};
+				// Load staff type limits from limit_config.staffTypeLimits if present
+				const stl = lc.staffTypeLimits as Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; isHard?: boolean }> | undefined;
+				if (stl) {
+					const merged: Record<string, { minOff: number; maxOff: number; maxEarly: number; isHard: boolean }> = structuredClone(DEFAULT_STAFF_TYPE_LIMITS);
+					for (const [type, vals] of Object.entries(stl)) {
+						merged[type] = {
+							minOff: vals.minOff ?? DEFAULT_STAFF_TYPE_LIMITS[type as keyof typeof DEFAULT_STAFF_TYPE_LIMITS]?.minOff ?? 0,
+							maxOff: vals.maxOff ?? DEFAULT_STAFF_TYPE_LIMITS[type as keyof typeof DEFAULT_STAFF_TYPE_LIMITS]?.maxOff ?? 1,
+							maxEarly: vals.maxEarly ?? DEFAULT_STAFF_TYPE_LIMITS[type as keyof typeof DEFAULT_STAFF_TYPE_LIMITS]?.maxEarly ?? 2,
+							isHard: vals.isHard ?? false
+						};
+					}
+					staffTypeLimits = merged;
+				}
+			}
+			if (ml) {
+				const mlc = ml.limit_config as Record<string, unknown> | undefined;
+				monthlyForm = {
+					min_count: ml.min_count ?? 6,
+					max_count: ml.max_count ?? 10,
+					is_hard_constraint: ml.is_hard_constraint ?? false,
+					exclude_calendar_rules: (mlc?.exclude_calendar_rules as boolean) ?? true
+				};
+			}
+			hasChanges = false;
+		});
 	});
 
 	function markChanged() {
@@ -115,7 +140,8 @@
 		feedbackMessage = null;
 
 		try {
-			// TODO: Implement staff type limits API
+			// Staff type limits are stored inside daily_limits.limit_config.staffTypeLimits
+			await updateDailyLimits({ staffTypeLimits });
 			feedbackMessage = { type: 'success', text: 'スタッフタイプ別制限を保存しました' };
 			hasChanges = false;
 			await onSave();
@@ -199,20 +225,12 @@
 			<h3 class="text-lg font-semibold text-gray-900 mb-4">日次制限設定</h3>
 			<p class="text-sm text-gray-600 mb-6">1日あたりの休みや早番の人数制限を設定します。</p>
 
-			<!-- Info Box -->
-			<div class="mb-6 rounded-lg bg-blue-50 p-4 border border-blue-200">
-				<div class="flex items-start gap-3">
-					<svg class="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-						<path
-							fill-rule="evenodd"
-							d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<div class="text-sm text-blue-800">
-						<p class="font-medium mb-1">日次制限について</p>
-						<p>毎日の出勤バランスを維持するための制限です。ハード制約に設定すると、必ず守られます。</p>
-					</div>
+			<!-- OR-Tools info banner -->
+			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+				<div>
+					<span class="font-medium">OR-Tools連携：</span>
+					各日の休み・早番人数がこの範囲に収まるよう最適化します。ハード制約にすると必ず守られ、ソフト制約はペナルティで調整されます。
 				</div>
 			</div>
 
@@ -320,20 +338,12 @@
 			<h3 class="text-lg font-semibold text-gray-900 mb-4">月次制限設定</h3>
 			<p class="text-sm text-gray-600 mb-6">1ヶ月あたりの休み日数の制限を設定します。</p>
 
-			<!-- Info Box -->
-			<div class="mb-6 rounded-lg bg-blue-50 p-4 border border-blue-200">
-				<div class="flex items-start gap-3">
-					<svg class="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-						<path
-							fill-rule="evenodd"
-							d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<div class="text-sm text-blue-800">
-						<p class="font-medium mb-1">月次制限について</p>
-						<p>各スタッフの月間休み日数を管理します。公平な休み分配のために使用されます。</p>
-					</div>
+			<!-- OR-Tools info banner -->
+			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+				<div>
+					<span class="font-medium">OR-Tools連携：</span>
+					各スタッフの月間休み日数がこの範囲に収まるよう調整します。公平な休み分配を実現します。
 				</div>
 			</div>
 
@@ -419,20 +429,12 @@
 			<h3 class="text-lg font-semibold text-gray-900 mb-4">スタッフタイプ別制限</h3>
 			<p class="text-sm text-gray-600 mb-6">雇用形態ごとに1日あたりの休み人数を制限します。</p>
 
-			<!-- Info Box -->
-			<div class="mb-6 rounded-lg bg-yellow-50 p-4 border border-yellow-200">
-				<div class="flex items-start gap-3">
-					<svg class="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-						<path
-							fill-rule="evenodd"
-							d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-							clip-rule="evenodd"
-						/>
-					</svg>
-					<div class="text-sm text-yellow-800">
-						<p class="font-medium mb-1">スタッフタイプ別制限について</p>
-						<p>社員・派遣・パートなど、雇用形態ごとに同時に休める人数を制限できます。</p>
-					</div>
+			<!-- OR-Tools info banner -->
+			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+				<div>
+					<span class="font-medium">OR-Tools連携：</span>
+					雇用形態ごとの制限は <code class="bg-blue-100 px-1 rounded">limit_config.staffTypeLimits</code> に保存され、OR-Toolsが各タイプの同日休み人数を制御します。
 				</div>
 			</div>
 
@@ -469,6 +471,27 @@
 									onchange={markChanged}
 									min="0"
 								/>
+							</div>
+							<div>
+								<label class="block text-sm font-medium text-gray-700 mb-1">最大早番人数</label>
+								<input
+									type="number"
+									class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+									bind:value={limits.maxEarly}
+									onchange={markChanged}
+									min="0"
+								/>
+							</div>
+							<div class="flex items-center pt-6">
+								<label class="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										bind:checked={limits.isHard}
+										onchange={markChanged}
+										class="w-4 h-4 rounded border-gray-300 text-blue-600"
+									/>
+									<span class="text-sm font-medium text-gray-700">ハード制約</span>
+								</label>
 							</div>
 						</div>
 					</div>
