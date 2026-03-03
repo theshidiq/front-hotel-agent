@@ -750,6 +750,63 @@ Use this if you need the exact gold sparkle-cross nodes (4-point star shape) mat
 | Static background (SSR, no JS, email) | PNG pattern file |
 | App dashboard background | Neither — white `#FFFFFF` only |
 
+### Readability Fix — Gradient Veil over Text Sections
+
+The constellation animation runs full-width across the hero. On the left side where text lives, the moving lines compete with headline readability. Fix this with a gradient veil — a single `div` layered between the canvas and the content that fades the animation out behind the text.
+
+**Layer order (z-index):**
+```
+canvas (z-0) → gradient veil (z-1) → content (z-10)
+```
+
+**Implementation — add this div inside the hero section, after the canvas/particles and before the content wrapper:**
+
+```svelte
+<!-- Gradient veil: solid cream on text-left, fades to transparent on demo-right -->
+<div
+  class="absolute inset-0 z-[1] pointer-events-none"
+  style="background: linear-gradient(105deg, #F5F1EC 28%, rgba(245,241,236,0.88) 45%, rgba(245,241,236,0.3) 62%, transparent 75%)"
+/>
+```
+
+**Full hero section structure:**
+```svelte
+<section class="relative min-h-screen overflow-hidden" style="background: #F5F1EC;">
+
+  <!-- 1. Constellation animation — sits at bottom -->
+  <ConstellationBg class="absolute inset-0 z-0" />
+
+  <!-- 2. Gradient veil — protects text readability on the left -->
+  <div
+    class="absolute inset-0 z-[1] pointer-events-none"
+    style="background: linear-gradient(105deg, #F5F1EC 28%, rgba(245,241,236,0.88) 45%, rgba(245,241,236,0.3) 62%, transparent 75%)"
+  />
+
+  <!-- 3. Content — sits on top -->
+  <div class="relative z-10 flex items-center min-h-screen max-w-7xl mx-auto px-16 py-24">
+    <!-- left: text column -->
+    <div class="w-1/2"> ... </div>
+    <!-- right: app mockup — constellation fully visible here -->
+    <div class="w-1/2"> ... </div>
+  </div>
+
+</section>
+```
+
+**Gradient tuning guide:**
+| Value | Effect |
+|---|---|
+| `28%` — first stop | How far the solid cream extends from the left. Increase to protect more text. |
+| `45%` — mid stop | Where the fade transition happens. Should land roughly at the column gap. |
+| `62%` — third stop | Where the veil becomes mostly transparent. Should clear the mockup area. |
+| `75%` — transparent | Full constellation visible from here rightward. |
+| `105deg` — angle | Diagonal matches a two-column hero layout. Adjust if layout changes. |
+
+**For full-width text sections** (quote block, feature descriptions — no side-by-side layout):
+Do not use the constellation animation at all. Use solid `#F5F1EC` background. The animation is hero-only.
+
+---
+
 ### Performance notes
 - Keep node count ≤ 90 — O(n²) line checks become expensive above that
 - Set `fpsLimit: 60` in tsParticles (already in config above)

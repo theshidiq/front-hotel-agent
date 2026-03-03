@@ -120,10 +120,14 @@
 </nav>
 
 <!-- HERO -->
-<section class="hero">
+<section class="hero relative overflow-hidden">
     <div class="hero-glow"></div>
     <ConstellationCanvas />
-    <div class="hero-inner">
+    <div
+        class="absolute inset-0 z-[1] pointer-events-none"
+        style="background: linear-gradient(105deg, #F5F1EC 28%, rgba(245,241,236,0.88) 45%, rgba(245,241,236,0.3) 62%, transparent 75%)"
+    ></div>
+    <div class="hero-inner relative z-10">
         <div class="hero-left">
             <p class="hero-eyebrow">
                 sinar · nara &nbsp;·&nbsp; ray of light · human being
