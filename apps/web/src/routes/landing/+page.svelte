@@ -251,14 +251,13 @@
     </div>
 </section>
 
-<!-- FEATURES -->
-<section class="features" id="features">
-    <div class="section-inner">
-        <div class="section-label">How it works</div>
-        <h2 class="section-heading">Two things, done with precision.</h2>
-
-        <div class="feature-rows">
-            <!-- Feature 1: Shift Intelligence -->
+<!-- MODERN SCROLL SEQUENCE -->
+<div class="scroll-sequence-wrapper">
+    <!-- CARD 1: Shift Intelligence -->
+    <section class="sticky-stack-card card-shift" id="features">
+        <div class="section-inner">
+            <div class="section-label">How it works</div>
+            <h2 class="section-heading">Two things, done with precision.</h2>
             <div class="feature-row">
                 <div class="feature-content">
                     <div class="feature-num">01</div>
@@ -298,8 +297,12 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </section>
 
-            <!-- Feature 2: Allergen Vision -->
+    <!-- CARD 2: Allergen Vision -->
+    <section class="sticky-stack-card card-allergen">
+        <div class="section-inner">
             <div class="feature-row reversed">
                 <div class="feature-content">
                     <div class="feature-num">02</div>
@@ -337,65 +340,65 @@
                 </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- STELLA -->
-<section class="stella-section" id="stella">
-    <div class="section-inner stella-inner">
-        <div class="stella-phone">
-            <div class="phone-frame">
-                <div class="phone-notch"></div>
-                <div class="phone-screen">
-                    <div class="phone-header">
-                        <span class="stella-star">★</span>
-                        <span>stella</span>
-                        <span class="online-dot"></span>
-                    </div>
-                    <div class="phone-chat">
-                        <div class="msg msg-in">
-                            Good morning. Period 10 is ready — shall I publish
-                            and notify the team?
+    <!-- CARD 3: STELLA -->
+    <section class="sticky-stack-card card-stella stella-section" id="stella">
+        <div class="section-inner stella-inner">
+            <div class="stella-phone">
+                <div class="phone-frame">
+                    <div class="phone-notch"></div>
+                    <div class="phone-screen">
+                        <div class="phone-header">
+                            <span class="stella-star">★</span>
+                            <span>stella</span>
+                            <span class="online-dot"></span>
                         </div>
-                        <div class="msg msg-out">Yes, go ahead.</div>
-                        <div class="msg msg-in">
-                            Done. All 12 staff notified. Room 302 has a late
-                            check-out request.
+                        <div class="phone-chat">
+                            <div class="msg msg-in">
+                                Good morning. Period 10 is ready — shall I
+                                publish and notify the team?
+                            </div>
+                            <div class="msg msg-out">Yes, go ahead.</div>
+                            <div class="msg msg-in">
+                                Done. All 12 staff notified. Room 302 has a late
+                                check-out request.
+                            </div>
+                            <div class="msg msg-out">
+                                Add 1 hour. Adjust Kenji's morning shift.
+                            </div>
+                            <div class="msg msg-in">
+                                Updated. Kenji notified. Anything else?
+                            </div>
+                            <div class="msg msg-out">That's it. Thank you.</div>
                         </div>
-                        <div class="msg msg-out">
-                            Add 1 hour. Adjust Kenji's morning shift.
-                        </div>
-                        <div class="msg msg-in">
-                            Updated. Kenji notified. Anything else?
-                        </div>
-                        <div class="msg msg-out">That's it. Thank you.</div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="stella-content">
-            <div class="section-label">Stella · AI</div>
-            <h2 class="section-heading left">
-                The star your team<br />navigates by.
-            </h2>
-            <p class="stella-desc">
-                Stella is Sinara's AI companion — built to feel, above all else,
-                human. She speaks in plain language, offers choices rather than
-                blank fields, and always leads somewhere useful. For a senior
-                staff member and for a manager encountering AI for the first
-                time, the experience is the same: someone is there, and they are
-                helpful.
-            </p>
-            <ul class="stella-list">
-                <li>Natural language scheduling — no training required</li>
-                <li>Real-time allergen alerts to your team</li>
-                <li>Guest notes and preferences, always at hand</li>
-                <li>Available in multiple languages</li>
-            </ul>
+            <div class="stella-content">
+                <div class="section-label">Stella · AI</div>
+                <h2 class="section-heading left">
+                    The star your team<br />navigates by.
+                </h2>
+                <p class="stella-desc">
+                    Stella is Sinara's AI companion — built to feel, above all
+                    else, human. She speaks in plain language, offers choices
+                    rather than blank fields, and always leads somewhere useful.
+                    For a senior staff member and for a manager encountering AI
+                    for the first time, the experience is the same: someone is
+                    there, and they are helpful.
+                </p>
+                <ul class="stella-list">
+                    <li>Natural language scheduling — no training required</li>
+                    <li>Real-time allergen alerts to your team</li>
+                    <li>Guest notes and preferences, always at hand</li>
+                    <li>Available in multiple languages</li>
+                </ul>
+            </div>
         </div>
-    </div>
-</section>
+    </section>
+</div>
 
 <!-- INDUSTRIES -->
 <section class="industries" id="industries">
@@ -1060,11 +1063,35 @@
         margin: 0;
     }
 
-    /* ── FEATURES ── */
-    .features {
-        padding: 100px 2rem;
-        background: #f5f1ec;
+    /* ── SCROLL SEQUENCE ── */
+    .scroll-sequence-wrapper {
+        position: relative;
+        z-index: 20;
     }
+    .sticky-stack-card {
+        position: sticky;
+        top: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        background: #f5f1ec;
+        box-shadow: 0 -20px 50px rgba(26, 39, 68, 0.03);
+        overflow: hidden;
+        padding: 40px 2rem;
+    }
+    .card-shift {
+        z-index: 1;
+        box-shadow: none; /* First card has no shadow above it */
+        align-items: flex-start;
+        padding-top: 100px;
+    }
+    .card-allergen {
+        z-index: 2;
+    }
+    .card-stella {
+        z-index: 3;
+    }
+
     .section-label {
         font-family: "Instrument Sans", sans-serif;
         font-size: 11px;
@@ -1086,12 +1113,6 @@
     .section-heading.left {
         text-align: left;
         margin-bottom: 1.25rem;
-    }
-
-    .feature-rows {
-        display: flex;
-        flex-direction: column;
-        gap: 80px;
     }
     .feature-row {
         display: grid;
@@ -1248,9 +1269,7 @@
 
     /* ── STELLA ── */
     .stella-section {
-        padding: 100px 2rem;
         background: #f5f1ec;
-        border-top: 1px solid #c8c0b4;
     }
     .stella-inner {
         display: grid;
