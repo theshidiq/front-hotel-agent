@@ -104,6 +104,27 @@
 		isOpen = false;
 	}
 
+	// Keyboard navigation (← → arrow keys)
+	function handleKeyDown(event: KeyboardEvent) {
+		// Skip if an input/textarea is focused or dropdown is open
+		const active = document.activeElement;
+		const isInputFocused =
+			active?.tagName === 'INPUT' ||
+			active?.tagName === 'TEXTAREA' ||
+			(active as HTMLElement)?.contentEditable === 'true' ||
+			isOpen;
+
+		if (isInputFocused) return;
+
+		if (event.key === 'ArrowLeft') {
+			event.preventDefault();
+			prevPeriod();
+		} else if (event.key === 'ArrowRight') {
+			event.preventDefault();
+			nextPeriod();
+		}
+	}
+
 	// Update selected year when current period changes
 	$effect(() => {
 		if (currentPeriod) {
@@ -120,7 +141,7 @@
 	}
 </script>
 
-<svelte:window onclick={handleClickOutside} />
+<svelte:window onclick={handleClickOutside} onkeydown={handleKeyDown} />
 
 <div class="period-picker relative inline-flex items-center gap-1">
 	<!-- Previous Period Button -->
@@ -129,7 +150,7 @@
 		class="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 		onclick={prevPeriod}
 		disabled={!canGoPrev()}
-		title="前の期間"
+		title="前の期間 (← 左矢印キー)"
 	>
 		<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -159,7 +180,7 @@
 		class="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 		onclick={nextPeriod}
 		disabled={!canGoNext()}
-		title="次の期間"
+		title="次の期間 (→ 右矢印キー)"
 	>
 		<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />

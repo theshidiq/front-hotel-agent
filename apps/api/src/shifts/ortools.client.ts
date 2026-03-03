@@ -20,8 +20,8 @@ export interface ORToolsOptimizeRequest {
     staffGroups?: Array<{
       id: string;
       name: string;
-      member_ids: string[];
-      group_config?: Record<string, any>;
+      members: string[];
+      config?: Record<string, any>;
     }>;
     dailyLimits?: {
       minOffPerDay: number;
@@ -178,7 +178,7 @@ export class ORToolsClient implements OnModuleInit {
   }
 
   private convertToORToolsFormat(request: ORToolsOptimizeRequest): any {
-    // Convert staff members
+    // Convert staff members (Python reads these keys directly)
     const staffMembers = request.staffMembers.map((staff) => ({
       id: staff.id,
       name: staff.name,
@@ -187,58 +187,92 @@ export class ORToolsClient implements OnModuleInit {
       staff_order: staff.staff_order || 0,
     }));
 
-    // Build constraints object
+    // Build constraints object using camelCase keys that Python scheduler reads
     const constraints: any = {};
 
-    // Calendar rules
+    // calendarRules: Python expects a DICT keyed by date
+    // { "2026-03-01": { must_day_off: true, must_work: false } }
     if (request.constraints.calendarRules?.length) {
-      constraints.calendar_rules = request.constraints.calendarRules.map((rule) => ({
-        date: rule.date,
-        rule_type: rule.rule_type,
-        staff_ids: rule.staff_ids || [],
-      }));
+      const calendarRulesDict: Record<string, { must_day_off: boolean; must_work: boolean; staff_ids?: string[] }> = {};
+      for (const rule of request.constraints.calendarRules) {
+        calendarRulesDict[rule.date] = {
+          must_day_off: rule.rule_type === 'must_day_off',
+          must_work: rule.rule_type === 'must_work',
+          ...(rule.staff_ids?.length ? { staff_ids: rule.staff_ids } : {}),
+        };
+      }
+      constraints.calendarRules = calendarRulesDict;
     }
 
-    // Staff groups
+    // staffGroups: Python reads group.get('members', []) and group.get('config', {})
     if (request.constraints.staffGroups?.length) {
-      constraints.staff_groups = request.constraints.staffGroups.map((group) => ({
+      constraints.staffGroups = request.constraints.staffGroups.map((group) => ({
         id: group.id,
         name: group.name,
-        member_ids: group.member_ids,
-        config: group.group_config || {},
+        members: group.members,
+        config: group.config || {},
       }));
     }
 
-    // Daily limits
+    // dailyLimitsRaw: camelCase keys that Python reads
     if (request.constraints.dailyLimits) {
-      constraints.daily_limits = {
-        min_off: request.constraints.dailyLimits.minOffPerDay,
-        max_off: request.constraints.dailyLimits.maxOffPerDay,
-        min_early: request.constraints.dailyLimits.minEarlyPerDay,
-        max_early: request.constraints.dailyLimits.maxEarlyPerDay,
-        min_working: request.constraints.dailyLimits.minWorkingStaffPerDay || 0,
-        is_hard: request.constraints.dailyLimits.is_hard_constraint || false,
-      };
-    }
-
-    // Monthly limits
-    if (request.constraints.monthlyLimits) {
-      constraints.monthly_limits = {
-        min_count: request.constraints.monthlyLimits.min_count,
-        max_count: request.constraints.monthlyLimits.max_count,
-        is_hard: request.constraints.monthlyLimits.is_hard_constraint || false,
-        exclude_calendar_rules: request.constraints.monthlyLimits.exclude_calendar_rules || false,
-        individual_overrides: request.constraints.monthlyLimits.individual_overrides || {},
-        staff_status_overrides: request.constraints.monthlyLimits.staff_status_overrides || {},
-      };
-    }
-
-    // Five day rest
-    if (request.constraints.fiveDayRest?.enabled) {
-      constraints.five_day_rest = {
+      constraints.dailyLimitsRaw = {
+        minOffPerDay: request.constraints.dailyLimits.minOffPerDay,
+        maxOffPerDay: request.constraints.dailyLimits.maxOffPerDay,
+        minEarlyPerDay: request.constraints.dailyLimits.minEarlyPerDay,
+        maxEarlyPerDay: request.constraints.dailyLimits.maxEarlyPerDay,
+        minWorkingStaffPerDay: request.constraints.dailyLimits.minWorkingStaffPerDay || 0,
         enabled: true,
-        is_hard: request.constraints.fiveDayRest.is_hard_constraint || false,
       };
+    }
+
+    // monthlyLimit: legacy format Python reads (camelCase values)
+    if (request.constraints.monthlyLimits) {
+      constraints.monthlyLimit = {
+        minCount: request.constraints.monthlyLimits.min_count,
+        maxCount: request.constraints.monthlyLimits.max_count,
+        isHardConstraint: request.constraints.monthlyLimits.is_hard_constraint || false,
+        excludeCalendarRules: request.constraints.monthlyLimits.exclude_calendar_rules ?? true,
+      };
+
+      // Individual staff overrides as monthlyLimitsArray entries
+      if (request.constraints.monthlyLimits.individual_overrides) {
+        const overrideEntries = Object.entries(request.constraints.monthlyLimits.individual_overrides);
+        if (overrideEntries.length) {
+          constraints.monthlyLimitsArray = overrideEntries.map(([staffId, limits]) => ({
+            scope: 'individual',
+            targetIds: [staffId],
+            minCount: (limits as any).min_count,
+            maxCount: (limits as any).max_count,
+            isHardConstraint: request.constraints.monthlyLimits?.is_hard_constraint || false,
+            excludeCalendarRules: request.constraints.monthlyLimits?.exclude_calendar_rules ?? true,
+          }));
+        }
+      }
+
+      // Staff status overrides as monthlyLimitsArray entries
+      if (request.constraints.monthlyLimits.staff_status_overrides) {
+        const statusEntries = Object.entries(request.constraints.monthlyLimits.staff_status_overrides);
+        if (statusEntries.length) {
+          const statusArray = statusEntries.map(([status, limits]) => ({
+            scope: 'staff_status',
+            targetIds: [status],
+            minCount: (limits as any).min_count,
+            maxCount: (limits as any).max_count,
+            isHardConstraint: request.constraints.monthlyLimits?.is_hard_constraint || false,
+            excludeCalendarRules: request.constraints.monthlyLimits?.exclude_calendar_rules ?? true,
+          }));
+          constraints.monthlyLimitsArray = [
+            ...(constraints.monthlyLimitsArray || []),
+            ...statusArray,
+          ];
+        }
+      }
+    }
+
+    // prefilledSchedule: existing schedule to lock as hard constraints
+    if (request.preservePrefilled && request.existingSchedule && Object.keys(request.existingSchedule).length) {
+      constraints.prefilledSchedule = request.existingSchedule;
     }
 
     // Penalty weights
@@ -259,27 +293,33 @@ export class ORToolsClient implements OnModuleInit {
       monthlyLimits: false,
     };
 
+    // ortoolsConfig: penalty weights + hard constraints + solver settings
+    constraints.ortoolsConfig = {
+      penaltyWeights: {
+        staffGroup: penaltyWeights.staffGroup,
+        fiveDayRest: penaltyWeights.fiveDayRest,
+        monthlyLimit: penaltyWeights.monthlyLimit,
+        dailyLimitMax: penaltyWeights.dailyLimitMax,
+        dailyLimitMin: penaltyWeights.dailyLimitMin,
+        adjacentConflict: penaltyWeights.adjacentConflict,
+      },
+      hardConstraints: {
+        dailyLimits: hardConstraints.dailyLimits,
+        fiveDayRest: hardConstraints.fiveDayRest,
+        staffGroups: hardConstraints.staffGroups,
+        monthlyLimits: hardConstraints.monthlyLimits,
+      },
+      solverSettings: {
+        timeout: request.timeout || 30,
+      },
+    };
+
     return {
-      staff_members: staffMembers,
-      date_range: request.dateRange,
-      existing_schedule: request.existingSchedule || {},
+      staffMembers,
+      dateRange: request.dateRange,
       constraints,
-      penalty_weights: {
-        staff_group: penaltyWeights.staffGroup,
-        five_day_rest: penaltyWeights.fiveDayRest,
-        monthly_limit: penaltyWeights.monthlyLimit,
-        daily_limit_max: penaltyWeights.dailyLimitMax,
-        daily_limit_min: penaltyWeights.dailyLimitMin,
-        adjacent_conflict: penaltyWeights.adjacentConflict,
-      },
-      hard_constraints: {
-        daily_limits: hardConstraints.dailyLimits,
-        five_day_rest: hardConstraints.fiveDayRest,
-        staff_groups: hardConstraints.staffGroups,
-        monthly_limits: hardConstraints.monthlyLimits,
-      },
       timeout: request.timeout || 30,
-      preserve_prefilled: request.preservePrefilled ?? true,
+      preservePrefilled: request.preservePrefilled ?? true,
     };
   }
 }

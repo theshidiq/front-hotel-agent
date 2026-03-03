@@ -442,18 +442,13 @@ export class ShiftsService {
       this.getPriorityRules(restaurantId),
     ]);
 
-    // Fetch staff group members
-    const staffGroupsWithMembers = await Promise.all(
-      staffGroups.map(async (group) => {
-        const members = await this.getStaffGroupMembers(restaurantId, group.id);
-        return {
-          id: group.id,
-          name: group.name,
-          member_ids: members.map((m) => m.staff_id),
-          group_config: group.group_config,
-        };
-      }),
-    );
+    // Build staff groups with members from group_config.members JSONB
+    const staffGroupsWithMembers = staffGroups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      members: (group.group_config?.members as string[]) || [],
+      config: group.group_config || {},
+    }));
 
     // Generate date range
     const dateRange = this.generateDateRange(period.start_date, period.end_date);
@@ -911,8 +906,11 @@ export class ShiftsService {
         version_id: versionId,
         name: dto.name,
         description: dto.description,
-        color: dto.color,
-        group_config: dto.group_config,
+        group_config: {
+          ...(dto.group_config || {}),
+          color: dto.color || (dto.group_config as any)?.color || '#3B82F6',
+          members: (dto.group_config as any)?.members || [],
+        },
         is_active: true,
       })
       .select()
@@ -931,9 +929,30 @@ export class ShiftsService {
     id: string,
     dto: UpdateStaffGroupDto,
   ): Promise<ScheduleStaffGroup> {
+    // Fetch existing to preserve group_config.members when updating name/color/description
+    const { data: existing } = await this.supabase
+      .from('staff_groups')
+      .select('group_config')
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .single();
+
+    const updatePayload: any = { updated_at: new Date().toISOString() };
+    if (dto.name !== undefined) updatePayload.name = dto.name;
+    if (dto.description !== undefined) updatePayload.description = dto.description;
+    if (dto.is_active !== undefined) updatePayload.is_active = dto.is_active;
+    // Merge color into group_config, preserving existing members
+    if (dto.color !== undefined || dto.group_config !== undefined) {
+      updatePayload.group_config = {
+        ...(existing?.group_config || {}),
+        ...(dto.group_config || {}),
+        ...(dto.color !== undefined ? { color: dto.color } : {}),
+      };
+    }
+
     const { data, error } = await this.supabase
       .from('staff_groups')
-      .update({ ...dto, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', id)
       .eq('restaurant_id', restaurantId)
       .select()
@@ -964,18 +983,21 @@ export class ShiftsService {
     restaurantId: string,
     groupId: string,
   ): Promise<Array<{ staff_id: string; group_id: string }>> {
+    // Members are stored in group_config.members JSONB array on the staff_groups table
     const { data, error } = await this.supabase
-      .from('staff_backup_assignments')
-      .select('staff_id, group_id')
-      .eq('group_id', groupId)
-      .eq('is_active', true);
+      .from('staff_groups')
+      .select('id, group_config')
+      .eq('id', groupId)
+      .eq('restaurant_id', restaurantId)
+      .single();
 
     if (error) {
       this.logger.error('Failed to fetch staff group members', error);
       throw new BadRequestException('Failed to fetch staff group members');
     }
 
-    return data || [];
+    const memberIds: string[] = data?.group_config?.members || [];
+    return memberIds.map((staffId) => ({ staff_id: staffId, group_id: groupId }));
   }
 
   async setStaffGroupMembers(
@@ -983,29 +1005,33 @@ export class ShiftsService {
     groupId: string,
     staffIds: string[],
   ): Promise<void> {
-    // Soft delete existing members
-    await this.supabase
-      .from('staff_backup_assignments')
-      .update({ is_active: false })
-      .eq('group_id', groupId);
+    // Store members in group_config.members JSONB on the staff_groups table
+    const { data: existing, error: fetchError } = await this.supabase
+      .from('staff_groups')
+      .select('group_config')
+      .eq('id', groupId)
+      .eq('restaurant_id', restaurantId)
+      .single();
 
-    // Insert new members
-    if (staffIds.length > 0) {
-      const versionId = await this.getOrCreateConfigVersion(restaurantId);
-      const { error } = await this.supabase.from('staff_backup_assignments').insert(
-        staffIds.map((staffId) => ({
-          restaurant_id: restaurantId,
-          version_id: versionId,
-          group_id: groupId,
-          staff_id: staffId,
-          is_active: true,
-        })),
-      );
+    if (fetchError) {
+      this.logger.error('Failed to fetch staff group for member update', fetchError);
+      throw new BadRequestException('Failed to fetch staff group');
+    }
 
-      if (error) {
-        this.logger.error('Failed to set staff group members', error);
-        throw new BadRequestException('Failed to set staff group members');
-      }
+    const updatedConfig = {
+      ...(existing?.group_config || {}),
+      members: staffIds,
+    };
+
+    const { error } = await this.supabase
+      .from('staff_groups')
+      .update({ group_config: updatedConfig, updated_at: new Date().toISOString() })
+      .eq('id', groupId)
+      .eq('restaurant_id', restaurantId);
+
+    if (error) {
+      this.logger.error('Failed to set staff group members', error);
+      throw new BadRequestException('Failed to set staff group members');
     }
   }
 

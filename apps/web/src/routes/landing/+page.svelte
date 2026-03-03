@@ -562,7 +562,7 @@
     }
 
     /* ── TOKENS ── */
-    /* bg-canvas:   #FAF9F5  (off-white, paper-like) */
+    /* bg-canvas:   #FCFCFB  (off-white, paper-like) */
     /* bg-surface:  #FFFFFF  (pure white cards) */
     /* text-head:   #1E2A4A  (deep brand navy) */
     /* text-body:   #4A5568  (slate gray-blue) */
@@ -584,7 +584,7 @@
             border-bottom 0.3s;
     }
     .navbar.scrolled {
-        background: rgba(250, 249, 245, 0.95);
+        background: rgba(252, 252, 251, 0.95);
         backdrop-filter: blur(16px);
         border-bottom: 1px solid rgba(30, 42, 74, 0.06);
     }
@@ -1205,10 +1205,10 @@
         color: #faf9f5;
     }
     .waitlist-sub {
-        color: rgba(250, 249, 245, 0.7);
+        color: rgba(252, 252, 251, 0.7);
     }
     .waitlist-fine {
-        color: rgba(250, 249, 245, 0.4);
+        color: rgba(252, 252, 251, 0.4);
     }
 
     .waitlist-form .btn-navy {
@@ -1223,12 +1223,12 @@
     /* ── FOOTER ── */
     .footer {
         background: #162038;
-        border-top-color: rgba(250, 249, 245, 0.05);
+        border-top-color: rgba(252, 252, 251, 0.05);
     }
     .footer-logo svg line,
     .footer-logo svg circle {
-        stroke: rgba(250, 249, 245, 0.2) !important;
-        fill: rgba(250, 249, 245, 0.2) !important;
+        stroke: rgba(252, 252, 251, 0.2) !important;
+        fill: rgba(252, 252, 251, 0.2) !important;
     }
     .footer-logo svg circle:last-of-type {
         fill: #c4963a !important;
@@ -1241,10 +1241,10 @@
     } /* Navbar logo must be dark */
 
     .footer-tag {
-        color: rgba(250, 249, 245, 0.4);
+        color: rgba(252, 252, 251, 0.4);
     }
     .footer-links a {
-        color: rgba(250, 249, 245, 0.5);
+        color: rgba(252, 252, 251, 0.5);
     }
     .footer-links a:hover {
         color: #faf9f5;

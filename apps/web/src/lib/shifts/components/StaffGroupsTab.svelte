@@ -49,15 +49,15 @@ let availableStaff = $derived.by(() => {
   return allStaff.filter(staff => !groupMemberIds.includes(String(staff.id)));
 });
 
-// Load members for all groups
-async function loadAllMembers() {
+// Load members from group_config.members (already in the prop)
+function loadAllMembers() {
   for (const group of staffGroups) {
-    const members = await getStaffGroupMembers(group.id);
-    groupMembers.set(group.id, members);
+    const memberIds: string[] = (group.group_config?.members as string[]) || [];
+    groupMembers.set(group.id, memberIds.map(staffId => ({ staff_id: staffId, group_id: group.id })));
   }
 }
 
-// Initial load
+// Initial load and sync when staffGroups prop changes
 $effect(() => {
   loadAllMembers();
 });
@@ -159,12 +159,12 @@ async function handleAddMember(groupId: string) {
 
     await setStaffGroupMembers(groupId, newMemberIds);
 
-    // Reload members
-    const updatedMembers = await getStaffGroupMembers(groupId);
-    groupMembers.set(groupId, updatedMembers);
+    // Update local state immediately
+    groupMembers.set(groupId, newMemberIds.map(id => ({ staff_id: id, group_id: groupId })));
 
     addingMemberToGroup = null;
     selectedStaffId = null;
+    await onGroupsChange();
     showSuccess('メンバーを追加しました');
   } catch (err) {
     error = err instanceof Error ? err.message : 'メンバーの追加に失敗しました';
@@ -185,10 +185,10 @@ async function handleRemoveMember(groupId: string, staffId: string) {
 
     await setStaffGroupMembers(groupId, newMemberIds);
 
-    // Reload members
-    const updatedMembers = await getStaffGroupMembers(groupId);
-    groupMembers.set(groupId, updatedMembers);
+    // Update local state immediately
+    groupMembers.set(groupId, newMemberIds.map(id => ({ staff_id: id, group_id: groupId })));
 
+    await onGroupsChange();
     showSuccess('メンバーを削除しました');
   } catch (err) {
     error = err instanceof Error ? err.message : 'メンバーの削除に失敗しました';

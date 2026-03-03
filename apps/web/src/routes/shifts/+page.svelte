@@ -134,34 +134,21 @@
 
 			// Select the period that contains today's date, or the closest upcoming/recent one
 			if (periods.length > 0) {
-				const today = new Date();
-				today.setHours(0, 0, 0, 0);
-				console.log('📊 [loadInitialData] Today:', today.toISOString());
+				// Use local date string (YYYY-MM-DD) for timezone-safe comparison
+				const now = new Date();
+				const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-				// Find period that contains today
-				let selectedPeriod = periods.find(p => {
-					const start = new Date(p.start_date);
-					const end = new Date(p.end_date);
-					start.setHours(0, 0, 0, 0);
-					end.setHours(23, 59, 59, 999);
-					const contains = today >= start && today <= end;
-					console.log(`📊 [loadInitialData] Checking ${p.label}: ${p.start_date} to ${p.end_date} -> ${contains ? 'CONTAINS TODAY' : 'no'}`);
-					return contains;
-				});
+				// Find period that contains today using string comparison (avoids UTC parsing issues)
+				let selectedPeriod = periods.find(p => todayStr >= p.start_date && todayStr <= p.end_date);
 
-				// If no period contains today, find the closest one
+				// If no period contains today, find the most recent past period (not closest by distance)
 				if (!selectedPeriod) {
-					console.log('📊 [loadInitialData] No period contains today, finding closest...');
-					const sortedPeriods = [...periods].sort((a, b) => {
-						const aStart = new Date(a.start_date).getTime();
-						const bStart = new Date(b.start_date).getTime();
-						const todayTime = today.getTime();
-						return Math.abs(aStart - todayTime) - Math.abs(bStart - todayTime);
-					});
-					selectedPeriod = sortedPeriods[0];
+					const pastPeriods = periods
+						.filter(p => p.start_date <= todayStr)
+						.sort((a, b) => b.start_date.localeCompare(a.start_date));
+					selectedPeriod = pastPeriods[0] ?? [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
 				}
 
-				console.log('📊 [loadInitialData] Selected period:', selectedPeriod?.label, selectedPeriod?.id);
 				selectedPeriodId = selectedPeriod.id;
 				await loadSchedule(selectedPeriod.id);
 
@@ -526,7 +513,7 @@
 				</button>
 			</div>
 
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-3">
 				{#if optimizerHealthy}
 					<span class="text-xs text-green-600 flex items-center gap-1">
 						<span class="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -538,6 +525,13 @@
 						Optimizer Offline
 					</span>
 				{/if}
+				<button
+					class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+					onclick={openAddStaffModal}
+					title="スタッフ追加"
+				>
+					<span class="material-symbols-rounded text-xl">person_add</span>
+				</button>
 			</div>
 		</div>
 	</header>
@@ -607,13 +601,13 @@
 
 				<!-- Actions -->
 				<div class="flex items-center gap-2">
-					<button
-						class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
-						onclick={openAddStaffModal}
+					<a
+						href="/shifts/settings"
+						class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+						title="制約設定"
 					>
-						<span class="material-symbols-rounded text-sm">person_add</span>
-						スタッフ追加
-					</button>
+						<span class="material-symbols-rounded text-xl">tune</span>
+					</a>
 
 					<button
 						class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50"
