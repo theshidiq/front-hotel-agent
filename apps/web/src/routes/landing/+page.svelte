@@ -44,17 +44,17 @@
                 viewBox="0 0 32 32"
                 fill="none"
             >
-                <circle cx="8" cy="8" r="2.5" fill="rgba(240,235,224,0.35)" />
-                <circle cx="24" cy="6" r="2.5" fill="rgba(240,235,224,0.35)" />
-                <circle cx="26" cy="22" r="2.5" fill="rgba(240,235,224,0.35)" />
-                <circle cx="6" cy="26" r="2.5" fill="rgba(240,235,224,0.35)" />
+                <circle cx="8" cy="8" r="2.5" fill="rgba(30,42,74,0.35)" />
+                <circle cx="24" cy="6" r="2.5" fill="rgba(30,42,74,0.35)" />
+                <circle cx="26" cy="22" r="2.5" fill="rgba(30,42,74,0.35)" />
+                <circle cx="6" cy="26" r="2.5" fill="rgba(30,42,74,0.35)" />
                 <circle cx="16" cy="16" r="3.5" fill="#C4963A" />
                 <line
                     x1="8"
                     y1="8"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.15)"
+                    stroke="rgba(30,42,74,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -62,7 +62,7 @@
                     y1="6"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.15)"
+                    stroke="rgba(30,42,74,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -70,7 +70,7 @@
                     y1="22"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.15)"
+                    stroke="rgba(30,42,74,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -78,7 +78,7 @@
                     y1="26"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.15)"
+                    stroke="rgba(30,42,74,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -86,7 +86,7 @@
                     y1="8"
                     x2="24"
                     y2="6"
-                    stroke="rgba(240,235,224,0.08)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -94,7 +94,7 @@
                     y1="26"
                     x2="26"
                     y2="22"
-                    stroke="rgba(240,235,224,0.08)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
             </svg>
@@ -110,7 +110,7 @@
 
         <div class="nav-actions">
             <a href="/login" class="nav-login">Log in</a>
-            <a href="#contact" class="btn-gold">Book a Demo</a>
+            <a href="#contact" class="btn-navy">Book a Demo</a>
         </div>
     </div>
 </nav>
@@ -136,8 +136,8 @@
             </p>
 
             <div class="hero-ctas">
-                <a href="#contact" class="btn-gold">Book a Demo</a>
-                <a href="#features" class="btn-ghost">See how it works</a>
+                <a href="#contact" class="btn-navy">Book a Demo</a>
+                <a href="#features" class="btn-ghost-dark">See how it works</a>
             </div>
 
             <div class="hero-trust">
@@ -169,9 +169,14 @@
                     </div>
                     <div class="shift-grid">
                         <div class="staff-col">
-                            {#each [{ name: "Yui", role: "Server" }, { name: "Kenji", role: "Cook" }, { name: "Mia", role: "Service" }, { name: "Ryo", role: "Kitchen" }] as s}
+                            {#each [{ name: "Yui", role: "Server", color: "#FFF4E5" }, { name: "Kenji", role: "Cook", color: "#E5F0FF" }, { name: "Mia", role: "Service", color: "#F0E5FF" }, { name: "Ryo", role: "Kitchen", color: "#E5FFF0" }] as s}
                                 <div class="staff-row">
-                                    <div class="staff-avatar">{s.name[0]}</div>
+                                    <div
+                                        class="staff-avatar"
+                                        style="background: {s.color}"
+                                    >
+                                        {s.name[0]}
+                                    </div>
                                     <div class="staff-info">
                                         <span class="staff-name">{s.name}</span>
                                         <span class="staff-role">{s.role}</span>
@@ -410,16 +415,16 @@
     <div class="section-inner">
         <div class="constellation-line">
             <svg width="200" height="80" viewBox="0 0 200 80" fill="none">
-                <circle cx="20" cy="40" r="4" fill="rgba(240,235,224,0.3)" />
-                <circle cx="90" cy="15" r="4" fill="rgba(240,235,224,0.3)" />
-                <circle cx="160" cy="55" r="4" fill="rgba(240,235,224,0.3)" />
+                <circle cx="20" cy="40" r="4" fill="rgba(30,42,74,0.15)" />
+                <circle cx="90" cy="15" r="4" fill="rgba(30,42,74,0.15)" />
+                <circle cx="160" cy="55" r="4" fill="rgba(30,42,74,0.15)" />
                 <circle cx="100" cy="50" r="5" fill="#C4963A" />
                 <line
                     x1="20"
                     y1="40"
                     x2="90"
                     y2="15"
-                    stroke="rgba(240,235,224,0.15)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -427,7 +432,7 @@
                     y1="15"
                     x2="160"
                     y2="55"
-                    stroke="rgba(240,235,224,0.15)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -435,7 +440,7 @@
                     y1="15"
                     x2="100"
                     y2="50"
-                    stroke="rgba(240,235,224,0.15)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
             </svg>
@@ -476,7 +481,7 @@
                     bind:value={emailInput}
                     required
                 />
-                <button type="submit" class="btn-gold">Book a Demo</button>
+                <button type="submit" class="btn-navy">Book a Demo</button>
             </form>
         {/if}
 
@@ -492,17 +497,17 @@
     <div class="footer-inner">
         <a href="/landing" class="logo footer-logo">
             <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
-                <circle cx="8" cy="8" r="2" fill="rgba(240,235,224,0.25)" />
-                <circle cx="24" cy="6" r="2" fill="rgba(240,235,224,0.25)" />
-                <circle cx="26" cy="22" r="2" fill="rgba(240,235,224,0.25)" />
-                <circle cx="6" cy="26" r="2" fill="rgba(240,235,224,0.25)" />
+                <circle cx="8" cy="8" r="2" fill="rgba(30,42,74,0.15)" />
+                <circle cx="24" cy="6" r="2" fill="rgba(30,42,74,0.15)" />
+                <circle cx="26" cy="22" r="2" fill="rgba(30,42,74,0.15)" />
+                <circle cx="6" cy="26" r="2" fill="rgba(30,42,74,0.15)" />
                 <circle cx="16" cy="16" r="3" fill="#C4963A" />
                 <line
                     x1="8"
                     y1="8"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.12)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -510,7 +515,7 @@
                     y1="6"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.12)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -518,7 +523,7 @@
                     y1="22"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.12)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -526,7 +531,7 @@
                     y1="26"
                     x2="16"
                     y2="16"
-                    stroke="rgba(240,235,224,0.12)"
+                    stroke="rgba(30,42,74,0.08)"
                     stroke-width="1"
                 />
             </svg>
@@ -548,8 +553,8 @@
 <style>
     :global(body) {
         margin: 0;
-        background: #1e2a4a;
-        color: #f0ebe0;
+        background: #faf9f5; /* Canvas cream white */
+        color: #2d3a5d; /* Darker navy body text */
         font-family: "Instrument Sans", system-ui, sans-serif;
         font-size: 16px;
         line-height: 1.6;
@@ -557,12 +562,11 @@
     }
 
     /* ── TOKENS ── */
-    /* bg-primary:  #1E2A4A  (warm navy, brand-true) */
-    /* bg-section:  #162038  (slightly deeper) */
-    /* bg-card:     #243150  (card surface) */
-    /* text-body:   rgba(240,235,224,0.8) — readable for 40+ */
+    /* bg-canvas:   #FAF9F5  (off-white, paper-like) */
+    /* bg-surface:  #FFFFFF  (pure white cards) */
+    /* text-head:   #1E2A4A  (deep brand navy) */
+    /* text-body:   #4A5568  (slate gray-blue) */
     /* gold:        #C4963A */
-    /* cream:       #f0ebe0  */
 
     /* ── NAVBAR ── */
     .navbar {
@@ -580,9 +584,9 @@
             border-bottom 0.3s;
     }
     .navbar.scrolled {
-        background: rgba(30, 42, 74, 0.95);
+        background: rgba(250, 249, 245, 0.95);
         backdrop-filter: blur(16px);
-        border-bottom: 1px solid rgba(240, 235, 224, 0.08);
+        border-bottom: 1px solid rgba(30, 42, 74, 0.06);
     }
     .nav-inner {
         max-width: 1100px;
@@ -602,7 +606,7 @@
     .logo-text {
         font-family: "Instrument Serif", serif;
         font-size: 1.45rem;
-        color: #f0ebe0;
+        color: #1e2a4a;
         letter-spacing: -0.02em;
     }
     .nav-links {
@@ -612,13 +616,14 @@
         justify-content: center;
     }
     .nav-links a {
-        color: rgba(240, 235, 224, 0.65);
+        color: #4a5568;
         text-decoration: none;
         font-size: 0.9rem;
+        font-weight: 500;
         transition: color 0.2s;
     }
     .nav-links a:hover {
-        color: #f0ebe0;
+        color: #1e2a4a;
     }
     .nav-actions {
         display: flex;
@@ -626,20 +631,21 @@
         gap: 1rem;
     }
     .nav-login {
-        color: rgba(240, 235, 224, 0.65);
+        color: #4a5568;
         text-decoration: none;
         font-size: 0.9rem;
+        font-weight: 500;
         transition: color 0.2s;
     }
     .nav-login:hover {
-        color: #f0ebe0;
+        color: #1e2a4a;
     }
 
     /* ── BUTTONS ── */
-    .btn-gold {
-        background: #c4963a;
-        color: #1e2a4a;
-        font-weight: 600;
+    .btn-navy {
+        background: #1e2a4a;
+        color: #faf9f5;
+        font-weight: 500;
         font-size: 0.9rem;
         padding: 0.65rem 1.4rem;
         border-radius: 6px;
@@ -647,29 +653,31 @@
         border: none;
         cursor: pointer;
         transition:
-            opacity 0.2s,
-            transform 0.15s;
+            transform 0.15s,
+            box-shadow 0.2s;
         display: inline-block;
         font-family: inherit;
+        box-shadow: 0 4px 12px rgba(30, 42, 74, 0.15);
     }
-    .btn-gold:hover {
-        opacity: 0.88;
+    .btn-navy:hover {
         transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(30, 42, 74, 0.2);
     }
-    .btn-ghost {
-        color: rgba(240, 235, 224, 0.7);
-        border: 1px solid rgba(240, 235, 224, 0.2);
+    .btn-ghost-dark {
+        color: #4a5568;
+        border: 1px solid rgba(30, 42, 74, 0.15);
         padding: 0.65rem 1.4rem;
         border-radius: 6px;
         text-decoration: none;
         font-size: 0.9rem;
+        font-weight: 500;
         transition:
             border-color 0.2s,
             color 0.2s;
     }
-    .btn-ghost:hover {
-        border-color: rgba(196, 150, 58, 0.5);
-        color: #f0ebe0;
+    .btn-ghost-dark:hover {
+        border-color: rgba(30, 42, 74, 0.4);
+        color: #1e2a4a;
     }
 
     /* ── HERO ── */
@@ -680,18 +688,18 @@
         padding: 110px 2rem 70px;
         position: relative;
         overflow: hidden;
-        background: linear-gradient(135deg, #1e2a4a 0%, #162038 100%);
+        background: #faf9f5;
     }
     .hero-glow {
         position: absolute;
-        top: 20%;
-        right: 10%;
-        width: 500px;
-        height: 350px;
+        top: -10%;
+        right: -5%;
+        width: 700px;
+        height: 700px;
         background: radial-gradient(
-            ellipse,
-            rgba(196, 150, 58, 0.07) 0%,
-            transparent 70%
+            circle,
+            rgba(196, 150, 58, 0.06) 0%,
+            transparent 60%
         );
         pointer-events: none;
     }
@@ -704,10 +712,7 @@
         gap: 4rem;
         align-items: center;
     }
-    .hero-left {
-    }
 
-    /* The etymological hook — first thing a GM reads */
     .hero-eyebrow {
         font-size: 0.78rem;
         letter-spacing: 0.06em;
@@ -721,19 +726,19 @@
         font-size: clamp(2.8rem, 5.5vw, 4.2rem);
         line-height: 1.05;
         letter-spacing: -0.02em;
-        color: #f0ebe0;
+        color: #1e2a4a;
         margin: 0 0 0.25rem;
     }
     .hero-sub-headline {
         font-family: "Instrument Serif", serif;
         font-size: clamp(1.3rem, 2.5vw, 1.7rem);
         font-style: italic;
-        color: rgba(240, 235, 224, 0.5);
+        color: #4a5568;
         margin: 0 0 1.5rem;
         letter-spacing: -0.01em;
     }
     .hero-sub {
-        color: rgba(240, 235, 224, 0.72);
+        color: #4a5568;
         font-size: 1.05rem;
         line-height: 1.75;
         max-width: 440px;
@@ -750,27 +755,27 @@
         align-items: center;
         gap: 0.5rem;
         font-size: 0.85rem;
-        color: rgba(240, 235, 224, 0.4);
+        color: #718096;
         flex-wrap: wrap;
     }
     .trust-sep {
-        color: rgba(240, 235, 224, 0.2);
+        color: rgba(30, 42, 74, 0.2);
     }
 
-    /* ── HERO APP MOCKUP ── */
+    /* ── HERO APP MOCKUP (Light Mode) ── */
     .hero-right {
         position: relative;
     }
     .app-mockup {
-        background: #243150;
-        border: 1px solid rgba(240, 235, 224, 0.1);
+        background: #ffffff;
+        border: 1px solid rgba(30, 42, 74, 0.08);
         border-radius: 14px;
         overflow: hidden;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 24px 60px rgba(30, 42, 74, 0.08);
     }
     .mockup-bar {
-        background: #1a2540;
-        border-bottom: 1px solid rgba(240, 235, 224, 0.06);
+        background: #f8f9fa;
+        border-bottom: 1px solid rgba(30, 42, 74, 0.06);
         padding: 10px 14px;
         display: flex;
         align-items: center;
@@ -784,11 +789,11 @@
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: rgba(240, 235, 224, 0.1);
+        background: rgba(30, 42, 74, 0.15);
     }
     .mockup-url {
         font-size: 0.7rem;
-        color: rgba(240, 235, 224, 0.3);
+        color: #718096;
         flex: 1;
     }
     .mockup-body {
@@ -802,14 +807,14 @@
     }
     .shift-title {
         font-size: 0.82rem;
-        color: rgba(240, 235, 224, 0.65);
-        font-weight: 500;
+        color: #1e2a4a;
+        font-weight: 600;
     }
     .shift-badge {
         font-size: 0.68rem;
-        color: #4ade80;
-        background: rgba(74, 222, 128, 0.1);
-        border: 1px solid rgba(74, 222, 128, 0.2);
+        color: #047857;
+        background: #d1fae5;
+        border: 1px solid #a7f3d0;
         padding: 2px 8px;
         border-radius: 100px;
     }
@@ -828,14 +833,14 @@
         align-items: center;
         gap: 8px;
         padding: 6px 8px;
-        background: rgba(240, 235, 224, 0.04);
+        background: #f8f9fa;
         border-radius: 6px;
+        border: 1px solid rgba(30, 42, 74, 0.03);
     }
     .staff-avatar {
         width: 24px;
         height: 24px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #c4963a, #8b6a28);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -843,6 +848,7 @@
         font-weight: 600;
         color: #1e2a4a;
         flex-shrink: 0;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
     }
     .staff-info {
         display: flex;
@@ -850,12 +856,12 @@
     }
     .staff-name {
         font-size: 0.72rem;
-        color: rgba(240, 235, 224, 0.8);
-        font-weight: 500;
+        color: #1e2a4a;
+        font-weight: 600;
     }
     .staff-role {
         font-size: 0.62rem;
-        color: rgba(240, 235, 224, 0.35);
+        color: #718096;
     }
     .days-col {
         display: flex;
@@ -876,22 +882,24 @@
         justify-content: center;
         font-size: 0.62rem;
         font-weight: 600;
-        background: rgba(240, 235, 224, 0.04);
-        color: rgba(240, 235, 224, 0.2);
+        background: #f8f9fa;
+        border: 1px solid rgba(30, 42, 74, 0.03);
+        color: #a0aec0;
     }
     .shift-cell.morning {
-        background: rgba(96, 165, 250, 0.15);
-        color: #60a5fa;
+        background: #ebf8ff;
+        color: #3182ce;
+        border-color: #bee3f8;
     }
     .shift-cell.evening {
-        background: rgba(196, 150, 58, 0.15);
-        color: #c4963a;
+        background: #fff5f5;
+        color: #e53e3e;
+        border-color: #fed7d7;
     }
     .shift-cell.off {
-        background: rgba(240, 235, 224, 0.03);
+        background: #f8f9fa;
     }
 
-    /* Outcome bar — shows GM-level results, not automation mechanics */
     .outcome-bar {
         display: flex;
         gap: 8px;
@@ -903,9 +911,10 @@
         align-items: center;
         gap: 6px;
         font-size: 0.72rem;
-        color: rgba(240, 235, 224, 0.65);
-        background: rgba(240, 235, 224, 0.04);
-        border: 1px solid rgba(240, 235, 224, 0.08);
+        color: #4a5568;
+        font-weight: 500;
+        background: #f8f9fa;
+        border: 1px solid rgba(30, 42, 74, 0.06);
         padding: 5px 10px;
         border-radius: 6px;
     }
@@ -913,38 +922,28 @@
         width: 6px;
         height: 6px;
         border-radius: 50%;
-        background: #4ade80;
+        background: #10b981;
         flex-shrink: 0;
     }
     .oc-dot.warn {
-        background: #fbbf24;
+        background: #f59e0b;
     }
 
-    /* Stella notification card — a human moment, not a system alert */
+    /* Stella notification card (Light Theme) */
     .story-card {
         position: absolute;
         bottom: -16px;
         left: -20px;
-        background: #243150;
-        border: 1px solid rgba(196, 150, 58, 0.25);
+        background: #ffffff;
+        border: 1px solid rgba(196, 150, 58, 0.3);
         border-radius: 10px;
         padding: 12px 16px;
         display: flex;
         align-items: flex-start;
         gap: 10px;
         max-width: 260px;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 12px 32px rgba(30, 42, 74, 0.08);
         animation: slideUp 0.5s ease 0.4s both;
-    }
-    @keyframes slideUp {
-        from {
-            opacity: 0;
-            transform: translateY(8px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
     .story-icon {
         color: #c4963a;
@@ -953,24 +952,26 @@
     }
     .story-body {
         font-size: 0.78rem;
-        color: rgba(240, 235, 224, 0.75);
+        color: #4a5568;
         line-height: 1.5;
+        font-weight: 500;
     }
     .story-label {
         display: block;
         font-size: 0.65rem;
         color: #c4963a;
-        font-weight: 600;
+        font-weight: 700;
         margin-bottom: 3px;
         letter-spacing: 0.04em;
+        text-transform: uppercase;
     }
 
     /* ── PROBLEM STATEMENT ── */
     .problem-section {
         padding: 80px 2rem;
-        background: #162038;
-        border-top: 1px solid rgba(240, 235, 224, 0.06);
-        border-bottom: 1px solid rgba(240, 235, 224, 0.06);
+        background: #ffffff;
+        border-top: 1px solid rgba(30, 42, 74, 0.05);
+        border-bottom: 1px solid rgba(30, 42, 74, 0.05);
     }
     .problem-inner {
         max-width: 800px;
@@ -980,13 +981,13 @@
         font-family: "Instrument Serif", serif;
         font-size: clamp(1.3rem, 3vw, 2rem);
         font-style: italic;
-        color: rgba(240, 235, 224, 0.85);
+        color: #1e2a4a;
         line-height: 1.5;
         margin: 0 0 1.5rem;
     }
     .problem-sub {
         font-size: 1rem;
-        color: rgba(240, 235, 224, 0.55);
+        color: #4a5568;
         line-height: 1.8;
         margin: 0;
     }
@@ -994,11 +995,7 @@
     /* ── FEATURES ── */
     .features {
         padding: 100px 2rem;
-        background: #1e2a4a;
-    }
-    .section-inner {
-        max-width: 1100px;
-        margin: 0 auto;
+        background: #faf9f5;
     }
     .section-label {
         font-size: 0.72rem;
@@ -1006,14 +1003,14 @@
         letter-spacing: 0.12em;
         color: #c4963a;
         margin-bottom: 0.75rem;
-        font-weight: 500;
+        font-weight: 600;
     }
     .section-heading {
         font-family: "Instrument Serif", serif;
         font-size: clamp(1.9rem, 4vw, 2.9rem);
         line-height: 1.15;
         letter-spacing: -0.02em;
-        color: #f0ebe0;
+        color: #1e2a4a;
         margin: 0 0 3.5rem;
     }
     .section-heading.left {
@@ -1038,9 +1035,10 @@
     .feature-row.reversed > * {
         direction: ltr;
     }
+
     .feature-num {
         font-family: "Instrument Serif", serif;
-        font-size: 0.85rem;
+        font-size: 1rem;
         color: #c4963a;
         margin-bottom: 0.5rem;
         letter-spacing: 0.08em;
@@ -1048,421 +1046,207 @@
     .feature-title {
         font-family: "Instrument Serif", serif;
         font-size: 1.8rem;
-        color: #f0ebe0;
+        color: #1e2a4a;
         margin: 0 0 1rem;
         letter-spacing: -0.01em;
     }
     .feature-desc {
         font-size: 1rem;
-        color: rgba(240, 235, 224, 0.65);
+        color: #4a5568;
         line-height: 1.75;
         margin: 0 0 1.25rem;
     }
     .feature-outcome {
         font-size: 0.9rem;
-        color: rgba(240, 235, 224, 0.65);
+        color: #4a5568;
+        font-weight: 500;
         line-height: 1.6;
         margin: 0;
         border-left: 2px solid rgba(196, 150, 58, 0.4);
         padding-left: 1rem;
     }
     .outcome-gold {
-        color: #c4963a;
-        font-weight: 600;
+        color: #8b6a28;
+        font-weight: 700;
     }
 
-    /* Mini schedule card in feature section */
-    .mini-schedule-card {
-        background: #243150;
-        border: 1px solid rgba(240, 235, 224, 0.08);
-        border-radius: 12px;
-        padding: 1.25rem;
-    }
-    .msc-header {
-        font-size: 0.75rem;
-        color: rgba(240, 235, 224, 0.5);
-        margin-bottom: 1rem;
-        font-weight: 500;
-    }
-    .msc-row {
-        display: flex;
-        gap: 5px;
-        align-items: center;
-        margin-bottom: 5px;
-    }
-    .msc-name {
-        font-size: 0.7rem;
-        color: rgba(240, 235, 224, 0.5);
-        width: 38px;
-        flex-shrink: 0;
-    }
-    .msc-cell {
-        width: 26px;
-        height: 22px;
-        border-radius: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.6rem;
-        font-weight: 600;
-        background: rgba(240, 235, 224, 0.04);
-        color: rgba(240, 235, 224, 0.2);
-    }
-    .msc-cell.m {
-        background: rgba(96, 165, 250, 0.15);
-        color: #60a5fa;
-    }
-    .msc-cell.e {
-        background: rgba(196, 150, 58, 0.15);
-        color: #c4963a;
-    }
-    .msc-cell.off {
-    }
-    .msc-badge {
-        margin-top: 1rem;
-        font-size: 0.72rem;
-        color: #4ade80;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    /* Allergen card */
+    /* Feature Cards (Light) */
+    .mini-schedule-card,
     .allergen-card {
-        background: #243150;
-        border: 1px solid rgba(240, 235, 224, 0.08);
+        background: #ffffff;
+        border: 1px solid rgba(30, 42, 74, 0.06);
         border-radius: 12px;
         padding: 1.25rem;
+        box-shadow: 0 8px 30px rgba(30, 42, 74, 0.04);
     }
+    .msc-header,
     .allergen-header {
         font-size: 0.75rem;
-        color: rgba(240, 235, 224, 0.5);
+        color: #718096;
+        font-weight: 600;
         margin-bottom: 1rem;
     }
-    .allergen-items {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+    .msc-name {
+        color: #4a5568;
+        font-weight: 500;
     }
+    .msc-cell {
+        background: #f8f9fa;
+        border: 1px solid rgba(30, 42, 74, 0.03);
+        color: #a0aec0;
+    }
+    .msc-cell.m {
+        background: #ebf8ff;
+        color: #3182ce;
+        border-color: #bee3f8;
+    }
+    .msc-cell.e {
+        background: #fff5f5;
+        color: #e53e3e;
+        border-color: #fed7d7;
+    }
+    .msc-badge {
+        color: #047857;
+        font-weight: 500;
+    }
+
     .allergen-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.8rem;
-        color: rgba(240, 235, 224, 0.72);
-        background: rgba(240, 235, 224, 0.03);
-        border-radius: 6px;
-        padding: 7px 10px;
-        animation: fadeIn 0.3s ease both;
-    }
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateX(-4px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
+        color: #4a5568;
+        font-weight: 500;
+        background: #f8f9fa;
+        border: 1px solid rgba(30, 42, 74, 0.03);
     }
     .allergen-check {
-        color: #4ade80;
-        font-size: 0.7rem;
+        color: #10b981;
     }
     .allergen-footer {
-        margin-top: 1rem;
-        font-size: 0.7rem;
-        color: rgba(240, 235, 224, 0.35);
+        color: #a0aec0;
+        font-weight: 500;
     }
 
     /* ── STELLA ── */
     .stella-section {
         padding: 100px 2rem;
-        background: #162038;
-    }
-    .stella-inner {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 5rem;
-        align-items: center;
-    }
-    .stella-phone {
-        display: flex;
-        justify-content: center;
+        background: #ffffff;
+        border-top: 1px solid rgba(30, 42, 74, 0.05);
     }
     .phone-frame {
-        width: 240px;
-        background: #243150;
-        border: 1px solid rgba(240, 235, 224, 0.1);
-        border-radius: 36px;
-        padding: 16px;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+        background: #f8f9fa;
+        border: 1px solid rgba(30, 42, 74, 0.1);
+        box-shadow: 0 24px 60px rgba(30, 42, 74, 0.08);
     }
     .phone-notch {
-        width: 60px;
-        height: 8px;
-        background: rgba(240, 235, 224, 0.07);
-        border-radius: 4px;
-        margin: 0 auto 14px;
+        background: rgba(30, 42, 74, 0.08);
     }
     .phone-screen {
-        background: #1a2540;
-        border-radius: 24px;
-        padding: 14px;
-        min-height: 340px;
+        background: #ffffff;
+        border: 1px solid rgba(30, 42, 74, 0.05);
     }
     .phone-header {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-bottom: 14px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        color: #f0ebe0;
-    }
-    .stella-star {
-        color: #c4963a;
-    }
-    .online-dot {
-        width: 6px;
-        height: 6px;
-        background: #4ade80;
-        border-radius: 50%;
-        margin-left: auto;
-    }
-    .phone-chat {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-    .msg {
-        font-size: 0.72rem;
-        line-height: 1.5;
-        padding: 8px 11px;
-        border-radius: 10px;
-        max-width: 92%;
+        color: #1e2a4a;
     }
     .msg-in {
-        background: rgba(240, 235, 224, 0.07);
-        color: rgba(240, 235, 224, 0.75);
-        align-self: flex-start;
-        border-bottom-left-radius: 3px;
+        background: #f1f3f5;
+        color: #4a5568;
+        font-weight: 500;
     }
     .msg-out {
-        background: rgba(196, 150, 58, 0.18);
-        color: rgba(240, 235, 224, 0.9);
-        align-self: flex-end;
-        border-bottom-right-radius: 3px;
+        background: #1e2a4a;
+        color: #ffffff;
+        font-weight: 500;
     }
     .stella-desc {
-        font-size: 1rem;
-        color: rgba(240, 235, 224, 0.65);
-        line-height: 1.78;
-        margin: 0 0 1.75rem;
-    }
-    .stella-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.6rem;
+        color: #4a5568;
     }
     .stella-list li {
-        font-size: 0.92rem;
-        color: rgba(240, 235, 224, 0.72);
-        padding: 0.5rem 0 0.5rem 1.25rem;
-        position: relative;
-        border-bottom: 1px solid rgba(240, 235, 224, 0.06);
-    }
-    .stella-list li::before {
-        content: "·";
-        position: absolute;
-        left: 0;
-        color: #c4963a;
-        font-weight: 700;
+        color: #4a5568;
+        font-weight: 500;
+        border-bottom-color: rgba(30, 42, 74, 0.05);
     }
 
     /* ── INDUSTRIES ── */
     .industries {
         padding: 100px 2rem;
-        background: #1e2a4a;
-    }
-    .industry-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 1rem;
+        background: #faf9f5;
+        border-top: 1px solid rgba(30, 42, 74, 0.05);
     }
     .industry-card {
-        background: #243150;
-        border: 1px solid rgba(240, 235, 224, 0.07);
+        background: #ffffff;
+        border: 1px solid rgba(30, 42, 74, 0.06);
         border-top: 3px solid rgba(196, 150, 58, 0.35);
-        border-radius: 10px;
-        padding: 1.5rem 1.25rem;
-        transition:
-            border-top-color 0.2s,
-            transform 0.2s;
-    }
-    .industry-card:hover {
-        border-top-color: #c4963a;
-        transform: translateY(-3px);
-    }
-    .ind-icon {
-        font-size: 1.6rem;
-        margin-bottom: 0.75rem;
+        box-shadow: 0 8px 24px rgba(30, 42, 74, 0.03);
     }
     .ind-name {
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #f0ebe0;
-        margin-bottom: 0.5rem;
+        color: #1e2a4a;
     }
     .ind-desc {
-        font-size: 0.82rem;
-        color: rgba(240, 235, 224, 0.5);
-        line-height: 1.6;
+        color: #4a5568;
+        font-weight: 400;
     }
 
     /* ── PHILOSOPHY ── */
     .philosophy-section {
-        padding: 100px 2rem;
-        background: #162038;
-        border-top: 1px solid rgba(240, 235, 224, 0.06);
-        text-align: center;
-    }
-    .constellation-line {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 2rem;
+        background: #ffffff;
+        border-top: 1px solid rgba(30, 42, 74, 0.05);
     }
     .philosophy-quote {
-        font-family: "Instrument Serif", serif;
-        font-size: clamp(1.2rem, 2.5vw, 1.7rem);
-        font-style: italic;
-        color: rgba(240, 235, 224, 0.78);
-        line-height: 1.65;
-        max-width: 720px;
-        margin: 0 auto 1.25rem;
-        border: 0;
-        padding: 0;
+        color: #1e2a4a;
     }
     .philosophy-attr {
-        font-size: 0.8rem;
-        color: rgba(240, 235, 224, 0.3);
-        letter-spacing: 0.04em;
-        margin: 0;
+        color: #718096;
+        font-weight: 500;
     }
 
     /* ── WAITLIST ── */
     .waitlist-section {
-        padding: 120px 2rem;
-        background: #1e2a4a;
-        text-align: center;
-    }
-    .waitlist-inner {
-        max-width: 560px;
+        background: #1e2a4a; /* Keep footer/CTA area dark for contrast */
     }
     .waitlist-heading {
-        font-family: "Instrument Serif", serif;
-        font-size: clamp(2rem, 5vw, 3rem);
-        line-height: 1.15;
-        letter-spacing: -0.02em;
-        color: #f0ebe0;
-        margin: 0 0 1rem;
-    }
-    .waitlist-heading em {
-        font-style: italic;
-        color: #c4963a;
+        color: #faf9f5;
     }
     .waitlist-sub {
-        font-size: 1.05rem;
-        color: rgba(240, 235, 224, 0.6);
-        margin: 0 0 2.5rem;
-        line-height: 1.7;
-    }
-    .waitlist-form {
-        display: flex;
-        gap: 0.75rem;
-        max-width: 460px;
-        margin: 0 auto 1rem;
-    }
-    .waitlist-input {
-        flex: 1;
-        background: rgba(240, 235, 224, 0.06);
-        border: 1px solid rgba(240, 235, 224, 0.15);
-        border-radius: 6px;
-        padding: 0.75rem 1rem;
-        color: #f0ebe0;
-        font-size: 0.95rem;
-        font-family: inherit;
-        outline: none;
-        transition: border-color 0.2s;
-    }
-    .waitlist-input:focus {
-        border-color: rgba(196, 150, 58, 0.5);
-    }
-    .waitlist-input::placeholder {
-        color: rgba(240, 235, 224, 0.3);
+        color: rgba(250, 249, 245, 0.7);
     }
     .waitlist-fine {
-        font-size: 0.8rem;
-        color: rgba(240, 235, 224, 0.3);
-        margin: 0;
+        color: rgba(250, 249, 245, 0.4);
     }
-    .submitted-msg {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        justify-content: center;
-        font-size: 1rem;
-        color: rgba(240, 235, 224, 0.7);
-        margin-bottom: 1rem;
+
+    .waitlist-form .btn-navy {
+        background: #c4963a;
+        color: #1e2a4a; /* Invert button inside the dark section */
+        box-shadow: none;
     }
-    .check-gold {
-        color: #c4963a;
-        font-size: 1.3rem;
+    .waitlist-form .btn-navy:hover {
+        background: #d8aa49;
     }
 
     /* ── FOOTER ── */
     .footer {
-        padding: 1.75rem 2rem;
-        border-top: 1px solid rgba(240, 235, 224, 0.07);
         background: #162038;
+        border-top-color: rgba(250, 249, 245, 0.05);
     }
-    .footer-inner {
-        max-width: 1100px;
-        margin: 0 auto;
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
+    .footer-logo svg line,
+    .footer-logo svg circle {
+        stroke: rgba(250, 249, 245, 0.2) !important;
+        fill: rgba(250, 249, 245, 0.2) !important;
     }
-    .footer-logo {
-        opacity: 0.55;
-        transition: opacity 0.2s;
+    .footer-logo svg circle:last-of-type {
+        fill: #c4963a !important;
     }
-    .footer-logo:hover {
-        opacity: 1;
+    .logo-text {
+        color: #faf9f5;
     }
-    .footer-mid {
-        flex: 1;
-        text-align: center;
-    }
+    .navbar .logo-text {
+        color: #1e2a4a;
+    } /* Navbar logo must be dark */
+
     .footer-tag {
-        font-size: 0.75rem;
-        color: rgba(240, 235, 224, 0.25);
-        font-style: italic;
-    }
-    .footer-links {
-        display: flex;
-        gap: 1.5rem;
+        color: rgba(250, 249, 245, 0.4);
     }
     .footer-links a {
-        color: rgba(240, 235, 224, 0.3);
-        text-decoration: none;
-        font-size: 0.8rem;
-        transition: color 0.2s;
+        color: rgba(250, 249, 245, 0.5);
     }
     .footer-links a:hover {
-        color: rgba(240, 235, 224, 0.65);
+        color: #faf9f5;
     }
 </style>
