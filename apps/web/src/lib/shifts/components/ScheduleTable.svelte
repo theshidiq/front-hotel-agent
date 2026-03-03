@@ -22,12 +22,7 @@
 		) => void;
 		onStaffEdit?: (staff: ScheduleStaff) => void;
 		onStaffDelete?: (staff: ScheduleStaff) => void;
-		// Connection and offline queue state
-		pendingCells?: Set<string>;
-		hasPendingChanges?: boolean;
-		isConnected?: boolean;
-		offlineQueueSize?: number;
-	}
+		}
 
 	let {
 		staff,
@@ -37,10 +32,6 @@
 		onBulkUpdate,
 		onStaffEdit,
 		onStaffDelete,
-		pendingCells = new Set(),
-		hasPendingChanges = false,
-		isConnected = true,
-		offlineQueueSize = 0,
 	}: Props = $props();
 
 	// Derived: Ordered staff members (社員 > 派遣 > パート, sorted by start date, 中田 at end)
@@ -499,12 +490,6 @@
 		}
 	}
 
-	// Check if a cell has pending changes
-	function isCellPending(staffId: string, dateKey: string): boolean {
-		const cellKey = `${staffId}_${dateKey}`;
-		return pendingCells.has(cellKey);
-	}
-
 	// Calculate day-off count for a staff member
 	function getDayOffCount(staffId: string): number {
 		const staffSchedule = scheduleData[staffId] || {};
@@ -564,32 +549,6 @@
 />
 
 <div class="relative">
-	<!-- Connection and Queue Status Indicator -->
-	{#if !isConnected || hasPendingChanges}
-		<div
-			class="mb-2 flex items-center gap-2 px-3 py-2 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-md"
-		>
-			{#if !isConnected}
-				<div class="flex items-center gap-2">
-					<div class="w-2 h-2 bg-red-500 rounded-full"></div>
-					<span class="text-sm font-medium text-red-700"
-						>オフライン</span
-					>
-				</div>
-			{/if}
-			{#if hasPendingChanges}
-				<div class="flex items-center gap-2">
-					<div
-						class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"
-					></div>
-					<span class="text-sm font-medium text-orange-700">
-						保存待ち: {offlineQueueSize}件
-					</span>
-				</div>
-			{/if}
-		</div>
-	{/if}
-
 	<!-- Bulk Operations Toolbar -->
 	{#if showBulkToolbar}
 		<div
@@ -797,8 +756,6 @@
 								s,
 								date,
 							)}
-							{@const isPending = isCellPending(s.id, date)}
-
 							<td
 								class="text-center relative {!isActive
 									? 'bg-gray-100'
@@ -814,10 +771,7 @@
 										? 'cursor-not-allowed text-gray-400'
 										: 'cursor-pointer hover:bg-gray-100'}
 										{isActive && isSelected ? 'bg-blue-100 hover:bg-blue-200' : ''}
-										{isFocused ? 'ring-2 ring-blue-500 ring-inset' : ''}
-										{isPending
-										? 'ring-2 ring-orange-400 ring-inset bg-orange-50 hover:bg-orange-100'
-										: ''}"
+										{isFocused ? 'ring-2 ring-blue-500 ring-inset' : ''}"
 									role="gridcell"
 									tabindex="-1"
 									onclick={(e) =>
@@ -895,14 +849,6 @@
 												)}
 											</span>
 										{/if}
-									{/if}
-
-									<!-- Pending changes indicator -->
-									{#if isPending}
-										<div
-											class="absolute bottom-0 left-0 w-2 h-2 bg-orange-500 rounded-full animate-pulse transform -translate-x-1 translate-y-1"
-											title="保存待ち"
-										></div>
 									{/if}
 
 									<!-- Selection indicator -->

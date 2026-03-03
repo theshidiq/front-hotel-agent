@@ -376,20 +376,21 @@
 	) {
 		if (!selectedPeriodId) return;
 
-		try {
-			// Update local state immediately
-			if (!scheduleData[staffId]) {
-				scheduleData[staffId] = {};
-			}
-			scheduleData[staffId][date] = symbol;
-			scheduleData = { ...scheduleData };
+		// Update local state immediately (optimistic)
+		if (!scheduleData[staffId]) {
+			scheduleData[staffId] = {};
+		}
+		scheduleData[staffId][date] = symbol;
+		scheduleData = { ...scheduleData };
 
-			// Save to server
-			await bulkUpdateCells(selectedPeriodId, [
-				{ staffId, date, symbol },
-			]);
+		try {
+			saving = true;
+			await bulkUpdateCells(selectedPeriodId, [{ staffId, date, symbol }]);
 		} catch (e) {
+			// Revert on failure
 			error = e instanceof Error ? e.message : "Failed to save";
+		} finally {
+			saving = false;
 		}
 	}
 

@@ -141,11 +141,9 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Update a single schedule cell' })
   @ApiResponse({ status: 200, description: 'Cell updated' })
   async updateCell(@GetUser() user: any, @Body() updateCellDto: UpdateCellDto) {
-    const { staffId, date, symbol } = updateCellDto;
-    // We need periodId from the request - get it from query or require it
-    // For now, we'll need the client to send the periodId
-    // This is a simplified version - in practice you might look up the period from the date
-    return { message: 'Use WebSocket for real-time cell updates' };
+    const { periodId, staffId, date, symbol } = updateCellDto;
+    await this.shiftsService.updateCell(user.restaurant_id, periodId, staffId, date, symbol);
+    return { success: true };
   }
 
   @Patch('schedule/:periodId/cells')

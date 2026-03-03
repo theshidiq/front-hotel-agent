@@ -17,6 +17,10 @@ export class CreatePeriodDto {
 }
 
 export class UpdateCellDto {
+  @ApiProperty({ description: 'Period ID' })
+  @IsString()
+  periodId: string;
+
   @ApiProperty({ description: 'Staff member ID' })
   @IsString()
   staffId: string;
