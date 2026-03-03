@@ -28,6 +28,12 @@
 	import PeriodPicker from '$lib/shifts/components/PeriodPicker.svelte';
 	import ScheduleSkeleton from '$lib/shifts/components/ScheduleSkeleton.svelte';
 	import TableSkeleton from '$lib/shifts/components/TableSkeleton.svelte';
+	import Sidebar from '$lib/components/Sidebar.svelte';
+
+	// ── Sidebar State ──
+	let sidebarCollapsed = $state(false);
+	let sidebarMobileOpen = $state(false);
+	const sidebarSections: any[] = [];
 
 	// ── Navigation State ──
 	type ShiftSection = 'schedule' | 'settings';
@@ -484,16 +490,31 @@
 	}
 </script>
 
-<div class="min-h-screen bg-gray-100">
-	<!-- Header -->
-	<header class="bg-white shadow">
-		<div class="max-w-full mx-auto px-4 py-4 flex items-center justify-between">
-			<div class="flex items-center gap-4">
-				<a href="/" class="text-gray-500 hover:text-gray-700">
-					<span class="material-symbols-rounded">arrow_back</span>
-				</a>
-				<h1 class="text-xl font-bold text-gray-900">シフト管理</h1>
-			</div>
+<div class="flex h-screen overflow-hidden bg-gray-100">
+	<Sidebar
+		sections={sidebarSections}
+		bind:collapsed={sidebarCollapsed}
+		bind:mobileOpen={sidebarMobileOpen}
+	/>
+
+	<!-- Main Content Wrapper -->
+	<div class="flex-1 flex flex-col overflow-hidden relative">
+		<!-- Header -->
+		<header class="bg-white shadow shrink-0 z-10">
+			<div class="max-w-full mx-auto px-4 py-4 flex items-center justify-between">
+				<div class="flex items-center gap-4">
+					<button
+						onclick={() => (sidebarMobileOpen = true)}
+						class="md:hidden p-1.5 -ml-1 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 transition-colors"
+						aria-label="メニューを開く"
+					>
+						<span class="material-symbols-rounded text-xl">menu</span>
+					</button>
+					<a href="/dashboard" class="text-gray-500 hover:text-gray-700 hidden sm:block">
+						<span class="material-symbols-rounded">arrow_back</span>
+					</a>
+					<h1 class="text-xl font-bold text-gray-900 hidden sm:block">シフト管理</h1>
+				</div>
 
 			<!-- Navigation tabs -->
 			<div class="flex gap-2">
@@ -533,11 +554,12 @@
 					<span class="material-symbols-rounded text-xl">person_add</span>
 				</button>
 			</div>
-		</div>
-	</header>
+		</header>
 
-	<!-- Messages -->
-	{#if error}
+		<!-- Scrollable Body -->
+		<div class="flex-1 overflow-x-hidden overflow-y-auto">
+			<!-- Messages -->
+			{#if error}
 		<div class="bg-red-50 border-l-4 border-red-500 p-4 mx-4 mt-4">
 			<div class="flex items-center">
 				<span class="material-symbols-rounded text-red-500 mr-2">error</span>
@@ -773,6 +795,9 @@
 			</div>
 		</div>
 	{/if}
+			</div>
+		</div>
+	</div>
 </div>
 
 <!-- Staff Modal -->
