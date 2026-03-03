@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-    <title>Sinara — Presence, by Design</title>
+    <title>Sinara — presence, by design</title>
     <meta
         name="description"
         content="Sinara handles the operational weight so your team can focus on what only humans can do — making guests feel seen, welcome, and cared for."
@@ -28,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
     <link
-        href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Gloock:ital@0;1&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
         rel="stylesheet"
     />
 </svelte:head>
@@ -44,17 +44,17 @@
                 viewBox="0 0 32 32"
                 fill="none"
             >
-                <circle cx="8" cy="8" r="2.5" fill="rgba(30,42,74,0.35)" />
-                <circle cx="24" cy="6" r="2.5" fill="rgba(30,42,74,0.35)" />
-                <circle cx="26" cy="22" r="2.5" fill="rgba(30,42,74,0.35)" />
-                <circle cx="6" cy="26" r="2.5" fill="rgba(30,42,74,0.35)" />
-                <circle cx="16" cy="16" r="3.5" fill="#C4963A" />
+                <circle cx="8" cy="8" r="2.5" fill="rgba(26,39,68,0.35)" />
+                <circle cx="24" cy="6" r="2.5" fill="rgba(26,39,68,0.35)" />
+                <circle cx="26" cy="22" r="2.5" fill="rgba(26,39,68,0.35)" />
+                <circle cx="6" cy="26" r="2.5" fill="rgba(26,39,68,0.35)" />
+                <circle cx="16" cy="16" r="3.5" fill="#B8956A" />
                 <line
                     x1="8"
                     y1="8"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.15)"
+                    stroke="rgba(26,39,68,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -62,7 +62,7 @@
                     y1="6"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.15)"
+                    stroke="rgba(26,39,68,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -70,7 +70,7 @@
                     y1="22"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.15)"
+                    stroke="rgba(26,39,68,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -78,7 +78,7 @@
                     y1="26"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.15)"
+                    stroke="rgba(26,39,68,0.15)"
                     stroke-width="1"
                 />
                 <line
@@ -86,7 +86,7 @@
                     y1="8"
                     x2="24"
                     y2="6"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(26,39,68,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -94,7 +94,7 @@
                     y1="26"
                     x2="26"
                     y2="22"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(26,39,68,0.08)"
                     stroke-width="1"
                 />
             </svg>
@@ -110,7 +110,7 @@
 
         <div class="nav-actions">
             <a href="/login" class="nav-login">Log in</a>
-            <a href="#contact" class="btn-navy">Book a Demo</a>
+            <a href="#contact" class="btn-primary">Book a Demo</a>
         </div>
     </div>
 </nav>
@@ -136,8 +136,8 @@
             </p>
 
             <div class="hero-ctas">
-                <a href="#contact" class="btn-navy">Book a Demo</a>
-                <a href="#features" class="btn-ghost-dark">See how it works</a>
+                <a href="#contact" class="btn-primary">Book a Demo</a>
+                <a href="#features" class="btn-secondary">See how it works</a>
             </div>
 
             <div class="hero-trust">
@@ -158,9 +158,7 @@
                     <div class="mockup-dots">
                         <span></span><span></span><span></span>
                     </div>
-                    <div class="mockup-url">
-                        sinara · shift scheduler — October 2025
-                    </div>
+                    <div class="mockup-url">sinara · shift scheduler</div>
                 </div>
                 <div class="mockup-body">
                     <div class="shift-header">
@@ -169,7 +167,7 @@
                     </div>
                     <div class="shift-grid">
                         <div class="staff-col">
-                            {#each [{ name: "Yui", role: "Server", color: "#FFF4E5" }, { name: "Kenji", role: "Cook", color: "#E5F0FF" }, { name: "Mia", role: "Service", color: "#F0E5FF" }, { name: "Ryo", role: "Kitchen", color: "#E5FFF0" }] as s}
+                            {#each [{ name: "Yui", role: "Server", color: "#F5EDE3" }, { name: "Kenji", role: "Cook", color: "#EEF2FF" }, { name: "Mia", role: "Service", color: "#FDF4FF" }, { name: "Ryo", role: "Kitchen", color: "#F0FDF4" }] as s}
                                 <div class="staff-row">
                                     <div
                                         class="staff-avatar"
@@ -216,7 +214,7 @@
                 </div>
             </div>
 
-            <!-- Human story card: the guest with the allergy -->
+            <!-- Stella Human story card -->
             <div class="story-card">
                 <div class="story-icon">★</div>
                 <div class="story-body">
@@ -228,7 +226,7 @@
     </div>
 </section>
 
-<!-- PROBLEM STATEMENT — speaks to the GM -->
+<!-- PROBLEM STATEMENT -->
 <section class="problem-section">
     <div class="section-inner problem-inner">
         <div class="problem-quote">
@@ -270,7 +268,7 @@
                     </p>
                 </div>
                 <div class="feature-visual">
-                    <div class="mini-schedule-card">
+                    <div class="mini-app-card">
                         <div class="msc-header">October · Period 10</div>
                         {#each [{ name: "Yui", shifts: ["M", "E", "■", "M", "E"] }, { name: "Kenji", shifts: ["■", "M", "E", "E", "M"] }, { name: "Mia", shifts: ["E", "■", "M", "M", "■"] }] as s}
                             <div class="msc-row">
@@ -310,7 +308,7 @@
                     </p>
                 </div>
                 <div class="feature-visual">
-                    <div class="allergen-card">
+                    <div class="mini-app-card">
                         <div class="allergen-header">Menu scan complete</div>
                         <div class="allergen-items">
                             {#each ["Shellfish", "Gluten", "Dairy", "Sesame", "Tree nuts"] as a, i}
@@ -415,16 +413,16 @@
     <div class="section-inner">
         <div class="constellation-line">
             <svg width="200" height="80" viewBox="0 0 200 80" fill="none">
-                <circle cx="20" cy="40" r="4" fill="rgba(30,42,74,0.15)" />
-                <circle cx="90" cy="15" r="4" fill="rgba(30,42,74,0.15)" />
-                <circle cx="160" cy="55" r="4" fill="rgba(30,42,74,0.15)" />
-                <circle cx="100" cy="50" r="5" fill="#C4963A" />
+                <circle cx="20" cy="40" r="4" fill="rgba(26,39,68,0.15)" />
+                <circle cx="90" cy="15" r="4" fill="rgba(26,39,68,0.15)" />
+                <circle cx="160" cy="55" r="4" fill="rgba(26,39,68,0.15)" />
+                <circle cx="100" cy="50" r="5" fill="#B8956A" />
                 <line
                     x1="20"
                     y1="40"
                     x2="90"
                     y2="15"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(26,39,68,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -432,7 +430,7 @@
                     y1="15"
                     x2="160"
                     y2="55"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(26,39,68,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -440,7 +438,7 @@
                     y1="15"
                     x2="100"
                     y2="50"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(26,39,68,0.08)"
                     stroke-width="1"
                 />
             </svg>
@@ -481,7 +479,7 @@
                     bind:value={emailInput}
                     required
                 />
-                <button type="submit" class="btn-navy">Book a Demo</button>
+                <button type="submit" class="btn-accent">Book a Demo</button>
             </form>
         {/if}
 
@@ -497,17 +495,17 @@
     <div class="footer-inner">
         <a href="/landing" class="logo footer-logo">
             <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
-                <circle cx="8" cy="8" r="2" fill="rgba(30,42,74,0.15)" />
-                <circle cx="24" cy="6" r="2" fill="rgba(30,42,74,0.15)" />
-                <circle cx="26" cy="22" r="2" fill="rgba(30,42,74,0.15)" />
-                <circle cx="6" cy="26" r="2" fill="rgba(30,42,74,0.15)" />
-                <circle cx="16" cy="16" r="3" fill="#C4963A" />
+                <circle cx="8" cy="8" r="2" fill="rgba(245,241,236,0.15)" />
+                <circle cx="24" cy="6" r="2" fill="rgba(245,241,236,0.15)" />
+                <circle cx="26" cy="22" r="2" fill="rgba(245,241,236,0.15)" />
+                <circle cx="6" cy="26" r="2" fill="rgba(245,241,236,0.15)" />
+                <circle cx="16" cy="16" r="3" fill="#B8956A" />
                 <line
                     x1="8"
                     y1="8"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(245,241,236,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -515,7 +513,7 @@
                     y1="6"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(245,241,236,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -523,7 +521,7 @@
                     y1="22"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(245,241,236,0.08)"
                     stroke-width="1"
                 />
                 <line
@@ -531,7 +529,7 @@
                     y1="26"
                     x2="16"
                     y2="16"
-                    stroke="rgba(30,42,74,0.08)"
+                    stroke="rgba(245,241,236,0.08)"
                     stroke-width="1"
                 />
             </svg>
@@ -553,8 +551,8 @@
 <style>
     :global(body) {
         margin: 0;
-        background: #faf9f5; /* Canvas cream white */
-        color: #2d3a5d; /* Darker navy body text */
+        background: #f5f1ec; /* Marketing Cream */
+        color: #1a2744; /* Marketing Navy primary text */
         font-family: "Instrument Sans", system-ui, sans-serif;
         font-size: 16px;
         line-height: 1.6;
@@ -562,11 +560,11 @@
     }
 
     /* ── TOKENS ── */
-    /* bg-canvas:   #FCFCFB  (off-white, paper-like) */
-    /* bg-surface:  #FFFFFF  (pure white cards) */
-    /* text-head:   #1E2A4A  (deep brand navy) */
-    /* text-body:   #4A5568  (slate gray-blue) */
-    /* gold:        #C4963A */
+    /* Marketing Layer */
+    /* bg-cream:    #F5F1EC */
+    /* text-primary:#1A2744 (Navy) */
+    /* accent:      #B8956A (Gold) */
+    /* border-mkt:  #C8C0B4 (Stone) */
 
     /* ── NAVBAR ── */
     .navbar {
@@ -584,9 +582,9 @@
             border-bottom 0.3s;
     }
     .navbar.scrolled {
-        background: rgba(252, 252, 251, 0.95);
+        background: rgba(245, 241, 236, 0.95);
         backdrop-filter: blur(16px);
-        border-bottom: 1px solid rgba(30, 42, 74, 0.06);
+        border-bottom: 1px solid #c8c0b4;
     }
     .nav-inner {
         max-width: 1100px;
@@ -604,9 +602,9 @@
         flex-shrink: 0;
     }
     .logo-text {
-        font-family: "Instrument Serif", serif;
+        font-family: "Gloock", serif;
         font-size: 1.45rem;
-        color: #1e2a4a;
+        color: #1a2744;
         letter-spacing: -0.02em;
     }
     .nav-links {
@@ -616,14 +614,14 @@
         justify-content: center;
     }
     .nav-links a {
-        color: #4a5568;
+        color: #1a2744;
         text-decoration: none;
-        font-size: 0.9rem;
+        font-size: 14px;
         font-weight: 500;
         transition: color 0.2s;
     }
     .nav-links a:hover {
-        color: #1e2a4a;
+        color: #b8956a;
     }
     .nav-actions {
         display: flex;
@@ -631,53 +629,69 @@
         gap: 1rem;
     }
     .nav-login {
-        color: #4a5568;
+        color: #1a2744;
         text-decoration: none;
-        font-size: 0.9rem;
+        font-size: 14px;
         font-weight: 500;
         transition: color 0.2s;
     }
     .nav-login:hover {
-        color: #1e2a4a;
+        color: #b8956a;
     }
 
     /* ── BUTTONS ── */
-    .btn-navy {
-        background: #1e2a4a;
-        color: #faf9f5;
-        font-weight: 500;
-        font-size: 0.9rem;
-        padding: 0.65rem 1.4rem;
+    .btn-primary {
+        background: #1a2744;
+        color: #ffffff;
+        font-family: "Instrument Sans", sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+        padding: 10px 20px;
         border-radius: 6px;
         text-decoration: none;
         border: none;
         cursor: pointer;
-        transition:
-            transform 0.15s,
-            box-shadow 0.2s;
-        display: inline-block;
-        font-family: inherit;
-        box-shadow: 0 4px 12px rgba(30, 42, 74, 0.15);
+        transition: background 0.2s;
     }
-    .btn-navy:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 16px rgba(30, 42, 74, 0.2);
+    .btn-primary:hover {
+        background: #243561;
     }
-    .btn-ghost-dark {
-        color: #4a5568;
-        border: 1px solid rgba(30, 42, 74, 0.15);
-        padding: 0.65rem 1.4rem;
+
+    .btn-accent {
+        background: #b8956a;
+        color: #ffffff;
+        font-family: "Instrument Sans", sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+        padding: 10px 20px;
         border-radius: 6px;
         text-decoration: none;
-        font-size: 0.9rem;
-        font-weight: 500;
-        transition:
-            border-color 0.2s,
-            color 0.2s;
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s;
     }
-    .btn-ghost-dark:hover {
-        border-color: rgba(30, 42, 74, 0.4);
-        color: #1e2a4a;
+    .btn-accent:hover {
+        background: #a07d55;
+    }
+
+    .btn-secondary {
+        background: transparent;
+        color: #1a2744;
+        border: 1px solid #c8c0b4;
+        font-family: "Instrument Sans", sans-serif;
+        font-weight: 500;
+        font-size: 14px;
+        padding: 10px 20px;
+        border-radius: 6px;
+        text-decoration: none;
+        cursor: pointer;
+        transition:
+            background 0.2s,
+            border-color 0.2s;
+    }
+    .btn-secondary:hover {
+        background: rgba(200, 192, 180, 0.15);
+        border-color: #b8956a;
     }
 
     /* ── HERO ── */
@@ -688,7 +702,7 @@
         padding: 110px 2rem 70px;
         position: relative;
         overflow: hidden;
-        background: #faf9f5;
+        background: #f5f1ec;
     }
     .hero-glow {
         position: absolute;
@@ -698,7 +712,7 @@
         height: 700px;
         background: radial-gradient(
             circle,
-            rgba(196, 150, 58, 0.06) 0%,
+            rgba(184, 149, 106, 0.1) 0%,
             transparent 60%
         );
         pointer-events: none;
@@ -714,32 +728,36 @@
     }
 
     .hero-eyebrow {
-        font-size: 0.78rem;
-        letter-spacing: 0.06em;
-        color: #c4963a;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: #b8956a;
         margin: 0 0 1.25rem;
-        text-transform: lowercase;
-        font-style: italic;
+        text-transform: uppercase;
+        font-weight: 600;
     }
     .hero-headline {
-        font-family: "Instrument Serif", serif;
-        font-size: clamp(2.8rem, 5.5vw, 4.2rem);
+        font-family: "Gloock", serif;
+        font-size: clamp(64px, 5.5vw, 80px);
         line-height: 1.05;
         letter-spacing: -0.02em;
-        color: #1e2a4a;
+        color: #1a2744;
         margin: 0 0 0.25rem;
+        font-weight: 400;
     }
     .hero-sub-headline {
-        font-family: "Instrument Serif", serif;
-        font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+        font-family: "Gloock", serif;
+        font-size: clamp(32px, 2.5vw, 42px);
         font-style: italic;
-        color: #4a5568;
+        color: #b8956a;
         margin: 0 0 1.5rem;
         letter-spacing: -0.01em;
+        font-weight: 400;
     }
     .hero-sub {
-        color: #4a5568;
-        font-size: 1.05rem;
+        font-family: "Instrument Sans", sans-serif;
+        color: #1a2744;
+        font-size: 16px;
         line-height: 1.75;
         max-width: 440px;
         margin: 0 0 2.25rem;
@@ -754,28 +772,32 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-size: 0.85rem;
-        color: #718096;
+        font-size: 12px;
+        color: #b8956a;
+        font-weight: 500;
         flex-wrap: wrap;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
     .trust-sep {
-        color: rgba(30, 42, 74, 0.2);
+        color: #c8c0b4;
     }
 
-    /* ── HERO APP MOCKUP (Light Mode) ── */
+    /* ── APP MOCKUP (Product Layer: Functional UI) ── */
+    /* Backgrounds must be White #FFFFFF, borders #E8E8E8, fonts IBM Plex */
     .hero-right {
         position: relative;
     }
     .app-mockup {
         background: #ffffff;
-        border: 1px solid rgba(30, 42, 74, 0.08);
-        border-radius: 14px;
+        border: 1px solid #e8e8e8;
+        border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 24px 60px rgba(30, 42, 74, 0.08);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
     .mockup-bar {
         background: #f8f9fa;
-        border-bottom: 1px solid rgba(30, 42, 74, 0.06);
+        border-bottom: 1px solid #e8e8e8;
         padding: 10px 14px;
         display: flex;
         align-items: center;
@@ -789,34 +811,38 @@
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: rgba(30, 42, 74, 0.15);
+        background: #d1d1d1;
     }
     .mockup-url {
-        font-size: 0.7rem;
-        color: #718096;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        color: #6b7280;
         flex: 1;
     }
     .mockup-body {
-        padding: 16px;
+        padding: 24px;
     }
+
     .shift-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
     }
     .shift-title {
-        font-size: 0.82rem;
-        color: #1e2a4a;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 16px;
+        color: #1a2744;
         font-weight: 600;
     }
     .shift-badge {
-        font-size: 0.68rem;
-        color: #047857;
-        background: #d1fae5;
-        border: 1px solid #a7f3d0;
-        padding: 2px 8px;
-        border-radius: 100px;
+        font-family: "Instrument Sans", sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        color: #ffffff;
+        background: #b8956a;
+        padding: 4px 8px;
+        border-radius: 4px;
     }
     .shift-grid {
         display: flex;
@@ -825,28 +851,29 @@
     .staff-col {
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        gap: 8px;
         min-width: 120px;
     }
     .staff-row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 6px 8px;
-        background: #f8f9fa;
+        gap: 12px;
+        padding: 8px;
+        background: #ffffff;
         border-radius: 6px;
-        border: 1px solid rgba(30, 42, 74, 0.03);
+        border: 1px solid #e8e8e8;
     }
     .staff-avatar {
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.68rem;
+        font-size: 14px;
+        font-family: "Instrument Sans", sans-serif;
         font-weight: 600;
-        color: #1e2a4a;
+        color: #1a2744;
         flex-shrink: 0;
         box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
     }
@@ -855,139 +882,155 @@
         flex-direction: column;
     }
     .staff-name {
-        font-size: 0.72rem;
-        color: #1e2a4a;
-        font-weight: 600;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #1a2744;
+        font-weight: 500;
     }
     .staff-role {
-        font-size: 0.62rem;
-        color: #718096;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 11px;
+        color: #6b7280;
     }
+
     .days-col {
         display: flex;
         flex-direction: column;
-        gap: 5px;
+        gap: 8px;
         flex: 1;
     }
     .shift-row {
         display: flex;
-        gap: 3px;
+        gap: 4px;
     }
     .shift-cell {
         flex: 1;
-        height: 36px;
+        height: 50px;
         border-radius: 4px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.62rem;
-        font-weight: 600;
-        background: #f8f9fa;
-        border: 1px solid rgba(30, 42, 74, 0.03);
-        color: #a0aec0;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13px;
+        background: #f9fafb;
+        border-left: 3px solid #e8e8e8;
+        color: #9ca3af;
     }
     .shift-cell.morning {
-        background: #ebf8ff;
-        color: #3182ce;
-        border-color: #bee3f8;
+        background: #eef2ff;
+        color: #4f6ac8;
+        border-color: #4f6ac8;
+        font-weight: 500;
     }
     .shift-cell.evening {
-        background: #fff5f5;
-        color: #e53e3e;
-        border-color: #fed7d7;
+        background: #f0fdf4;
+        color: #16a34a;
+        border-color: #16a34a;
+        font-weight: 500;
     }
     .shift-cell.off {
-        background: #f8f9fa;
+        background: #f9fafb;
     }
 
     .outcome-bar {
         display: flex;
         gap: 8px;
-        margin-top: 12px;
+        margin-top: 16px;
         flex-wrap: wrap;
     }
     .outcome-card {
         display: flex;
         align-items: center;
         gap: 6px;
-        font-size: 0.72rem;
-        color: #4a5568;
-        font-weight: 500;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #1a2744;
         background: #f8f9fa;
-        border: 1px solid rgba(30, 42, 74, 0.06);
-        padding: 5px 10px;
-        border-radius: 6px;
+        border: 1px solid #e8e8e8;
+        padding: 6px 12px;
+        border-radius: 4px;
     }
     .oc-dot {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
-        background: #10b981;
+        background: #16a34a;
         flex-shrink: 0;
     }
     .oc-dot.warn {
-        background: #f59e0b;
+        background: #d97706;
     }
 
-    /* Stella notification card (Light Theme) */
+    /* Stella Notification Card (Stella Identity) */
     .story-card {
         position: absolute;
-        bottom: -16px;
-        left: -20px;
-        background: #ffffff;
-        border: 1px solid rgba(196, 150, 58, 0.3);
-        border-radius: 10px;
-        padding: 12px 16px;
+        bottom: -20px;
+        left: -24px;
+        background: #2d2648; /* Stella Indigo */
+        border-radius: 8px;
+        padding: 16px 20px;
         display: flex;
         align-items: flex-start;
-        gap: 10px;
-        max-width: 260px;
-        box-shadow: 0 12px 32px rgba(30, 42, 74, 0.08);
+        gap: 12px;
+        max-width: 280px;
+        box-shadow: 0 12px 32px rgba(26, 39, 68, 0.15);
         animation: slideUp 0.5s ease 0.4s both;
     }
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
     .story-icon {
-        color: #c4963a;
-        font-size: 1rem;
-        margin-top: 1px;
+        color: #d2a362;
+        font-size: 16px;
+        margin-top: 2px;
     }
     .story-body {
-        font-size: 0.78rem;
-        color: #4a5568;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #ffffff;
         line-height: 1.5;
-        font-weight: 500;
     }
     .story-label {
         display: block;
-        font-size: 0.65rem;
-        color: #c4963a;
-        font-weight: 700;
-        margin-bottom: 3px;
-        letter-spacing: 0.04em;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 11px;
+        color: #d2a362;
+        font-weight: 600;
+        margin-bottom: 4px;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
     }
 
     /* ── PROBLEM STATEMENT ── */
     .problem-section {
         padding: 80px 2rem;
-        background: #ffffff;
-        border-top: 1px solid rgba(30, 42, 74, 0.05);
-        border-bottom: 1px solid rgba(30, 42, 74, 0.05);
+        background: #f5f1ec;
+        border-top: 1px solid #c8c0b4;
+        border-bottom: 1px solid #c8c0b4;
     }
     .problem-inner {
         max-width: 800px;
         text-align: center;
     }
     .problem-quote {
-        font-family: "Instrument Serif", serif;
-        font-size: clamp(1.3rem, 3vw, 2rem);
+        font-family: "Gloock", serif;
+        font-size: clamp(32px, 3vw, 48px);
         font-style: italic;
-        color: #1e2a4a;
+        color: #1a2744;
         line-height: 1.5;
         margin: 0 0 1.5rem;
     }
     .problem-sub {
-        font-size: 1rem;
-        color: #4a5568;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 16px;
+        color: #1a2744;
         line-height: 1.8;
         margin: 0;
     }
@@ -995,23 +1038,25 @@
     /* ── FEATURES ── */
     .features {
         padding: 100px 2rem;
-        background: #faf9f5;
+        background: #f5f1ec;
     }
     .section-label {
-        font-size: 0.72rem;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 11px;
         text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: #c4963a;
+        letter-spacing: 0.1em;
+        color: #b8956a;
         margin-bottom: 0.75rem;
         font-weight: 600;
     }
     .section-heading {
-        font-family: "Instrument Serif", serif;
-        font-size: clamp(1.9rem, 4vw, 2.9rem);
+        font-family: "Gloock", serif;
+        font-size: clamp(40px, 4vw, 56px);
         line-height: 1.15;
         letter-spacing: -0.02em;
-        color: #1e2a4a;
+        color: #1a2744;
         margin: 0 0 3.5rem;
+        font-weight: 400;
     }
     .section-heading.left {
         text-align: left;
@@ -1021,12 +1066,12 @@
     .feature-rows {
         display: flex;
         flex-direction: column;
-        gap: 5rem;
+        gap: 80px;
     }
     .feature-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 4rem;
+        gap: 64px;
         align-items: center;
     }
     .feature-row.reversed {
@@ -1037,216 +1082,459 @@
     }
 
     .feature-num {
-        font-family: "Instrument Serif", serif;
-        font-size: 1rem;
-        color: #c4963a;
+        font-family: "Gloock", serif;
+        font-size: 18px;
+        color: #b8956a;
         margin-bottom: 0.5rem;
         letter-spacing: 0.08em;
     }
     .feature-title {
-        font-family: "Instrument Serif", serif;
-        font-size: 1.8rem;
-        color: #1e2a4a;
+        font-family: "Gloock", serif;
+        font-size: 36px;
+        color: #1a2744;
         margin: 0 0 1rem;
         letter-spacing: -0.01em;
     }
     .feature-desc {
-        font-size: 1rem;
-        color: #4a5568;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 16px;
+        color: #1a2744;
         line-height: 1.75;
         margin: 0 0 1.25rem;
     }
     .feature-outcome {
-        font-size: 0.9rem;
-        color: #4a5568;
-        font-weight: 500;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        color: #1a2744;
         line-height: 1.6;
         margin: 0;
-        border-left: 2px solid rgba(196, 150, 58, 0.4);
+        border-left: 3px solid #b8956a;
         padding-left: 1rem;
     }
     .outcome-gold {
-        color: #8b6a28;
-        font-weight: 700;
+        color: #b8956a;
+        font-weight: 600;
     }
 
-    /* Feature Cards (Light) */
-    .mini-schedule-card,
-    .allergen-card {
+    /* Feature Cards (Product Layer App Mockups) */
+    .mini-app-card {
         background: #ffffff;
-        border: 1px solid rgba(30, 42, 74, 0.06);
-        border-radius: 12px;
-        padding: 1.25rem;
-        box-shadow: 0 8px 30px rgba(30, 42, 74, 0.04);
+        border: 1px solid #e8e8e8;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
     .msc-header,
     .allergen-header {
-        font-size: 0.75rem;
-        color: #718096;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 16px;
+        color: #1a2744;
         font-weight: 600;
-        margin-bottom: 1rem;
+        margin-bottom: 16px;
+    }
+    .msc-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+        align-items: center;
     }
     .msc-name {
-        color: #4a5568;
-        font-weight: 500;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #1a2744;
+        width: 44px;
+        flex-shrink: 0;
     }
     .msc-cell {
-        background: #f8f9fa;
-        border: 1px solid rgba(30, 42, 74, 0.03);
-        color: #a0aec0;
+        width: 32px;
+        height: 28px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        background: #f9fafb;
+        border-left: 3px solid #e8e8e8;
+        color: #9ca3af;
     }
     .msc-cell.m {
-        background: #ebf8ff;
-        color: #3182ce;
-        border-color: #bee3f8;
+        background: #eef2ff;
+        color: #4f6ac8;
+        border-color: #4f6ac8;
+        font-weight: 500;
     }
     .msc-cell.e {
-        background: #fff5f5;
-        color: #e53e3e;
-        border-color: #fed7d7;
+        background: #f0fdf4;
+        color: #16a34a;
+        border-color: #16a34a;
+        font-weight: 500;
     }
     .msc-badge {
-        color: #047857;
+        margin-top: 16px;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #16a34a;
+        display: flex;
+        align-items: center;
+        gap: 6px;
         font-weight: 500;
     }
 
+    .allergen-items {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
     .allergen-item {
-        color: #4a5568;
-        font-weight: 500;
-        background: #f8f9fa;
-        border: 1px solid rgba(30, 42, 74, 0.03);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        color: #1a2744;
+        background: #ffffff;
+        border: 1px solid #e8e8e8;
+        border-radius: 6px;
+        padding: 8px 12px;
+        animation: fadeIn 0.3s ease both;
+    }
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateX(-4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
     }
     .allergen-check {
-        color: #10b981;
+        color: #16a34a;
+        font-size: 14px;
+        font-weight: 600;
     }
     .allergen-footer {
-        color: #a0aec0;
-        font-weight: 500;
+        margin-top: 16px;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 12px;
+        color: #6b7280;
     }
 
     /* ── STELLA ── */
     .stella-section {
         padding: 100px 2rem;
-        background: #ffffff;
-        border-top: 1px solid rgba(30, 42, 74, 0.05);
+        background: #f5f1ec;
+        border-top: 1px solid #c8c0b4;
     }
+    .stella-inner {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5rem;
+        align-items: center;
+    }
+    .stella-phone {
+        display: flex;
+        justify-content: center;
+    }
+
     .phone-frame {
-        background: #f8f9fa;
-        border: 1px solid rgba(30, 42, 74, 0.1);
-        box-shadow: 0 24px 60px rgba(30, 42, 74, 0.08);
+        width: 260px;
+        background: #2d2648; /* Stella Identity frame */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 36px;
+        padding: 16px;
+        box-shadow: 0 24px 60px rgba(26, 39, 68, 0.2);
     }
     .phone-notch {
-        background: rgba(30, 42, 74, 0.08);
+        width: 60px;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        margin: 0 auto 14px;
     }
     .phone-screen {
         background: #ffffff;
-        border: 1px solid rgba(30, 42, 74, 0.05);
+        border-radius: 20px;
+        padding: 16px;
+        min-height: 400px;
     }
     .phone-header {
-        color: #1e2a4a;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 20px;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: #2d2648;
+    }
+    .stella-star {
+        color: #d2a362;
+    }
+    .online-dot {
+        width: 8px;
+        height: 8px;
+        background: #16a34a;
+        border-radius: 50%;
+        margin-left: auto;
+    }
+    .phone-chat {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .msg {
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        line-height: 1.5;
+        padding: 10px 14px;
+        border-radius: 8px;
+        max-width: 92%;
     }
     .msg-in {
-        background: #f1f3f5;
-        color: #4a5568;
-        font-weight: 500;
+        background: #f8f9fa;
+        border: 1px solid #e8e8e8;
+        color: #1a2744;
+        align-self: flex-start;
+        border-bottom-left-radius: 2px;
     }
     .msg-out {
-        background: #1e2a4a;
+        background: #2d2648;
         color: #ffffff;
-        font-weight: 500;
+        align-self: flex-end;
+        border-bottom-right-radius: 2px;
     }
     .stella-desc {
-        color: #4a5568;
+        font-family: "Instrument Sans", sans-serif;
+        color: #1a2744;
+        font-size: 16px;
+        line-height: 1.78;
+        margin: 0 0 1.75rem;
+    }
+    .stella-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
     }
     .stella-list li {
-        color: #4a5568;
-        font-weight: 500;
-        border-bottom-color: rgba(30, 42, 74, 0.05);
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        color: #1a2744;
+        padding: 8px 0 8px 16px;
+        position: relative;
+        border-bottom: 1px solid #c8c0b4;
+    }
+    .stella-list li::before {
+        content: "★";
+        position: absolute;
+        left: 0;
+        color: #b8956a;
+        font-size: 10px;
+        top: 12px;
     }
 
     /* ── INDUSTRIES ── */
     .industries {
         padding: 100px 2rem;
-        background: #faf9f5;
-        border-top: 1px solid rgba(30, 42, 74, 0.05);
+        background: #f5f1ec;
+        border-top: 1px solid #c8c0b4;
+    }
+    .industry-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
     }
     .industry-card {
         background: #ffffff;
-        border: 1px solid rgba(30, 42, 74, 0.06);
-        border-top: 3px solid rgba(196, 150, 58, 0.35);
-        box-shadow: 0 8px 24px rgba(30, 42, 74, 0.03);
+        border: 1px solid #e8e8e8;
+        border-radius: 8px;
+        padding: 24px;
+        transition:
+            transform 0.2s,
+            box-shadow 0.2s;
+    }
+    .industry-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(26, 39, 68, 0.05);
+    }
+    .ind-icon {
+        font-size: 24px;
+        margin-bottom: 12px;
     }
     .ind-name {
-        color: #1e2a4a;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1a2744;
+        margin-bottom: 8px;
     }
     .ind-desc {
-        color: #4a5568;
-        font-weight: 400;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #6b7280;
+        line-height: 1.6;
     }
 
     /* ── PHILOSOPHY ── */
     .philosophy-section {
-        background: #ffffff;
-        border-top: 1px solid rgba(30, 42, 74, 0.05);
+        padding: 100px 2rem;
+        background: #f5f1ec;
+        border-top: 1px solid #c8c0b4;
+        text-align: center;
+    }
+    .constellation-line {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
     }
     .philosophy-quote {
-        color: #1e2a4a;
+        font-family: "Gloock", serif;
+        font-size: clamp(24px, 2.5vw, 32px);
+        font-style: italic;
+        color: #1a2744;
+        line-height: 1.65;
+        max-width: 720px;
+        margin: 0 auto 1.25rem;
+        border: 0;
+        padding: 0;
     }
     .philosophy-attr {
-        color: #718096;
-        font-weight: 500;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 14px;
+        color: #b8956a;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 0;
+        font-weight: 600;
     }
 
     /* ── WAITLIST ── */
     .waitlist-section {
-        background: #1e2a4a; /* Keep footer/CTA area dark for contrast */
+        padding: 120px 2rem;
+        background: #1a2744;
+        text-align: center;
+    } /* Footer contrast */
+    .waitlist-inner {
+        max-width: 560px;
+        margin: 0 auto;
     }
     .waitlist-heading {
-        color: #faf9f5;
+        font-family: "Gloock", serif;
+        font-size: clamp(40px, 5vw, 56px);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        color: #ffffff;
+        margin: 0 0 1rem;
+    }
+    .waitlist-heading em {
+        font-style: italic;
+        color: #b8956a;
     }
     .waitlist-sub {
-        color: rgba(252, 252, 251, 0.7);
-    }
-    .waitlist-fine {
-        color: rgba(252, 252, 251, 0.4);
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 16px;
+        color: #a8b8d8;
+        margin: 0 0 2.5rem;
+        line-height: 1.7;
     }
 
-    .waitlist-form .btn-navy {
-        background: #c4963a;
-        color: #1e2a4a; /* Invert button inside the dark section */
-        box-shadow: none;
+    .waitlist-form {
+        display: flex;
+        gap: 12px;
+        max-width: 460px;
+        margin: 0 auto 1rem;
     }
-    .waitlist-form .btn-navy:hover {
-        background: #d8aa49;
+    .waitlist-input {
+        flex: 1;
+        background: #ffffff;
+        border: 1px solid #e8e8e8;
+        border-radius: 6px;
+        padding: 12px 16px;
+        color: #1a2744;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        outline: none;
+        transition: box-shadow 0.2s;
+    }
+    .waitlist-input:focus {
+        box-shadow: 0 0 0 2px rgba(184, 149, 106, 0.3);
+        border-color: #b8956a;
+    }
+    .waitlist-input::placeholder {
+        color: #b0b0b0;
+    }
+
+    .waitlist-fine {
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 12px;
+        color: #a8b8d8;
+        margin: 0;
+    }
+    .submitted-msg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        color: #ffffff;
+        margin-bottom: 1rem;
+    }
+    .check-gold {
+        color: #b8956a;
+        font-size: 18px;
     }
 
     /* ── FOOTER ── */
     .footer {
-        background: #162038;
-        border-top-color: rgba(252, 252, 251, 0.05);
+        padding: 32px 2rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        background: #1a2744;
     }
-    .footer-logo svg line,
-    .footer-logo svg circle {
-        stroke: rgba(252, 252, 251, 0.2) !important;
-        fill: rgba(252, 252, 251, 0.2) !important;
+    .footer-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 24px;
     }
-    .footer-logo svg circle:last-of-type {
-        fill: #c4963a !important;
+    .footer-logo {
+        opacity: 0.8;
+        transition: opacity 0.2s;
     }
-    .logo-text {
-        color: #faf9f5;
+    .footer-logo:hover {
+        opacity: 1;
     }
-    .navbar .logo-text {
-        color: #1e2a4a;
-    } /* Navbar logo must be dark */
-
+    .footer-mid {
+        flex: 1;
+        text-align: center;
+    }
     .footer-tag {
-        color: rgba(252, 252, 251, 0.4);
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 12px;
+        color: #a8b8d8;
+        font-style: italic;
+        letter-spacing: 0.05em;
+    }
+    .footer-links {
+        display: flex;
+        gap: 24px;
     }
     .footer-links a {
-        color: rgba(252, 252, 251, 0.5);
+        color: #a8b8d8;
+        text-decoration: none;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 13px;
+        transition: color 0.2s;
     }
     .footer-links a:hover {
-        color: #faf9f5;
+        color: #f5f1ec;
+    }
+    .navbar .logo-text {
+        color: #1a2744;
     }
 </style>
