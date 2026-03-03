@@ -966,6 +966,12 @@ export class ShiftsService {
   ): Promise<ScheduleStaffGroup> {
     const versionId = await this.getOrCreateConfigVersion(restaurantId);
 
+    // Ensure members is always a clean string[]
+    const rawMembers = dto.group_config?.members;
+    const members = Array.isArray(rawMembers)
+      ? rawMembers.filter((m) => typeof m === 'string')
+      : [];
+
     const { data, error } = await this.supabase
       .from('staff_groups')
       .insert({
@@ -975,8 +981,8 @@ export class ShiftsService {
         description: dto.description,
         group_config: {
           ...(dto.group_config || {}),
-          color: dto.color || (dto.group_config as any)?.color || '#3B82F6',
-          members: (dto.group_config as any)?.members || [],
+          color: dto.color || dto.group_config?.color || '#3B82F6',
+          members,
         },
         is_active: true,
       })
@@ -1010,9 +1016,19 @@ export class ShiftsService {
     if (dto.is_active !== undefined) updatePayload.is_active = dto.is_active;
     // Merge color into group_config, preserving existing members
     if (dto.color !== undefined || dto.group_config !== undefined) {
+      const incomingConfig = dto.group_config || {};
+      // Coerce members to string[] if provided in the patch
+      const patchedMembers =
+        incomingConfig.members !== undefined
+          ? Array.isArray(incomingConfig.members)
+            ? incomingConfig.members.filter((m) => typeof m === 'string')
+            : (existing?.group_config?.members ?? [])
+          : undefined;
+
       updatePayload.group_config = {
         ...(existing?.group_config || {}),
-        ...(dto.group_config || {}),
+        ...incomingConfig,
+        ...(patchedMembers !== undefined ? { members: patchedMembers } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
       };
     }
@@ -1072,6 +1088,29 @@ export class ShiftsService {
     groupId: string,
     staffIds: string[],
   ): Promise<void> {
+    // Validate all provided IDs belong to active staff in this restaurant
+    if (staffIds.length > 0) {
+      const { data: validStaff, error: staffError } = await this.supabase
+        .from('staff')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .in('id', staffIds);
+
+      if (staffError) {
+        this.logger.error('Failed to validate staff IDs', staffError);
+        throw new BadRequestException('Failed to validate staff IDs');
+      }
+
+      const validIds = new Set((validStaff || []).map((s: any) => s.id));
+      const invalidIds = staffIds.filter((id) => !validIds.has(id));
+      if (invalidIds.length > 0) {
+        throw new BadRequestException(
+          `Invalid or inactive staff IDs: ${invalidIds.join(', ')}`,
+        );
+      }
+    }
+
     // Store members in group_config.members JSONB on the staff_groups table
     const { data: existing, error: fetchError } = await this.supabase
       .from('staff_groups')

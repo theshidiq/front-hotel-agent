@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsNumber, IsBoolean, IsArray, IsHexColor } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateDailyLimitsDto {
@@ -151,6 +151,19 @@ export class CreateCalendarRuleDto {
   reason?: string;
 }
 
+export class StaffGroupConfigDto {
+  @ApiPropertyOptional({ description: 'Hex color for this group' })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiPropertyOptional({ description: 'Array of staff IDs in this group', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  members?: string[];
+}
+
 export class CreateStaffGroupDto {
   @ApiProperty()
   @IsString()
@@ -161,15 +174,15 @@ export class CreateStaffGroupDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Hex color (shortcut — also accepted inside group_config)' })
   @IsOptional()
   @IsString()
   color?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: StaffGroupConfigDto })
   @IsOptional()
   @IsObject()
-  group_config?: Record<string, any>;
+  group_config?: StaffGroupConfigDto;
 }
 
 export class UpdateStaffGroupDto {
@@ -183,15 +196,15 @@ export class UpdateStaffGroupDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Hex color (shortcut — also accepted inside group_config)' })
   @IsOptional()
   @IsString()
   color?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: StaffGroupConfigDto })
   @IsOptional()
   @IsObject()
-  group_config?: Record<string, any>;
+  group_config?: StaffGroupConfigDto;
 
   @ApiPropertyOptional()
   @IsOptional()

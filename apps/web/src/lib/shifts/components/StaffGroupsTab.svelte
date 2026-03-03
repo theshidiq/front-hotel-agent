@@ -7,6 +7,7 @@ import {
   deleteStaffGroup,
   setStaffGroupMembers
 } from '../api';
+import { isStaffActiveInCurrentPeriod } from '../staffUtils';
 
 interface Props {
   staffGroups: ScheduleStaffGroup[];
@@ -25,8 +26,10 @@ const COLOR_PRESETS = [
   '#B91C1C', '#C2410C', '#A16207', '#4D7C0F', '#15803D'
 ];
 
-// Active staff only (is_active === true)
-let activeStaff = $derived(allStaff.filter(s => s.is_active !== false));
+// Filter staff active as of today — same logic as the schedule page.
+// Uses start_period/end_period to exclude staff who haven't started or have already left.
+const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+let activeStaff = $derived(allStaff.filter(s => isStaffActiveInCurrentPeriod(s, [today])));
 
 // State
 let loading = $state(false);
@@ -52,34 +55,68 @@ let availableStaff = $derived.by(() => {
 });
 
 // Sync members from group_config.members when prop changes.
+// Also assign unique colors to any groups that don't have one yet.
 // Filter out any stored IDs that don't match an active staff member,
-// and silently persist the cleanup to DB if stale IDs were found.
+// and silently persist the cleanup/color assignment to DB.
 $effect(() => {
   const groups = staffGroups;
   const staff = activeStaff;
   untrack(async () => {
     const activeIds = new Set(staff.map(s => String(s.id)));
     const newMap = new Map<string, string[]>();
-    const toClean: { groupId: string; cleanIds: string[] }[] = [];
+    const toClean: { groupId: string; cleanIds: string[]; color?: string }[] = [];
+
+    // Assign unique colors to groups that don't have one
+    const assignedColors = new Set(
+      groups
+        .map(g => g.group_config?.color as string | undefined)
+        .filter(Boolean)
+    );
+    const colorQueue = COLOR_PRESETS.filter(c => !assignedColors.has(c));
+    let colorIdx = 0;
 
     for (const group of groups) {
       const raw = (group.group_config?.members as string[]) || [];
       const cleanIds = raw.filter(id => activeIds.has(id));
       newMap.set(group.id, cleanIds);
-      // If stale IDs were removed, queue a DB cleanup
-      if (cleanIds.length !== raw.length) {
-        toClean.push({ groupId: group.id, cleanIds });
+
+      const needsClean = cleanIds.length !== raw.length;
+      const needsColor = !group.group_config?.color;
+
+      if (needsClean || needsColor) {
+        let newColor: string | undefined;
+        if (needsColor) {
+          // Pick next unused color, cycling if we run out
+          newColor = colorQueue.length > 0
+            ? colorQueue[colorIdx % colorQueue.length]
+            : COLOR_PRESETS[colorIdx % COLOR_PRESETS.length];
+          assignedColors.add(newColor);
+          colorIdx++;
+        }
+        toClean.push({ groupId: group.id, cleanIds, color: newColor });
       }
     }
     groupMembers = newMap;
 
-    // Silently remove stale member IDs from DB
-    for (const { groupId, cleanIds } of toClean) {
+    // Silently persist member cleanup + color assignment to DB
+    for (const { groupId, cleanIds, color } of toClean) {
       try {
-        await setStaffGroupMembers(groupId, cleanIds);
+        if (color) {
+          // color goes via top-level field; backend merges it into group_config
+          await updateStaffGroup(groupId, { color });
+          // also sync the cleaned member list
+          await setStaffGroupMembers(groupId, cleanIds);
+        } else {
+          await setStaffGroupMembers(groupId, cleanIds);
+        }
       } catch {
-        // Best-effort cleanup, ignore errors
+        // Best-effort, ignore errors
       }
+    }
+
+    // Refresh to pick up the newly saved colors
+    if (toClean.some(c => c.color)) {
+      await onGroupsChange();
     }
   });
 });
@@ -461,8 +498,7 @@ function getActiveMemberIds(groupId: string): string[] {
                     {#if s}
                       <div class="flex items-center justify-between px-2 py-1.5 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
                         <div class="flex items-center gap-2 min-w-0">
-                          <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                               style="background-color: {groupColor}">
+                          <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-gray-400">
                             {s.name.charAt(0)}
                           </div>
                           <span class="text-xs font-medium truncate">{s.name}</span>

@@ -198,6 +198,41 @@ async function handleResponse<T>(response: Response): Promise<T> {
 	return JSON.parse(text);
 }
 
+/**
+ * Fetch with automatic retry + exponential backoff.
+ * Handles Supabase free-tier cold starts: the DB pauses after inactivity and
+ * the first request after wake-up can fail or time out. Retrying transparently
+ * means the user sees a brief delay instead of a broken skeleton forever.
+ *
+ * Retries on: network errors (TypeError), 502/503/504 gateway errors.
+ * Does NOT retry on 4xx client errors.
+ */
+export async function fetchWithRetry(
+	url: string,
+	options: RequestInit,
+	maxAttempts = 3,
+	baseDelayMs = 1500
+): Promise<Response> {
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			const response = await fetch(url, options);
+			// Retry on gateway errors (Supabase/NestJS waking up)
+			if (attempt < maxAttempts && (response.status === 502 || response.status === 503 || response.status === 504)) {
+				await new Promise((r) => setTimeout(r, baseDelayMs * attempt));
+				continue;
+			}
+			return response;
+		} catch (err) {
+			lastError = err;
+			if (attempt < maxAttempts) {
+				await new Promise((r) => setTimeout(r, baseDelayMs * attempt));
+			}
+		}
+	}
+	throw lastError;
+}
+
 // Cached fetch wrapper
 async function cachedFetch<T>(
 	cacheKey: string,
@@ -220,7 +255,7 @@ async function cachedFetch<T>(
 
 export async function getShiftStaff(): Promise<ScheduleStaff[]> {
 	return cachedFetch('staff:all', async () => {
-		const response = await fetch(`${API_URL}/shifts/staff`, {
+		const response = await fetchWithRetry(`${API_URL}/shifts/staff`, {
 			headers: authHeaders()
 		});
 		return handleResponse(response);
@@ -305,7 +340,7 @@ export async function reorderShiftStaff(staffIds: string[]): Promise<void> {
 
 export async function getShiftPeriods(): Promise<SchedulePeriod[]> {
 	return cachedFetch('periods:all', async () => {
-		const response = await fetch(`${API_URL}/shifts/periods`, {
+		const response = await fetchWithRetry(`${API_URL}/shifts/periods`, {
 			headers: authHeaders()
 		});
 		return handleResponse(response);
@@ -350,7 +385,7 @@ export async function deleteShiftPeriod(id: string): Promise<void> {
 
 export async function getSchedule(periodId: string): Promise<ScheduleResponse> {
 	return cachedFetch(`schedule:${periodId}`, async () => {
-		const response = await fetch(`${API_URL}/shifts/schedule/${periodId}`, {
+		const response = await fetchWithRetry(`${API_URL}/shifts/schedule/${periodId}`, {
 			headers: authHeaders()
 		});
 		return handleResponse(response);

@@ -68,15 +68,32 @@
 	type ShiftSection = "schedule" | "settings";
 	let activeSection: ShiftSection = $state("schedule");
 
+	// ── Session cache helpers ──
+	// Persist staff/periods across tab discards so the skeleton never flashes on return.
+	const SESSION_KEY_STAFF = 'shifts:staff';
+	const SESSION_KEY_PERIODS = 'shifts:periods';
+
+	function sessionSave(key: string, value: unknown) {
+		try { sessionStorage.setItem(key, JSON.stringify(value)); } catch { /* quota */ }
+	}
+	function sessionLoad<T>(key: string): T | null {
+		try {
+			const raw = sessionStorage.getItem(key);
+			return raw ? JSON.parse(raw) as T : null;
+		} catch { return null; }
+	}
+
 	// ── Data State ──
-	let staff: ScheduleStaff[] = $state([]);
-	let periods: SchedulePeriod[] = $state([]);
+	// Pre-seed from sessionStorage so there's no blank slate after a tab discard
+	let staff: ScheduleStaff[] = $state(sessionLoad<ScheduleStaff[]>(SESSION_KEY_STAFF) ?? []);
+	let periods: SchedulePeriod[] = $state(sessionLoad<SchedulePeriod[]>(SESSION_KEY_PERIODS) ?? []);
 	let selectedPeriodId: string | null = $state(null);
 	let scheduleData: Record<string, Record<string, string>> = $state({});
 	let dateRange: string[] = $state([]);
 	let loading = $state(false);
 	let loadingSchedule = $state(false);
 	let saving = $state(false);
+	let reconnecting = $state(false); // true when reloading after tab wake-up
 	let error = $state("");
 	let successMessage = $state("");
 
@@ -134,6 +151,10 @@
 
 	// ── Lifecycle ──
 	let initialized = $state(false);
+	// Track when the page was last hidden so we can decide whether to reload on focus
+	let hiddenAt: number | null = null;
+	// If the page has been hidden for more than this long, reload data when it becomes visible again
+	const RELOAD_AFTER_HIDDEN_MS = 5 * 60 * 1000; // 5 minutes
 
 	// Wait for auth to be ready AND user to be logged in before loading data
 	$effect(() => {
@@ -159,12 +180,45 @@
 			.catch(() => {
 				optimizerHealthy = false;
 			});
+
+		// Re-fetch data when the tab becomes visible again after being hidden.
+		// Supabase free tier pauses the DB after inactivity — coming back to the
+		// tab can leave the page stuck on skeletons. This triggers a fresh load.
+		function handleVisibilityChange() {
+			if (document.visibilityState === 'hidden') {
+				hiddenAt = Date.now();
+			} else if (document.visibilityState === 'visible' && authState.session) {
+				const wasHiddenMs = hiddenAt ? Date.now() - hiddenAt : 0;
+				if (wasHiddenMs >= RELOAD_AFTER_HIDDEN_MS) {
+					// Clear cache so we get fresh data, not stale cached data
+					apiCache.clear();
+					reconnecting = true;
+					loadInitialData().finally(() => { reconnecting = false; });
+					checkOptimizerHealth()
+						.then((health) => { optimizerHealthy = health.healthy; })
+						.catch(() => { optimizerHealthy = false; });
+				}
+				hiddenAt = null;
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		// Cleanup is handled by onDestroy below
+		onDestroyCallbacks.push(() =>
+			document.removeEventListener('visibilitychange', handleVisibilityChange)
+		);
 	});
+
+	// Collect cleanup callbacks from effects
+	const onDestroyCallbacks: (() => void)[] = [];
+	onDestroy(() => onDestroyCallbacks.forEach((fn) => fn()));
 
 	// ── Data Loading ──
 	async function loadInitialData() {
+		// Only show the skeleton if we have no cached data to show
+		const hasCachedData = staff.length > 0 || periods.length > 0;
 		try {
-			loading = true;
+			loading = !hasCachedData;
 			error = "";
 
 			const [staffResult, periodsResult] = await Promise.all([
@@ -174,6 +228,8 @@
 
 			staff = staffResult;
 			periods = periodsResult;
+			sessionSave(SESSION_KEY_STAFF, staffResult);
+			sessionSave(SESSION_KEY_PERIODS, periodsResult);
 			console.log(
 				"📊 [loadInitialData] Staff count:",
 				staffResult.length,
@@ -723,12 +779,19 @@
 			{/if}
 
 			<!-- Main Content -->
-			{#if authState.loading || (loading && staff.length === 0)}
-				<!-- Auth or data loading - show skeleton -->
+			{#if reconnecting}
+				<!-- Waking up after inactivity - show banner over existing data -->
+				<div class="sticky top-0 z-20 flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-sm">
+					<span class="material-symbols-rounded text-base animate-spin" style="animation-duration:1.2s">autorenew</span>
+					再接続中です。しばらくお待ちください…
+				</div>
+			{/if}
+			{#if (authState.loading || loading) && staff.length === 0 && periods.length === 0}
+				<!-- Show skeleton only on true first load — no cached data available yet -->
 				<div class="p-4">
 					<ScheduleSkeleton rows={12} columns={15} />
 				</div>
-			{:else if !authState.session}
+			{:else if !authState.loading && !authState.session}
 				<!-- Not logged in - show login prompt -->
 				<div class="flex items-center justify-center h-64">
 					<div class="text-center">
