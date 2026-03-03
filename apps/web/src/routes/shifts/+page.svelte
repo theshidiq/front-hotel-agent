@@ -6,6 +6,7 @@
 		getShiftPeriods,
 		getSchedule,
 		bulkUpdateCells,
+		clearSchedule,
 		createShiftPeriod,
 		deleteShiftPeriod,
 		createShiftStaff,
@@ -99,6 +100,7 @@
 
 	// ── Optimization State ──
 	let optimizing = $state(false);
+	let clearing = $state(false);
 	let optimizerHealthy = $state(false);
 
 	// ── Staff Modal State ──
@@ -522,6 +524,23 @@
 		}
 	}
 
+	async function handleClear() {
+		if (!selectedPeriodId) return;
+		if (!confirm('この期間のスケジュールデータをすべてクリアしますか？')) return;
+
+		try {
+			clearing = true;
+			error = '';
+			await clearSchedule(selectedPeriodId);
+			scheduleData = {};
+			showSuccess('スケジュールをクリアしました');
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Clear failed';
+		} finally {
+			clearing = false;
+		}
+	}
+
 	// ── Staff Management ──
 	function openAddStaffModal() {
 		editingStaff = null;
@@ -852,38 +871,48 @@
 							onSelect={handlePeriodChange}
 						/>
 
+						<!-- Divider -->
+						<div class="w-px h-8 bg-gray-200 shrink-0"></div>
+
+						<!-- Optimize Button (left, next to period picker) -->
+						<button
+							class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+							onclick={handleOptimize}
+							disabled={optimizing || clearing || !optimizerHealthy}
+						>
+							{#if optimizing}
+								<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-white shrink-0"></span>
+							{:else}
+								<span class="material-symbols-rounded text-sm shrink-0">auto_fix_high</span>
+							{/if}
+							自動最適化
+						</button>
+
+						<!-- Clear Button -->
+						<button
+							class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-300 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+							onclick={handleClear}
+							disabled={clearing || optimizing}
+							title="スケジュールをクリア"
+						>
+							{#if clearing}
+								<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 shrink-0"></span>
+							{:else}
+								<span class="material-symbols-rounded text-sm shrink-0">delete_sweep</span>
+							{/if}
+							クリア
+						</button>
+
 						<div class="flex-1"></div>
 
-						<!-- Actions -->
-						<div class="flex items-center gap-2">
-							<a
-								href="/shifts/settings"
-								class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-								title="制約設定"
-							>
-								<span class="material-symbols-rounded text-xl"
-									>tune</span
-								>
-							</a>
-
-							<button
-								class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50"
-								onclick={handleOptimize}
-								disabled={optimizing || !optimizerHealthy}
-							>
-								{#if optimizing}
-									<span
-										class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"
-									></span>
-								{:else}
-									<span
-										class="material-symbols-rounded text-sm"
-										>auto_fix_high</span
-									>
-								{/if}
-								自動最適化
-							</button>
-						</div>
+						<!-- Settings icon (right) -->
+						<a
+							href="/shifts/settings"
+							class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+							title="制約設定"
+						>
+							<span class="material-symbols-rounded text-xl">tune</span>
+						</a>
 					</div>
 
 					<!-- Schedule Table (Transposed: dates as rows, staff as columns) -->

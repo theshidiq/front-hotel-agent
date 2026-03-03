@@ -607,6 +607,19 @@ export class ShiftsService {
     return result;
   }
 
+  async clearSchedule(restaurantId: string, periodId: string): Promise<void> {
+    const schedule = await this.getOrCreateSchedule(restaurantId, periodId);
+    const { error } = await this.supabase
+      .from('schedules')
+      .update({ schedule_data: {}, updated_at: new Date().toISOString() })
+      .eq('id', schedule.id);
+
+    if (error) {
+      this.logger.error('Failed to clear schedule', error);
+      throw new BadRequestException('Failed to clear schedule');
+    }
+  }
+
   async checkOptimizerHealth(): Promise<{ healthy: boolean; url: string }> {
     const healthy = await this.ortoolsClient.healthCheck();
     return {

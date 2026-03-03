@@ -159,6 +159,18 @@ export class ShiftsController {
     return this.shiftsService.bulkUpdateCells(user.restaurant_id, periodId, bulkUpdateDto.updates);
   }
 
+  @Delete('schedule/:periodId/cells')
+  @ApiOperation({ summary: 'Clear all schedule cells for a period' })
+  @ApiParam({ name: 'periodId', description: 'Period ID' })
+  @ApiResponse({ status: 204, description: 'Schedule cleared' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async clearSchedule(
+    @GetUser() user: any,
+    @Param('periodId') periodId: string,
+  ) {
+    return this.shiftsService.clearSchedule(user.restaurant_id, periodId);
+  }
+
   // ==================== OPTIMIZATION ENDPOINTS ====================
 
   @Post('optimize')

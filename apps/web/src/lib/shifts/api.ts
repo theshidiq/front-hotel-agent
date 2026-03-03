@@ -484,6 +484,19 @@ export async function bulkUpdateCells(periodId: string, updates: CellUpdate[]): 
 	}
 }
 
+export async function clearSchedule(periodId: string): Promise<void> {
+	// Optimistically clear local cache immediately
+	apiCache.invalidateSchedule(periodId);
+	const response = await apiFetch(`${API_URL}/shifts/schedule/${periodId}/cells`, {
+		method: 'DELETE',
+		headers: authHeaders()
+	});
+	if (!response.ok && response.status !== 204) {
+		const error = await response.json().catch(() => ({ message: 'Clear failed' }));
+		throw new Error(error.message);
+	}
+}
+
 // ==================== OPTIMIZATION ====================
 
 export interface OptimizeOptions {
