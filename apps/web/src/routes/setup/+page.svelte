@@ -482,41 +482,6 @@
                                     {/each}
                                 </div>
                             </div>
-
-                            <!-- Country + Timezone -->
-                            <div class="setup-row">
-                                <div
-                                    class="setup-field"
-                                    style="flex:0 0 100px;"
-                                >
-                                    <label for="country" class="setup-label"
-                                        >Country</label
-                                    >
-                                    <input
-                                        id="country"
-                                        type="text"
-                                        bind:value={country}
-                                        placeholder="JP"
-                                        class="setup-input"
-                                    />
-                                </div>
-                                <div class="setup-field" style="flex:1;">
-                                    <label for="timezone" class="setup-label"
-                                        >Timezone</label
-                                    >
-                                    <select
-                                        id="timezone"
-                                        bind:value={timezone}
-                                        class="setup-input"
-                                    >
-                                        {#each TIMEZONES as tz}
-                                            <option value={tz.value}
-                                                >{tz.label}</option
-                                            >
-                                        {/each}
-                                    </select>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- ── STEP 2 ── -->
@@ -534,23 +499,6 @@
 
                         <div class="setup-fields">
                             <div class="setup-field">
-                                <label for="display-name" class="setup-label"
-                                    >Display name <span
-                                        class="setup-hint-inline"
-                                        >(shown to staff)</span
-                                    ></label
-                                >
-                                <input
-                                    id="display-name"
-                                    type="text"
-                                    bind:value={displayName}
-                                    placeholder={name ||
-                                        "e.g. Sinara Front Desk"}
-                                    class="setup-input"
-                                />
-                            </div>
-
-                            <div class="setup-field">
                                 <label for="address" class="setup-label"
                                     >Address</label
                                 >
@@ -561,6 +509,19 @@
                                     placeholder="123 Grand Avenue, Tokyo, Japan"
                                     class="setup-input setup-textarea"
                                 ></textarea>
+                            </div>
+
+                            <div class="setup-field">
+                                <label for="country" class="setup-label"
+                                    >Country</label
+                                >
+                                <input
+                                    id="country"
+                                    type="text"
+                                    bind:value={country}
+                                    placeholder="JP"
+                                    class="setup-input"
+                                />
                             </div>
 
                             <div class="setup-row">
@@ -596,41 +557,6 @@
                                         </p>{/if}
                                 </div>
                             </div>
-
-                            <!-- Brand color -->
-                            <div class="setup-field">
-                                <p class="setup-label">Brand color</p>
-                                <div class="setup-color-row">
-                                    {#each BRAND_COLORS as c}
-                                        <button
-                                            type="button"
-                                            onclick={() => (brandColor = c)}
-                                            class="setup-color-swatch {brandColor ===
-                                            c
-                                                ? 'setup-color-active'
-                                                : ''}"
-                                            style="background:{c};"
-                                            aria-label="Color {c}"
-                                        ></button>
-                                    {/each}
-                                    <label class="setup-color-custom">
-                                        <input
-                                            type="color"
-                                            bind:value={brandColor}
-                                            class="setup-color-input"
-                                        />
-                                        <span
-                                            class="material-symbols-rounded"
-                                            style="font-size:14px;color:#9CA3AF;"
-                                            >colorize</span
-                                        >
-                                    </label>
-                                    <div
-                                        class="setup-color-preview"
-                                        style="background:{brandColor};"
-                                    ></div>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- ── STEP 3 ── -->
@@ -639,156 +565,28 @@
                             <p class="setup-step-tag">Step 3 of 3</p>
                             <h2 class="setup-step-title">Workspace settings</h2>
                             <p class="setup-step-desc">
-                                Configure your schedule defaults — all
-                                adjustable later from Settings.
+                                Pick your timezone — everything else can be
+                                configured inside the app.
                             </p>
                         </div>
 
                         <div class="setup-fields">
-                            <!-- Hours -->
+                            <!-- Timezone -->
                             <div class="setup-field">
-                                <p class="setup-label">Business hours</p>
-                                <div class="setup-row">
-                                    <div style="flex:1;">
-                                        <label
-                                            for="hours-open"
-                                            class="setup-sublabel"
-                                            >Opens at</label
+                                <label for="timezone" class="setup-label"
+                                    >Timezone</label
+                                >
+                                <select
+                                    id="timezone"
+                                    bind:value={timezone}
+                                    class="setup-input"
+                                >
+                                    {#each TIMEZONES as tz}
+                                        <option value={tz.value}
+                                            >{tz.label}</option
                                         >
-                                        <input
-                                            id="hours-open"
-                                            type="time"
-                                            bind:value={hoursOpen}
-                                            class="setup-input"
-                                        />
-                                    </div>
-                                    <div style="flex:1;">
-                                        <label
-                                            for="hours-close"
-                                            class="setup-sublabel"
-                                            >Closes at</label
-                                        >
-                                        <input
-                                            id="hours-close"
-                                            type="time"
-                                            bind:value={hoursClose}
-                                            class="setup-input"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Shift rules -->
-                            <div class="setup-field">
-                                <p class="setup-label">Shift rules</p>
-                                <div class="setup-row">
-                                    <div style="flex:1;">
-                                        <label
-                                            for="shift-dur"
-                                            class="setup-sublabel"
-                                            >Duration (hrs)</label
-                                        >
-                                        <input
-                                            id="shift-dur"
-                                            type="number"
-                                            min="1"
-                                            max="24"
-                                            bind:value={shiftDuration}
-                                            class="setup-input setup-num {fieldErrors.shiftDuration
-                                                ? 'setup-input-error'
-                                                : ''}"
-                                        />
-                                    </div>
-                                    <div style="flex:1;">
-                                        <label
-                                            for="min-staff"
-                                            class="setup-sublabel"
-                                            >Min staff/shift</label
-                                        >
-                                        <input
-                                            id="min-staff"
-                                            type="number"
-                                            min="1"
-                                            bind:value={minStaff}
-                                            class="setup-input setup-num {fieldErrors.minStaff
-                                                ? 'setup-input-error'
-                                                : ''}"
-                                        />
-                                    </div>
-                                    <div style="flex:1;">
-                                        <label
-                                            for="max-consec"
-                                            class="setup-sublabel"
-                                            >Max consec. days</label
-                                        >
-                                        <input
-                                            id="max-consec"
-                                            type="number"
-                                            min="1"
-                                            max="14"
-                                            bind:value={maxConsecutiveDays}
-                                            class="setup-input setup-num"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Period -->
-                            <div class="setup-field">
-                                <p class="setup-label">Schedule period</p>
-                                <p class="setup-field-hint">
-                                    Day of month each period starts and ends.
-                                </p>
-                                <div class="setup-row" style="margin-top:8px;">
-                                    <div style="flex:1;">
-                                        <label
-                                            for="period-start"
-                                            class="setup-sublabel"
-                                            >Start day</label
-                                        >
-                                        <input
-                                            id="period-start"
-                                            type="number"
-                                            min="1"
-                                            max="31"
-                                            bind:value={periodStartDay}
-                                            class="setup-input setup-num {fieldErrors.periodStartDay
-                                                ? 'setup-input-error'
-                                                : ''}"
-                                        />
-                                        {#if fieldErrors.periodStartDay}<p
-                                                class="setup-field-error"
-                                            >
-                                                {fieldErrors.periodStartDay}
-                                            </p>{/if}
-                                    </div>
-                                    <div style="flex:1;">
-                                        <label
-                                            for="period-end"
-                                            class="setup-sublabel"
-                                            >End day</label
-                                        >
-                                        <input
-                                            id="period-end"
-                                            type="number"
-                                            min="1"
-                                            max="31"
-                                            bind:value={periodEndDay}
-                                            class="setup-input setup-num {fieldErrors.periodEndDay
-                                                ? 'setup-input-error'
-                                                : ''}"
-                                        />
-                                        {#if fieldErrors.periodEndDay}<p
-                                                class="setup-field-error"
-                                            >
-                                                {fieldErrors.periodEndDay}
-                                            </p>{/if}
-                                    </div>
-                                </div>
-                                <p class="setup-field-hint">
-                                    e.g. start 21, end 20 → 21st to 20th of
-                                    following month.
-                                </p>
+                                    {/each}
+                                </select>
                             </div>
 
                             <!-- Summary card -->
@@ -1290,16 +1088,6 @@
         letter-spacing: 0.15em;
         margin-bottom: 10px;
     }
-    .setup-sublabel {
-        font-size: 12px;
-        color: #6b7280;
-        margin-bottom: 4px;
-        display: block;
-    }
-    .setup-hint-inline {
-        font-weight: 400;
-        color: #9ca3af;
-    }
     .setup-required {
         color: #dc2626;
     }
@@ -1345,9 +1133,6 @@
         height: auto;
         padding: 16px 18px;
         resize: none;
-    }
-    .setup-num {
-        text-align: center;
     }
 
     /* Slug row */
@@ -1426,54 +1211,6 @@
     .setup-biz-icon {
         font-size: 28px;
         color: inherit;
-    }
-
-    /* Color picker */
-    .setup-color-row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-    .setup-color-swatch {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 2px solid transparent;
-        cursor: pointer;
-        transition: all 0.15s;
-    }
-    .setup-color-swatch:hover {
-        transform: scale(1.1);
-    }
-    .setup-color-active {
-        border-color: #1a2744 !important;
-        transform: scale(1.15) !important;
-    }
-    .setup-color-custom {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 2px dashed #d1d1d1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-    }
-    .setup-color-input {
-        opacity: 0;
-        position: absolute;
-        width: 48px;
-        height: 48px;
-        cursor: pointer;
-    }
-    .setup-color-preview {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: 1px solid #e8e8e8;
     }
 
     /* Summary card */
