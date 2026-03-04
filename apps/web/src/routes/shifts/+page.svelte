@@ -97,6 +97,7 @@
 	let loadingSchedule = $state(false);
 	let saving = $state(false);
 	let reconnecting = $state(false); // true when reloading after tab wake-up
+	let loadFailed = $state(false);   // true when initial load failed (DB paused etc.)
 	let error = $state("");
 	let successMessage = $state("");
 
@@ -287,14 +288,19 @@
 		// Load data only after auth is ready
 		loadInitialData();
 
-		// Check optimizer health
-		checkOptimizerHealth()
-			.then((health) => {
+		// Check optimizer health + poll every 30s so "Offline" self-heals
+		// when Supabase free tier wakes the DB back up.
+		async function refreshHealth() {
+			try {
+				const health = await checkOptimizerHealth();
 				optimizerHealthy = health.healthy;
-			})
-			.catch(() => {
+			} catch {
 				optimizerHealthy = false;
-			});
+			}
+		}
+		refreshHealth();
+		const healthInterval = setInterval(refreshHealth, 30_000);
+		onDestroyCallbacks.push(() => clearInterval(healthInterval));
 
 		// Re-fetch data when the tab becomes visible again after being hidden.
 		// Supabase free tier pauses the DB after inactivity — coming back to the
@@ -306,6 +312,9 @@
 				const wasHiddenMs = hiddenAt ? Date.now() - hiddenAt : 0;
 				hiddenAt = null;
 
+				// Always re-check optimizer health when returning to the tab
+				refreshHealth();
+
 				// Proactively refresh the token if it's expiring soon (within 5 min)
 				if (isTokenExpiringSoon(300)) {
 					await refreshAuthToken();
@@ -316,9 +325,6 @@
 					apiCache.clear();
 					reconnecting = true;
 					loadInitialData().finally(() => { reconnecting = false; });
-					checkOptimizerHealth()
-						.then((health) => { optimizerHealthy = health.healthy; })
-						.catch(() => { optimizerHealthy = false; });
 				}
 			}
 		}
@@ -403,6 +409,15 @@
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Failed to load data";
+			// If we have no data at all, mark as failed so the UI shows a retry button.
+			// Then auto-retry after 10s (Supabase free tier takes ~5-10s to wake).
+			if (staff.length === 0) {
+				loadFailed = true;
+				setTimeout(() => {
+					loadFailed = false;
+					loadInitialData();
+				}, 10_000);
+			}
 		} finally {
 			loading = false;
 		}
@@ -951,6 +966,21 @@
 				<div class="sticky top-0 z-20 flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-sm">
 					<span class="material-symbols-rounded text-base animate-spin" style="animation-duration:1.2s">autorenew</span>
 					再接続中です。しばらくお待ちください…
+				</div>
+			{/if}
+			{#if loadFailed}
+				<!-- DB was paused (Supabase free tier) — auto-retrying, but show manual option -->
+				<div class="sticky top-0 z-20 flex items-center justify-between gap-2 px-4 py-2 bg-red-50 border-b border-red-200 text-red-800 text-sm">
+					<div class="flex items-center gap-2">
+						<span class="material-symbols-rounded text-base animate-spin" style="animation-duration:2s">sync_problem</span>
+						<span>データベースが起動中です。10秒後に自動で再試行します…</span>
+					</div>
+					<button
+						class="px-3 py-1 text-xs bg-red-100 hover:bg-red-200 border border-red-300 rounded-md font-medium transition-colors"
+						onclick={() => { loadFailed = false; loadInitialData(); }}
+					>
+						今すぐ再試行
+					</button>
 				</div>
 			{/if}
 			{#if (authState.loading || loading) && staff.length === 0 && periods.length === 0}
