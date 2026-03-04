@@ -714,8 +714,19 @@
 				return `<td><span class="sym" style="${style}">${symbol}</span></td>`;
 			}).join('');
 
-			return `<tr><td class="date-col ${dateClass}"><b>${day}</b><small>${wd}</small></td>${cells}</tr>`;
+			// Inline date: "21 土" — day and weekday on same line
+		return `<tr><td class="date-col ${dateClass}">${day} <span class="wd">${wd}</span></td>${cells}</tr>`;
 		}).join('');
+
+		// A4 landscape usable area ~277mm wide × ~190mm tall.
+		// Header ~10mm + legend ~5mm + title/period ~8mm = ~23mm overhead.
+		// Remaining ~167mm / rowCount gives row height budget.
+		const rowCount = dateRange.length;
+		// Target: squeeze all rows into one page. Base row height in px for screen preview.
+		// Use CSS @page to force single sheet; font scales down with row count.
+		const rowPx = Math.max(14, Math.min(22, Math.floor(480 / rowCount)));
+		const fontSize = Math.max(7, Math.min(11, Math.floor(rowPx * 0.55)));
+		const symSize = Math.max(9, Math.min(13, fontSize + 2));
 
 		const html = `<!DOCTYPE html>
 <html>
@@ -723,34 +734,58 @@
   <meta charset="utf-8">
   <title>調理場シフト表</title>
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; margin: 10mm; }
-    h1 { font-size: 15px; text-align: center; margin: 0 0 2px; }
-    .period { text-align: center; font-size: 11px; color: #555; margin: 0 0 8px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Arial', sans-serif; background: #fff; }
+    .page { padding: 6mm; }
+    .title-row { display: flex; align-items: baseline; justify-content: center; gap: 12px; margin-bottom: 3px; }
+    h1 { font-size: 13px; font-weight: 700; }
+    .period { font-size: 10px; color: #555; }
     table { border-collapse: collapse; width: 100%; table-layout: fixed; }
-    th, td { border: 1px solid #ddd; text-align: center; font-size: 11px; padding: 3px 2px; height: 24px; overflow: hidden; }
-    thead th { background: #374151; color: #fff; font-size: 10px; height: 36px; word-break: break-all; }
-    .date-col { background: #f9fafb; font-size: 10px; white-space: nowrap; }
-    .date-col small { display: block; font-size: 9px; color: #6b7280; }
+    th {
+      background: #1f2937; color: #fff;
+      font-size: ${fontSize}px; font-weight: 600;
+      padding: 3px 1px; height: ${rowPx + 4}px;
+      border: 1px solid #374151;
+      overflow: hidden; word-break: break-all; vertical-align: middle;
+    }
+    td {
+      border: 1px solid #e5e7eb;
+      text-align: center; vertical-align: middle;
+      font-size: ${fontSize}px;
+      height: ${rowPx}px; padding: 0;
+      overflow: hidden;
+    }
+    .date-col {
+      background: #f9fafb; font-weight: 600;
+      white-space: nowrap; text-align: left;
+      padding-left: 4px; letter-spacing: 0.01em;
+    }
+    .wd { font-weight: 400; color: #6b7280; margin-left: 2px; }
     .weekend { color: #dc2626; }
-    .weekend small { color: #dc2626; }
-    .not-working { background: #f3f4f6; color: #9ca3af; }
-    .sym { font-size: 13px; font-weight: bold; }
-    .legend { margin-top: 8px; font-size: 9px; text-align: center; color: #6b7280; }
+    .weekend .wd { color: #dc2626; }
+    .not-working { background: #f3f4f6; color: #d1d5db; }
+    .sym { font-size: ${symSize}px; font-weight: 700; line-height: 1; }
+    tr:nth-child(even) td:not(.date-col):not(.not-working) { background: #fafafa; }
+    .legend { margin-top: 4px; font-size: 8px; text-align: center; color: #9ca3af; letter-spacing: 0.03em; }
     @media print {
-      @page { size: A4 landscape; margin: 8mm; }
+      @page { size: A4 landscape; margin: 0; }
       body { margin: 0; }
+      .page { padding: 5mm; }
     }
   </style>
 </head>
 <body>
-  <h1>調理場シフト表</h1>
-  <p class="period">期間: ${periodLabel}</p>
-  <table>
-    <thead><tr><th>日付</th>${headerCells}</tr></thead>
-    <tbody>${bodyRows}</tbody>
-  </table>
-  <div class="legend">△ 早番 &nbsp;|&nbsp; ○ 出勤 &nbsp;|&nbsp; ◇ 遅番 &nbsp;|&nbsp; × 休み &nbsp;|&nbsp; ★ 管理 &nbsp;|&nbsp; ⊘ 不可</div>
+  <div class="page">
+    <div class="title-row">
+      <h1>調理場シフト表</h1>
+      <span class="period">${periodLabel}</span>
+    </div>
+    <table>
+      <thead><tr><th style="text-align:left;padding-left:4px;">日付</th>${headerCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+    <div class="legend">△ 早番 &nbsp;·&nbsp; ○ 出勤 &nbsp;·&nbsp; ◇ 遅番 &nbsp;·&nbsp; × 休み &nbsp;·&nbsp; ★ 管理 &nbsp;·&nbsp; ⊘ 不可</div>
+  </div>
   <script>window.onload = () => { window.print(); }<\/script>
 </body>
 </html>`;
