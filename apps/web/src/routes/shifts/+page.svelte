@@ -728,51 +728,35 @@
 		const fontSize = Math.max(7, Math.min(11, Math.floor(rowPx * 0.55)));
 		const symSize = Math.max(9, Math.min(13, fontSize + 2));
 
-		const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>調理場シフト表</title>
-  <style>
+		// Build CSS separately so the <style> tag doesn't appear inside a Svelte template literal
+		// (PostCSS would try to parse it and choke on the JS interpolations)
+		const styleTag = '<style>' + `
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Arial', sans-serif; background: #fff; }
+    body { font-family: Arial, sans-serif; background: #fff; }
     .page { padding: 6mm; }
     .title-row { display: flex; align-items: baseline; justify-content: center; gap: 12px; margin-bottom: 3px; }
     h1 { font-size: 13px; font-weight: 700; }
     .period { font-size: 10px; color: #555; }
     table { border-collapse: collapse; width: 100%; table-layout: fixed; }
-    th {
-      background: #1f2937; color: #fff;
-      font-size: ${fontSize}px; font-weight: 600;
-      padding: 3px 1px; height: ${rowPx + 4}px;
-      border: 1px solid #374151;
-      overflow: hidden; word-break: break-all; vertical-align: middle;
-    }
-    td {
-      border: 1px solid #e5e7eb;
-      text-align: center; vertical-align: middle;
-      font-size: ${fontSize}px;
-      height: ${rowPx}px; padding: 0;
-      overflow: hidden;
-    }
-    .date-col {
-      background: #f9fafb; font-weight: 600;
-      white-space: nowrap; text-align: left;
-      padding-left: 4px; letter-spacing: 0.01em;
-    }
+    th { background: #1f2937; color: #fff; font-size: ${fontSize}px; font-weight: 600; padding: 3px 1px; height: ${rowPx + 4}px; border: 1px solid #374151; overflow: hidden; word-break: break-all; vertical-align: middle; }
+    td { border: 1px solid #e5e7eb; text-align: center; vertical-align: middle; font-size: ${fontSize}px; height: ${rowPx}px; padding: 0; overflow: hidden; }
+    .date-col { background: #f9fafb; font-weight: 600; white-space: nowrap; text-align: left; padding-left: 4px; }
     .wd { font-weight: 400; color: #6b7280; margin-left: 2px; }
     .weekend { color: #dc2626; }
     .weekend .wd { color: #dc2626; }
     .not-working { background: #f3f4f6; color: #d1d5db; }
     .sym { font-size: ${symSize}px; font-weight: 700; line-height: 1; }
     tr:nth-child(even) td:not(.date-col):not(.not-working) { background: #fafafa; }
-    .legend { margin-top: 4px; font-size: 8px; text-align: center; color: #9ca3af; letter-spacing: 0.03em; }
-    @media print {
-      @page { size: A4 landscape; margin: 0; }
-      body { margin: 0; }
-      .page { padding: 5mm; }
-    }
-  </style>
+    .legend { margin-top: 4px; font-size: 8px; text-align: center; color: #9ca3af; }
+    @media print { @page { size: A4 landscape; margin: 0; } body { margin: 0; } .page { padding: 5mm; } }
+  ` + '</style>';
+
+		const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>調理場シフト表</title>
+  ${styleTag}
 </head>
 <body>
   <div class="page">
