@@ -35,6 +35,7 @@
     let phone = $state("");
     let ownerEmail = $state(authState.user?.email ?? "");
     let brandColor = $state("#B8956A");
+    let plan = $state<"free" | "pro" | "business">("free");
 
     let hoursOpen = $state("09:00");
     let hoursClose = $state("22:00");
@@ -130,6 +131,65 @@
         { n: 4, label: "Launch" },
     ];
 
+    const PLANS = [
+        {
+            value: "free" as const,
+            tier: "Free",
+            name: "Starter",
+            price: "¥0",
+            priceNote: "Forever free · No credit card",
+            badge: null as string | null,
+            features: [
+                "1 division",
+                "Up to 20 staff",
+                "Intelligent auto-scheduler",
+                "Basic shift rules",
+            ],
+            locked: [
+                "OCR allergen scanning",
+                "Multiple divisions",
+                "Analytics & reports",
+            ],
+        },
+        {
+            value: "pro" as const,
+            tier: "Pro",
+            name: "Professional",
+            price: "¥4,980",
+            priceNote: "≈ $33 USD · Billed monthly",
+            badge: "Most Popular" as string | null,
+            features: [
+                "Up to 3 divisions",
+                "Up to 80 staff",
+                "Intelligent auto-scheduler",
+                "Advanced shift rules",
+                "OCR allergen scanning",
+                "Menu management",
+                "Basic analytics",
+            ],
+            locked: ["Unlimited divisions", "Priority support"],
+        },
+        {
+            value: "business" as const,
+            tier: "Business",
+            name: "Business",
+            price: "¥12,800",
+            priceNote: "≈ $85 USD · Billed monthly",
+            badge: null as string | null,
+            features: [
+                "Unlimited divisions & staff",
+                "Intelligent auto-scheduler",
+                "Custom shift rules",
+                "OCR allergen scanning",
+                "Full menu management",
+                "Advanced analytics & exports",
+                "Priority support",
+                "Early feature access",
+            ],
+            locked: [],
+        },
+    ];
+
     // ─── Derived ──────────────────────────────────────────────────────────────
     const selectedBizType = $derived(
         BUSINESS_TYPES.find((b) => b.value === businessType)!,
@@ -214,7 +274,7 @@
                     phone: phone.trim() || null,
                     owner_email: resolvedEmail,
                     brand_color: brandColor,
-                    plan: "free",
+                    plan,
                 })
                 .select("id")
                 .single();
@@ -565,13 +625,64 @@
                             <p class="setup-step-tag">Step 3 of 3</p>
                             <h2 class="setup-step-title">Workspace settings</h2>
                             <p class="setup-step-desc">
-                                Pick your timezone — everything else can be
-                                configured inside the app.
+                                Choose your plan and pick your timezone.
                             </p>
                         </div>
 
                         <div class="setup-fields">
-                            <!-- Timezone -->
+                            <!-- Plan picker -->
+                            <div class="setup-field">
+                                <p class="setup-label">Plan</p>
+                                <div class="setup-plan-grid">
+                                    {#each PLANS as p}
+                                        <button
+                                            type="button"
+                                            class="setup-plan-card {plan ===
+                                            p.value
+                                                ? 'setup-plan-active'
+                                                : ''} {p.value === 'pro'
+                                                ? 'setup-plan-recommended'
+                                                : ''}"
+                                            onclick={() => (plan = p.value)}
+                                        >
+                                            {#if p.badge}
+                                                <span class="setup-plan-badge"
+                                                    >{p.badge}</span
+                                                >
+                                            {/if}
+                                            <div class="setup-plan-tier">
+                                                {p.value === "free"
+                                                    ? "Free"
+                                                    : p.value === "pro"
+                                                      ? "Pro"
+                                                      : "Business"}
+                                            </div>
+                                            <div class="setup-plan-name">
+                                                {p.name}
+                                            </div>
+                                            <div class="setup-plan-price">
+                                                {p.price}<span
+                                                    class="setup-plan-per"
+                                                >
+                                                    / mo</span
+                                                >
+                                            </div>
+                                            <div class="setup-plan-note">
+                                                {p.priceNote}
+                                            </div>
+                                            <hr class="setup-plan-divider" />
+                                            <ul class="setup-plan-features">
+                                                {#each p.features as f}
+                                                    <li>{f}</li>
+                                                {/each}
+                                                {#each p.locked as f}
+                                                    <li class="muted">{f}</li>
+                                                {/each}
+                                            </ul>
+                                        </button>
+                                    {/each}
+                                </div>
+                            </div>
                             <div class="setup-field">
                                 <label for="timezone" class="setup-label"
                                     >Timezone</label
@@ -611,6 +722,14 @@
                                     <div class="setup-summary-row">
                                         <span>Timezone</span><span
                                             >{timezone}</span
+                                        >
+                                    </div>
+                                    <div class="setup-summary-row">
+                                        <span>Plan</span><span
+                                            style="color:#b8956a;font-weight:600;"
+                                            >{PLANS.find(
+                                                (p) => p.value === plan,
+                                            )?.name}</span
                                         >
                                     </div>
                                     <div class="setup-summary-row">
@@ -1211,6 +1330,133 @@
     .setup-biz-icon {
         font-size: 28px;
         color: inherit;
+    }
+
+    /* Plan picker */
+    .setup-plan-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        align-items: start;
+    }
+    .setup-plan-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+        padding: 22px 20px 24px;
+        border-radius: 16px;
+        border: 1.5px solid #e5e1da;
+        background: #fff;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: inherit;
+        color: #1a2744;
+    }
+    .setup-plan-card:hover {
+        border-color: rgba(184, 149, 106, 0.5);
+        box-shadow: 0 2px 12px rgba(184, 149, 106, 0.08);
+    }
+    .setup-plan-recommended {
+        border-color: #b8956a;
+        box-shadow: 0 4px 20px rgba(184, 149, 106, 0.15);
+    }
+    .setup-plan-active {
+        border-color: #b8956a !important;
+        background: #fdfaf7 !important;
+        box-shadow:
+            0 0 0 3px rgba(184, 149, 106, 0.2),
+            0 4px 20px rgba(184, 149, 106, 0.12) !important;
+    }
+    .setup-plan-badge {
+        position: absolute;
+        top: -11px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #b8956a;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 3px 12px;
+        border-radius: 99px;
+        white-space: nowrap;
+    }
+    .setup-plan-tier {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #b8956a;
+        margin-bottom: 4px;
+    }
+    .setup-plan-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a2744;
+        font-family: "Instrument Sans", sans-serif;
+        margin-bottom: 10px;
+    }
+    .setup-plan-price {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1a2744;
+        font-family: "IBM Plex Mono", monospace;
+        line-height: 1;
+    }
+    .setup-plan-per {
+        font-size: 12px;
+        font-weight: 400;
+        color: #9ca3af;
+        font-family: "Instrument Sans", sans-serif;
+    }
+    .setup-plan-note {
+        font-size: 11px;
+        color: #b8956a;
+        margin-top: 3px;
+        margin-bottom: 14px;
+        min-height: 16px;
+    }
+    .setup-plan-divider {
+        border: none;
+        border-top: 1px solid #f0ede8;
+        width: 100%;
+        margin-bottom: 14px;
+    }
+    .setup-plan-features {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        width: 100%;
+        padding: 0;
+        margin: 0;
+    }
+    .setup-plan-features li {
+        font-size: 12px;
+        color: #374151;
+        display: flex;
+        gap: 7px;
+        align-items: flex-start;
+        line-height: 1.4;
+    }
+    .setup-plan-features li::before {
+        content: "✓";
+        color: #b8956a;
+        font-weight: 700;
+        font-size: 11px;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+    .setup-plan-features li.muted {
+        color: #9ca3af;
+    }
+    .setup-plan-features li.muted::before {
+        content: "—";
+        color: #d1cac0;
     }
 
     /* Summary card */
