@@ -3,144 +3,208 @@
 
 ---
 
-## The Founder Story
+## The Core Narrative
 
-**The headline that ties everything together:**
+**This is the one sentence everything else must come back to:**
 
-> *Kitchen professional in Japan, last-year student, building AI for the industry he works in.*
+> *I was the scheduling logic for my team before the software existed.*
 
-This is the core of the personal brand. You're not an outsider theorizing about hospitality — you live it daily, you've been the informal scheduling logic-layer for your team, and you built the solution from inside the problem. That insider credibility is impossible to fake.
+Kamal didn't read about the scheduling problem and decide to solve it. He lived it. Every rotation cycle, he was the informal layer between his manager and a spreadsheet — explaining the constraints, flagging conflicts, knowing which rotations would break. He was the presence before the software existed.
+
+This is the moat. Not the algorithm. Not OR-Tools. Not constraint programming. The fact that the person who built this system has been *inside* it for two years.
+
+Anyone can copy the code. Nobody can copy that.
+
+---
+
+## The Story in One Arc
+
+```
+Kitchen staff in Japan
+   ↓
+Informal scheduling logic for his team (not officially, just... how it worked)
+   ↓
+Realizes: what he was saying out loud every month are rules
+Rules can be written down
+Written down rules can be encoded
+   ↓
+Finds the research — NSP, OR-Tools, CP-SAT
+Algorithm validates what he already knew
+   ↓
+Builds Sinara: his knowledge, made accessible to every manager
+who doesn't have someone like him in the room
+   ↓
+Also his thesis. Also his portfolio. Also his brand.
+```
+
+Every post, every thread, every demo should map back to some point in this arc.
+
+---
+
+## Positioning Statement
+
+**Not:** "I built an AI scheduling tool."
+**Yes:** "I was the scheduling logic for my team. I built Sinara to give that knowledge to every manager who doesn't have someone like me in their kitchen."
+
+**Not:** "Sinara uses OR-Tools CP-SAT to automate shift scheduling."
+**Yes:** "The constraints are right because the person who defined them lives with the consequences."
+
+**Not:** "I'm a student and kitchen worker who built an app."
+**Yes:** "I built this from inside the problem. The kitchen I work in is the case study. My manager is the baseline."
 
 ---
 
 ## Transparency Framework
 
-### What to lead with
-**Kitchen staff / working in Japan** — this is your strongest card. "I built Sinara from inside the kitchen" immediately earns attention. You don't need to say "TG 1 visa" specifically — the story is that you work in this industry, right now, in Japan.
+### Lead with
+**The knowledge, not the title.** "I've been the informal scheduling logic for my team" is more powerful than "I'm a kitchen staff in Japan." The first positions you as an expert. The second positions you as an underdog. Both are true — but one is a better opening.
 
-### What not to hide, but not to lead with
-**Online university** — reframe it: *"I completed my degree while working full-time in hospitality in Japan."* That's discipline and ambition, not a limitation. The achievement is the same — the framing changes how it lands.
+### Be open about
+- Working in hospitality in Japan right now — this is the source of authority
+- Being a student finishing your degree — frames the thesis as applied research, not just academic
+- The journey: the naming, the decisions, the rebuilds, the failures
+- Research findings as you go — live thesis updates build credibility in real time
 
-### What is actually a strength
-**Being a student** — your thesis gives the product academic legitimacy. "I'm researching the measurable impact of automated scheduling on staff presence and guest experience" is validated research, not a hobby project.
+### Don't lead with, but never hide
+- Online university — reframe as: *"I completed my degree while working full-time in hospitality in Japan."* The achievement is the same. The framing changes how it lands.
+- TG-1 visa specifics — the story is that you work in this industry, right now, in Japan. The visa type is not the story.
+
+### The transparency play
+Post the journey, not the blueprints. Share what you're building and why. Be quieter about exact implementation details of unreleased features. The difference:
+
+| Share openly | Hold until shipped |
+|---|---|
+| "Sinara schedules a month in seconds" | Exact solver config and constraint model |
+| "Allergen detection from Japanese product photos" | OCR pipeline and prompt engineering |
+| "I was the informal scheduler for my team" | Unreleased features in progress |
+| Thesis research, academic framing, findings | Architecture decisions that give you an edge |
 
 ---
 
 ## Two-Account Strategy
 
-### Personal Account (you)
+### Personal Account — @kamal
 | Element | Direction |
-|---------|-----------|
+|---|---|
 | Tone | Casual, honest, mix of Indonesian and English |
-| Content | Journey, decisions, failures, behind the scenes |
-| Feel | "I'm figuring this out" |
-| Frequency | More often, lower stakes |
-| Stories | Naming Sinara from Basa Sunda, the scheduling problem from inside the kitchen, student + worker life |
+| Core message | "I was the presence before the software existed" |
+| Content | The journey, the decisions, the kitchen stories, the build |
+| Feel | "I'm figuring this out, and I know this problem from the inside" |
+| Frequency | Often — lower stakes, real-time |
 
-### Sinara Account (@sinara_app / @getsinara)
+### Sinara Account — @sinara_app
 | Element | Direction |
-|---------|-----------|
-| Tone | Clean, product-focused, bilingual (EN + JP) |
-| Content | Feature releases, demos, philosophy, updates |
-| Feel | "This is what we built" |
-| Frequency | Less often, higher quality |
-| Stories | OR-Tools scheduling in action, allergen scan demos, Stella interactions |
+|---|---|
+| Tone | Clean, product-focused, bilingual EN + JP |
+| Core message | "Operations in the background. People in the light." |
+| Content | What it does, how it works, demos, philosophy |
+| Feel | "This is what we built, and here's why it matters" |
+| Frequency | Less often — higher quality, milestone-driven |
 
-**The link between them:** Personal account drives attention → product account is the reference point. Cross-link naturally: *"we just shipped the allergen scan feature — here's the thread on why I built it"* on personal, pointing to Sinara's post showing it working.
+**The link between them:** Personal account tells the story of *why* → Sinara account shows *what* was built from that story. Cross-link naturally. Don't keep them siloed.
 
 ---
 
 ## Platform Priority
 
 ### 1. LinkedIn (highest priority)
-- Thesis gives academic credibility to post about
-- Hospitality businesses (B2B customers) are here
+- Thesis gives academic weight — hospitality + tech professionals respond to this
+- B2B customers (hotel operators, restaurant managers) are here
 - Indonesian and Japanese professional communities are active
-- Portfolio visibility for hiring managers
-- Best format: long-form story posts, thesis updates, product milestones
+- Portfolio visibility for future opportunities
+- Best format: long-form story posts, thesis milestones, product launches
 
 ### 2. Twitter / X
-- Build in public culture lives here
+- Build-in-public culture lives here
+- Shorter form — thread style works perfectly for the arc above
 - Indonesian and Japanese tech communities are active
-- Casual, frequent updates work well
-- Best format: short threads, honest process posts, scheduling demos
+- Best format: threads from the arc, honest process updates, scheduling demos
 
-### 3. TikTok or Instagram
-- Indonesia is one of TikTok's largest markets
-- A 30-second video: manual scheduling vs. Sinara's output has viral potential
-- Brand visuals (Sinara identity, poster) perform well on Instagram
-- Best format: screen recordings, before/after demos, product walkthroughs
+### 3. TikTok / Instagram
+- Indonesia is one of TikTok's largest markets — Sundanese founder in Japan is a story
+- Before/after demo (manual schedule vs. Sinara) has viral potential — no narration needed
+- Brand visuals perform well on Instagram
+- Best format: screen recordings, behind-the-scenes, product walkthroughs
 
 ---
 
 ## Content Pillars
 
 ### Personal Account
-1. **The Build** — what you're working on this week, decisions made, problems hit
-2. **The Story** — kitchen life, scheduling pain, why Sinara exists
-3. **The Name** — sinar (Indonesian: ray of light) + nara (Sanskrit: human) = human radiance
-4. **The Thesis** — research findings, what the data says about scheduling impact on staff presence
-5. **The Culture** — Sundanese perspective, working in Japan, building for global hospitality
+1. **The Knowledge** — what you understood about scheduling from being inside it
+2. **The Build** — decisions made, problems hit, what you're working on this week
+3. **The Name** — sinar + nara, Sundanese roots, why the name matters
+4. **The Thesis** — research findings, what the data says, live updates
+5. **The Life** — kitchen shifts, student life, building from Japan, West Javanese perspective
 
 ### Sinara Account
-1. **Product Updates** — new features, what changed and why
+1. **What it does** — scheduling, allergen management, Stella — shown not told
 2. **The Philosophy** — presence, by design; AI at the back, humans at the front
-3. **Demos** — OR-Tools scheduling, Qwen VL-OCR allergen scanning, Stella interactions
-4. **Use Cases** — hotel, restaurant, izakaya, clinic scenarios
-5. **Research** — data from thesis, impact numbers
+3. **Demos** — OR-Tools in action, allergen scan, Stella interactions
+4. **Research** — thesis data, impact numbers, academic validation
+5. **Updates** — new features, what changed, what's coming
 
 ---
 
 ## Thesis as Content Engine
 
-The BINUS thesis (Constraint Programming via Google OR-Tools CP-SAT for hotel kitchen scheduling) is a goldmine for content. It gives every post academic weight without needing to sound academic.
+The BINUS thesis (Constraint Programming via Google OR-Tools CP-SAT for hotel kitchen scheduling) provides ongoing content for months. Use it as a live research thread — not a finished paper reveal at the end, but a real-time journey.
 
-### Key stats to use
-- **Days → seconds**: Manual scheduling takes days per cycle. OR-Tools solved 20 shift scheduling instances in **0.009 seconds** (Elhalid & Işık, 2024).
-- **NP-hard problem**: Shift scheduling is mathematically classified as NP-hard — it cannot be solved optimally by brute force at scale. That's why even experienced managers spend hours on it.
-- **Nurses have the same problem**: The Nurse Scheduling Problem (NSP) and hotel kitchen scheduling share identical mathematical structure. Research that solved hospital rosters directly validates Sinara's approach.
-- **Fairness, not just speed**: OR-Tools doesn't just find *a* schedule — it optimizes for constraint satisfaction: fair workload distribution, rest gaps, staff preferences, regulatory compliance simultaneously.
+### The reframe
+**Old:** "I'm researching OR-Tools CP-SAT for my thesis."
+**New:** "I'm measuring how much better a schedule gets when it's built by someone who knows the constraints — vs. a solver that's just filling slots."
 
-### Academic references (for credibility, not citation-dumping)
-- Elhalid & Işık (2024) — OR-Tools CP-SAT solved 13/20 shift requests in 0.009 seconds
-- Müller et al. (2022) — CP-SAT outperforms Mixed Integer Programming on scheduling
-- Oliveira et al. (2024) — CP-SAT for nurse scheduling (NSP connection)
-- Mustafa et al. (2024) — AI-driven scheduling improved hotel operational efficiency
+The thesis is proof that Sinara's approach is right. But lead with the human story, let the data land as the evidence.
+
+### Key stats (use these, always with human context)
+- **0.009 seconds** — OR-Tools solved scheduling instances this fast (Elhalid & Işık, 2024). Don't lead with the stat. Lead with: "My manager spends two hours. Here's what the research says about how long it actually needs to take."
+- **NP-hard** — mathematically classified. Use to explain why even experienced managers struggle. Not to show off — to validate that the problem is real.
+- **NSP connection** — nurses and hotel kitchen staff have the same mathematical problem. Earns respect from two industries at once.
+- **Fairness** — OR-Tools doesn't just find *a* schedule, it finds one that distributes load fairly. This is the human story inside the algorithm.
+
+### Academic references (for credibility when needed)
+- Elhalid & Işık (2024) — OR-Tools CP-SAT, 0.009 seconds
+- Müller et al. (2022) — CP-SAT outperforms MIP on scheduling
+- Oliveira et al. (2024) — CP-SAT for nurse scheduling (NSP)
+- Mustafa et al. (2024) — AI scheduling improved hotel operational efficiency
 - Risqiwahid et al. (2023) — fuzzy methods for hotel staff rostering
-
-### Content angles from thesis
-1. **The "impossible problem" angle** — position scheduling as a legitimately hard CS problem, not an admin task
-2. **The NSP connection** — nurses and hotel kitchen staff have the same mathematical problem. That framing earns respect from both industries.
-3. **The speed stat** — 0.009 seconds vs. 2+ hours manually. No explanation needed.
-4. **The fairness angle** — scheduling affects people's lives (rest, pay, work-life balance). Sinara encodes fairness as a constraint, not an afterthought.
-5. **The thesis progress angle** — share findings as you go. Live research builds credibility in real time.
 
 ---
 
 ## The Demo That Matters Most
 
-A short screen recording showing:
-- Manual schedule: visible effort, multiple steps, time passing
-- Sinara: same result, seconds
+A short screen recording. No narration needed.
 
-No narration needed. The contrast speaks for itself. This is the content that gets shared.
+**Scheduling demo:**
+Show a manual schedule being built (effort visible) → Show Sinara generating the same schedule. Let the contrast speak. The emotional beat is the two hours becoming seconds — but what that means is: *someone gets their evening back.*
 
-**Allergen scan demo** (second most important):
-- Pick a Japanese product package
-- Open camera / upload image
-- Watch Sinara extract, parse, and categorize all allergens
-- Result: what took 3 minutes per product now takes seconds per batch
+**Allergen scan demo:**
+Pick a Japanese product package. Open camera. Watch Sinara extract, parse, categorize every allergen. What took 3 minutes per product now takes seconds per batch. The emotional beat is the risk that just got removed.
 
 ---
 
 ## Sequencing
 
-1. **Now** — start personal account, tell the founding story, build audience around the journey
-2. **Thesis in progress** — share research findings as you go, academic validation builds credibility
-3. **Pre-launch** — Sinara account goes live, cross-linked to personal
-4. **Launch** — audience already exists, community already formed
+```
+Now
+└── Personal account: start posting the story
+    └── Thread 01: The Founding Story (human version)
+    └── Thread 02: The Name
 
-*The personal brand should precede the product launch. By the time Sinara is ready, there should already be people who care.*
+Thesis in progress
+└── Weekly updates — live research, findings, what the data shows
+└── Sinara account: soft presence, brand philosophy posts
+
+Pre-launch
+└── Sinara account goes live fully, cross-linked to personal
+└── Audience already exists when product is ready
+
+Launch
+└── Community already formed
+└── First users come from people who've been following the journey
+```
+
+*The personal brand should precede the product launch. By the time Sinara is ready, people should already care — not because of what it does, but because of who built it and why.*
 
 ---
 
@@ -149,7 +213,8 @@ No narration needed. The contrast speaks for itself. This is the content that ge
 **Sinara** — sinar (light) + nara (human). Human radiance.
 **Tagline** — presence, by design
 **Stella** — the AI connector. Operator-facing and guest-facing.
-**Philosophy** — AI in the background. Humans in the light.
+**The founder story** — I was the presence before the software existed.
+**The philosophy** — AI in the background. Humans in the light.
 
 ---
 
