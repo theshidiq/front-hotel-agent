@@ -9,13 +9,22 @@
 
 ---
 
-> **Core narrative (read this first)**
-> The story is not "I built a scheduling app."
-> The story is "I was the scheduling logic for my team before the software existed."
-> Kamal didn't build Sinara from theory. He built it from memory.
-> Anyone can copy the code. Nobody can copy two years of standing in that kitchen.
-> The algorithm is how he encoded what he already knew.
-> Lead every story from the human. Let the tech land as the proof.
+> **Core narrative (read this first before writing or editing anything)**
+>
+> The founding story is simple and honest. Don't inflate it.
+>
+> Kamal is kitchen staff at a hotel in Japan.
+> Every month he watched his manager make the shift schedule — by hand, on paper.
+> It took hours. Same struggle every time.
+> He wondered: what if this could be automated?
+> That question became Sinara.
+>
+> He's not an expert. He's not a manager. He's not a scheduler.
+> He's a staff who noticed something and cared enough to do something about it.
+> That's the whole story. It doesn't need to be bigger.
+>
+> Lead every post from that honest place.
+> Let the tech and research land as proof — never as the headline.
 
 ---
 
@@ -27,85 +36,89 @@
 ---
 
 ## Thread 01 — The Founding Story
-*Lead: the human knowledge, not the algorithm*
 
 **Hook**
-For months, I was my manager's scheduling logic.
+Every month, my manager made the shift schedule by hand.
 
-Not officially. There was no title for it.
+Paper. Pen. Hours.
 
-He'd open the spreadsheet, and I'd stand next to him and explain — who can't close back-to-back, which shift gaps cause problems, why that rotation always breaks by week three.
+I'd watch the same struggle happen — cross out, rewrite, check again.
 
-He built the schedule. I was the reason it worked. 🧵
+One day I thought: what if this could be automated?
+
+That question became Sinara. 🧵
 
 ---
 
 **2**
-I'm a kitchen staff at a hotel in Japan.
+I'm kitchen staff at a hotel in Japan.
 
-Every month I watched the same thing happen: two hours of spreadsheet work, lots of fixes, sometimes frustration — and at the end, a schedule that was fine. Not great. Fine.
+I don't make the schedule. That's the manager's job.
 
-"Fine" means someone's tired on the wrong day. "Fine" means a request got missed. "Fine" costs the team.
+But I work the shifts. I see how the schedule lands — who's tired, whose request got missed, which week feels off.
+
+When you're on the floor, you notice things.
 
 ---
 
 **3**
-One day it clicked.
+The paper schedule was always a production.
 
-Everything I was explaining to him — the constraints, the patterns, the logic — it wasn't intuition. It was rules.
+Hours of work. Lots of erasing. Last-minute fixes.
 
-Rules that could be written down.
-Rules that could be encoded.
-Rules that a computer could apply in seconds.
+And at the end of it — a schedule that was fine. Not great. Fine.
+
+"Fine" means someone's rest gap got squeezed. "Fine" means a preference got lost. That stuff costs the team.
 
 ---
 
 **4**
-So I started writing them down.
+So I started asking: is this problem solved anywhere?
 
-Rest gaps. Consecutive day limits. Fairness across weekends. Individual availability. Seniority patterns.
+Turns out — hospitals have been solving it for decades.
 
-Every constraint I knew from being in that kitchen — I mapped it out.
+Same problem. Nurses instead of kitchen staff. Same constraints: shift gaps, fairness, availability, regulations.
 
-That list became the foundation of Sinara.
+And researchers had already built algorithms for it.
 
 ---
 
 **5**
-Then I found the research.
+One paper showed Google OR-Tools CP-SAT solving scheduling instances in 0.009 seconds.
 
-Computer scientists have been solving this exact problem for hospitals for decades.
+My manager was spending hours on paper.
 
-It's called the Nurse Scheduling Problem (NSP). Same constraints. Same complexity. Same human cost when it goes wrong.
-
-And they'd built solvers for it. Fast ones.
+The gap isn't a technology problem — the tools exist. The problem is that nobody brought them to hospitality.
 
 ---
 
 **6**
-One paper: OR-Tools CP-SAT solved shift scheduling instances in 0.009 seconds.
+So I started building.
 
-My manager spends two hours.
+Encoded the constraints I understood from working the shifts:
+rest gaps, consecutive day limits, fair weekend distribution, individual availability.
 
-The algorithm wasn't the invention. The invention was knowing exactly which rules to give it — because I'd been living those rules every rotation cycle.
+A system any manager could use — without needing to be a computer scientist. Without needing paper.
 
 ---
 
 **7**
-Sinara is me, encoded.
+It's also my thesis.
 
-The knowledge I was giving my manager informally, verbally, standing next to a spreadsheet — now it's a system any manager can use without needing someone like me in the room.
+I'm a last-year student at BINUS, finishing online while working here in Japan.
 
-That's the whole point.
+The research question: how much better does a schedule get when a computer does it vs. a manager doing it by hand?
+
+The kitchen I work in is my case study.
 
 ---
 
 **8 — CTA**
-It's also my thesis. I'm a last-year student at BINUS while working full-time here.
+Going to build this in public.
 
-Going to build this in public. The research. The decisions. The failures. The moments it works.
+The research. The decisions. The name origin (it's from Indonesian and Sanskrit — will explain). The failures. The moments it works.
 
-If you're in hospitality, operations, or just like watching someone build from inside the problem they're solving — follow along.
+If you're in hospitality, operations, or just like watching someone build from inside the problem — follow along.
 
 ---
 
@@ -123,16 +136,16 @@ Not a random word. Not an acronym. It's from home. 🧵
 **2**
 *sinar* — Indonesian/Sundanese for "ray of light"
 
-The word we use for sunlight coming through a window, the glow before sunrise, that shift in energy when someone walks into a room and you feel it before you see it.
+The word for sunlight through a window. The glow before sunrise. The shift in energy when someone walks into a room and you feel it before you see it.
 
 ---
 
 **3**
 *nara* — Sanskrit for "human"
 
-Same root as "narrate." The human who carries the story.
+Same root as "narrate." The human who holds the story.
 
-In Japanese culture, the idea that a person's presence — the way they make a room feel — is something real and worth protecting.
+In Japanese aesthetics, the idea that a person's presence in a room is something real — worth protecting, worth designing around.
 
 ---
 
@@ -141,19 +154,19 @@ Sinara = sinar + nara.
 
 Human radiance.
 
-The premise: in an age where AI is replacing more and more of what hospitality staff do — what's left, what matters most, is presence. The feeling of being genuinely seen.
+What a hotel actually sells — when it's doing it right — is the feeling of being genuinely seen. Cared for. Attended to.
 
-Sinara exists to protect that.
+That's what the product exists to protect.
 
 ---
 
 **5**
 The tagline: *presence, by design.*
 
-Name gives the WHAT — human radiance.
-Tagline gives the HOW — it doesn't happen by accident.
+The name gives the WHAT — human radiance.
+The tagline gives the HOW — it doesn't happen by accident.
 
-A schedule that burns out your team can't produce presence. A system that creates risk at the table can't produce presence. Sinara removes those things — quietly, in the background.
+A schedule that burns out your team can't produce presence. A system that creates allergen risk at the table can't produce presence. Sinara removes those things — quietly, in the background.
 
 ---
 
@@ -168,101 +181,103 @@ The name is a small piece of home inside something I hope travels far.
 
 ---
 
-## Thread 03 — The Human Behind the Algorithm
+## Thread 03 — What the Research Says
 
 **Hook**
-People keep asking me about the tech stack.
+I started building Sinara because I watched my manager struggle with a paper schedule.
 
-I get it — OR-Tools, CP-SAT, constraint programming, it sounds impressive.
+Then I found out this problem has a name, a 40-year research history, and solvers that handle it in milliseconds.
 
-But that's not why Sinara works. 🧵
+Here's what I learned. 🧵
 
 ---
 
 **2**
-The reason Sinara works is that I know which constraints actually matter.
+Shift scheduling is classified as NP-hard.
 
-Not from a textbook. From two years of standing next to a scheduling spreadsheet explaining to my manager why a particular rotation was going to break.
+That means as the number of staff and constraints grows, the possible combinations grow faster than any brute-force approach can handle.
 
-The algorithm is just how I wrote that knowledge down.
+It's not that managers are doing it wrong. It's that they're manually solving one of the hardest problems in computer science.
 
 ---
 
 **3**
-Here's the thing about shift scheduling software built by people who've never worked a shift:
+Hospitals figured this out first.
 
-It optimizes for the wrong things.
+The Nurse Scheduling Problem (NSP) — same structure as hotel and restaurant kitchen scheduling. Same constraints: rest gaps, availability, fairness, consecutive day limits, regulatory minimums.
 
-It fills the slots. It technically satisfies the rules. But it doesn't know that this person shouldn't close Thursday if they're opening Friday. It doesn't know why two specific staff can't overlap on weekends.
+Decades of research. Real solvers built for it.
 
 ---
 
 **4**
-That knowledge lives in the room. In the people who've been watching the patterns.
+One paper that changed how I thought about this:
 
-Most scheduling software ignores it because the people building it have never been in that room.
+Elhalid & Işık (2024) used Google OR-Tools CP-SAT to solve scheduling instances.
 
-I have. I am.
+Time: **0.009 seconds**.
+
+My manager was doing this on paper. For hours.
 
 ---
 
 **5**
-That's the difference Sinara is trying to encode.
+The key insight: the algorithm doesn't replace the manager's judgment.
 
-Not just "here's a solver." But: here's a system that understands hospitality scheduling the way someone who works in hospitality understands it.
+It encodes the rules the manager already knows — rest gaps, fairness across weekends, individual availability — and applies them perfectly, every time, in seconds.
 
-The constraints are right because the person who defined them lives with the consequences.
+The manager defines what matters. The solver finds the answer.
 
 ---
 
 **6 — Closer**
-My thesis question:
+That's the foundation Sinara is built on.
 
-*How effective is Constraint Programming via Google OR-Tools CP-SAT at automating hotel kitchen staff scheduling compared to manual approaches?*
+My thesis question: how much better is a constraint-programmed schedule vs. a paper one, measured in fairness, compliance, and time?
 
-But the real question underneath it: what happens when you give a manager the institutional knowledge of their best informal scheduler — in one click?
-
----
+The kitchen I work in is the case study. My manager is the baseline.
 
 ---
 
-## Thread 04 — The Student-Worker-Builder
+---
+
+## Thread 04 — Student + Worker + Builder
 
 **Hook**
-I work full-time in a hotel kitchen in Japan.
+I work full-time as kitchen staff in Japan.
 
-I'm in my last year of university online.
+I'm finishing my degree online.
 
-And I'm building a hospitality operations platform.
+And I'm building a hospitality operations platform from a staff dorm.
 
 This is what that actually looks like. 🧵
 
 ---
 
 **2**
-I do shifts. Then I study. Then I code. Sometimes in that order, sometimes all at once.
+Shifts first. Then coursework. Then code.
 
-The thesis I'm writing is about the software I'm already building. The software is about the problem I live every month at work.
+Sometimes two at once, sometimes all three in the same day.
 
-There's no separation. That's the point.
+There's no clean separation. The thesis is about the problem I see at work. The product is the answer to the thesis question.
 
 ---
 
 **3**
-Online university is easy to dismiss. "It's not a real degree."
+Online university is easy to dismiss.
 
-But I've been completing coursework from Japan while working full-time in hospitality. Writing research papers about scheduling optimization while living the scheduling problem.
+But I've been writing research papers about scheduling optimization while living the scheduling problem. Completing coursework while working the shifts I'm studying.
 
-That's not a limitation. That's the closest thing to applied research I know.
+That's not a limitation. That's applied research.
 
 ---
 
 **4**
-The thing nobody tells you about building from inside your industry:
+The thing about building from inside an industry:
 
-You stop asking "what should this feature do" and start asking "what would have helped me last Tuesday."
+You stop asking "what should this feature do" and start asking "what would have helped here last Tuesday."
 
-Every design decision has a reference point. Every constraint in the solver has a memory attached to it.
+Every design decision has a memory attached to it. Every constraint in the solver comes from something I actually observed.
 
 ---
 
@@ -273,7 +288,7 @@ The app is called Sinara.
 
 *Presence, by design.*
 
-Built from a hotel kitchen in Japan, by someone who was the scheduling logic before the software existed.
+Started from watching a paper schedule get made every month and wondering if there was a better way.
 
 ---
 
@@ -281,14 +296,14 @@ Built from a hotel kitchen in Japan, by someone who was the scheduling logic bef
 
 ## Standalone Posts — Personal
 
-**Post A — The moment it clicked**
-There was a specific moment.
+**Post A — The paper schedule**
+The shift schedule at my workplace is made on paper.
 
-My manager opened the spreadsheet. I started explaining the constraints — like I always did.
+Every month. By hand. Hours of work.
 
-And I thought: why am I saying this out loud every month? These are rules. Rules can be written down. Written down rules can be automated.
+That's what made me start building Sinara.
 
-That was the beginning of Sinara.
+Not a business plan. Not a market opportunity. Just: there has to be a better way than this.
 
 ---
 
@@ -297,7 +312,7 @@ A guest doesn't remember the system behind the desk.
 
 They remember the person who looked them in the eye.
 
-The staff who are free to do that — fully present, not distracted by a schedule they don't understand or an allergen they're not sure about — that's what Sinara is trying to create.
+The staff who are free to do that — not distracted by a schedule they don't trust, not anxious about an allergen they're not sure about — that's what Sinara is trying to create.
 
 The operations disappear. The humans remain.
 
@@ -308,7 +323,7 @@ Thesis update — [date]
 
 Researching: [what you're on]
 Found: [one interesting thing]
-Testing: [what you're building]
+Testing: [what you're building or running]
 
 Still on shift. Still building.
 
@@ -321,18 +336,18 @@ The app is called Sinara.
 
 I grew up in West Java. I'm building from Japan. I want this to run in hotels anywhere.
 
-Sometimes the most universal thing you can make starts from something very specific — a word from home, a problem you lived, a name that means something to exactly one person before it means something to everyone.
+Sometimes the most universal thing you can make starts from something very specific — a word from home, a problem you noticed, a question you couldn't let go of.
 
 ---
 
-**Post E — The 0.009 stat (personal framing)**
-My manager spends two hours building the monthly schedule.
+**Post E — The 0.009 stat**
+My manager makes the monthly schedule on paper. It takes hours.
 
-Researchers solved the same problem in 0.009 seconds.
+Research shows the same problem can be solved algorithmically in 0.009 seconds.
 
-But the gap isn't really about speed. It's about what a manager could do with two hours back every month.
+That gap isn't about technology. The tools exist.
 
-That's what I'm trying to give them.
+It's about whether someone bothers to bring them to the right place.
 
 ---
 
@@ -353,7 +368,7 @@ Menu allergen management in most hotels:
 → Receive product shipment
 → Manually read every Japanese label
 → Transcribe ingredients
-→ Update the system
+→ Update the records
 → Hope nothing was missed
 
 We automated this. 🧵
@@ -386,7 +401,7 @@ The output is a clean product database.
 
 Every item tagged. When a chef builds a menu from those products, allergens are derived automatically.
 
-No manual cross-referencing. No spreadsheet lookup. No risk of a transcription error.
+No manual cross-referencing. No spreadsheet lookup. No transcription errors.
 
 ---
 
@@ -394,7 +409,7 @@ No manual cross-referencing. No spreadsheet lookup. No risk of a transcription e
 Japan mandates labeling for 8 priority allergens:
 wheat, buckwheat, egg, milk, peanut, shrimp, crab, walnut.
 
-For international hospitality teams working in Japan — this system doesn't just save time. It removes a compliance risk that most operations are currently managing with memory and hope.
+For international hospitality teams working in Japan — this system doesn't just save time. It removes a compliance risk that most operations currently manage with memory and hope.
 
 ---
 
@@ -413,12 +428,12 @@ Follow @sinara_app for updates.
 
 ## Standalone Posts — Sinara
 
-**Post F — What Sinara actually does**
-Sinara handles two things most hospitality operations get wrong:
+**Post F — What Sinara does**
+Two things. Done well.
 
-**Scheduling** — auto-generated, constraint-based, fair. Staff get the rota. Manager gets two hours back.
+**Scheduling** — auto-generated, constraint-based, fair. Define the rules once. Generate the schedule. Manager gets hours back.
 
-**Allergen management** — scan a Japanese product label, get a clean ingredient record in seconds. Build a menu, get the allergen matrix automatically.
+**Allergen management** — photograph a Japanese product label, get a clean ingredient record in seconds. Build a menu, get the allergen matrix automatically.
 
 Operations in the background. People in the light.
 
@@ -431,7 +446,7 @@ Most hospitality software optimizes for efficiency.
 
 Sinara optimizes for presence.
 
-Because the most valuable thing a hotel can offer isn't a smooth check-in process.
+The most valuable thing a hotel can offer isn't a smooth process.
 
 It's a person who is fully there.
 
@@ -439,12 +454,12 @@ It's a person who is fully there.
 
 ---
 
-**Post H — Scheduling stat**
-Manual shift scheduling: 2+ hours per cycle.
+**Post H — Scheduling**
+Manual shift scheduling on paper: hours per month, every month.
 
-Sinara: define the rules once. Generate the schedule. Done.
+Sinara: define the rules once. Generate a fair, compliant schedule. Done in seconds.
 
-The constraints are right because the person who built the system has been living them.
+The constraints are right because the person who built this works the shifts.
 
 *presence, by design.*
 
@@ -471,8 +486,8 @@ AI in the background. Humans in the light.
 |------|-------------------|----------------------|
 | **1** | Thread 01: The Founding Story | Post G: Brand Philosophy |
 | **2** | Thread 02: The Name | Post F: What Sinara does |
-| **3** | Thread 03: Human Behind the Algorithm | Thread 05: The Allergen System |
-| **4** | Thread 04: Student-Worker-Builder | Post H: Scheduling stat |
+| **3** | Thread 03: What the Research Says | Thread 05: The Allergen System |
+| **4** | Thread 04: Student + Worker + Builder | Post H: Scheduling |
 | **Ongoing** | Post C: Thesis updates (weekly) | Post I: Stella (when ready) |
 
 ---
