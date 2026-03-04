@@ -523,9 +523,12 @@
                     {:else if currentStep === 2}
                         <div class="setup-step-header">
                             <p class="setup-step-tag">Step 2 of 3</p>
-                            <h2 class="setup-step-title">Contact & branding</h2>
+                            <h2 class="setup-step-title">
+                                Contact &amp; branding
+                            </h2>
                             <p class="setup-step-desc">
-                                Optional — updateable from Settings later.
+                                Optional details — you can update these from
+                                Settings anytime.
                             </p>
                         </div>
 
@@ -541,7 +544,8 @@
                                     id="display-name"
                                     type="text"
                                     bind:value={displayName}
-                                    placeholder={name || "My Workspace"}
+                                    placeholder={name ||
+                                        "e.g. Sinara Front Desk"}
                                     class="setup-input"
                                 />
                             </div>
@@ -553,8 +557,8 @@
                                 <textarea
                                     id="address"
                                     bind:value={address}
-                                    rows="2"
-                                    placeholder="〒999-9999 長野県..."
+                                    rows="3"
+                                    placeholder="123 Grand Avenue, Tokyo, Japan"
                                     class="setup-input setup-textarea"
                                 ></textarea>
                             </div>
@@ -568,7 +572,7 @@
                                         id="phone"
                                         type="tel"
                                         bind:value={phone}
-                                        placeholder="+81-263-99-9999"
+                                        placeholder="+81-3-0000-0000"
                                         class="setup-input"
                                     />
                                 </div>
@@ -635,7 +639,8 @@
                             <p class="setup-step-tag">Step 3 of 3</p>
                             <h2 class="setup-step-title">Workspace settings</h2>
                             <p class="setup-step-desc">
-                                Controls schedule generation. Adjustable later.
+                                Configure your schedule defaults — all
+                                adjustable later from Settings.
                             </p>
                         </div>
 
@@ -1264,7 +1269,7 @@
     .setup-fields {
         display: flex;
         flex-direction: column;
-        gap: 24px;
+        gap: 32px;
     }
     .setup-field {
         display: flex;
