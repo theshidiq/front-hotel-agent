@@ -31,6 +31,7 @@
 	import TableSkeleton from "$lib/shifts/components/TableSkeleton.svelte";
 	import OptimizeOverlay from "$lib/shifts/components/OptimizeOverlay.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
+	import { getOrderedStaffMembers, isDateWithinStaffWorkPeriod } from "$lib/shifts/staffUtils";
 
 	// ── Sidebar State ──
 	let sidebarCollapsed = $state(false);
@@ -663,6 +664,106 @@
 		});
 	}
 
+	// ── Print ──
+	function handlePrint() {
+		const orderedStaff = getOrderedStaffMembers(staff, dateRange);
+
+		const periodLabel = selectedPeriod
+			? `${selectedPeriod.start_date.replace(/-/g, '/')} 〜 ${selectedPeriod.end_date.replace(/-/g, '/')}`
+			: '';
+
+		const shiftColorMap: Record<string, string> = {
+			'×': '#dc2626', '△': '#2563eb', '◇': '#7c3aed',
+			'★': '#ca8a04', '●': '#16a34a', '○': '#374151',
+			'◎': '#ea580c', '▣': '#6b7280', '⊘': '#991b1b',
+		};
+
+		const headerCells = orderedStaff
+			.map((s) => `<th>${s.name}</th>`)
+			.join('');
+
+		const bodyRows = dateRange.map((date) => {
+			const d = new Date(date + 'T00:00:00');
+			const day = d.getDate();
+			const weekdays = ['日','月','火','水','木','金','土'];
+			const wd = weekdays[d.getDay()];
+			const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+			const dateClass = isWeekend ? 'weekend' : '';
+
+			const cells = orderedStaff.map((s) => {
+				if (!isDateWithinStaffWorkPeriod(s, date)) {
+					return '<td class="not-working">-</td>';
+				}
+				const raw = scheduleData[s.id]?.[date] ?? '';
+				let symbol = '';
+				if (!raw || raw === 'normal') {
+					symbol = s.status === 'パート' ? '○' : '';
+				} else if (raw === 'late') {
+					symbol = '◇';
+				} else if (raw === 'early') {
+					symbol = '△';
+				} else if (raw === 'off') {
+					symbol = '×';
+				} else if (raw === 'holiday') {
+					symbol = '★';
+				} else {
+					symbol = raw; // stored as symbol directly
+				}
+				const color = shiftColorMap[symbol] ?? '#374151';
+				const style = symbol ? `color:${color};` : '';
+				return `<td><span class="sym" style="${style}">${symbol}</span></td>`;
+			}).join('');
+
+			return `<tr><td class="date-col ${dateClass}"><b>${day}</b><small>${wd}</small></td>${cells}</tr>`;
+		}).join('');
+
+		const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>調理場シフト表</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 10mm; }
+    h1 { font-size: 15px; text-align: center; margin: 0 0 2px; }
+    .period { text-align: center; font-size: 11px; color: #555; margin: 0 0 8px; }
+    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    th, td { border: 1px solid #ddd; text-align: center; font-size: 11px; padding: 3px 2px; height: 24px; overflow: hidden; }
+    thead th { background: #374151; color: #fff; font-size: 10px; height: 36px; word-break: break-all; }
+    .date-col { background: #f9fafb; font-size: 10px; white-space: nowrap; }
+    .date-col small { display: block; font-size: 9px; color: #6b7280; }
+    .weekend { color: #dc2626; }
+    .weekend small { color: #dc2626; }
+    .not-working { background: #f3f4f6; color: #9ca3af; }
+    .sym { font-size: 13px; font-weight: bold; }
+    .legend { margin-top: 8px; font-size: 9px; text-align: center; color: #6b7280; }
+    @media print {
+      @page { size: A4 landscape; margin: 8mm; }
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>調理場シフト表</h1>
+  <p class="period">期間: ${periodLabel}</p>
+  <table>
+    <thead><tr><th>日付</th>${headerCells}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+  <div class="legend">△ 早番 &nbsp;|&nbsp; ○ 出勤 &nbsp;|&nbsp; ◇ 遅番 &nbsp;|&nbsp; × 休み &nbsp;|&nbsp; ★ 管理 &nbsp;|&nbsp; ⊘ 不可</div>
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`;
+
+		const w = window.open('', '_blank');
+		if (w) {
+			w.document.write(html);
+			w.document.close();
+		} else {
+			alert('ポップアップがブロックされました。許可してください。');
+		}
+	}
+
 	// ── Staff Management ──
 	function openAddStaffModal() {
 		editingStaff = null;
@@ -1037,6 +1138,17 @@
 								<span class="material-symbols-rounded text-sm shrink-0">delete_sweep</span>
 							{/if}
 							クリア
+						</button>
+
+						<!-- Print Button -->
+						<button
+							class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-800 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+							onclick={handlePrint}
+							disabled={optimizing || !dateRange.length}
+							title="印刷"
+						>
+							<span class="material-symbols-rounded text-sm shrink-0">print</span>
+							印刷
 						</button>
 
 						<div class="flex-1"></div>
