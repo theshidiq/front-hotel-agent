@@ -29,6 +29,7 @@
 	import PeriodPicker from "$lib/shifts/components/PeriodPicker.svelte";
 	import ScheduleSkeleton from "$lib/shifts/components/ScheduleSkeleton.svelte";
 	import TableSkeleton from "$lib/shifts/components/TableSkeleton.svelte";
+	import OptimizeOverlay from "$lib/shifts/components/OptimizeOverlay.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 
 	// ── Sidebar State ──
@@ -102,6 +103,117 @@
 	let optimizing = $state(false);
 	let clearing = $state(false);
 	let optimizerHealthy = $state(false);
+
+
+	// ── Optimize Progress Overlay ──
+	type OptimizeStage = {
+		id: string;
+		label: string;
+		detail: string;
+		icon: string;
+		weight: number; // relative time fraction
+	};
+	const OPTIMIZE_STAGES: OptimizeStage[] = [
+		{ id: 'init',        label: '初期化',           detail: 'スタッフ・日程データ読み込み中...',    icon: 'database',          weight: 8  },
+		{ id: 'constraints', label: '制約チェック',      detail: '制約条件を検証・構成中...',            icon: 'rule',              weight: 12 },
+		{ id: 'model',       label: 'モデル構築',        detail: 'CP-SATモデルを構築中...',              icon: 'schema',            weight: 15 },
+		{ id: 'solving',     label: 'OR-Tools 最適化',   detail: 'CP-SATソルバーで最適解を探索中...',   icon: 'psychology',        weight: 50 },
+		{ id: 'extract',     label: '解の抽出',          detail: 'スケジュールデータを構成中...',         icon: 'data_object',       weight: 8  },
+		{ id: 'saving',      label: '保存',              detail: 'スケジュールを保存中...',               icon: 'save',              weight: 7  },
+	];
+	let optimizeStageIdx = $state(-1); // -1 = hidden
+	let optimizeProgress = $state(0);  // 0–100
+	let optimizeElapsed = $state(0);   // seconds
+	let _optimizeTimer: ReturnType<typeof setInterval> | null = null;
+	let _stageTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const totalWeight = OPTIMIZE_STAGES.reduce((s, st) => s + st.weight, 0);
+
+	function startOptimizeProgress() {
+		optimizeStageIdx = 0;
+		optimizeProgress = 0;
+		optimizeElapsed = 0;
+
+		// Tick elapsed time every second
+		_optimizeTimer = setInterval(() => { optimizeElapsed += 1; }, 1000);
+
+		// Advance through stages except the last two (saving happens after real response)
+		advanceStage(0);
+	}
+
+	function advanceStage(idx: number) {
+		if (idx >= OPTIMIZE_STAGES.length - 2) return; // hold at "solving" until done
+
+		optimizeStageIdx = idx;
+
+		// Calculate cumulative progress up to this stage
+		const cumWeight = OPTIMIZE_STAGES.slice(0, idx + 1).reduce((s, st) => s + st.weight, 0);
+		const targetPct = Math.round((cumWeight / totalWeight) * 92); // cap at 92% until real done
+
+		// Smoothly animate progress to target over stage duration
+		const duration = (OPTIMIZE_STAGES[idx].weight / totalWeight) * 22000; // 22s budget for stages 0-3
+		const startPct = optimizeProgress;
+		const startTime = Date.now();
+
+		function tick() {
+			const elapsed = Date.now() - startTime;
+			const t = Math.min(elapsed / duration, 1);
+			const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease in-out quad
+			optimizeProgress = Math.round(startPct + (targetPct - startPct) * eased);
+			if (t < 1 && optimizing) {
+				requestAnimationFrame(tick);
+			} else if (t >= 1) {
+				const next = idx + 1;
+				if (next < OPTIMIZE_STAGES.length - 2) {
+					_stageTimer = setTimeout(() => advanceStage(next), 200);
+				}
+			}
+		}
+		requestAnimationFrame(tick);
+	}
+
+	function finishOptimizeProgress() {
+		// Jump to extract → saving → 100%
+		optimizeStageIdx = OPTIMIZE_STAGES.length - 2; // extract
+		optimizeProgress = 93;
+
+		setTimeout(() => {
+			optimizeStageIdx = OPTIMIZE_STAGES.length - 1; // saving
+			optimizeProgress = 97;
+			setTimeout(() => {
+				optimizeProgress = 100;
+				setTimeout(() => {
+					stopOptimizeProgress();
+				}, 600);
+			}, 500);
+		}, 400);
+	}
+
+	function stopOptimizeProgress() {
+		if (_optimizeTimer) { clearInterval(_optimizeTimer); _optimizeTimer = null; }
+		if (_stageTimer)    { clearTimeout(_stageTimer);     _stageTimer = null; }
+		optimizeStageIdx = -1;
+		optimizeProgress = 0;
+		optimizeElapsed = 0;
+	}
+
+	// ── Confirm Modal ──
+	type ConfirmModalOptions = {
+		title: string;
+		message: string;
+		confirmLabel?: string;
+		confirmClass?: string;
+		icon?: string;
+		onConfirm: () => void;
+	};
+	let confirmModal = $state<ConfirmModalOptions | null>(null);
+
+	function showConfirm(opts: ConfirmModalOptions) {
+		confirmModal = opts;
+	}
+	function closeConfirmModal() {
+		confirmModal = null;
+	}
 
 	// ── Staff Modal State ──
 	let showStaffModal = $state(false);
@@ -493,6 +605,7 @@
 		try {
 			optimizing = true;
 			error = "";
+			startOptimizeProgress();
 
 			const result = await optimizeSchedule({
 				periodId: selectedPeriodId,
@@ -501,44 +614,53 @@
 			});
 
 			if (result.success && result.schedule) {
+				finishOptimizeProgress();
+
 				scheduleData = result.schedule;
-				showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒)`);
 
 				// Save optimized schedule
 				const updates: CellUpdate[] = [];
-				for (const [staffId, dates] of Object.entries(
-					result.schedule,
-				)) {
+				for (const [staffId, dates] of Object.entries(result.schedule)) {
 					for (const [date, symbol] of Object.entries(dates)) {
 						updates.push({ staffId, date, symbol });
 					}
 				}
 				await bulkUpdateCells(selectedPeriodId, updates);
+				showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒)`);
 			} else {
+				stopOptimizeProgress();
 				error = result.error || "Optimization failed";
 			}
 		} catch (e) {
+			stopOptimizeProgress();
 			error = e instanceof Error ? e.message : "Optimization failed";
 		} finally {
 			optimizing = false;
 		}
 	}
 
-	async function handleClear() {
+	function handleClear() {
 		if (!selectedPeriodId) return;
-		if (!confirm('この期間のスケジュールデータをすべてクリアしますか？')) return;
-
-		try {
-			clearing = true;
-			error = '';
-			await clearSchedule(selectedPeriodId);
-			scheduleData = {};
-			showSuccess('スケジュールをクリアしました');
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Clear failed';
-		} finally {
-			clearing = false;
-		}
+		showConfirm({
+			title: 'スケジュールをクリア',
+			message: 'この期間のスケジュールデータをすべて削除します。この操作は元に戻せません。',
+			confirmLabel: 'クリアする',
+			confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
+			icon: 'delete_sweep',
+			onConfirm: async () => {
+				try {
+					clearing = true;
+					error = '';
+					await clearSchedule(selectedPeriodId!);
+					scheduleData = {};
+					showSuccess('スケジュールをクリアしました');
+				} catch (e) {
+					error = e instanceof Error ? e.message : 'Clear failed';
+				} finally {
+					clearing = false;
+				}
+			},
+		});
 	}
 
 	// ── Staff Management ──
@@ -591,16 +713,23 @@
 		}
 	}
 
-	async function handleDeleteStaff(s: ScheduleStaff) {
-		if (!confirm(`${s.name}を削除しますか？`)) return;
-
-		try {
-			await deleteShiftStaff(s.id);
-			staff = await getShiftStaff();
-			showSuccess("スタッフを削除しました");
-		} catch (e) {
-			error = e instanceof Error ? e.message : "Failed to delete staff";
-		}
+	function handleDeleteStaff(s: ScheduleStaff) {
+		showConfirm({
+			title: 'スタッフを削除',
+			message: `${s.name} を削除しますか？この操作は元に戻せません。`,
+			confirmLabel: '削除する',
+			confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
+			icon: 'person_remove',
+			onConfirm: async () => {
+				try {
+					await deleteShiftStaff(s.id);
+					staff = await getShiftStaff();
+					showSuccess("スタッフを削除しました");
+				} catch (e) {
+					error = e instanceof Error ? e.message : "Failed to delete staff";
+				}
+			},
+		});
 	}
 
 	// ── Period Management ──
@@ -627,22 +756,29 @@
 		}
 	}
 
-	async function handleDeletePeriod(p: SchedulePeriod) {
-		if (!confirm(`${p.label}を削除しますか？`)) return;
-
-		try {
-			await deleteShiftPeriod(p.id);
-			periods = await getShiftPeriods();
-			if (selectedPeriodId === p.id) {
-				selectedPeriodId = periods[0]?.id || null;
-				if (selectedPeriodId) {
-					await loadSchedule(selectedPeriodId);
+	function handleDeletePeriod(p: SchedulePeriod) {
+		showConfirm({
+			title: '期間を削除',
+			message: `「${p.label}」を削除しますか？この操作は元に戻せません。`,
+			confirmLabel: '削除する',
+			confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
+			icon: 'event_busy',
+			onConfirm: async () => {
+				try {
+					await deleteShiftPeriod(p.id);
+					periods = await getShiftPeriods();
+					if (selectedPeriodId === p.id) {
+						selectedPeriodId = periods[0]?.id || null;
+						if (selectedPeriodId) {
+							await loadSchedule(selectedPeriodId);
+						}
+					}
+					showSuccess("期間を削除しました");
+				} catch (e) {
+					error = e instanceof Error ? e.message : "Failed to delete period";
 				}
-			}
-			showSuccess("期間を削除しました");
-		} catch (e) {
-			error = e instanceof Error ? e.message : "Failed to delete period";
-		}
+			},
+		});
 	}
 
 	// ── Utilities ──
@@ -916,11 +1052,11 @@
 					</div>
 
 					<!-- Schedule Table (Transposed: dates as rows, staff as columns) -->
-					<div class="bg-white rounded-lg shadow">
+					<div class="relative bg-white rounded-lg shadow">
 						{#if loadingSchedule}
 							<TableSkeleton
-								rows={staff.length || 12}
-								columns={Math.min(dateRange.length || 15, 20)}
+								rows={dateRange.length || 20}
+								columns={staff.length || 12}
 							/>
 						{:else}
 							{@const hasScheduleData = Object.keys(
@@ -931,7 +1067,14 @@
 									Object.keys(scheduleData[k] || {}).length >
 										0,
 							)}
-							{#if !hasScheduleData && staff.length > 0}
+							{#if optimizing}
+								<!-- Skeleton behind glass overlay while optimizing -->
+								<TableSkeleton
+									rows={dateRange.length || 20}
+									columns={staff.length || 12}
+								/>
+								<OptimizeOverlay progress={optimizeProgress} elapsed={optimizeElapsed} />
+							{:else if !hasScheduleData && staff.length > 0}
 								<!-- Empty schedule notice -->
 								<div class="p-8 text-center">
 									<span
@@ -1134,10 +1277,51 @@
 	</div>
 </div>
 
+
+
+
+
+<!-- Confirm Modal -->
+{#if confirmModal}
+	<div
+		class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
+		role="dialog"
+		aria-modal="true"
+		onclick={(e) => { if (e.target === e.currentTarget) closeConfirmModal(); }}
+	>
+		<div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+			<!-- Icon + Title -->
+			<div class="px-6 pt-6 pb-4 flex flex-col items-center text-center">
+				<div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
+					<span class="material-symbols-rounded text-2xl text-red-600">{confirmModal.icon ?? 'warning'}</span>
+				</div>
+				<h2 class="text-lg font-bold text-gray-900 mb-1">{confirmModal.title}</h2>
+				<p class="text-sm text-gray-500 leading-relaxed">{confirmModal.message}</p>
+			</div>
+
+			<!-- Actions -->
+			<div class="px-6 pb-6 flex gap-3">
+				<button
+					class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+					onclick={closeConfirmModal}
+				>
+					キャンセル
+				</button>
+				<button
+					class="flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors {confirmModal.confirmClass ?? 'bg-blue-600 hover:bg-blue-700 text-white'}"
+					onclick={() => { const fn = confirmModal!.onConfirm; closeConfirmModal(); fn(); }}
+				>
+					{confirmModal.confirmLabel ?? '確認'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <!-- Staff Modal -->
 {#if showStaffModal}
 	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+		class="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center"
 		role="dialog"
 	>
 		<div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
@@ -1221,7 +1405,7 @@
 <!-- Period Modal -->
 {#if showPeriodModal}
 	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+		class="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center"
 		role="dialog"
 	>
 		<div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
