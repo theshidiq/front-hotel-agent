@@ -1,0 +1,1633 @@
+<script lang="ts">
+    import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
+    import { supabase } from "$lib/supabase";
+    import { authState } from "$lib/auth.svelte";
+
+    // ─── Already-onboarded guard ──────────────────────────────────────────────
+    onMount(async () => {
+        const userId = authState.user?.id;
+        if (userId) {
+            const { data: membership } = await supabase
+                .from("organization_members")
+                .select("id")
+                .eq("auth_user_id", userId)
+                .limit(1)
+                .maybeSingle();
+            if (membership) goto("/dashboard");
+        }
+    });
+
+    // ─── Step state ───────────────────────────────────────────────────────────
+    let currentStep = $state(1);
+    const TOTAL_STEPS = 4;
+
+    // ─── Form data ────────────────────────────────────────────────────────────
+    let name = $state("");
+    let slug = $state("");
+    let slugLocked = $state(false);
+    let businessType = $state("hotel");
+    let country = $state("JP");
+    let timezone = $state("Asia/Tokyo");
+
+    let displayName = $state("");
+    let address = $state("");
+    let phone = $state("");
+    let ownerEmail = $state(authState.user?.email ?? "");
+    let brandColor = $state("#B8956A");
+
+    let hoursOpen = $state("09:00");
+    let hoursClose = $state("22:00");
+    let shiftDuration = $state(8);
+    let minStaff = $state(2);
+    let maxConsecutiveDays = $state(6);
+    let periodStartDay = $state(21);
+    let periodEndDay = $state(20);
+
+    // ─── UI state ─────────────────────────────────────────────────────────────
+    let submitting = $state(false);
+    let submitError = $state<string | null>(null);
+    let fieldErrors = $state<Record<string, string>>({});
+
+    // ─── Constants ────────────────────────────────────────────────────────────
+    const BUSINESS_TYPES = [
+        {
+            value: "hotel",
+            label: "Hotel",
+            icon: "hotel",
+            industry: "accommodation",
+        },
+        {
+            value: "ryokan",
+            label: "Ryokan",
+            icon: "spa",
+            industry: "accommodation",
+        },
+        {
+            value: "restaurant",
+            label: "Restaurant",
+            icon: "restaurant",
+            industry: "food_beverage",
+        },
+        {
+            value: "izakaya",
+            label: "Izakaya",
+            icon: "local_bar",
+            industry: "food_beverage",
+        },
+        {
+            value: "cafe",
+            label: "Café",
+            icon: "coffee",
+            industry: "food_beverage",
+        },
+        {
+            value: "clinic",
+            label: "Clinic",
+            icon: "local_hospital",
+            industry: "healthcare",
+        },
+        {
+            value: "spa",
+            label: "Spa",
+            icon: "self_improvement",
+            industry: "wellness",
+        },
+        {
+            value: "event_venue",
+            label: "Event Venue",
+            icon: "celebration",
+            industry: "events",
+        },
+        { value: "other", label: "Other", icon: "business", industry: "other" },
+    ] as const;
+
+    const TIMEZONES = [
+        { value: "Asia/Tokyo", label: "Tokyo (JST, UTC+9)" },
+        { value: "Asia/Singapore", label: "Singapore (SGT, UTC+8)" },
+        { value: "Asia/Seoul", label: "Seoul (KST, UTC+9)" },
+        { value: "Asia/Bangkok", label: "Bangkok (ICT, UTC+7)" },
+        { value: "Europe/London", label: "London (GMT/BST)" },
+        { value: "America/New_York", label: "New York (ET)" },
+        { value: "UTC", label: "UTC" },
+    ];
+
+    const BRAND_COLORS = [
+        "#B8956A",
+        "#1A2744",
+        "#2563EB",
+        "#16A34A",
+        "#D97706",
+        "#DC2626",
+        "#9333EA",
+        "#0891B2",
+    ];
+
+    const STEPS = [
+        { n: 1, label: "Business identity" },
+        { n: 2, label: "Contact & branding" },
+        { n: 3, label: "Workspace settings" },
+        { n: 4, label: "Launch" },
+    ];
+
+    // ─── Derived ──────────────────────────────────────────────────────────────
+    const selectedBizType = $derived(
+        BUSINESS_TYPES.find((b) => b.value === businessType)!,
+    );
+    const industry = $derived(selectedBizType?.industry ?? "other");
+    const progressPct = $derived(((currentStep - 1) / TOTAL_STEPS) * 100);
+
+    // ─── Slug auto-gen ────────────────────────────────────────────────────────
+    function toSlug(s: string) {
+        return s
+            .toLowerCase()
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9\s-]/g, "")
+            .trim()
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+            .slice(0, 40);
+    }
+
+    function handleNameInput() {
+        if (!slugLocked) slug = toSlug(name);
+    }
+
+    // ─── Validation ───────────────────────────────────────────────────────────
+    function validateStep(step: number): boolean {
+        const errs: Record<string, string> = {};
+        if (step === 1) {
+            if (!name.trim()) errs.name = "Organization name is required";
+            if (!slug.trim()) errs.slug = "Slug is required";
+            else if (!/^[a-z0-9-]+$/.test(slug))
+                errs.slug = "Lowercase letters, numbers, hyphens only";
+        }
+        if (step === 2) {
+            if (ownerEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ownerEmail))
+                errs.ownerEmail = "Enter a valid email address";
+        }
+        if (step === 3) {
+            if (shiftDuration < 1 || shiftDuration > 24)
+                errs.shiftDuration = "1–24 hrs";
+            if (minStaff < 1) errs.minStaff = "At least 1";
+            if (periodStartDay < 1 || periodStartDay > 31)
+                errs.periodStartDay = "1–31";
+            if (periodEndDay < 1 || periodEndDay > 31)
+                errs.periodEndDay = "1–31";
+        }
+        fieldErrors = errs;
+        return Object.keys(errs).length === 0;
+    }
+
+    function nextStep() {
+        if (!validateStep(currentStep)) return;
+        currentStep = Math.min(TOTAL_STEPS, currentStep + 1);
+    }
+
+    function prevStep() {
+        currentStep = Math.max(1, currentStep - 1);
+        fieldErrors = {};
+        submitError = null;
+    }
+
+    // ─── Submit ───────────────────────────────────────────────────────────────
+    async function handleSubmit() {
+        if (!validateStep(3)) return;
+        submitting = true;
+        submitError = null;
+        try {
+            const authUserId = authState.user?.id ?? null;
+            const resolvedEmail = ownerEmail || authState.user?.email || null;
+
+            const { data: org, error: orgErr } = await supabase
+                .from("organizations")
+                .insert({
+                    name: name.trim(),
+                    slug: slug.trim(),
+                    display_name: displayName.trim() || name.trim(),
+                    business_type: businessType,
+                    industry,
+                    country,
+                    timezone,
+                    address: address.trim() || null,
+                    phone: phone.trim() || null,
+                    owner_email: resolvedEmail,
+                    brand_color: brandColor,
+                    plan: "free",
+                })
+                .select("id")
+                .single();
+            if (orgErr || !org)
+                throw new Error(
+                    orgErr?.message ?? "Failed to create organization",
+                );
+
+            const { data: restaurant, error: restErr } = await supabase
+                .from("restaurants")
+                .insert({
+                    name: name.trim(),
+                    slug: slug.trim(),
+                    timezone,
+                    settings: {
+                        business_hours: { open: hoursOpen, close: hoursClose },
+                        shift_duration: shiftDuration,
+                        min_staff_per_shift: minStaff,
+                        max_consecutive_days: maxConsecutiveDays,
+                    },
+                    contact_info: {
+                        address: address.trim() || null,
+                        phone: phone.trim() || null,
+                        email: resolvedEmail,
+                    },
+                })
+                .select("id")
+                .single();
+            if (restErr || !restaurant)
+                throw new Error(
+                    restErr?.message ?? "Failed to create restaurant",
+                );
+
+            await supabase
+                .from("organizations")
+                .update({ restaurant_id: restaurant.id })
+                .eq("id", org.id);
+
+            await supabase.from("period_configuration").insert({
+                restaurant_id: restaurant.id,
+                start_day: periodStartDay,
+                end_day: periodEndDay,
+                period_length_days: 30,
+            });
+
+            await supabase.from("organization_members").insert({
+                organization_id: org.id,
+                auth_user_id: authUserId,
+                role: "owner",
+                email: resolvedEmail,
+                is_active: true,
+            });
+
+            await supabase
+                .from("organizations")
+                .update({ onboarded_at: new Date().toISOString() })
+                .eq("id", org.id);
+
+            currentStep = TOTAL_STEPS;
+        } catch (err: unknown) {
+            submitError =
+                err instanceof Error
+                    ? err.message
+                    : "Something went wrong. Please try again.";
+        } finally {
+            submitting = false;
+        }
+    }
+
+    function goToDashboard() {
+        goto("/dashboard");
+    }
+</script>
+
+<svelte:head>
+    <title>Set up your workspace — Sinara</title>
+</svelte:head>
+
+<div class="setup-root">
+    <!-- ── Left: Brand Panel ── -->
+    <aside class="setup-sidebar">
+        <div class="setup-sidebar-dot-grid"></div>
+        <div class="setup-sidebar-inner">
+            <!-- Logo -->
+            <div class="setup-logo">
+                <div class="setup-logo-icon">S</div>
+                <span class="setup-logo-text">Sinara</span>
+            </div>
+
+            <!-- Headline -->
+            <div class="setup-sidebar-body">
+                <p class="setup-sidebar-label">Getting started</p>
+                <h1 class="setup-sidebar-title">
+                    Set up your<br /><span class="setup-sidebar-accent"
+                        >workspace</span
+                    >
+                </h1>
+                <p class="setup-sidebar-desc">
+                    A few details to personalize Sinara for your business —
+                    takes less than 2 minutes.
+                </p>
+
+                <!-- Step list -->
+                <div class="setup-step-list">
+                    {#each STEPS as s}
+                        <div class="setup-step-item">
+                            <div
+                                class="setup-step-circle
+								{currentStep > s.n
+                                    ? 'setup-step-done'
+                                    : currentStep === s.n
+                                      ? 'setup-step-active'
+                                      : 'setup-step-future'}"
+                            >
+                                {#if currentStep > s.n}
+                                    <span
+                                        class="material-symbols-rounded"
+                                        style="font-size:14px;">check</span
+                                    >
+                                {:else}
+                                    {s.n}
+                                {/if}
+                            </div>
+                            <span
+                                class="setup-step-label {currentStep === s.n
+                                    ? 'setup-step-label-active'
+                                    : ''}">{s.label}</span
+                            >
+                        </div>
+                    {/each}
+                </div>
+            </div>
+
+            <p class="setup-sidebar-footer">Sinara · presence, by design</p>
+        </div>
+    </aside>
+
+    <!-- ── Right: Form Panel ── -->
+    <div class="setup-form-panel">
+        <!-- Progress bar -->
+        <div class="setup-progress-track">
+            <div
+                class="setup-progress-fill"
+                style="width:{currentStep === TOTAL_STEPS ? 100 : progressPct}%"
+            ></div>
+        </div>
+
+        <!-- Mobile header -->
+        <div class="setup-mobile-header">
+            <div
+                class="setup-logo-icon"
+                style="width:32px;height:32px;font-size:14px;"
+            >
+                S
+            </div>
+            <span
+                style="font-weight:600;color:#1A2744;font-family:'Instrument Sans',sans-serif;"
+                >Sinara</span
+            >
+            <span class="setup-mobile-step"
+                >Step {Math.min(currentStep, TOTAL_STEPS - 1)} of {TOTAL_STEPS -
+                    1}</span
+            >
+        </div>
+
+        <!-- Main area: scroll + side nav -->
+        <div class="setup-main-area">
+            <div class="setup-scroll">
+                <div class="setup-form-content">
+                    <!-- step content unchanged -->
+                    {#if currentStep === 1}
+                        <div class="setup-step-header">
+                            <p class="setup-step-tag">Step 1 of 3</p>
+                            <h2 class="setup-step-title">Business identity</h2>
+                            <p class="setup-step-desc">
+                                Tell us about your organization.
+                            </p>
+                        </div>
+
+                        <div class="setup-fields">
+                            <!-- Name -->
+                            <div class="setup-field">
+                                <label for="org-name" class="setup-label"
+                                    >Organization name <span
+                                        class="setup-required">*</span
+                                    ></label
+                                >
+                                <input
+                                    id="org-name"
+                                    type="text"
+                                    bind:value={name}
+                                    oninput={handleNameInput}
+                                    placeholder="e.g. Sinara Grand Hotel"
+                                    class="setup-input {fieldErrors.name
+                                        ? 'setup-input-error'
+                                        : ''}"
+                                />
+                                {#if fieldErrors.name}<p
+                                        class="setup-field-error"
+                                    >
+                                        {fieldErrors.name}
+                                    </p>{/if}
+                            </div>
+
+                            <!-- Slug -->
+                            <div class="setup-field">
+                                <label for="org-slug" class="setup-label"
+                                    >Workspace URL <span class="setup-required"
+                                        >*</span
+                                    ></label
+                                >
+                                <div
+                                    class="setup-slug-wrap {fieldErrors.slug
+                                        ? 'setup-slug-error'
+                                        : ''}"
+                                >
+                                    <span class="setup-slug-prefix"
+                                        >sinara.app/</span
+                                    >
+                                    <input
+                                        id="org-slug"
+                                        type="text"
+                                        bind:value={slug}
+                                        oninput={() => (slugLocked = true)}
+                                        placeholder="my-workspace"
+                                        class="setup-slug-input"
+                                    />
+                                </div>
+                                {#if fieldErrors.slug}
+                                    <p class="setup-field-error">
+                                        {fieldErrors.slug}
+                                    </p>
+                                {:else}
+                                    <p class="setup-field-hint">
+                                        Lowercase letters, numbers, hyphens
+                                    </p>
+                                {/if}
+                            </div>
+
+                            <!-- Business type -->
+                            <div class="setup-field">
+                                <p class="setup-label">
+                                    Business type <span class="setup-required"
+                                        >*</span
+                                    >
+                                </p>
+                                <div class="setup-biz-grid">
+                                    {#each BUSINESS_TYPES as biz}
+                                        <button
+                                            type="button"
+                                            onclick={() => {
+                                                businessType = biz.value;
+                                            }}
+                                            class="setup-biz-card {businessType ===
+                                            biz.value
+                                                ? 'setup-biz-card-active'
+                                                : ''}"
+                                        >
+                                            <span
+                                                class="material-symbols-rounded setup-biz-icon"
+                                                >{biz.icon}</span
+                                            >
+                                            {biz.label}
+                                        </button>
+                                    {/each}
+                                </div>
+                            </div>
+
+                            <!-- Country + Timezone -->
+                            <div class="setup-row">
+                                <div
+                                    class="setup-field"
+                                    style="flex:0 0 100px;"
+                                >
+                                    <label for="country" class="setup-label"
+                                        >Country</label
+                                    >
+                                    <input
+                                        id="country"
+                                        type="text"
+                                        bind:value={country}
+                                        placeholder="JP"
+                                        class="setup-input"
+                                    />
+                                </div>
+                                <div class="setup-field" style="flex:1;">
+                                    <label for="timezone" class="setup-label"
+                                        >Timezone</label
+                                    >
+                                    <select
+                                        id="timezone"
+                                        bind:value={timezone}
+                                        class="setup-input"
+                                    >
+                                        {#each TIMEZONES as tz}
+                                            <option value={tz.value}
+                                                >{tz.label}</option
+                                            >
+                                        {/each}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── STEP 2 ── -->
+                    {:else if currentStep === 2}
+                        <div class="setup-step-header">
+                            <p class="setup-step-tag">Step 2 of 3</p>
+                            <h2 class="setup-step-title">Contact & branding</h2>
+                            <p class="setup-step-desc">
+                                Optional — updateable from Settings later.
+                            </p>
+                        </div>
+
+                        <div class="setup-fields">
+                            <div class="setup-field">
+                                <label for="display-name" class="setup-label"
+                                    >Display name <span
+                                        class="setup-hint-inline"
+                                        >(shown to staff)</span
+                                    ></label
+                                >
+                                <input
+                                    id="display-name"
+                                    type="text"
+                                    bind:value={displayName}
+                                    placeholder={name || "My Workspace"}
+                                    class="setup-input"
+                                />
+                            </div>
+
+                            <div class="setup-field">
+                                <label for="address" class="setup-label"
+                                    >Address</label
+                                >
+                                <textarea
+                                    id="address"
+                                    bind:value={address}
+                                    rows="2"
+                                    placeholder="〒999-9999 長野県..."
+                                    class="setup-input setup-textarea"
+                                ></textarea>
+                            </div>
+
+                            <div class="setup-row">
+                                <div class="setup-field" style="flex:1;">
+                                    <label for="phone" class="setup-label"
+                                        >Phone</label
+                                    >
+                                    <input
+                                        id="phone"
+                                        type="tel"
+                                        bind:value={phone}
+                                        placeholder="+81-263-99-9999"
+                                        class="setup-input"
+                                    />
+                                </div>
+                                <div class="setup-field" style="flex:1;">
+                                    <label for="owner-email" class="setup-label"
+                                        >Owner email</label
+                                    >
+                                    <input
+                                        id="owner-email"
+                                        type="email"
+                                        bind:value={ownerEmail}
+                                        placeholder="you@example.com"
+                                        class="setup-input {fieldErrors.ownerEmail
+                                            ? 'setup-input-error'
+                                            : ''}"
+                                    />
+                                    {#if fieldErrors.ownerEmail}<p
+                                            class="setup-field-error"
+                                        >
+                                            {fieldErrors.ownerEmail}
+                                        </p>{/if}
+                                </div>
+                            </div>
+
+                            <!-- Brand color -->
+                            <div class="setup-field">
+                                <p class="setup-label">Brand color</p>
+                                <div class="setup-color-row">
+                                    {#each BRAND_COLORS as c}
+                                        <button
+                                            type="button"
+                                            onclick={() => (brandColor = c)}
+                                            class="setup-color-swatch {brandColor ===
+                                            c
+                                                ? 'setup-color-active'
+                                                : ''}"
+                                            style="background:{c};"
+                                            aria-label="Color {c}"
+                                        ></button>
+                                    {/each}
+                                    <label class="setup-color-custom">
+                                        <input
+                                            type="color"
+                                            bind:value={brandColor}
+                                            class="setup-color-input"
+                                        />
+                                        <span
+                                            class="material-symbols-rounded"
+                                            style="font-size:14px;color:#9CA3AF;"
+                                            >colorize</span
+                                        >
+                                    </label>
+                                    <div
+                                        class="setup-color-preview"
+                                        style="background:{brandColor};"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── STEP 3 ── -->
+                    {:else if currentStep === 3}
+                        <div class="setup-step-header">
+                            <p class="setup-step-tag">Step 3 of 3</p>
+                            <h2 class="setup-step-title">Workspace settings</h2>
+                            <p class="setup-step-desc">
+                                Controls schedule generation. Adjustable later.
+                            </p>
+                        </div>
+
+                        <div class="setup-fields">
+                            <!-- Hours -->
+                            <div class="setup-field">
+                                <p class="setup-label">Business hours</p>
+                                <div class="setup-row">
+                                    <div style="flex:1;">
+                                        <label
+                                            for="hours-open"
+                                            class="setup-sublabel"
+                                            >Opens at</label
+                                        >
+                                        <input
+                                            id="hours-open"
+                                            type="time"
+                                            bind:value={hoursOpen}
+                                            class="setup-input"
+                                        />
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label
+                                            for="hours-close"
+                                            class="setup-sublabel"
+                                            >Closes at</label
+                                        >
+                                        <input
+                                            id="hours-close"
+                                            type="time"
+                                            bind:value={hoursClose}
+                                            class="setup-input"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Shift rules -->
+                            <div class="setup-field">
+                                <p class="setup-label">Shift rules</p>
+                                <div class="setup-row">
+                                    <div style="flex:1;">
+                                        <label
+                                            for="shift-dur"
+                                            class="setup-sublabel"
+                                            >Duration (hrs)</label
+                                        >
+                                        <input
+                                            id="shift-dur"
+                                            type="number"
+                                            min="1"
+                                            max="24"
+                                            bind:value={shiftDuration}
+                                            class="setup-input setup-num {fieldErrors.shiftDuration
+                                                ? 'setup-input-error'
+                                                : ''}"
+                                        />
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label
+                                            for="min-staff"
+                                            class="setup-sublabel"
+                                            >Min staff/shift</label
+                                        >
+                                        <input
+                                            id="min-staff"
+                                            type="number"
+                                            min="1"
+                                            bind:value={minStaff}
+                                            class="setup-input setup-num {fieldErrors.minStaff
+                                                ? 'setup-input-error'
+                                                : ''}"
+                                        />
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label
+                                            for="max-consec"
+                                            class="setup-sublabel"
+                                            >Max consec. days</label
+                                        >
+                                        <input
+                                            id="max-consec"
+                                            type="number"
+                                            min="1"
+                                            max="14"
+                                            bind:value={maxConsecutiveDays}
+                                            class="setup-input setup-num"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Period -->
+                            <div class="setup-field">
+                                <p class="setup-label">Schedule period</p>
+                                <p class="setup-field-hint">
+                                    Day of month each period starts and ends.
+                                </p>
+                                <div class="setup-row" style="margin-top:8px;">
+                                    <div style="flex:1;">
+                                        <label
+                                            for="period-start"
+                                            class="setup-sublabel"
+                                            >Start day</label
+                                        >
+                                        <input
+                                            id="period-start"
+                                            type="number"
+                                            min="1"
+                                            max="31"
+                                            bind:value={periodStartDay}
+                                            class="setup-input setup-num {fieldErrors.periodStartDay
+                                                ? 'setup-input-error'
+                                                : ''}"
+                                        />
+                                        {#if fieldErrors.periodStartDay}<p
+                                                class="setup-field-error"
+                                            >
+                                                {fieldErrors.periodStartDay}
+                                            </p>{/if}
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label
+                                            for="period-end"
+                                            class="setup-sublabel"
+                                            >End day</label
+                                        >
+                                        <input
+                                            id="period-end"
+                                            type="number"
+                                            min="1"
+                                            max="31"
+                                            bind:value={periodEndDay}
+                                            class="setup-input setup-num {fieldErrors.periodEndDay
+                                                ? 'setup-input-error'
+                                                : ''}"
+                                        />
+                                        {#if fieldErrors.periodEndDay}<p
+                                                class="setup-field-error"
+                                            >
+                                                {fieldErrors.periodEndDay}
+                                            </p>{/if}
+                                    </div>
+                                </div>
+                                <p class="setup-field-hint">
+                                    e.g. start 21, end 20 → 21st to 20th of
+                                    following month.
+                                </p>
+                            </div>
+
+                            <!-- Summary card -->
+                            <div class="setup-summary">
+                                <p
+                                    class="setup-step-tag"
+                                    style="margin-bottom:12px;"
+                                >
+                                    Summary
+                                </p>
+                                <div class="setup-summary-rows">
+                                    <div class="setup-summary-row">
+                                        <span>Organization</span><strong
+                                            >{name}</strong
+                                        >
+                                    </div>
+                                    <div class="setup-summary-row">
+                                        <span>Type</span><span
+                                            >{selectedBizType?.label}</span
+                                        >
+                                    </div>
+                                    <div class="setup-summary-row">
+                                        <span>Timezone</span><span
+                                            >{timezone}</span
+                                        >
+                                    </div>
+                                    <div class="setup-summary-row">
+                                        <span>URL slug</span><code>/{slug}</code
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+
+                            {#if submitError}
+                                <div class="setup-error-banner">
+                                    <span
+                                        class="material-symbols-rounded"
+                                        style="color:#DC2626;font-size:18px;flex-shrink:0;"
+                                        >error</span
+                                    >
+                                    <p>{submitError}</p>
+                                </div>
+                            {/if}
+                        </div>
+
+                        <!-- ── STEP 4: Done ── -->
+                    {:else}
+                        <div class="setup-done">
+                            <div class="setup-done-icon">
+                                <span
+                                    class="material-symbols-rounded"
+                                    style="font-size:40px;color:#B8956A;"
+                                    >celebration</span
+                                >
+                            </div>
+                            <h2 class="setup-done-title">
+                                Your workspace is ready!
+                            </h2>
+                            <p class="setup-done-desc">
+                                <strong>{name}</strong> has been set up. Invite staff
+                                and start managing schedules.
+                            </p>
+                            <div class="setup-done-checklist">
+                                {#each ["Organization created", "Workspace configured", "Schedule periods set up", "Owner account linked"] as item}
+                                    <div class="setup-done-check-item">
+                                        <div class="setup-done-check-circle">
+                                            <span
+                                                class="material-symbols-rounded"
+                                                style="font-size:14px;color:#B8956A;"
+                                                >check</span
+                                            >
+                                        </div>
+                                        <span>{item}</span>
+                                    </div>
+                                {/each}
+                            </div>
+                            <button
+                                class="setup-btn-primary"
+                                onclick={goToDashboard}
+                            >
+                                Go to dashboard
+                                <span
+                                    class="material-symbols-rounded"
+                                    style="font-size:16px;">arrow_forward</span
+                                >
+                            </button>
+                        </div>
+                    {/if}
+                </div>
+                <!-- /setup-form-content -->
+            </div>
+            <!-- /setup-scroll -->
+
+            <!-- ── Side nav column ── -->
+            {#if currentStep < TOTAL_STEPS}
+                <div class="setup-side-nav">
+                    <div class="setup-side-nav-inner">
+                        <div class="setup-side-step-count">
+                            {Math.min(currentStep, 3)}/3
+                        </div>
+                        <p class="setup-side-step-count-label">Steps</p>
+
+                        <div class="setup-side-btn-group">
+                            {#if currentStep < 3}
+                                <button
+                                    class="setup-btn-primary setup-btn-continue-tall setup-btn-block"
+                                    onclick={nextStep}
+                                >
+                                    <span>Continue</span>
+                                    <span
+                                        class="material-symbols-rounded"
+                                        style="color:#b8956a;font-size:24px;"
+                                        >arrow_forward</span
+                                    >
+                                </button>
+                            {:else}
+                                <button
+                                    class="setup-btn-gold setup-btn-continue-tall setup-btn-block"
+                                    onclick={handleSubmit}
+                                    disabled={submitting}
+                                >
+                                    {#if submitting}
+                                        <span
+                                            class="material-symbols-rounded setup-spin"
+                                            style="font-size:24px;"
+                                            >progress_activity</span
+                                        >
+                                        <span>Setting up…</span>
+                                    {:else}
+                                        <span
+                                            class="material-symbols-rounded"
+                                            style="font-size:24px;"
+                                            >rocket_launch</span
+                                        >
+                                        <span>Launch</span>
+                                    {/if}
+                                </button>
+                            {/if}
+
+                            {#if currentStep > 1}
+                                <button
+                                    class="setup-btn-back setup-btn-block"
+                                    onclick={prevStep}
+                                >
+                                    Back
+                                </button>
+                            {/if}
+                        </div>
+                    </div>
+                </div>
+            {/if}
+        </div>
+        <!-- /setup-main-area -->
+    </div>
+</div>
+
+<style>
+    /* ── Root layout ─────────────────────────────────────────── */
+    .setup-root {
+        display: flex;
+        min-height: 100vh;
+        background: #f7f7f6;
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .setup-sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 400px;
+        height: 100vh;
+        background: #1a2744;
+        display: none;
+        flex-direction: column;
+        overflow-y: auto;
+        z-index: 20;
+    }
+    @media (min-width: 1024px) {
+        .setup-sidebar {
+            display: flex;
+        }
+    }
+    .setup-sidebar-dot-grid {
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(
+            circle,
+            rgba(255, 255, 255, 0.08) 1px,
+            transparent 1px
+        );
+        background-size: 24px 24px;
+        pointer-events: none;
+    }
+    .setup-sidebar-dot-grid {
+        display: none;
+    }
+    .setup-sidebar-inner {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 80px 48px;
+    }
+    .setup-sidebar-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Logo */
+    .setup-logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 64px;
+    }
+    .setup-logo-icon {
+        width: 40px;
+        height: 40px;
+        background: #b8956a;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #1a2744;
+        font-weight: 700;
+        font-size: 22px;
+        font-family: "Instrument Sans", sans-serif;
+        flex-shrink: 0;
+    }
+    .setup-logo-text {
+        color: white;
+        font-weight: 600;
+        font-size: 17px;
+        font-family: "Instrument Sans", sans-serif;
+    }
+
+    /* Sidebar text */
+    .setup-sidebar-label {
+        color: #a8b8d8;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 16px;
+    }
+    .setup-sidebar-title {
+        color: white;
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1.35;
+        margin-bottom: 12px;
+        font-family: "Instrument Sans", sans-serif;
+    }
+    .setup-sidebar-accent {
+        color: #b8956a;
+    }
+    .setup-sidebar-desc {
+        color: #a8b8d8;
+        font-size: 13px;
+        line-height: 1.6;
+        margin-bottom: 40px;
+    }
+    .setup-sidebar-footer {
+        color: #a8b8d8;
+        font-size: 11px;
+        margin-top: auto;
+        padding-top: 32px;
+    }
+
+    /* Step list */
+    .setup-step-list {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+        margin-top: 48px;
+    }
+    .setup-step-item {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .setup-step-circle {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 2px solid;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .setup-step-done {
+        border-color: #b8956a;
+        background: #b8956a;
+        color: #1a2744;
+    }
+    .setup-step-active {
+        border-color: #b8956a;
+        background: transparent;
+        color: #b8956a;
+    }
+    .setup-step-future {
+        border-color: rgba(100, 116, 139, 0.5);
+        color: rgba(100, 116, 139, 0.8);
+        background: transparent;
+        opacity: 0.4;
+    }
+    .setup-step-label {
+        font-size: 18px;
+        font-weight: 500;
+        color: rgba(203, 213, 225, 0.8);
+    }
+    .setup-step-label-active {
+        color: white;
+        font-weight: 600;
+    }
+
+    /* ── Form panel ──────────────────────────────────────────── */
+    .setup-form-panel {
+        flex: 1;
+        margin-left: 400px;
+        margin-right: 240px;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+    @media (max-width: 1023px) {
+        .setup-form-panel {
+            margin-left: 0;
+            margin-right: 0;
+        }
+    }
+
+    /* Progress bar */
+    .setup-progress-track {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        height: 4px;
+        background: #f1f5f9;
+    }
+    .setup-progress-fill {
+        height: 100%;
+        background: rgba(184, 149, 106, 0.6);
+        transition: width 0.5s ease;
+    }
+
+    /* Mobile header */
+    .setup-mobile-header {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 24px;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    @media (max-width: 1023px) {
+        .setup-mobile-header {
+            display: flex;
+        }
+    }
+    .setup-mobile-step {
+        margin-left: auto;
+        font-size: 12px;
+        color: #9ca3af;
+    }
+
+    /* Scrollable area */
+    .setup-main-area {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+    }
+    .setup-scroll {
+        flex: 1;
+        overflow-y: auto;
+    }
+    .setup-form-content {
+        max-width: 56rem;
+        margin: 0 auto;
+        padding: 80px 64px;
+    }
+
+    /* Right side-nav (fixed) */
+    .setup-side-nav {
+        position: fixed;
+        right: 0;
+        top: 0;
+        width: 240px;
+        height: 100vh;
+        background: white;
+        border-left: 1px solid #f1f5f9;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 20;
+    }
+    .setup-side-nav-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        padding: 0 32px;
+    }
+    .setup-side-step-count {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a2744;
+        font-family: "Instrument Sans", sans-serif;
+        line-height: 1;
+        text-align: center;
+    }
+    .setup-side-step-count-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        text-align: center;
+        margin-top: 4px;
+    }
+    .setup-btn-block {
+        width: 100%;
+        justify-content: center;
+    }
+    .setup-side-btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        margin-top: 32px;
+    }
+    .setup-btn-continue-tall {
+        height: 56px;
+        gap: 8px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    @media (max-width: 1023px) {
+        .setup-side-nav {
+            display: none;
+        }
+    }
+
+    /* Step header */
+    .setup-step-header {
+        margin-bottom: 32px;
+    }
+    .setup-step-tag {
+        font-size: 11px;
+        font-weight: 600;
+        color: #b8956a;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 8px;
+    }
+    .setup-step-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1a2744;
+        font-family: "Instrument Sans", sans-serif;
+    }
+    .setup-step-desc {
+        font-size: 14px;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+
+    /* Fields */
+    .setup-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    .setup-field {
+        display: flex;
+        flex-direction: column;
+    }
+    .setup-row {
+        display: flex;
+        gap: 16px;
+    }
+    .setup-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #1a2744;
+        margin-bottom: 6px;
+    }
+    .setup-sublabel {
+        font-size: 12px;
+        color: #6b7280;
+        margin-bottom: 4px;
+        display: block;
+    }
+    .setup-hint-inline {
+        font-weight: 400;
+        color: #9ca3af;
+    }
+    .setup-required {
+        color: #dc2626;
+    }
+    .setup-field-hint {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-top: 4px;
+    }
+    .setup-field-error {
+        font-size: 12px;
+        color: #dc2626;
+        margin-top: 4px;
+    }
+
+    /* Inputs */
+    .setup-input {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid #e8e8e8;
+        border-radius: 6px;
+        background: #fff;
+        font-size: 14px;
+        color: #1a2744;
+        box-sizing: border-box;
+        outline: none;
+        font-family: inherit;
+        transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    .setup-input:focus {
+        border-color: #b8956a;
+        box-shadow: 0 0 0 3px rgba(184, 149, 106, 0.15);
+    }
+    .setup-input-error {
+        border-color: #dc2626;
+        background: #fef2f2;
+    }
+    .setup-textarea {
+        resize: none;
+    }
+    .setup-num {
+        text-align: center;
+    }
+
+    /* Slug row */
+    .setup-slug-wrap {
+        display: flex;
+        border: 1px solid #e8e8e8;
+        border-radius: 6px;
+        overflow: hidden;
+        transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
+    }
+    .setup-slug-wrap:focus-within {
+        border-color: #b8956a;
+        box-shadow: 0 0 0 3px rgba(184, 149, 106, 0.15);
+    }
+    .setup-slug-error {
+        border-color: #dc2626;
+    }
+    .setup-slug-prefix {
+        padding: 10px 12px;
+        font-size: 13px;
+        color: #9ca3af;
+        background: #f9fafb;
+        border-right: 1px solid #e8e8e8;
+        white-space: nowrap;
+        flex-shrink: 0;
+        user-select: none;
+    }
+    .setup-slug-input {
+        flex: 1;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: #1a2744;
+        background: #fff;
+        border: none;
+        outline: none;
+        min-width: 0;
+        font-family: inherit;
+    }
+
+    /* Business type grid */
+    .setup-biz-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    .setup-biz-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 28px 16px;
+        border-radius: 12px;
+        border: 1.5px solid #e8e8e8;
+        background: #fff;
+        color: #6b7280;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: inherit;
+    }
+    .setup-biz-card:hover {
+        border-color: #d1d1d1;
+        background: #f9fafb;
+    }
+    .setup-biz-card-active {
+        border-color: #b8956a !important;
+        background: #f5ede3 !important;
+        color: #b8956a !important;
+    }
+    .setup-biz-icon {
+        font-size: 20px;
+    }
+
+    /* Color picker */
+    .setup-color-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .setup-color-swatch {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .setup-color-swatch:hover {
+        transform: scale(1.1);
+    }
+    .setup-color-active {
+        border-color: #1a2744 !important;
+        transform: scale(1.15) !important;
+    }
+    .setup-color-custom {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px dashed #d1d1d1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+    .setup-color-input {
+        opacity: 0;
+        position: absolute;
+        width: 48px;
+        height: 48px;
+        cursor: pointer;
+    }
+    .setup-color-preview {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid #e8e8e8;
+    }
+
+    /* Summary card */
+    .setup-summary {
+        background: #f8f9fa;
+        border: 1px solid #e8e8e8;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    .setup-summary-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .setup-summary-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        color: #6b7280;
+    }
+    .setup-summary-row strong,
+    .setup-summary-row code {
+        color: #1a2744;
+    }
+    .setup-summary-row code {
+        font-size: 12px;
+        font-family: "IBM Plex Mono", monospace;
+    }
+
+    /* Error banner */
+    .setup-error-banner {
+        display: flex;
+        gap: 10px;
+        padding: 14px 16px;
+        border-radius: 8px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        font-size: 13px;
+        color: #dc2626;
+    }
+
+    /* Done screen */
+    .setup-done {
+        text-align: center;
+        padding: 48px 0;
+    }
+    .setup-done-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: #f5ede3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 24px;
+    }
+    .setup-done-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1a2744;
+        margin-bottom: 8px;
+        font-family: "Instrument Sans", sans-serif;
+    }
+    .setup-done-desc {
+        font-size: 14px;
+        color: #6b7280;
+        max-width: 300px;
+        margin: 0 auto 32px;
+        line-height: 1.6;
+    }
+    .setup-done-checklist {
+        background: #f8f9fa;
+        border: 1px solid #e8e8e8;
+        border-radius: 12px;
+        padding: 20px;
+        max-width: 320px;
+        margin: 0 auto 32px;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .setup-done-check-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+        color: #1a2744;
+    }
+    .setup-done-check-circle {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #f5ede3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* Navigation */
+    /* Navigation buttons */
+    .setup-btn-back {
+        padding: 10px 18px;
+        border-radius: 6px;
+        background: #f9fafb;
+        color: #6b7280;
+        font-size: 14px;
+        font-weight: 500;
+        border: 1px solid #e8e8e8;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: inherit;
+        transition: background 0.15s;
+    }
+    .setup-btn-back:hover {
+        background: #f3f4f6;
+        color: #1a2744;
+    }
+    .setup-btn-primary {
+        padding: 10px 24px;
+        border-radius: 6px;
+        background: #1a2744;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "Instrument Sans", sans-serif;
+        transition: background 0.15s;
+    }
+    .setup-btn-primary:hover {
+        background: #243561;
+    }
+    .setup-btn-gold {
+        padding: 10px 24px;
+        border-radius: 6px;
+        background: #b8956a;
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "Instrument Sans", sans-serif;
+        transition: background 0.15s;
+    }
+    .setup-btn-gold:hover {
+        background: #a07d55;
+    }
+    .setup-btn-gold:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    @keyframes spin {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    .setup-spin {
+        animation: spin 1s linear infinite;
+    }
+</style>
