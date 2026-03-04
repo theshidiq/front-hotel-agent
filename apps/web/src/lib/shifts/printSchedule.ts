@@ -30,15 +30,16 @@ export function printSchedule(
 	const colCount = orderedStaff.length;
 	const rowCount = dateRange.length;
 
-	// Portrait A4: usable ~190mm wide, ~267mm tall (with 5mm padding each side).
-	// Overhead: title ~8mm + legend ~5mm = ~13mm. Row budget: ~254mm / rowCount.
-	// At 3.78px/mm → ~960px tall usable for rows.
-	const rowPx  = Math.max(13, Math.min(26, Math.floor(960 / rowCount)));
+	// Portrait A4 at 96dpi: 794px wide × 1123px tall.
+	// Padding 5mm each side = ~19px → usable: 756px wide, 1085px tall.
+	// Overhead: title+period row ~20px, legend ~14px = ~34px.
+	// Row budget: (1085 - 34) px split across (rowCount rows + 1 header row).
+	const totalRowPx = 1051;
+	const rowPx  = Math.floor(totalRowPx / (rowCount + 1)); // +1 for header
 	const fs     = Math.max(7,  Math.min(11, Math.floor(rowPx * 0.52)));
 	const symFs  = Math.max(9,  Math.min(13, fs + 2));
-	// Date col: fixed 36px; staff cols share the rest equally.
-	// At ~718px usable width (190mm): (718 - 36) / colCount
-	const staffColPx = Math.max(20, Math.floor((718 - 36) / Math.max(colCount, 1)));
+	// Date col: fixed 38px; staff cols share the rest equally across 756px usable.
+	const staffColPx = Math.max(20, Math.floor((756 - 38) / Math.max(colCount, 1)));
 
 	const headerCells = orderedStaff.map((s) => '<th>' + s.name + '</th>').join('');
 
@@ -79,10 +80,10 @@ export function printSchedule(
 		'h1{font-size:12px;font-weight:700}',
 		'.period{font-size:9px;color:#555}',
 		'table{border-collapse:collapse;width:100%;table-layout:fixed}',
-		'col.date-w{width:36px}',
+		'col.date-w{width:38px}',
 		'col.staff-w{width:' + staffColPx + 'px}',
-		'th{background:#1f2937;color:#fff;font-size:' + fs + 'px;font-weight:600;'
-			+ 'padding:2px 1px;height:' + (rowPx + 4) + 'px;border:1px solid #374151;'
+		'th{background:#f3f4f6;color:#111;font-size:' + fs + 'px;font-weight:600;'
+			+ 'padding:2px 1px;height:' + rowPx + 'px;border:1px solid #d1d5db;'
 			+ 'overflow:hidden;word-break:break-all;vertical-align:middle}',
 		'td{border:1px solid #e5e7eb;text-align:center;vertical-align:middle;'
 			+ 'font-size:' + fs + 'px;height:' + rowPx + 'px;padding:0;overflow:hidden}',
