@@ -1,17 +1,128 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { cubicOut } from "svelte/easing";
     import ConstellationCanvas from "$lib/components/ConstellationCanvas.svelte";
 
     let emailInput = $state("");
     let submitted = $state(false);
     let navScrolled = $state(false);
 
+    // Scroll-driven story state
+    const PANELS = ["hero", "shift", "allergen", "stella"] as const;
+    const PANEL_COUNT = PANELS.length;
+    let currentPanel = $state(0);
+    let activeSection = $derived(PANELS[currentPanel]);
+
+    let wrapperEl: HTMLElement;
+    let trackEl: HTMLElement;
+
+    // ── Gesture-silence debounce ──
+    // A "gesture" is a continuous stream of wheel events (trackpad swipe / mouse
+    // wheel tick). Only the FIRST event advances a panel. ALL subsequent events
+    // within the gesture are silently eaten. After 400ms of wheel silence, the
+    // gesture resets and the next event can advance again.
+    let gestureActive = false;
+    let gestureTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Custom slide-up transition for right-side visuals
+    function slideUp(
+        node: HTMLElement,
+        { duration = 400, delay = 0 }: { duration?: number; delay?: number },
+    ) {
+        return {
+            duration,
+            delay,
+            easing: cubicOut,
+            css: (t: number) =>
+                `opacity: ${t}; transform: translateY(${(1 - t) * 28}px);`,
+        };
+    }
+
+    /** Move to a specific panel index */
+    function goToPanel(index: number) {
+        const target = Math.max(0, Math.min(PANEL_COUNT - 1, index));
+        currentPanel = target;
+
+        if (trackEl) {
+            const offset = -target * window.innerHeight;
+            trackEl.style.setProperty("--track-offset", `${offset}px`);
+        }
+
+        if (wrapperEl) {
+            const sectionTop =
+                wrapperEl.getBoundingClientRect().top + window.scrollY;
+            window.scrollTo({
+                top: sectionTop + target * window.innerHeight,
+                behavior: "instant",
+            });
+        }
+    }
+
+    function handleWheel(e: WheelEvent) {
+        if (!wrapperEl) return;
+
+        const rect = wrapperEl.getBoundingClientRect();
+        const inSection =
+            rect.top <= 5 && rect.bottom >= window.innerHeight - 5;
+        if (!inSection) return;
+
+        // Reset gesture timer on every wheel event
+        if (gestureTimer) clearTimeout(gestureTimer);
+        gestureTimer = setTimeout(() => {
+            gestureActive = false;
+        }, 200);
+
+        // If gesture already active, just eat the event (no panel change)
+        if (gestureActive) {
+            e.preventDefault();
+            return;
+        }
+
+        // This is the FIRST event of a new gesture — determine direction
+        const dir = e.deltaY > 0 ? 1 : -1;
+        const next = currentPanel + dir;
+
+        // At boundary → let page scroll normally (don't mark gesture active)
+        if (next < 0 || next >= PANEL_COUNT) return;
+
+        // Advance one panel and lock the gesture
+        e.preventDefault();
+        gestureActive = true;
+        goToPanel(next);
+    }
+
     onMount(() => {
         const handleScroll = () => {
             navScrolled = window.scrollY > 20;
+            // Don't fight with goToPanel during a gesture
+            if (!wrapperEl || gestureActive) return;
+
+            const rect = wrapperEl.getBoundingClientRect();
+            const scrollableHeight =
+                wrapperEl.offsetHeight - window.innerHeight;
+            const scrolled = Math.max(0, -rect.top);
+            const progress = Math.min(1, scrolled / scrollableHeight);
+            const panel = Math.min(
+                PANEL_COUNT - 1,
+                Math.round(progress * (PANEL_COUNT - 1)),
+            );
+
+            if (panel !== currentPanel) currentPanel = panel;
+
+            if (trackEl) {
+                const offset = -panel * window.innerHeight;
+                trackEl.style.setProperty("--track-offset", `${offset}px`);
+            }
         };
-        window.addEventListener("scroll", handleScroll);
-        return () => window.removeEventListener("scroll", handleScroll);
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        window.addEventListener("wheel", handleWheel, { passive: false });
+        handleScroll();
+
+        return () => {
+            window.removeEventListener("scroll", handleScroll);
+            window.removeEventListener("wheel", handleWheel);
+        };
     });
 
     function handleWaitlist(e: Event) {
@@ -36,6 +147,13 @@
 
 <!-- NOISE OVERLAY (Tactile Premium Feel) -->
 <div class="noise-overlay"></div>
+
+<!-- FIXED CONSTELLATION BACKGROUND -->
+<div class="constellation-bg">
+    <div class="hero-glow"></div>
+    <ConstellationCanvas />
+    <div class="constellation-gradient"></div>
+</div>
 
 <!-- NAVBAR -->
 <nav class="navbar" class:scrolled={navScrolled}>
@@ -119,149 +237,61 @@
     </div>
 </nav>
 
-<!-- HERO -->
-<section class="hero relative overflow-hidden">
-    <div class="hero-glow"></div>
-    <ConstellationCanvas />
-    <div
-        class="absolute inset-0 z-[1] pointer-events-none"
-        style="background: linear-gradient(105deg, #F5F1EC 28%, rgba(245,241,236,0.88) 45%, rgba(245,241,236,0.3) 62%, transparent 75%)"
-    ></div>
-    <div class="hero-inner relative z-10">
-        <div class="hero-left">
-            <p class="hero-eyebrow">
-                sinar · nara &nbsp;·&nbsp; ray of light · human being
-            </p>
-
-            <h1 class="hero-headline">
-                People in<br />the light.
-            </h1>
-            <p class="hero-sub-headline">Operations in the background.</p>
-
-            <p class="hero-sub">
-                A guest doesn't remember the system behind the desk. They
-                remember the person who looked them in the eye. Sinara handles
-                everything else — so your team can be fully present.
-            </p>
-
-            <div class="hero-ctas">
-                <a href="#contact" class="btn-primary">Book a Demo</a>
-                <a href="#features" class="btn-secondary">See how it works</a>
-            </div>
-
-            <div class="hero-trust">
-                <span class="trust-item">🏨 Hotel</span>
-                <span class="trust-sep">·</span>
-                <span class="trust-item">🍽 Restaurant</span>
-                <span class="trust-sep">·</span>
-                <span class="trust-item">🏮 Izakaya</span>
-                <span class="trust-sep">·</span>
-                <span class="trust-item">🏥 Clinic</span>
-            </div>
-        </div>
-
-        <div class="hero-right">
-            <!-- App mockup: the schedule that builds itself -->
-            <div class="app-mockup">
-                <div class="mockup-bar">
-                    <div class="mockup-dots">
-                        <span></span><span></span><span></span>
+<!-- ═══════════════════════════════════════════════════════════
+     SCROLLYTELLING SECTION
+     Tall outer wrapper (4×100vh) with sticky inner shell.
+     Left track slides up as user scrolls — one panel per 100vh.
+     Right column is sticky and swaps visuals by panel index.
+     ═══════════════════════════════════════════════════════════ -->
+<section class="story-wrapper" bind:this={wrapperEl} id="hero">
+    <!-- Sticky shell clips to 100vh -->
+    <div class="story-shell">
+        <div class="story-grid">
+            <!-- ─── LEFT TRACK (slides up as you scroll) ─── -->
+            <div class="story-track" bind:this={trackEl}>
+                <!-- Slide 0 · HERO -->
+                <div class="story-slide" id="features">
+                    <p class="hero-eyebrow">
+                        sinar · nara &nbsp;·&nbsp; ray of light · human being
+                    </p>
+                    <h1 class="hero-headline">
+                        People in<br />the light.
+                    </h1>
+                    <p class="hero-sub-headline">
+                        Operations in the background.
+                    </p>
+                    <p class="hero-sub">
+                        A guest doesn't remember the system behind the desk.
+                        They remember the person who looked them in the eye.
+                        Sinara handles everything else — so your team can be
+                        fully present.
+                    </p>
+                    <div class="hero-ctas">
+                        <a href="#contact" class="btn-primary">Book a Demo</a>
+                        <a href="#features" class="btn-secondary"
+                            >See how it works</a
+                        >
                     </div>
-                    <div class="mockup-url">sinara · shift scheduler</div>
-                </div>
-                <div class="mockup-body">
-                    <div class="shift-header">
-                        <div class="shift-title">Period 10 · Week 3</div>
-                        <div class="shift-badge">Auto-generated ✓</div>
+                    <div class="hero-trust">
+                        <span class="trust-item">🏨 Hotel</span>
+                        <span class="trust-sep">·</span>
+                        <span class="trust-item">🍽 Restaurant</span>
+                        <span class="trust-sep">·</span>
+                        <span class="trust-item">🏮 Izakaya</span>
+                        <span class="trust-sep">·</span>
+                        <span class="trust-item">🏥 Clinic</span>
                     </div>
-                    <div class="shift-grid">
-                        <div class="staff-col">
-                            {#each [{ name: "Yui", role: "Server", color: "#F5EDE3" }, { name: "Kenji", role: "Cook", color: "#EEF2FF" }, { name: "Mia", role: "Service", color: "#FDF4FF" }, { name: "Ryo", role: "Kitchen", color: "#F0FDF4" }] as s}
-                                <div class="staff-row">
-                                    <div
-                                        class="staff-avatar"
-                                        style="background: {s.color}"
-                                    >
-                                        {s.name[0]}
-                                    </div>
-                                    <div class="staff-info">
-                                        <span class="staff-name">{s.name}</span>
-                                        <span class="staff-role">{s.role}</span>
-                                    </div>
-                                </div>
-                            {/each}
-                        </div>
-                        <div class="days-col">
-                            {#each [["M", "E", "M", "■", "E", "M", "■"], ["E", "M", "■", "M", "E", "■", "M"], ["■", "E", "M", "E", "■", "M", "E"], ["M", "■", "E", "M", "M", "E", "■"]] as row}
-                                <div class="shift-row">
-                                    {#each row as cell}
-                                        <div
-                                            class="shift-cell"
-                                            class:morning={cell === "M"}
-                                            class:evening={cell === "E"}
-                                            class:off={cell === "■"}
-                                        >
-                                            {cell === "■" ? "" : cell}
-                                        </div>
-                                    {/each}
-                                </div>
-                            {/each}
-                        </div>
-                    </div>
-
-                    <!-- Outcome cards — what the GM sees -->
-                    <div class="outcome-bar">
-                        <div class="outcome-card good">
-                            <span class="oc-dot"></span>
-                            All roles covered this week
-                        </div>
-                        <div class="outcome-card warn">
-                            <span class="oc-dot warn"></span>
-                            Kenji: rest day added Fri
-                        </div>
+                    <!-- Scroll cue -->
+                    <div class="scroll-cue">
+                        <span class="cue-label">scroll</span>
+                        <div class="cue-arrow">↓</div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Stella Human story card -->
-            <div class="story-card">
-                <div class="story-icon">★</div>
-                <div class="story-body">
-                    <span class="story-label">stella</span>
-                    Table 4 guest has a shellfish allergy — Mia has been notified.
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- PROBLEM STATEMENT -->
-<section class="problem-section">
-    <div class="section-inner problem-inner">
-        <div class="problem-quote">
-            "When your team is busy managing the schedule,<br />
-            they are not managing the guest."
-        </div>
-        <p class="problem-sub">
-            Every shift rebuilt in a spreadsheet. Every allergen question
-            hesitated over. Every manager who arrived depleted because they were
-            up until midnight fixing a rota. Sinara removes this weight —
-            quietly, without announcement.
-        </p>
-    </div>
-</section>
-
-<!-- MODERN SCROLL SEQUENCE -->
-<div class="scroll-sequence-wrapper">
-    <!-- CARD 1: Shift Intelligence -->
-    <section class="sticky-stack-card card-shift" id="features">
-        <div class="section-inner">
-            <div class="section-label">How it works</div>
-            <h2 class="section-heading">Two things, done with precision.</h2>
-            <div class="feature-row">
-                <div class="feature-content">
-                    <div class="feature-num">01</div>
-                    <h3 class="feature-title">Shift Intelligence</h3>
+                <!-- Slide 1 · SHIFT INTELLIGENCE -->
+                <div class="story-slide">
+                    <div class="section-label">How it works · 01</div>
+                    <h2 class="section-heading left">Shift Intelligence.</h2>
                     <p class="feature-desc">
                         Your schedule builds itself. Sinara reads your operation
                         — who is available, what roles need filling, what
@@ -274,39 +304,20 @@
                         <span class="outcome-gold">Result:</span> Your manager arrives
                         ready to lead — not exhausted from last night's rota.
                     </p>
-                </div>
-                <div class="feature-visual">
-                    <div class="mini-app-card">
-                        <div class="msc-header">October · Period 10</div>
-                        {#each [{ name: "Yui", shifts: ["M", "E", "■", "M", "E"] }, { name: "Kenji", shifts: ["■", "M", "E", "E", "M"] }, { name: "Mia", shifts: ["E", "■", "M", "M", "■"] }] as s}
-                            <div class="msc-row">
-                                <span class="msc-name">{s.name}</span>
-                                {#each s.shifts as sh}
-                                    <div
-                                        class="msc-cell"
-                                        class:m={sh === "M"}
-                                        class:e={sh === "E"}
-                                        class:off={sh === "■"}
-                                    >
-                                        {sh === "■" ? "" : sh}
-                                    </div>
-                                {/each}
-                            </div>
+                    <div class="slide-progress">
+                        {#each PANELS as _, i}
+                            <div
+                                class="progress-dot"
+                                class:active={i === currentPanel}
+                            ></div>
                         {/each}
-                        <div class="msc-badge">All roles covered ✓</div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- CARD 2: Allergen Vision -->
-    <section class="sticky-stack-card card-allergen">
-        <div class="section-inner">
-            <div class="feature-row reversed">
-                <div class="feature-content">
-                    <div class="feature-num">02</div>
-                    <h3 class="feature-title">Allergen Vision</h3>
+                <!-- Slide 2 · ALLERGEN VISION -->
+                <div class="story-slide">
+                    <div class="section-label">How it works · 02</div>
+                    <h2 class="section-heading left">Allergen Vision.</h2>
                     <p class="feature-desc">
                         Computer vision and OCR read your menus — photographs,
                         PDFs, handwritten notes — and extract every ingredient
@@ -318,87 +329,223 @@
                         the allergy question with confidence. The guest feels safe.
                         The moment is not lost.
                     </p>
+                    <div class="slide-progress">
+                        {#each PANELS as _, i}
+                            <div
+                                class="progress-dot"
+                                class:active={i === currentPanel}
+                            ></div>
+                        {/each}
+                    </div>
                 </div>
-                <div class="feature-visual">
-                    <div class="mini-app-card">
-                        <div class="allergen-header">Menu scan complete</div>
-                        <div class="allergen-items">
-                            {#each ["Shellfish", "Gluten", "Dairy", "Sesame", "Tree nuts"] as a, i}
-                                <div
-                                    class="allergen-item"
-                                    style="animation-delay: {i * 0.1}s"
-                                >
-                                    <span class="allergen-check">✓</span>
-                                    {a}
+
+                <!-- Slide 3 · STELLA -->
+                <div class="story-slide" id="stella">
+                    <div class="section-label">Stella · AI</div>
+                    <h2 class="section-heading left">
+                        The star your team<br />navigates by.
+                    </h2>
+                    <p class="stella-desc">
+                        Stella is Sinara's AI companion — built to feel, above
+                        all else, human. She speaks in plain language, offers
+                        choices rather than blank fields, and always leads
+                        somewhere useful.
+                    </p>
+                    <ul class="stella-list">
+                        <li>
+                            Natural language scheduling — no training required
+                        </li>
+                        <li>Real-time allergen alerts to your team</li>
+                        <li>Guest notes and preferences, always at hand</li>
+                        <li>Available in multiple languages</li>
+                    </ul>
+                    <div class="slide-progress">
+                        {#each PANELS as _, i}
+                            <div
+                                class="progress-dot"
+                                class:active={i === currentPanel}
+                            ></div>
+                        {/each}
+                    </div>
+                </div>
+            </div>
+            <!-- end story-track -->
+
+            <!-- ─── RIGHT COLUMN (Sticky Visuals) ─── -->
+            <div class="story-visuals">
+                {#key currentPanel}
+                    <div
+                        class="visual-panel"
+                        class:stella-visual={currentPanel === 3}
+                        in:slideUp={{ duration: 380, delay: 60 }}
+                    >
+                        {#if currentPanel === 0}
+                            <!-- Hero App Mockup -->
+                            <div class="app-mockup">
+                                <div class="mockup-bar">
+                                    <div class="mockup-dots">
+                                        <span></span><span></span><span></span>
+                                    </div>
+                                    <div class="mockup-url">
+                                        sinara · shift scheduler
+                                    </div>
                                 </div>
-                            {/each}
-                        </div>
-                        <div class="allergen-footer">
-                            43 ingredients detected · Always current
-                        </div>
+                                <div class="mockup-body">
+                                    <div class="shift-header">
+                                        <div class="shift-title">
+                                            Period 10 · Week 3
+                                        </div>
+                                        <div class="shift-badge">
+                                            Auto-generated ✓
+                                        </div>
+                                    </div>
+                                    <div class="shift-grid">
+                                        <div class="staff-col">
+                                            {#each [{ name: "Yui", role: "Server", color: "#F5EDE3" }, { name: "Kenji", role: "Cook", color: "#EEF2FF" }, { name: "Mia", role: "Service", color: "#FDF4FF" }, { name: "Ryo", role: "Kitchen", color: "#F0FDF4" }] as s}
+                                                <div class="staff-row">
+                                                    <div
+                                                        class="staff-avatar"
+                                                        style="background: {s.color}"
+                                                    >
+                                                        {s.name[0]}
+                                                    </div>
+                                                    <div class="staff-info">
+                                                        <span class="staff-name"
+                                                            >{s.name}</span
+                                                        >
+                                                        <span class="staff-role"
+                                                            >{s.role}</span
+                                                        >
+                                                    </div>
+                                                </div>
+                                            {/each}
+                                        </div>
+                                        <div class="days-col">
+                                            {#each [["M", "E", "M", "■", "E", "M", "■"], ["E", "M", "■", "M", "E", "■", "M"], ["■", "E", "M", "E", "■", "M", "E"], ["M", "■", "E", "M", "M", "E", "■"]] as row}
+                                                <div class="shift-row">
+                                                    {#each row as cell}
+                                                        <div
+                                                            class="shift-cell"
+                                                            class:morning={cell ===
+                                                                "M"}
+                                                            class:evening={cell ===
+                                                                "E"}
+                                                            class:off={cell ===
+                                                                "■"}
+                                                        >
+                                                            {cell === "■"
+                                                                ? ""
+                                                                : cell}
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            {/each}
+                                        </div>
+                                    </div>
+                                    <div class="outcome-bar">
+                                        <div class="outcome-card good">
+                                            <span class="oc-dot"></span>All
+                                            roles covered this week
+                                        </div>
+                                        <div class="outcome-card warn">
+                                            <span class="oc-dot warn"
+                                            ></span>Kenji: rest day added Fri
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="story-card">
+                                <div class="story-icon">★</div>
+                                <div class="story-body">
+                                    <span class="story-label">stella</span>
+                                    Table 4 guest has a shellfish allergy — Mia has
+                                    been notified.
+                                </div>
+                            </div>
+                        {:else if currentPanel === 1}
+                            <div class="mini-app-card">
+                                <div class="msc-header">
+                                    October · Period 10
+                                </div>
+                                {#each [{ name: "Yui", shifts: ["M", "E", "■", "M", "E"] }, { name: "Kenji", shifts: ["■", "M", "E", "E", "M"] }, { name: "Mia", shifts: ["E", "■", "M", "M", "■"] }] as s}
+                                    <div class="msc-row">
+                                        <span class="msc-name">{s.name}</span>
+                                        {#each s.shifts as sh}
+                                            <div
+                                                class="msc-cell"
+                                                class:m={sh === "M"}
+                                                class:e={sh === "E"}
+                                                class:off={sh === "■"}
+                                            >
+                                                {sh === "■" ? "" : sh}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/each}
+                                <div class="msc-badge">All roles covered ✓</div>
+                            </div>
+                        {:else if currentPanel === 2}
+                            <div class="mini-app-card">
+                                <div class="allergen-header">
+                                    Menu scan complete
+                                </div>
+                                <div class="allergen-items">
+                                    {#each ["Shellfish", "Gluten", "Dairy", "Sesame", "Tree nuts"] as a, i}
+                                        <div
+                                            class="allergen-item"
+                                            style="animation-delay: {i * 0.1}s"
+                                        >
+                                            <span class="allergen-check">✓</span
+                                            >{a}
+                                        </div>
+                                    {/each}
+                                </div>
+                                <div class="allergen-footer">
+                                    43 ingredients detected · Always current
+                                </div>
+                            </div>
+                        {:else if currentPanel === 3}
+                            <div class="phone-frame">
+                                <div class="phone-notch"></div>
+                                <div class="phone-screen">
+                                    <div class="phone-header">
+                                        <span class="stella-star">★</span>
+                                        <span>stella</span>
+                                        <span class="online-dot"></span>
+                                    </div>
+                                    <div class="phone-chat">
+                                        <div class="msg msg-in">
+                                            Good morning. Period 10 is ready —
+                                            shall I publish and notify the team?
+                                        </div>
+                                        <div class="msg msg-out">
+                                            Yes, go ahead.
+                                        </div>
+                                        <div class="msg msg-in">
+                                            Done. All 12 staff notified. Room
+                                            302 has a late check-out request.
+                                        </div>
+                                        <div class="msg msg-out">
+                                            Add 1 hour. Adjust Kenji's morning
+                                            shift.
+                                        </div>
+                                        <div class="msg msg-in">
+                                            Updated. Kenji notified. Anything
+                                            else?
+                                        </div>
+                                        <div class="msg msg-out">
+                                            That's it. Thank you.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
                     </div>
-                </div>
+                {/key}
             </div>
         </div>
-    </section>
-
-    <!-- CARD 3: STELLA -->
-    <section class="sticky-stack-card card-stella stella-section" id="stella">
-        <div class="section-inner stella-inner">
-            <div class="stella-phone">
-                <div class="phone-frame">
-                    <div class="phone-notch"></div>
-                    <div class="phone-screen">
-                        <div class="phone-header">
-                            <span class="stella-star">★</span>
-                            <span>stella</span>
-                            <span class="online-dot"></span>
-                        </div>
-                        <div class="phone-chat">
-                            <div class="msg msg-in">
-                                Good morning. Period 10 is ready — shall I
-                                publish and notify the team?
-                            </div>
-                            <div class="msg msg-out">Yes, go ahead.</div>
-                            <div class="msg msg-in">
-                                Done. All 12 staff notified. Room 302 has a late
-                                check-out request.
-                            </div>
-                            <div class="msg msg-out">
-                                Add 1 hour. Adjust Kenji's morning shift.
-                            </div>
-                            <div class="msg msg-in">
-                                Updated. Kenji notified. Anything else?
-                            </div>
-                            <div class="msg msg-out">That's it. Thank you.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stella-content">
-                <div class="section-label">Stella · AI</div>
-                <h2 class="section-heading left">
-                    The star your team<br />navigates by.
-                </h2>
-                <p class="stella-desc">
-                    Stella is Sinara's AI companion — built to feel, above all
-                    else, human. She speaks in plain language, offers choices
-                    rather than blank fields, and always leads somewhere useful.
-                    For a senior staff member and for a manager encountering AI
-                    for the first time, the experience is the same: someone is
-                    there, and they are helpful.
-                </p>
-                <ul class="stella-list">
-                    <li>Natural language scheduling — no training required</li>
-                    <li>Real-time allergen alerts to your team</li>
-                    <li>Guest notes and preferences, always at hand</li>
-                    <li>Available in multiple languages</li>
-                </ul>
-            </div>
-        </div>
-    </section>
-</div>
+    </div>
+</section>
 
 <!-- INDUSTRIES -->
 <section class="industries" id="industries">
@@ -563,20 +710,13 @@
 <style>
     :global(body) {
         margin: 0;
-        background: #f5f1ec; /* Marketing Cream */
-        color: #1a2744; /* Marketing Navy primary text */
+        background: #f5f1ec;
+        color: #1a2744;
         font-family: "Instrument Sans", system-ui, sans-serif;
         font-size: 16px;
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
     }
-
-    /* ── TOKENS ── */
-    /* Marketing Layer */
-    /* bg-cream:    #F5F1EC */
-    /* text-primary:#1A2744 (Navy) */
-    /* accent:      #B8956A (Gold) */
-    /* border-mkt:  #C8C0B4 (Stone) */
 
     /* ── BACKGROUND TEXTURES ── */
     .noise-overlay {
@@ -584,8 +724,48 @@
         inset: 0;
         z-index: 50;
         pointer-events: none;
-        opacity: 0.08; /* Increased from 0.035 to be more visible */
+        opacity: 0.08;
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    /* ── FIXED CONSTELLATION BACKGROUND ── */
+    .constellation-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+        background: #f5f1ec;
+        background-image: radial-gradient(
+            circle at 85% 90%,
+            rgba(184, 149, 106, 0.12) 0%,
+            transparent 60%
+        );
+    }
+    .constellation-gradient {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: linear-gradient(
+            105deg,
+            #f5f1ec 28%,
+            rgba(245, 241, 236, 0.88) 45%,
+            rgba(245, 241, 236, 0.3) 62%,
+            transparent 75%
+        );
+    }
+    .hero-glow {
+        position: absolute;
+        top: -20%;
+        left: -10%;
+        width: 120vw;
+        height: 120vh;
+        background: radial-gradient(
+            circle at 30% 20%,
+            rgba(184, 149, 106, 0.18) 0%,
+            transparent 70%
+        );
+        pointer-events: none;
     }
 
     /* ── NAVBAR ── */
@@ -678,7 +858,6 @@
     .btn-primary:hover {
         background: #243561;
     }
-
     .btn-accent {
         background: #b8956a;
         color: #ffffff;
@@ -695,7 +874,6 @@
     .btn-accent:hover {
         background: #a07d55;
     }
-
     .btn-secondary {
         background: transparent;
         color: #1a2744;
@@ -716,45 +894,147 @@
         border-color: #b8956a;
     }
 
-    /* ── HERO ── */
-    .hero {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        padding: 110px 2rem 70px;
+    /* ═══════════════════════════════════════════
+       SCROLLYTELLING — STICKY SCROLL DRIVER
+       ═══════════════════════════════════════════ */
+
+    /* Outer wrapper: tall enough to scroll through N panels */
+    .story-wrapper {
         position: relative;
-        overflow: hidden;
-        background: #f5f1ec;
-        /* Secondary subtle glow originating from bottom right of hero */
-        background-image: radial-gradient(
-            circle at 85% 90%,
-            rgba(184, 149, 106, 0.12) 0%,
-            transparent 60%
-        );
-    }
-    .hero-glow {
-        position: absolute;
-        top: -20%;
-        left: -10%;
-        width: 120vw;
-        height: 120vh;
-        background: radial-gradient(
-            circle at 30% 20%,
-            rgba(184, 149, 106, 0.18) 0%,
-            transparent 70%
-        );
-        pointer-events: none;
-    }
-    .hero-inner {
-        max-width: 1100px;
-        margin: 0 auto;
-        width: 100%;
-        display: grid;
-        grid-template-columns: 1fr 1.05fr;
-        gap: 4rem;
-        align-items: center;
+        z-index: 10;
+        /* 4 panels × 100vh — the extra height gives us scroll travel */
+        height: calc(4 * 100vh);
     }
 
+    /* Sticky shell: stays pinned at top, clips the sliding track */
+    .story-shell {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: hidden;
+        padding: 0 2rem;
+        display: flex;
+        align-items: stretch;
+    }
+
+    /* Two-column grid inside the shell */
+    .story-grid {
+        max-width: 1100px;
+        width: 100%;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1.1fr;
+        gap: 4rem;
+        align-items: start;
+    }
+
+    /* Left track: 4 slides stacked, controlled by JS translateY */
+    .story-track {
+        display: flex;
+        flex-direction: column;
+        /* Height = 4 slides, each 100vh */
+        height: calc(4 * 100vh);
+        /* JS will set --track-offset via style attribute */
+        transform: translateY(var(--track-offset, 0px));
+        transition: transform 0.55s cubic-bezier(0.77, 0, 0.175, 1);
+        will-change: transform;
+    }
+
+    /* Each slide fills exactly 100vh */
+    .story-slide {
+        height: 100vh;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-top: 68px; /* navbar clearance */
+        padding-bottom: 2rem;
+    }
+
+    /* Right visuals: sticky within the already-sticky shell, always 100vh */
+    .story-visuals {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 68px;
+    }
+
+    .visual-panel {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .visual-panel.stella-visual {
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Scroll-cue on hero panel */
+    .scroll-cue {
+        margin-top: 2.5rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0.45;
+        animation: cue-pulse 2.4s ease-in-out infinite;
+    }
+    .cue-label {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        color: #1a2744;
+        text-transform: uppercase;
+    }
+    .cue-arrow {
+        font-size: 14px;
+        color: #b8956a;
+        animation: cue-bounce 1.2s ease-in-out infinite;
+    }
+    @keyframes cue-pulse {
+        0%,
+        100% {
+            opacity: 0.35;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
+    @keyframes cue-bounce {
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(4px);
+        }
+    }
+
+    /* Panel progress dots */
+    .slide-progress {
+        display: flex;
+        gap: 6px;
+        margin-top: 2rem;
+    }
+    .progress-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #c8c0b4;
+        transition:
+            background 0.3s,
+            transform 0.3s;
+    }
+    .progress-dot.active {
+        background: #b8956a;
+        transform: scale(1.4);
+    }
+
+    /* ── HERO TEXT ── */
     .hero-eyebrow {
         font-family: "Instrument Sans", sans-serif;
         font-size: 11px;
@@ -766,7 +1046,7 @@
     }
     .hero-headline {
         font-family: "Gloock", serif;
-        font-size: clamp(64px, 5.5vw, 80px);
+        font-size: clamp(52px, 5vw, 72px);
         line-height: 1.05;
         letter-spacing: -0.02em;
         color: #1a2744;
@@ -775,7 +1055,7 @@
     }
     .hero-sub-headline {
         font-family: "Gloock", serif;
-        font-size: clamp(32px, 2.5vw, 42px);
+        font-size: clamp(28px, 2.2vw, 38px);
         font-style: italic;
         color: #b8956a;
         margin: 0 0 1.5rem;
@@ -811,17 +1091,57 @@
         color: #c8c0b4;
     }
 
-    /* ── APP MOCKUP (Product Layer: Functional UI) ── */
-    /* Backgrounds must be White #FFFFFF, borders #E8E8E8, fonts IBM Plex */
-    .hero-right {
-        position: relative;
+    /* ── SECTION TYPOGRAPHY ── */
+    .section-label {
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #b8956a;
+        margin-bottom: 0.75rem;
+        font-weight: 600;
     }
+    .section-heading {
+        font-family: "Gloock", serif;
+        font-size: clamp(36px, 3.5vw, 50px);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        color: #1a2744;
+        margin: 0 0 2.5rem;
+        font-weight: 400;
+    }
+    .section-heading.left {
+        text-align: left;
+        margin-bottom: 1.25rem;
+    }
+    .feature-desc {
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 16px;
+        color: #1a2744;
+        line-height: 1.75;
+        margin: 0 0 1.25rem;
+    }
+    .feature-outcome {
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        color: #1a2744;
+        line-height: 1.6;
+        margin: 0;
+        border-left: 3px solid #b8956a;
+        padding-left: 1rem;
+    }
+    .outcome-gold {
+        color: #b8956a;
+        font-weight: 600;
+    }
+
+    /* ── APP MOCKUP (Hero Visual) ── */
     .app-mockup {
         background: #ffffff;
         border: 1px solid #e8e8e8;
         border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
     }
     .mockup-bar {
         background: #f8f9fa;
@@ -920,7 +1240,6 @@
         font-size: 11px;
         color: #6b7280;
     }
-
     .days-col {
         display: flex;
         flex-direction: column;
@@ -989,12 +1308,12 @@
         background: #d97706;
     }
 
-    /* Stella Notification Card (Stella Identity) */
+    /* Stella Notification Card */
     .story-card {
         position: absolute;
         bottom: -20px;
         left: -24px;
-        background: #2d2648; /* Stella Indigo */
+        background: #2d2648;
         border-radius: 8px;
         padding: 16px 20px;
         display: flex;
@@ -1036,139 +1355,15 @@
         text-transform: uppercase;
     }
 
-    /* ── PROBLEM STATEMENT ── */
-    .problem-section {
-        padding: 80px 2rem;
-        background: #f5f1ec;
-        border-top: 1px solid #c8c0b4;
-        border-bottom: 1px solid #c8c0b4;
-    }
-    .problem-inner {
-        max-width: 800px;
-        text-align: center;
-    }
-    .problem-quote {
-        font-family: "Gloock", serif;
-        font-size: clamp(32px, 3vw, 48px);
-        font-style: italic;
-        color: #1a2744;
-        line-height: 1.5;
-        margin: 0 0 1.5rem;
-    }
-    .problem-sub {
-        font-family: "Instrument Sans", sans-serif;
-        font-size: 16px;
-        color: #1a2744;
-        line-height: 1.8;
-        margin: 0;
-    }
-
-    /* ── SCROLL SEQUENCE ── */
-    .scroll-sequence-wrapper {
-        position: relative;
-        z-index: 20;
-    }
-    .sticky-stack-card {
-        position: sticky;
-        top: 0;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        background: #f5f1ec;
-        box-shadow: 0 -20px 50px rgba(26, 39, 68, 0.03);
-        overflow: hidden;
-        padding: 40px 2rem;
-    }
-    .card-shift {
-        z-index: 1;
-        box-shadow: none; /* First card has no shadow above it */
-        align-items: flex-start;
-        padding-top: 100px;
-    }
-    .card-allergen {
-        z-index: 2;
-    }
-    .card-stella {
-        z-index: 3;
-    }
-
-    .section-label {
-        font-family: "Instrument Sans", sans-serif;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: #b8956a;
-        margin-bottom: 0.75rem;
-        font-weight: 600;
-    }
-    .section-heading {
-        font-family: "Gloock", serif;
-        font-size: clamp(40px, 4vw, 56px);
-        line-height: 1.15;
-        letter-spacing: -0.02em;
-        color: #1a2744;
-        margin: 0 0 3.5rem;
-        font-weight: 400;
-    }
-    .section-heading.left {
-        text-align: left;
-        margin-bottom: 1.25rem;
-    }
-    .feature-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 64px;
-        align-items: center;
-    }
-    .feature-row.reversed {
-        direction: rtl;
-    }
-    .feature-row.reversed > * {
-        direction: ltr;
-    }
-
-    .feature-num {
-        font-family: "Gloock", serif;
-        font-size: 18px;
-        color: #b8956a;
-        margin-bottom: 0.5rem;
-        letter-spacing: 0.08em;
-    }
-    .feature-title {
-        font-family: "Gloock", serif;
-        font-size: 36px;
-        color: #1a2744;
-        margin: 0 0 1rem;
-        letter-spacing: -0.01em;
-    }
-    .feature-desc {
-        font-family: "Instrument Sans", sans-serif;
-        font-size: 16px;
-        color: #1a2744;
-        line-height: 1.75;
-        margin: 0 0 1.25rem;
-    }
-    .feature-outcome {
-        font-family: "IBM Plex Sans", sans-serif;
-        font-size: 14px;
-        color: #1a2744;
-        line-height: 1.6;
-        margin: 0;
-        border-left: 3px solid #b8956a;
-        padding-left: 1rem;
-    }
-    .outcome-gold {
-        color: #b8956a;
-        font-weight: 600;
-    }
-
-    /* Feature Cards (Product Layer App Mockups) */
+    /* ── MINI-APP CARDS (Feature Visuals) ── */
     .mini-app-card {
         background: #ffffff;
         border: 1px solid #e8e8e8;
         border-radius: 8px;
         padding: 24px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        width: 100%;
+        max-width: 400px;
     }
     .msc-header,
     .allergen-header {
@@ -1226,7 +1421,6 @@
         gap: 6px;
         font-weight: 500;
     }
-
     .allergen-items {
         display: flex;
         flex-direction: column;
@@ -1268,23 +1462,40 @@
     }
 
     /* ── STELLA ── */
-    .stella-section {
-        background: #f5f1ec;
+    .stella-desc {
+        font-family: "Instrument Sans", sans-serif;
+        color: #1a2744;
+        font-size: 16px;
+        line-height: 1.78;
+        margin: 0 0 1.75rem;
     }
-    .stella-inner {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 5rem;
-        align-items: center;
-    }
-    .stella-phone {
+    .stella-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
         display: flex;
-        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
     }
-
+    .stella-list li {
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 14px;
+        color: #1a2744;
+        padding: 8px 0 8px 16px;
+        position: relative;
+        border-bottom: 1px solid #c8c0b4;
+    }
+    .stella-list li::before {
+        content: "★";
+        position: absolute;
+        left: 0;
+        color: #b8956a;
+        font-size: 10px;
+        top: 12px;
+    }
     .phone-frame {
         width: 260px;
-        background: #2d2648; /* Stella Identity frame */
+        background: #2d2648;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 36px;
         padding: 16px;
@@ -1349,43 +1560,18 @@
         align-self: flex-end;
         border-bottom-right-radius: 2px;
     }
-    .stella-desc {
-        font-family: "Instrument Sans", sans-serif;
-        color: #1a2744;
-        font-size: 16px;
-        line-height: 1.78;
-        margin: 0 0 1.75rem;
-    }
-    .stella-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-    .stella-list li {
-        font-family: "IBM Plex Sans", sans-serif;
-        font-size: 14px;
-        color: #1a2744;
-        padding: 8px 0 8px 16px;
-        position: relative;
-        border-bottom: 1px solid #c8c0b4;
-    }
-    .stella-list li::before {
-        content: "★";
-        position: absolute;
-        left: 0;
-        color: #b8956a;
-        font-size: 10px;
-        top: 12px;
-    }
 
     /* ── INDUSTRIES ── */
     .industries {
+        position: relative;
+        z-index: 20;
         padding: 100px 2rem;
         background: #f5f1ec;
         border-top: 1px solid #c8c0b4;
+    }
+    .section-inner {
+        max-width: 1100px;
+        margin: 0 auto;
     }
     .industry-grid {
         display: grid;
@@ -1425,6 +1611,8 @@
 
     /* ── PHILOSOPHY ── */
     .philosophy-section {
+        position: relative;
+        z-index: 20;
         padding: 100px 2rem;
         background: #f5f1ec;
         border-top: 1px solid #c8c0b4;
@@ -1458,10 +1646,12 @@
 
     /* ── WAITLIST ── */
     .waitlist-section {
+        position: relative;
+        z-index: 20;
         padding: 120px 2rem;
         background: #1a2744;
         text-align: center;
-    } /* Footer contrast */
+    }
     .waitlist-inner {
         max-width: 560px;
         margin: 0 auto;
@@ -1485,7 +1675,6 @@
         margin: 0 0 2.5rem;
         line-height: 1.7;
     }
-
     .waitlist-form {
         display: flex;
         gap: 12px;
@@ -1511,7 +1700,6 @@
     .waitlist-input::placeholder {
         color: #b0b0b0;
     }
-
     .waitlist-fine {
         font-family: "IBM Plex Sans", sans-serif;
         font-size: 12px;
@@ -1535,6 +1723,8 @@
 
     /* ── FOOTER ── */
     .footer {
+        position: relative;
+        z-index: 20;
         padding: 32px 2rem;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         background: #1a2744;
