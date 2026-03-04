@@ -27,10 +27,18 @@ export function printSchedule(
 		? selectedPeriod.start_date.replace(/-/g, '/') + ' 〜 ' + selectedPeriod.end_date.replace(/-/g, '/')
 		: '';
 
+	const colCount = orderedStaff.length;
 	const rowCount = dateRange.length;
-	const rowPx   = Math.max(14, Math.min(22, Math.floor(480 / rowCount)));
-	const fs       = Math.max(7,  Math.min(11, Math.floor(rowPx * 0.55)));
-	const symFs    = Math.max(9,  Math.min(13, fs + 2));
+
+	// Portrait A4: usable ~190mm wide, ~267mm tall (with 5mm padding each side).
+	// Overhead: title ~8mm + legend ~5mm = ~13mm. Row budget: ~254mm / rowCount.
+	// At 3.78px/mm → ~960px tall usable for rows.
+	const rowPx  = Math.max(13, Math.min(26, Math.floor(960 / rowCount)));
+	const fs     = Math.max(7,  Math.min(11, Math.floor(rowPx * 0.52)));
+	const symFs  = Math.max(9,  Math.min(13, fs + 2));
+	// Date col: fixed 36px; staff cols share the rest equally.
+	// At ~718px usable width (190mm): (718 - 36) / colCount
+	const staffColPx = Math.max(20, Math.floor((718 - 36) / Math.max(colCount, 1)));
 
 	const headerCells = orderedStaff.map((s) => '<th>' + s.name + '</th>').join('');
 
@@ -66,26 +74,33 @@ export function printSchedule(
 	const css = [
 		'*{box-sizing:border-box;margin:0;padding:0}',
 		'body{font-family:Arial,sans-serif;background:#fff}',
-		'.page{padding:6mm}',
+		'.page{padding:5mm}',
 		'.title-row{display:flex;align-items:baseline;justify-content:center;gap:10px;margin-bottom:3px}',
-		'h1{font-size:13px;font-weight:700}',
-		'.period{font-size:10px;color:#555}',
+		'h1{font-size:12px;font-weight:700}',
+		'.period{font-size:9px;color:#555}',
 		'table{border-collapse:collapse;width:100%;table-layout:fixed}',
+		'col.date-w{width:36px}',
+		'col.staff-w{width:' + staffColPx + 'px}',
 		'th{background:#1f2937;color:#fff;font-size:' + fs + 'px;font-weight:600;'
-			+ 'padding:3px 1px;height:' + (rowPx + 4) + 'px;border:1px solid #374151;'
+			+ 'padding:2px 1px;height:' + (rowPx + 4) + 'px;border:1px solid #374151;'
 			+ 'overflow:hidden;word-break:break-all;vertical-align:middle}',
 		'td{border:1px solid #e5e7eb;text-align:center;vertical-align:middle;'
 			+ 'font-size:' + fs + 'px;height:' + rowPx + 'px;padding:0;overflow:hidden}',
-		'.date-col{background:#f9fafb;font-weight:600;white-space:nowrap;text-align:left;padding-left:4px}',
-		'.wd{font-weight:400;color:#6b7280;margin-left:2px}',
+		'.date-col{background:#f9fafb;font-weight:600;white-space:nowrap;text-align:left;padding-left:3px}',
+		'.wd{font-weight:400;color:#6b7280;margin-left:1px}',
 		'.weekend{color:#dc2626}',
 		'.weekend .wd{color:#dc2626}',
 		'.not-working{background:#f3f4f6;color:#d1d5db}',
 		'.sym{font-size:' + symFs + 'px;font-weight:700;line-height:1}',
 		'tr:nth-child(even) td:not(.date-col):not(.not-working){background:#fafafa}',
-		'.legend{margin-top:4px;font-size:8px;text-align:center;color:#9ca3af}',
-		'@media print{@page{size:A4 landscape;margin:0}body{margin:0}.page{padding:5mm}}',
+		'.legend{margin-top:3px;font-size:7px;text-align:center;color:#9ca3af}',
+		'@media print{@page{size:A4 portrait;margin:0}body{margin:0}.page{padding:5mm}}',
 	].join('\n');
+
+	const colgroup = '<colgroup>'
+		+ '<col class="date-w">'
+		+ orderedStaff.map(() => '<col class="staff-w">').join('')
+		+ '</colgroup>';
 
 	const html = '<!DOCTYPE html>'
 		+ '<html><head><meta charset="utf-8"><title>調理場シフト表</title>'
@@ -94,7 +109,8 @@ export function printSchedule(
 		+ '<div class="page">'
 		+ '<div class="title-row"><h1>調理場シフト表</h1><span class="period">' + periodLabel + '</span></div>'
 		+ '<table>'
-		+ '<thead><tr><th style="text-align:left;padding-left:4px;">日付</th>' + headerCells + '</tr></thead>'
+		+ colgroup
+		+ '<thead><tr><th style="text-align:left;padding-left:3px;">日付</th>' + headerCells + '</tr></thead>'
 		+ '<tbody>' + bodyRows + '</tbody>'
 		+ '</table>'
 		+ '<div class="legend">△ 早番 · ○ 出勤 · ◇ 遅番 · × 休み · ★ 管理 · ⊘ 不可</div>'
