@@ -896,6 +896,84 @@ export class ShiftsService {
     }
   }
 
+  async createMonthlyLimitRecord(restaurantId: string, dto: any): Promise<any> {
+    const versionId = await this.getOrCreateConfigVersion(restaurantId);
+    const { data, error } = await this.supabase
+      .from('monthly_limits')
+      .insert({
+        restaurant_id: restaurantId,
+        version_id: versionId,
+        name: dto.name || (dto.scope === 'all' ? 'default' : dto.targetIds?.[0] || dto.scope),
+        min_count: dto.min_count,
+        max_count: dto.max_count,
+        is_hard_constraint: dto.is_hard_constraint ?? false,
+        limit_config: {
+          scope: dto.scope || 'all',
+          targetIds: dto.targetIds || [],
+          minCount: dto.min_count,
+          maxCount: dto.max_count,
+          exclude_calendar_rules: dto.exclude_calendar_rules ?? true,
+        },
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) throw new BadRequestException('Failed to create monthly limit record');
+    return data;
+  }
+
+  async updateMonthlyLimitRecord(restaurantId: string, limitId: string, dto: any): Promise<any> {
+    const { data: existing } = await this.supabase
+      .from('monthly_limits')
+      .select('limit_config')
+      .eq('id', limitId)
+      .eq('restaurant_id', restaurantId)
+      .single();
+
+    const existingConfig = (existing?.limit_config as any) || {};
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+      limit_config: {
+        ...existingConfig,
+        ...(dto.scope !== undefined && { scope: dto.scope }),
+        ...(dto.targetIds !== undefined && { targetIds: dto.targetIds }),
+        ...(dto.min_count !== undefined && { minCount: dto.min_count }),
+        ...(dto.max_count !== undefined && { maxCount: dto.max_count }),
+        ...(dto.exclude_calendar_rules !== undefined && {
+          exclude_calendar_rules: dto.exclude_calendar_rules,
+          excludeCalendarRules: dto.exclude_calendar_rules,
+        }),
+      },
+    };
+
+    if (dto.min_count !== undefined) updateData.min_count = dto.min_count;
+    if (dto.max_count !== undefined) updateData.max_count = dto.max_count;
+    if (dto.is_hard_constraint !== undefined) updateData.is_hard_constraint = dto.is_hard_constraint;
+    if (dto.name !== undefined) updateData.name = dto.name;
+
+    const { data, error } = await this.supabase
+      .from('monthly_limits')
+      .update(updateData)
+      .eq('id', limitId)
+      .eq('restaurant_id', restaurantId)
+      .select()
+      .single();
+
+    if (error) throw new BadRequestException('Failed to update monthly limit record');
+    return data;
+  }
+
+  async deleteMonthlyLimitRecord(restaurantId: string, limitId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('monthly_limits')
+      .delete()
+      .eq('id', limitId)
+      .eq('restaurant_id', restaurantId);
+
+    if (error) throw new BadRequestException('Failed to delete monthly limit record');
+  }
+
   // ==================== SETTINGS: Solver Config ====================
 
   async getSolverConfig(restaurantId: string): Promise<ORToolsSolverConfig | null> {

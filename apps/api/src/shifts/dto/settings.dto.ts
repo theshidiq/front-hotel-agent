@@ -60,6 +60,41 @@ export class UpdateMonthlyLimitsDto {
   exclude_calendar_rules?: boolean;
 }
 
+export class CreateMonthlyLimitRecordDto {
+  @ApiPropertyOptional({ description: 'Display name for this limit record', default: 'default' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiProperty({ description: 'Scope: all | staff_status | individual', default: 'all' })
+  @IsString()
+  scope: 'all' | 'staff_status' | 'individual';
+
+  @ApiPropertyOptional({ description: 'Staff IDs or status values this applies to', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetIds?: string[];
+
+  @ApiProperty()
+  @IsNumber()
+  min_count: number;
+
+  @ApiProperty()
+  @IsNumber()
+  max_count: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  is_hard_constraint?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  exclude_calendar_rules?: boolean;
+}
+
 export class UpdatePenaltyWeightsDto {
   @ApiPropertyOptional()
   @IsOptional()

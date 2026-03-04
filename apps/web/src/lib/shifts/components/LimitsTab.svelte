@@ -1,16 +1,27 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import type { DailyLimits, MonthlyLimits, ORToolsSolverConfig } from '$lib/shifts/types';
-	import { updateDailyLimits, updateMonthlyLimits, updateSolverConfig } from '$lib/shifts/api';
+	import type { DailyLimits, MonthlyLimits, ORToolsSolverConfig, ScheduleStaff } from '$lib/shifts/types';
+	import {
+		updateDailyLimits,
+		updateMonthlyLimits,
+		updateSolverConfig,
+		getAllMonthlyLimits,
+		createMonthlyLimitRecord,
+		updateMonthlyLimitRecord,
+		deleteMonthlyLimitRecord,
+		type MonthlyLimitRecord
+	} from '$lib/shifts/api';
 
 	interface Props {
 		dailyLimits: DailyLimits | null;
 		monthlyLimits: MonthlyLimits | null;
 		solverConfig: ORToolsSolverConfig | null;
+		staff: ScheduleStaff[];        // all active staff — for name lookups
+		periodStaff: ScheduleStaff[]; // staff active in current period — for chip pickers
 		onSave: () => Promise<void>;
 	}
 
-	let { dailyLimits, monthlyLimits, solverConfig, onSave }: Props = $props();
+	let { dailyLimits, monthlyLimits, solverConfig, staff = [], periodStaff = [], onSave }: Props = $props();
 
 	// Active section
 	let activeSection = $state<'daily' | 'monthly' | 'staff_type' | 'solver'>('daily');
@@ -25,13 +36,178 @@
 		is_hard_constraint: false
 	});
 
-	// Monthly limits form
+	// Monthly limits form (global "all" scope — the default row)
 	let monthlyForm = $state({
 		min_count: 6,
 		max_count: 10,
 		is_hard_constraint: false,
 		exclude_calendar_rules: true
 	});
+
+	// All monthly limit records (global + per-staff)
+	let allMonthlyLimitRecords = $state<MonthlyLimitRecord[]>([]);
+	let loadingMonthlyRecords = $state(false);
+
+	// New individual limit form
+	let showAddForm = $state(false);
+	let addForm = $state({
+		scope: 'individual' as 'all' | 'staff_status' | 'individual',
+		targetIds: [] as string[],
+		min_count: 6,
+		max_count: 10,
+		is_hard_constraint: false,
+		exclude_calendar_rules: true
+	});
+
+	const STAFF_STATUS_OPTIONS = ['社員', '派遣', 'パート'];
+
+	const activeStaff = $derived(periodStaff.filter(s => s.is_active));
+
+	// Inline edit state — one record open at a time
+	let editingId = $state<string | null>(null);
+	let editForm = $state({
+		scope: 'individual' as 'all' | 'staff_status' | 'individual',
+		targetIds: [] as string[],
+		min_count: 0,
+		max_count: 10,
+		is_hard_constraint: false,
+		exclude_calendar_rules: true,
+	});
+
+	function resolveCount(cfg: Record<string, unknown> | undefined, cfgKey: string, topLevel: number | string | null | undefined, fallback: number): number {
+		const fromCfg = cfg?.[cfgKey];
+		if (typeof fromCfg === 'number') return fromCfg;
+		if (fromCfg !== undefined && fromCfg !== null) {
+			const n = Number(fromCfg);
+			if (!isNaN(n)) return n;
+		}
+		if (topLevel !== undefined && topLevel !== null) {
+			const n = Number(topLevel);
+			if (!isNaN(n)) return n;
+		}
+		return fallback;
+	}
+
+	function openEdit(record: MonthlyLimitRecord) {
+		editingId = record.id;
+		const cfg = record.limit_config;
+		editForm = {
+			scope: (cfg?.scope as 'all' | 'staff_status' | 'individual') || 'individual',
+			targetIds: (cfg?.targetIds as string[]) || [],
+			min_count: resolveCount(cfg, 'minCount', record.min_count, 0),
+			max_count: resolveCount(cfg, 'maxCount', record.max_count, 10),
+			is_hard_constraint: record.is_hard_constraint ?? false,
+			exclude_calendar_rules: (cfg?.excludeCalendarRules as boolean) ?? (cfg?.exclude_calendar_rules as boolean) ?? true,
+		};
+	}
+
+	function cancelEdit() {
+		editingId = null;
+	}
+
+	async function saveEdit(id: string) {
+		isSaving = true;
+		feedbackMessage = null;
+		try {
+			await updateMonthlyLimitRecord(id, {
+				scope: editForm.scope,
+				targetIds: editForm.targetIds,
+				min_count: editForm.min_count,
+				max_count: editForm.max_count,
+				is_hard_constraint: editForm.is_hard_constraint,
+				exclude_calendar_rules: editForm.exclude_calendar_rules,
+			});
+			editingId = null;
+			await loadAllMonthlyLimits();
+			feedbackMessage = { type: 'success', text: '制限を更新しました' };
+			setTimeout(() => { feedbackMessage = null; }, 3000);
+		} catch (error) {
+			feedbackMessage = { type: 'error', text: `更新に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}` };
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	async function loadAllMonthlyLimits() {
+		loadingMonthlyRecords = true;
+		try {
+			allMonthlyLimitRecords = await getAllMonthlyLimits();
+		} catch {
+			// ignore — records are optional
+		} finally {
+			loadingMonthlyRecords = false;
+		}
+	}
+
+	async function addMonthlyLimitRecord() {
+		if (addForm.targetIds.length === 0 && addForm.scope !== 'all') return;
+		isSaving = true;
+		feedbackMessage = null;
+		try {
+			await createMonthlyLimitRecord({
+				scope: addForm.scope,
+				targetIds: addForm.targetIds,
+				min_count: addForm.min_count,
+				max_count: addForm.max_count,
+				is_hard_constraint: addForm.is_hard_constraint,
+				exclude_calendar_rules: addForm.exclude_calendar_rules,
+			});
+			showAddForm = false;
+			addForm = { scope: 'individual', targetIds: [], min_count: 6, max_count: 10, is_hard_constraint: false, exclude_calendar_rules: true };
+			await loadAllMonthlyLimits();
+			feedbackMessage = { type: 'success', text: '個別制限を追加しました' };
+			setTimeout(() => { feedbackMessage = null; }, 3000);
+		} catch (error) {
+			feedbackMessage = { type: 'error', text: `追加に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}` };
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	async function removeMonthlyLimitRecord(id: string) {
+		isSaving = true;
+		try {
+			await deleteMonthlyLimitRecord(id);
+			await loadAllMonthlyLimits();
+			feedbackMessage = { type: 'success', text: '制限を削除しました' };
+			setTimeout(() => { feedbackMessage = null; }, 3000);
+		} catch (error) {
+			feedbackMessage = { type: 'error', text: `削除に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}` };
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	function getStaffName(id: string): string {
+		return staff.find(s => s.id === id)?.name ?? `(削除済み)`;
+	}
+
+	function getScopeLabel(record: MonthlyLimitRecord): string {
+		const scope = record.limit_config?.scope || 'all';
+		const targets = record.limit_config?.targetIds as string[] | undefined;
+		if (scope === 'all') return 'デフォルト（全員）';
+		if (scope === 'staff_status') return targets?.join(', ') ?? 'スタッフ種別';
+		if (scope === 'individual') {
+			if (!targets || targets.length === 0) return '個別スタッフ';
+			return targets.map(getStaffName).join(', ');
+		}
+		return scope;
+	}
+
+	// Click-outside action to close inline edit
+	function clickOutside(node: HTMLElement, callback: () => void) {
+		function handleClick(event: MouseEvent) {
+			if (!node.contains(event.target as Node)) {
+				callback();
+			}
+		}
+		document.addEventListener('pointerdown', handleClick, true);
+		return {
+			destroy() {
+				document.removeEventListener('pointerdown', handleClick, true);
+			}
+		};
+	}
 
 	// Staff type limits — stored in daily_limits.limit_config.staffTypeLimits
 	const DEFAULT_STAFF_TYPE_LIMITS = {
@@ -70,6 +246,13 @@
 	let isSaving = $state(false);
 	let hasChanges = $state(false);
 	let feedbackMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+
+	// Load all monthly limit records when switching to monthly section
+	$effect(() => {
+		if (activeSection === 'monthly') {
+			untrack(() => { loadAllMonthlyLimits(); });
+		}
+	});
 
 	// Initialize forms from props — only re-runs when props change.
 	// Writes to form state are wrapped in untrack so they don't create a reactive cycle.
@@ -429,20 +612,21 @@
 	{#if activeSection === 'monthly'}
 		<div class="rounded-lg border border-gray-200 bg-white p-6">
 			<h3 class="text-lg font-semibold text-gray-900 mb-4">月次制限設定</h3>
-			<p class="text-sm text-gray-600 mb-6">1ヶ月あたりの休み日数の制限を設定します。</p>
+			<p class="text-sm text-gray-600 mb-6">1ヶ月あたりの休み日数を設定します。デフォルト（全員）と個別スタッフの両方を設定できます。</p>
 
 			<!-- OR-Tools info banner -->
 			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
 				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
 				<div>
 					<span class="font-medium">OR-Tools連携：</span>
-					各スタッフの月間休み日数がこの範囲に収まるよう調整します。公平な休み分配を実現します。
+					個別設定 &gt; スタッフ種別 &gt; 全員（デフォルト）の優先順でスタッフに適用されます。
 				</div>
 			</div>
 
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-				<div class="space-y-4 p-4 rounded-lg bg-purple-50 border border-purple-200">
-					<h4 class="font-medium text-purple-800">月間休み日数</h4>
+			<!-- Default (all) monthly limit form -->
+			<div class="p-4 rounded-lg bg-purple-50 border border-purple-200 mb-6">
+				<h4 class="font-medium text-purple-800 mb-4">デフォルト設定（全員）</h4>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
 						<label class="block text-sm font-medium text-gray-700 mb-1">最小休み日数</label>
 						<input
@@ -452,7 +636,6 @@
 							onchange={markChanged}
 							min="0"
 						/>
-						<p class="text-xs text-gray-500 mt-1">各スタッフは最低この日数休める</p>
 					</div>
 					<div>
 						<label class="block text-sm font-medium text-gray-700 mb-1">最大休み日数</label>
@@ -463,56 +646,253 @@
 							onchange={markChanged}
 							min="0"
 						/>
-						<p class="text-xs text-gray-500 mt-1">各スタッフの休みはこの日数まで</p>
+					</div>
+					<div class="flex items-center gap-3">
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input type="checkbox" bind:checked={monthlyForm.is_hard_constraint} onchange={markChanged} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+							<span class="text-sm font-medium text-gray-700">ハード制約</span>
+						</label>
+					</div>
+					<div class="flex items-center gap-3">
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input type="checkbox" bind:checked={monthlyForm.exclude_calendar_rules} onchange={markChanged} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+							<span class="text-sm font-medium text-gray-700">カレンダールール除外</span>
+						</label>
 					</div>
 				</div>
-
-				<div class="space-y-4">
-					<!-- Hard Constraint -->
-					<div class="p-4 rounded-lg bg-gray-50 border border-gray-200">
-						<label class="flex items-center gap-3 cursor-pointer">
-							<input
-								type="checkbox"
-								bind:checked={monthlyForm.is_hard_constraint}
-								onchange={markChanged}
-								class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-							/>
-							<div>
-								<span class="font-medium text-gray-900">ハード制約</span>
-								<p class="text-sm text-gray-500">必ず守る制約として設定</p>
-							</div>
-						</label>
-					</div>
-
-					<!-- Exclude Calendar Rules -->
-					<div class="p-4 rounded-lg bg-gray-50 border border-gray-200">
-						<label class="flex items-center gap-3 cursor-pointer">
-							<input
-								type="checkbox"
-								bind:checked={monthlyForm.exclude_calendar_rules}
-								onchange={markChanged}
-								class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-							/>
-							<div>
-								<span class="font-medium text-gray-900">カレンダールールを除外</span>
-								<p class="text-sm text-gray-500">カレンダールールの休みをカウントから除外</p>
-							</div>
-						</label>
-					</div>
+				<div class="mt-4 flex justify-end">
+					<button
+						type="button"
+						onclick={saveMonthlyLimits}
+						disabled={isSaving}
+						class="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none disabled:opacity-50 transition-colors"
+					>
+						{isSaving ? '保存中...' : 'デフォルト設定を保存'}
+					</button>
 				</div>
 			</div>
 
-			<!-- Save Button -->
-			<div class="mt-6 flex justify-end">
+			<!-- Per-staff monthly limit records -->
+			<div class="mb-4 flex items-center justify-between">
+				<h4 class="font-medium text-gray-800">個別・スタッフ種別設定</h4>
 				<button
 					type="button"
-					onclick={saveMonthlyLimits}
-					disabled={isSaving}
-					class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					onclick={() => { showAddForm = !showAddForm; }}
+					class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
 				>
-					{isSaving ? '保存中...' : '月次制限を保存'}
+					<span class="material-symbols-rounded text-base">add</span>
+					追加
 				</button>
 			</div>
+
+			{#if showAddForm}
+				<div class="mb-4 p-4 rounded-lg border border-blue-200 bg-blue-50">
+					<h5 class="font-medium text-blue-800 mb-3">新しい個別制限</h5>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<!-- Scope selector -->
+						<div class="md:col-span-2">
+							<label class="block text-sm font-medium text-gray-700 mb-1">対象スコープ</label>
+							<div class="flex gap-2">
+								{#each [['individual','個別スタッフ'], ['staff_status','スタッフ種別']] as [val, label]}
+									<button
+										type="button"
+										onclick={() => { addForm.scope = val as 'individual' | 'staff_status'; addForm.targetIds = []; }}
+										class="px-3 py-1.5 text-sm rounded-lg border-2 transition-colors {addForm.scope === val ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
+									>
+										{label}
+									</button>
+								{/each}
+							</div>
+						</div>
+
+						<!-- Target IDs picker -->
+						<div class="md:col-span-2">
+							<label class="block text-sm font-medium text-gray-700 mb-1">
+								{addForm.scope === 'individual' ? 'スタッフを選択' : 'スタッフ種別を選択'}
+							</label>
+							<div class="flex flex-wrap gap-2">
+								{#if addForm.scope === 'individual'}
+									{#each activeStaff as s}
+										<button
+											type="button"
+											onclick={() => {
+												if (addForm.targetIds.includes(s.id)) {
+													addForm.targetIds = addForm.targetIds.filter(id => id !== s.id);
+												} else {
+													addForm.targetIds = [...addForm.targetIds, s.id];
+												}
+											}}
+											class="px-2.5 py-1 text-xs rounded-full border transition-colors {addForm.targetIds.includes(s.id) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
+										>
+											{s.name}
+										</button>
+									{/each}
+								{:else}
+									{#each STAFF_STATUS_OPTIONS as status}
+										<button
+											type="button"
+											onclick={() => {
+												if (addForm.targetIds.includes(status)) {
+													addForm.targetIds = addForm.targetIds.filter(s => s !== status);
+												} else {
+													addForm.targetIds = [...addForm.targetIds, status];
+												}
+											}}
+											class="px-3 py-1.5 text-sm rounded-full border transition-colors {addForm.targetIds.includes(status) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
+										>
+											{status}
+										</button>
+									{/each}
+								{/if}
+							</div>
+						</div>
+
+						<div>
+							<label class="block text-sm font-medium text-gray-700 mb-1">最小休み日数</label>
+							<input type="number" class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none" bind:value={addForm.min_count} min="0" />
+						</div>
+						<div>
+							<label class="block text-sm font-medium text-gray-700 mb-1">最大休み日数</label>
+							<input type="number" class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none" bind:value={addForm.max_count} min="0" />
+						</div>
+						<div class="flex items-center gap-3">
+							<label class="flex items-center gap-2 cursor-pointer">
+								<input type="checkbox" bind:checked={addForm.is_hard_constraint} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+								<span class="text-sm font-medium text-gray-700">ハード制約</span>
+							</label>
+						</div>
+					</div>
+					<div class="mt-4 flex justify-end gap-2">
+						<button type="button" onclick={() => { showAddForm = false; }} class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">キャンセル</button>
+						<button
+							type="button"
+							onclick={addMonthlyLimitRecord}
+							disabled={isSaving || (addForm.scope !== 'all' && addForm.targetIds.length === 0)}
+							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+						>
+							{isSaving ? '保存中...' : '追加'}
+						</button>
+					</div>
+				</div>
+			{/if}
+
+			{#if loadingMonthlyRecords}
+				<div class="text-sm text-gray-400 py-4 text-center">読み込み中...</div>
+			{:else}
+				{@const individualRecords = allMonthlyLimitRecords.filter(r => (r.limit_config?.scope || 'all') !== 'all')}
+				{#if individualRecords.length === 0}
+					<div class="text-sm text-gray-400 py-4 text-center border border-dashed border-gray-200 rounded-lg">個別設定はありません。「追加」ボタンで追加できます。</div>
+				{:else}
+					<div class="space-y-2">
+						{#each individualRecords as record}
+							{#if editingId === record.id}
+								<!-- Inline edit form -->
+								<div class="rounded-lg border-2 border-blue-300 bg-blue-50 p-4" use:clickOutside={cancelEdit}>
+									<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+										<!-- Scope -->
+										<div class="md:col-span-2">
+											<label class="block text-xs font-medium text-gray-600 mb-1">対象スコープ</label>
+											<div class="flex gap-2">
+												{#each [['individual','個別スタッフ'], ['staff_status','スタッフ種別']] as [val, lbl]}
+													<button type="button"
+														onclick={() => { editForm.scope = val as 'individual' | 'staff_status'; editForm.targetIds = []; }}
+														class="px-3 py-1.5 text-xs rounded-lg border-2 transition-colors {editForm.scope === val ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-white'}"
+													>{lbl}</button>
+												{/each}
+											</div>
+										</div>
+										<!-- Target picker -->
+										<div class="md:col-span-2">
+											<label class="block text-xs font-medium text-gray-600 mb-1">
+												{editForm.scope === 'individual' ? 'スタッフ' : 'スタッフ種別'}
+											</label>
+											<div class="flex flex-wrap gap-1.5">
+												{#if editForm.scope === 'individual'}
+													{#each activeStaff as s}
+														<button type="button"
+															onclick={() => {
+																if (editForm.targetIds.includes(s.id)) {
+																	editForm.targetIds = editForm.targetIds.filter(id => id !== s.id);
+																} else {
+																	editForm.targetIds = [...editForm.targetIds, s.id];
+																}
+															}}
+															class="px-2.5 py-1 text-xs rounded-full border transition-colors {editForm.targetIds.includes(s.id) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}"
+														>{s.name}</button>
+													{/each}
+												{:else}
+													{#each STAFF_STATUS_OPTIONS as status}
+														<button type="button"
+															onclick={() => {
+																if (editForm.targetIds.includes(status)) {
+																	editForm.targetIds = editForm.targetIds.filter(s => s !== status);
+																} else {
+																	editForm.targetIds = [...editForm.targetIds, status];
+																}
+															}}
+															class="px-3 py-1.5 text-xs rounded-full border transition-colors {editForm.targetIds.includes(status) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}"
+														>{status}</button>
+													{/each}
+												{/if}
+											</div>
+										</div>
+										<!-- Min/Max -->
+										<div>
+											<label class="block text-xs font-medium text-gray-600 mb-1">最小休み日数</label>
+											<input type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white" bind:value={editForm.min_count} min="0" max="31" />
+										</div>
+										<div>
+											<label class="block text-xs font-medium text-gray-600 mb-1">最大休み日数</label>
+											<input type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white" bind:value={editForm.max_count} min="0" max="31" />
+										</div>
+										<!-- Toggles -->
+										<div class="flex items-center gap-4">
+											<label class="flex items-center gap-2 cursor-pointer">
+												<input type="checkbox" bind:checked={editForm.is_hard_constraint} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+												<span class="text-xs font-medium text-gray-700">ハード制約</span>
+											</label>
+											<label class="flex items-center gap-2 cursor-pointer">
+												<input type="checkbox" bind:checked={editForm.exclude_calendar_rules} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+												<span class="text-xs font-medium text-gray-700">カレンダー除外</span>
+											</label>
+										</div>
+									</div>
+									<div class="mt-4 flex items-center justify-between">
+										<button type="button" onclick={() => removeMonthlyLimitRecord(record.id)} disabled={isSaving}
+											class="text-xs text-red-500 hover:text-red-700 disabled:opacity-40 flex items-center gap-1">
+											<span class="material-symbols-rounded text-sm">delete</span>削除
+										</button>
+										<div class="flex gap-2">
+											<button type="button" onclick={cancelEdit} class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-white">キャンセル</button>
+											<button type="button" onclick={() => saveEdit(record.id)} disabled={isSaving || editForm.targetIds.length === 0}
+												class="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+												{isSaving ? '保存中...' : '保存'}
+											</button>
+										</div>
+									</div>
+								</div>
+							{:else}
+								<!-- Collapsed row — click to edit -->
+								<button
+									type="button"
+									onclick={() => openEdit(record)}
+									class="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/40 bg-white transition-colors text-left"
+								>
+									<span class="material-symbols-rounded text-gray-400 text-base shrink-0">edit</span>
+									<div class="flex-1 min-w-0">
+										<div class="text-sm font-medium text-gray-800 truncate">{getScopeLabel(record)}</div>
+										<div class="text-xs text-gray-500 mt-0.5">
+											休み: {resolveCount(record.limit_config, 'minCount', record.min_count, 0)}〜{resolveCount(record.limit_config, 'maxCount', record.max_count, 10)}日
+											{record.is_hard_constraint ? ' · ハード' : ' · ソフト'}
+										</div>
+									</div>
+									<span class="material-symbols-rounded text-gray-300 text-base shrink-0">chevron_right</span>
+								</button>
+							{/if}
+						{/each}
+					</div>
+				{/if}
+			{/if}
 		</div>
 	{/if}
 

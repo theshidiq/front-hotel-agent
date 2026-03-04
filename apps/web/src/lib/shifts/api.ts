@@ -623,6 +623,67 @@ export async function updateMonthlyLimits(data: UpdateMonthlyLimitsData): Promis
 	return handleResponse(response);
 }
 
+export interface MonthlyLimitRecord {
+	id: string;
+	name: string;
+	min_count: number | string | null;
+	max_count: number | string | null;
+	is_hard_constraint: boolean;
+	limit_config: {
+		scope?: 'all' | 'staff_status' | 'individual';
+		targetIds?: string[];
+		exclude_calendar_rules?: boolean;
+		[key: string]: unknown;
+	};
+	is_active: boolean;
+	created_at: string;
+}
+
+export interface CreateMonthlyLimitRecordData {
+	name?: string;
+	scope: 'all' | 'staff_status' | 'individual';
+	targetIds?: string[];
+	min_count: number;
+	max_count: number;
+	is_hard_constraint?: boolean;
+	exclude_calendar_rules?: boolean;
+}
+
+export async function getAllMonthlyLimits(): Promise<MonthlyLimitRecord[]> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits/all`, {
+		headers: authHeaders()
+	});
+	return handleResponse(response);
+}
+
+export async function createMonthlyLimitRecord(data: CreateMonthlyLimitRecordData): Promise<MonthlyLimitRecord> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function updateMonthlyLimitRecord(id: string, data: Partial<CreateMonthlyLimitRecordData>): Promise<MonthlyLimitRecord> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits/${id}`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function deleteMonthlyLimitRecord(id: string): Promise<void> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders()
+	});
+	if (!response.ok && response.status !== 204) {
+		throw new Error('Failed to delete monthly limit record');
+	}
+}
+
 // ==================== SOLVER CONFIG ====================
 
 export async function getSolverConfig(): Promise<ORToolsSolverConfig | null> {

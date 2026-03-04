@@ -52,6 +52,20 @@
 	let periodConfig: PeriodConfiguration | null = $state(null);
 	let periods: SchedulePeriod[] = $state([]);
 
+	// Staff active in the current (latest) period — excludes staff whose end_period is before the period start
+	const activeStaffForPeriod = $derived(() => {
+		const latestPeriod = [...periods].sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+		if (!latestPeriod) return allStaff.filter(s => s.is_active);
+		const periodStart = new Date(latestPeriod.start_date);
+		return allStaff.filter(s => {
+			if (!s.is_active) return false;
+			if (!s.end_period) return true;
+			const ep = s.end_period;
+			const endDate = new Date(ep.year, ep.month - 1, ep.day);
+			return endDate >= periodStart;
+		});
+	});
+
 	let loading = $state(true);
 	let error = $state('');
 
@@ -276,6 +290,8 @@
 								{dailyLimits}
 								{monthlyLimits}
 								{solverConfig}
+								staff={allStaff.filter(s => s.is_active)}
+								periodStaff={activeStaffForPeriod()}
 								onSave={handleLimitsSave}
 							/>
 

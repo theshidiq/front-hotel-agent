@@ -42,6 +42,7 @@ import {
 import {
   UpdateDailyLimitsDto,
   UpdateMonthlyLimitsDto,
+  CreateMonthlyLimitRecordDto,
   UpdateSolverConfigDto,
   CreateCalendarRuleDto,
   CreateStaffGroupDto,
@@ -250,6 +251,35 @@ export class ShiftsController {
   @ApiResponse({ status: 200, description: 'Monthly limits updated' })
   async updateMonthlyLimits(@GetUser() user: any, @Body() updateDto: UpdateMonthlyLimitsDto) {
     return this.shiftsService.updateMonthlyLimits(user.restaurant_id, updateDto);
+  }
+
+  @Get('settings/monthly-limits/all')
+  @ApiOperation({ summary: 'Get all monthly limit records (global + per-staff)' })
+  @ApiResponse({ status: 200, description: 'All monthly limit records' })
+  async getAllMonthlyLimits(@GetUser() user: any) {
+    return this.shiftsService.getAllMonthlyLimits(user.restaurant_id);
+  }
+
+  @Post('settings/monthly-limits')
+  @ApiOperation({ summary: 'Create a new monthly limit record (per-staff or global)' })
+  @ApiResponse({ status: 201, description: 'Monthly limit record created' })
+  async createMonthlyLimitRecord(@GetUser() user: any, @Body() dto: CreateMonthlyLimitRecordDto) {
+    return this.shiftsService.createMonthlyLimitRecord(user.restaurant_id, dto);
+  }
+
+  @Patch('settings/monthly-limits/:id')
+  @ApiOperation({ summary: 'Update an individual monthly limit record' })
+  @ApiResponse({ status: 200, description: 'Monthly limit record updated' })
+  async updateMonthlyLimitRecord(@GetUser() user: any, @Param('id') id: string, @Body() dto: any) {
+    return this.shiftsService.updateMonthlyLimitRecord(user.restaurant_id, id, dto);
+  }
+
+  @Delete('settings/monthly-limits/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a monthly limit record' })
+  @ApiResponse({ status: 204, description: 'Monthly limit record deleted' })
+  async deleteMonthlyLimitRecord(@GetUser() user: any, @Param('id') id: string) {
+    return this.shiftsService.deleteMonthlyLimitRecord(user.restaurant_id, id);
   }
 
   // Solver Config
