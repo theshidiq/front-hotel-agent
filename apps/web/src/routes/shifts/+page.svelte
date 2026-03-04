@@ -31,7 +31,7 @@
 	import TableSkeleton from "$lib/shifts/components/TableSkeleton.svelte";
 	import OptimizeOverlay from "$lib/shifts/components/OptimizeOverlay.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
-	import { getOrderedStaffMembers, isDateWithinStaffWorkPeriod } from "$lib/shifts/staffUtils";
+	import { printSchedule } from "$lib/shifts/printSchedule";
 
 	// ── Sidebar State ──
 	let sidebarCollapsed = $state(false);
@@ -666,121 +666,7 @@
 
 	// ── Print ──
 	function handlePrint() {
-		const orderedStaff = getOrderedStaffMembers(staff, dateRange);
-
-		const periodLabel = selectedPeriod
-			? `${selectedPeriod.start_date.replace(/-/g, '/')} 〜 ${selectedPeriod.end_date.replace(/-/g, '/')}`
-			: '';
-
-		const shiftColorMap: Record<string, string> = {
-			'×': '#dc2626', '△': '#2563eb', '◇': '#7c3aed',
-			'★': '#ca8a04', '●': '#16a34a', '○': '#374151',
-			'◎': '#ea580c', '▣': '#6b7280', '⊘': '#991b1b',
-		};
-
-		const headerCells = orderedStaff
-			.map((s) => `<th>${s.name}</th>`)
-			.join('');
-
-		const bodyRows = dateRange.map((date) => {
-			const d = new Date(date + 'T00:00:00');
-			const day = d.getDate();
-			const weekdays = ['日','月','火','水','木','金','土'];
-			const wd = weekdays[d.getDay()];
-			const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-			const dateClass = isWeekend ? 'weekend' : '';
-
-			const cells = orderedStaff.map((s) => {
-				if (!isDateWithinStaffWorkPeriod(s, date)) {
-					return '<td class="not-working">-</td>';
-				}
-				const raw = scheduleData[s.id]?.[date] ?? '';
-				let symbol = '';
-				if (!raw || raw === 'normal') {
-					symbol = s.status === 'パート' ? '○' : '';
-				} else if (raw === 'late') {
-					symbol = '◇';
-				} else if (raw === 'early') {
-					symbol = '△';
-				} else if (raw === 'off') {
-					symbol = '×';
-				} else if (raw === 'holiday') {
-					symbol = '★';
-				} else {
-					symbol = raw; // stored as symbol directly
-				}
-				const color = shiftColorMap[symbol] ?? '#374151';
-				const style = symbol ? `color:${color};` : '';
-				return `<td><span class="sym" style="${style}">${symbol}</span></td>`;
-			}).join('');
-
-			// Inline date: "21 土" — day and weekday on same line
-		return `<tr><td class="date-col ${dateClass}">${day} <span class="wd">${wd}</span></td>${cells}</tr>`;
-		}).join('');
-
-		// A4 landscape usable area ~277mm wide × ~190mm tall.
-		// Header ~10mm + legend ~5mm + title/period ~8mm = ~23mm overhead.
-		// Remaining ~167mm / rowCount gives row height budget.
-		const rowCount = dateRange.length;
-		// Target: squeeze all rows into one page. Base row height in px for screen preview.
-		// Use CSS @page to force single sheet; font scales down with row count.
-		const rowPx = Math.max(14, Math.min(22, Math.floor(480 / rowCount)));
-		const fontSize = Math.max(7, Math.min(11, Math.floor(rowPx * 0.55)));
-		const symSize = Math.max(9, Math.min(13, fontSize + 2));
-
-		// Build CSS separately so the <style> tag doesn't appear inside a Svelte template literal
-		// (PostCSS would try to parse it and choke on the JS interpolations)
-		const styleTag = '<style>' + `
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; }
-    .page { padding: 6mm; }
-    .title-row { display: flex; align-items: baseline; justify-content: center; gap: 12px; margin-bottom: 3px; }
-    h1 { font-size: 13px; font-weight: 700; }
-    .period { font-size: 10px; color: #555; }
-    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
-    th { background: #1f2937; color: #fff; font-size: ${fontSize}px; font-weight: 600; padding: 3px 1px; height: ${rowPx + 4}px; border: 1px solid #374151; overflow: hidden; word-break: break-all; vertical-align: middle; }
-    td { border: 1px solid #e5e7eb; text-align: center; vertical-align: middle; font-size: ${fontSize}px; height: ${rowPx}px; padding: 0; overflow: hidden; }
-    .date-col { background: #f9fafb; font-weight: 600; white-space: nowrap; text-align: left; padding-left: 4px; }
-    .wd { font-weight: 400; color: #6b7280; margin-left: 2px; }
-    .weekend { color: #dc2626; }
-    .weekend .wd { color: #dc2626; }
-    .not-working { background: #f3f4f6; color: #d1d5db; }
-    .sym { font-size: ${symSize}px; font-weight: 700; line-height: 1; }
-    tr:nth-child(even) td:not(.date-col):not(.not-working) { background: #fafafa; }
-    .legend { margin-top: 4px; font-size: 8px; text-align: center; color: #9ca3af; }
-    @media print { @page { size: A4 landscape; margin: 0; } body { margin: 0; } .page { padding: 5mm; } }
-  ` + '</style>';
-
-		const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>調理場シフト表</title>
-  ${styleTag}
-</head>
-<body>
-  <div class="page">
-    <div class="title-row">
-      <h1>調理場シフト表</h1>
-      <span class="period">${periodLabel}</span>
-    </div>
-    <table>
-      <thead><tr><th style="text-align:left;padding-left:4px;">日付</th>${headerCells}</tr></thead>
-      <tbody>${bodyRows}</tbody>
-    </table>
-    <div class="legend">△ 早番 &nbsp;·&nbsp; ○ 出勤 &nbsp;·&nbsp; ◇ 遅番 &nbsp;·&nbsp; × 休み &nbsp;·&nbsp; ★ 管理 &nbsp;·&nbsp; ⊘ 不可</div>
-  </div>
-  <script>window.onload = () => { window.print(); }<\/script>
-</body>
-</html>`;
-
-		const w = window.open('', '_blank');
-		if (w) {
-			w.document.write(html);
-			w.document.close();
-		} else {
-			alert('ポップアップがブロックされました。許可してください。');
-		}
+		printSchedule(staff, dateRange, scheduleData, selectedPeriod);
 	}
 
 	// ── Staff Management ──
