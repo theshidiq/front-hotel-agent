@@ -1243,7 +1243,7 @@
 
     /* Step header */
     .setup-step-header {
-        margin-bottom: 32px;
+        margin-bottom: 48px;
     }
     .setup-step-tag {
         font-size: 11px;
@@ -1254,15 +1254,18 @@
         margin-bottom: 8px;
     }
     .setup-step-title {
-        font-size: 22px;
+        font-size: 32px;
         font-weight: 700;
         color: #1a2744;
         font-family: "Instrument Sans", sans-serif;
+        margin: 8px 0 12px;
     }
     .setup-step-desc {
-        font-size: 14px;
-        color: #6b7280;
-        margin-top: 4px;
+        font-size: 18px;
+        font-weight: 300;
+        color: #64748b;
+        margin-top: 0;
+        line-height: 1.6;
     }
 
     /* Fields */
@@ -1277,13 +1280,15 @@
     }
     .setup-row {
         display: flex;
-        gap: 16px;
+        gap: 20px;
     }
     .setup-label {
-        font-size: 13px;
-        font-weight: 500;
+        font-size: 11px;
+        font-weight: 700;
         color: #1a2744;
-        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        margin-bottom: 10px;
     }
     .setup-sublabel {
         font-size: 12px;
@@ -1312,11 +1317,12 @@
     /* Inputs */
     .setup-input {
         width: 100%;
-        padding: 10px 14px;
-        border: 1px solid #e8e8e8;
-        border-radius: 6px;
+        height: 64px;
+        padding: 0 18px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
         background: #fff;
-        font-size: 14px;
+        font-size: 15px;
         color: #1a2744;
         box-sizing: border-box;
         outline: none;
@@ -1336,6 +1342,8 @@
         background: #fef2f2;
     }
     .setup-textarea {
+        height: auto;
+        padding: 16px 18px;
         resize: none;
     }
     .setup-num {
@@ -1345,8 +1353,8 @@
     /* Slug row */
     .setup-slug-wrap {
         display: flex;
-        border: 1px solid #e8e8e8;
-        border-radius: 6px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
         overflow: hidden;
         transition:
             border-color 0.15s,
@@ -1360,25 +1368,28 @@
         border-color: #dc2626;
     }
     .setup-slug-prefix {
-        padding: 10px 12px;
-        font-size: 13px;
+        padding: 0 18px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        font-size: 15px;
         color: #9ca3af;
         background: #f9fafb;
-        border-right: 1px solid #e8e8e8;
+        border-right: 1.5px solid #e5e7eb;
         white-space: nowrap;
         flex-shrink: 0;
         user-select: none;
     }
     .setup-slug-input {
         flex: 1;
-        padding: 10px 12px;
-        font-size: 13px;
-        color: #1a2744;
-        background: #fff;
+        padding: 0 18px;
+        height: 62px;
         border: none;
         outline: none;
-        min-width: 0;
+        font-size: 15px;
         font-family: inherit;
+        color: #1a2744;
+        background: transparent;
     }
 
     /* Business type grid */
@@ -1404,8 +1415,8 @@
         font-family: inherit;
     }
     .setup-biz-card:hover {
-        border-color: #d1d1d1;
-        background: #f9fafb;
+        border-color: rgba(184, 149, 106, 0.4);
+        background: #fdfaf7;
     }
     .setup-biz-card-active {
         border-color: #b8956a !important;
@@ -1413,7 +1424,8 @@
         color: #b8956a !important;
     }
     .setup-biz-icon {
-        font-size: 20px;
+        font-size: 28px;
+        color: inherit;
     }
 
     /* Color picker */
