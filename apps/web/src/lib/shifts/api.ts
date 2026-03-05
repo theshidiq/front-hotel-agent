@@ -293,9 +293,13 @@ async function cachedFetch<T>(
 
 // ==================== STAFF ====================
 
-export async function getShiftStaff(): Promise<ScheduleStaff[]> {
-	return cachedFetch('staff:all', async () => {
-		const response = await fetchWithRetry(`${API_URL}/shifts/staff`, {
+export async function getShiftStaff(departmentId?: string): Promise<ScheduleStaff[]> {
+	const cacheKey = departmentId ? `staff:dept:${departmentId}` : 'staff:all';
+	const url = departmentId
+		? `${API_URL}/shifts/staff?department_id=${departmentId}`
+		: `${API_URL}/shifts/staff`;
+	return cachedFetch(cacheKey, async () => {
+		const response = await fetchWithRetry(url, {
 			headers: authHeaders()
 		});
 		return handleResponse(response);
@@ -423,9 +427,13 @@ export async function deleteShiftPeriod(id: string): Promise<void> {
 
 // ==================== SCHEDULE ====================
 
-export async function getSchedule(periodId: string): Promise<ScheduleResponse> {
-	return cachedFetch(`schedule:${periodId}`, async () => {
-		const response = await fetchWithRetry(`${API_URL}/shifts/schedule/${periodId}`, {
+export async function getSchedule(periodId: string, departmentId?: string): Promise<ScheduleResponse> {
+	const cacheKey = departmentId ? `schedule:${periodId}:${departmentId}` : `schedule:${periodId}`;
+	const url = departmentId
+		? `${API_URL}/shifts/schedule/${periodId}?department_id=${departmentId}`
+		: `${API_URL}/shifts/schedule/${periodId}`;
+	return cachedFetch(cacheKey, async () => {
+		const response = await fetchWithRetry(url, {
 			headers: authHeaders()
 		});
 		return handleResponse(response);
@@ -433,9 +441,10 @@ export async function getSchedule(periodId: string): Promise<ScheduleResponse> {
 }
 
 // Force refresh schedule (bypass cache)
-export async function getScheduleForce(periodId: string): Promise<ScheduleResponse> {
-	apiCache.invalidateSchedule(periodId);
-	return getSchedule(periodId);
+export async function getScheduleForce(periodId: string, departmentId?: string): Promise<ScheduleResponse> {
+	const cacheKey = departmentId ? `schedule:${periodId}:${departmentId}` : `schedule:${periodId}`;
+	apiCache.invalidate(cacheKey);
+	return getSchedule(periodId, departmentId);
 }
 
 export interface CellUpdate {
@@ -444,9 +453,10 @@ export interface CellUpdate {
 	symbol: string;
 }
 
-export async function bulkUpdateCells(periodId: string, updates: CellUpdate[]): Promise<void> {
+export async function bulkUpdateCells(periodId: string, updates: CellUpdate[], departmentId?: string): Promise<void> {
+	const cacheKey = departmentId ? `schedule:${periodId}:${departmentId}` : `schedule:${periodId}`;
 	// Apply optimistic update to cache immediately
-	const cachedSchedule = apiCache.get<ScheduleResponse>(`schedule:${periodId}`);
+	const cachedSchedule = apiCache.get<ScheduleResponse>(cacheKey);
 	if (cachedSchedule && cachedSchedule.schedule) {
 		const optimisticData: ScheduleResponse = {
 			...cachedSchedule,
@@ -462,32 +472,37 @@ export async function bulkUpdateCells(periodId: string, updates: CellUpdate[]): 
 			optimisticData.schedule!.schedule_data[update.staffId][update.date] = update.symbol;
 		}
 		// Update cache with optimistic data
-		apiCache.set(`schedule:${periodId}`, optimisticData, SCHEDULE_TTL);
+		apiCache.set(cacheKey, optimisticData, SCHEDULE_TTL);
 	}
 
+	const url = departmentId
+		? `${API_URL}/shifts/schedule/${periodId}/cells?department_id=${departmentId}`
+		: `${API_URL}/shifts/schedule/${periodId}/cells`;
+
 	try {
-		const response = await apiFetch(`${API_URL}/shifts/schedule/${periodId}/cells`, {
+		const response = await apiFetch(url, {
 			method: 'PATCH',
 			headers: authHeaders({ 'Content-Type': 'application/json' }),
 			body: JSON.stringify({ updates })
 		});
 		if (!response.ok) {
-			// Revert optimistic update on error
-			apiCache.invalidateSchedule(periodId);
+			apiCache.invalidate(cacheKey);
 			const error = await response.json().catch(() => ({ message: 'Update failed' }));
 			throw new Error(error.message);
 		}
 	} catch (error) {
-		// Revert optimistic update on any error
-		apiCache.invalidateSchedule(periodId);
+		apiCache.invalidate(cacheKey);
 		throw error;
 	}
 }
 
-export async function clearSchedule(periodId: string): Promise<void> {
-	// Optimistically clear local cache immediately
-	apiCache.invalidateSchedule(periodId);
-	const response = await apiFetch(`${API_URL}/shifts/schedule/${periodId}/cells`, {
+export async function clearSchedule(periodId: string, departmentId?: string): Promise<void> {
+	const cacheKey = departmentId ? `schedule:${periodId}:${departmentId}` : `schedule:${periodId}`;
+	apiCache.invalidate(cacheKey);
+	const url = departmentId
+		? `${API_URL}/shifts/schedule/${periodId}/cells?department_id=${departmentId}`
+		: `${API_URL}/shifts/schedule/${periodId}/cells`;
+	const response = await apiFetch(url, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});
@@ -501,6 +516,7 @@ export async function clearSchedule(periodId: string): Promise<void> {
 
 export interface OptimizeOptions {
 	periodId: string;
+	departmentId?: string;
 	timeout?: number;
 	penaltyWeights?: Record<string, number>;
 	preservePrefilled?: boolean;
@@ -514,7 +530,10 @@ export async function optimizeSchedule(options: OptimizeOptions): Promise<Optimi
 	});
 	const result = await handleResponse<OptimizeResponse>(response);
 	// Invalidate schedule cache after optimization
-	apiCache.invalidateSchedule(options.periodId);
+	const cacheKey = options.departmentId
+		? `schedule:${options.periodId}:${options.departmentId}`
+		: `schedule:${options.periodId}`;
+	apiCache.invalidate(cacheKey);
 	return result;
 }
 

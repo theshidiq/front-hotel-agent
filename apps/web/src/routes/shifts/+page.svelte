@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from "svelte";
 	import { authState, signInWithGoogle, isTokenExpiringSoon, refreshAuthToken } from "$lib/auth.svelte";
+	import { getDepartments, type OrgDepartment } from "$lib/api";
 	import {
 		getShiftStaff,
 		getShiftPeriods,
@@ -90,6 +91,8 @@
 	// Pre-seed from sessionStorage so there's no blank slate after a tab discard
 	let staff: ScheduleStaff[] = $state(sessionLoad<ScheduleStaff[]>(SESSION_KEY_STAFF) ?? []);
 	let periods: SchedulePeriod[] = $state(sessionLoad<SchedulePeriod[]>(SESSION_KEY_PERIODS) ?? []);
+	let departments: OrgDepartment[] = $state([]);
+	let activeDepartmentId: string | null = $state(null);
 	let selectedPeriodId: string | null = $state(null);
 	let scheduleData: Record<string, Record<string, string>> = $state({});
 	let dateRange: string[] = $state([]);
@@ -348,13 +351,19 @@
 			loading = !hasCachedData;
 			error = "";
 
-			const [staffResult, periodsResult] = await Promise.all([
+			const [staffResult, periodsResult, deptResult] = await Promise.all([
 				getShiftStaff(),
 				getShiftPeriods(),
+				getDepartments(),
 			]);
 
 			staff = staffResult;
 			periods = periodsResult;
+			departments = deptResult;
+			// Default to first department if none selected
+			if (!activeDepartmentId && deptResult.length > 0) {
+				activeDepartmentId = deptResult[0].id;
+			}
 			sessionSave(SESSION_KEY_STAFF, staffResult);
 			sessionSave(SESSION_KEY_PERIODS, periodsResult);
 			console.log(
@@ -501,10 +510,15 @@
 		return remappedData;
 	}
 
-	async function loadSchedule(periodId: string) {
+	async function loadSchedule(periodId: string, deptId?: string | null) {
+		const effectiveDeptId = deptId !== undefined ? deptId : activeDepartmentId;
 		try {
 			loadingSchedule = true;
-			const response = await getSchedule(periodId);
+			const [response, deptStaff] = await Promise.all([
+				getSchedule(periodId, effectiveDeptId ?? undefined),
+				getShiftStaff(effectiveDeptId ?? undefined),
+			]);
+			staff = deptStaff;
 
 			// Generate date range from period
 			const period = periods.find((p) => p.id === periodId);
@@ -549,6 +563,14 @@
 		return dates;
 	}
 
+	// ── Department Selection ──
+	async function handleDepartmentChange(deptId: string) {
+		activeDepartmentId = deptId;
+		if (selectedPeriodId) {
+			await loadSchedule(selectedPeriodId, deptId);
+		}
+	}
+
 	// ── Period Selection ──
 	async function handlePeriodChange(periodId: string) {
 		selectedPeriodId = periodId;
@@ -577,7 +599,7 @@
 
 		try {
 			saving = true;
-			await bulkUpdateCells(selectedPeriodId, [{ staffId, date, symbol }]);
+			await bulkUpdateCells(selectedPeriodId, [{ staffId, date, symbol }], activeDepartmentId ?? undefined);
 		} catch (e) {
 			// Revert on failure
 			error = e instanceof Error ? e.message : "Failed to save";
@@ -605,7 +627,7 @@
 			scheduleData = { ...scheduleData };
 
 			// Save to server
-			await bulkUpdateCells(selectedPeriodId, updates);
+			await bulkUpdateCells(selectedPeriodId, updates, activeDepartmentId ?? undefined);
 			showSuccess("保存しました");
 		} catch (e) {
 			error = e instanceof Error ? e.message : "Failed to save";
@@ -625,6 +647,7 @@
 
 			const result = await optimizeSchedule({
 				periodId: selectedPeriodId,
+				departmentId: activeDepartmentId ?? undefined,
 				timeout: 30,
 				preservePrefilled: true,
 			});
@@ -641,7 +664,7 @@
 						updates.push({ staffId, date, symbol });
 					}
 				}
-				await bulkUpdateCells(selectedPeriodId, updates);
+				await bulkUpdateCells(selectedPeriodId, updates, activeDepartmentId ?? undefined);
 				showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒)`);
 			} else {
 				stopOptimizeProgress();
@@ -667,7 +690,7 @@
 				try {
 					clearing = true;
 					error = '';
-					await clearSchedule(selectedPeriodId!);
+					await clearSchedule(selectedPeriodId!, activeDepartmentId ?? undefined);
 					scheduleData = {};
 					showSuccess('スケジュールをクリアしました');
 				} catch (e) {
@@ -863,6 +886,18 @@
 					<h1 class="text-xl font-bold text-gray-900 hidden sm:block">
 						シフト管理
 					</h1>
+					{#if departments.length > 0}
+						<div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+							{#each departments as dept}
+								<button
+									onclick={() => handleDepartmentChange(dept.id)}
+									class="px-3 py-1.5 rounded-md text-sm font-medium transition-all {activeDepartmentId === dept.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+								>
+									{dept.name}
+								</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 
 				<!-- Navigation tabs -->

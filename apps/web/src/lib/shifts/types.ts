@@ -33,6 +33,7 @@ export interface ScheduleStaff {
 	name: string;
 	position?: string;
 	department?: string;
+	department_id?: string | null;
 	type?: string; // regular, part-time, temporary
 	status?: string; // 社員, 派遣, パート
 	staff_status?: string; // Alias for status (社員, 派遣, パート)

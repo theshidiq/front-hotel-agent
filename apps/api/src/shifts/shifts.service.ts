@@ -43,13 +43,19 @@ export class ShiftsService {
 
   // ==================== STAFF MANAGEMENT ====================
 
-  async getStaff(restaurantId: string): Promise<ScheduleStaff[]> {
-    const { data, error } = await this.supabase
+  async getStaff(restaurantId: string, departmentId?: string): Promise<ScheduleStaff[]> {
+    let query = this.supabase
       .from('staff')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true)
       .order('staff_order', { ascending: true });
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       this.logger.error('Failed to fetch staff', error);
@@ -220,22 +226,28 @@ export class ShiftsService {
 
   // ==================== SCHEDULE ====================
 
-  async getSchedule(restaurantId: string, periodId: string): Promise<{
+  async getSchedule(restaurantId: string, periodId: string, departmentId?: string): Promise<{
     period: SchedulePeriod;
     schedule: Schedule | null;
     staff: ScheduleStaff[];
   }> {
     const period = await this.getPeriodById(restaurantId, periodId);
-    const staff = await this.getStaff(restaurantId);
+    const staff = await this.getStaff(restaurantId, departmentId);
 
-    // Load schedule for the specific period by matching period dates
-    // This ensures each period has its own schedule data
-    const { data: scheduleForPeriod, error: periodError } = await this.supabase
+    // Load schedule for the specific period+department combination
+    let scheduleQuery = this.supabase
       .from('schedules')
       .select('*, schedule_metadata!inner(*)')
       .eq('schedule_metadata.schedule_period_start', period.start_date)
-      .eq('schedule_metadata.schedule_period_end', period.end_date)
-      .single();
+      .eq('schedule_metadata.schedule_period_end', period.end_date);
+
+    if (departmentId) {
+      scheduleQuery = scheduleQuery.eq('schedule_metadata.department_id', departmentId);
+    } else {
+      scheduleQuery = scheduleQuery.is('schedule_metadata.department_id', null);
+    }
+
+    const { data: scheduleForPeriod, error: periodError } = await scheduleQuery.single();
 
     let schedule = scheduleForPeriod;
 
@@ -317,9 +329,10 @@ export class ShiftsService {
     staffId: string,
     date: string,
     symbol: string,
+    departmentId?: string,
   ): Promise<void> {
-    // Get or create schedule for period
-    let schedule = await this.getOrCreateSchedule(restaurantId, periodId);
+    // Get or create schedule for period+department
+    let schedule = await this.getOrCreateSchedule(restaurantId, periodId, departmentId);
 
     // Update the cell
     const scheduleData = schedule.schedule_data || {};
@@ -346,8 +359,9 @@ export class ShiftsService {
     restaurantId: string,
     periodId: string,
     updates: Array<{ staffId: string; date: string; symbol: string }>,
+    departmentId?: string,
   ): Promise<void> {
-    let schedule = await this.getOrCreateSchedule(restaurantId, periodId);
+    let schedule = await this.getOrCreateSchedule(restaurantId, periodId, departmentId);
 
     const scheduleData = schedule.schedule_data || {};
     for (const update of updates) {
@@ -371,28 +385,47 @@ export class ShiftsService {
     }
   }
 
-  private async getOrCreateSchedule(restaurantId: string, periodId: string): Promise<Schedule> {
+  private async getOrCreateSchedule(restaurantId: string, periodId: string, departmentId?: string): Promise<Schedule> {
     const period = await this.getPeriodById(restaurantId, periodId);
 
-    // Try to find existing schedule
-    const { data: existing } = await this.supabase
+    // Try to find existing schedule for this period+department
+    let existingQuery = this.supabase
       .from('schedules')
       .select('*, schedule_metadata!inner(*)')
       .eq('schedule_metadata.schedule_period_start', period.start_date)
-      .eq('schedule_metadata.schedule_period_end', period.end_date)
-      .single();
+      .eq('schedule_metadata.schedule_period_end', period.end_date);
+
+    if (departmentId) {
+      existingQuery = existingQuery.eq('schedule_metadata.department_id', departmentId);
+    } else {
+      existingQuery = existingQuery.is('schedule_metadata.department_id', null);
+    }
+
+    const { data: existing } = await existingQuery.single();
 
     if (existing) {
       return existing;
+    }
+
+    // Determine schedule name
+    let scheduleName = period.label;
+    if (departmentId) {
+      const { data: dept } = await this.supabase
+        .from('departments')
+        .select('name')
+        .eq('id', departmentId)
+        .single();
+      if (dept) scheduleName = `${period.label} - ${dept.name}`;
     }
 
     // Create new schedule with metadata
     const { data: metadata, error: metaError } = await this.supabase
       .from('schedule_metadata')
       .insert({
-        schedule_name: period.label,
+        schedule_name: scheduleName,
         schedule_period_start: period.start_date,
         schedule_period_end: period.end_date,
+        department_id: departmentId ?? null,
         status: 'draft',
       })
       .select()
@@ -607,8 +640,8 @@ export class ShiftsService {
     return result;
   }
 
-  async clearSchedule(restaurantId: string, periodId: string): Promise<void> {
-    const schedule = await this.getOrCreateSchedule(restaurantId, periodId);
+  async clearSchedule(restaurantId: string, periodId: string, departmentId?: string): Promise<void> {
+    const schedule = await this.getOrCreateSchedule(restaurantId, periodId, departmentId);
     const { error } = await this.supabase
       .from('schedules')
       .update({ schedule_data: {}, updated_at: new Date().toISOString() })

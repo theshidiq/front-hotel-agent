@@ -66,9 +66,10 @@ export class ShiftsController {
 
   @Get('staff')
   @ApiOperation({ summary: 'Get all staff members' })
+  @ApiQuery({ name: 'department_id', required: false, description: 'Filter by department' })
   @ApiResponse({ status: 200, description: 'List of staff members' })
-  async getStaff(@GetUser() user: any) {
-    return this.shiftsService.getStaff(user.restaurant_id);
+  async getStaff(@GetUser() user: any, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.getStaff(user.restaurant_id, departmentId);
   }
 
   @Post('staff')
@@ -134,42 +135,56 @@ export class ShiftsController {
   @Get('schedule/:periodId')
   @ApiOperation({ summary: 'Get schedule for a period' })
   @ApiParam({ name: 'periodId', description: 'Period ID' })
+  @ApiQuery({ name: 'department_id', required: false, description: 'Department ID for isolated schedule' })
   @ApiResponse({ status: 200, description: 'Schedule data', type: ScheduleResponseDto })
-  async getSchedule(@GetUser() user: any, @Param('periodId') periodId: string) {
-    return this.shiftsService.getSchedule(user.restaurant_id, periodId);
+  async getSchedule(
+    @GetUser() user: any,
+    @Param('periodId') periodId: string,
+    @Query('department_id') departmentId?: string,
+  ) {
+    return this.shiftsService.getSchedule(user.restaurant_id, periodId, departmentId);
   }
 
   @Patch('schedule/cell')
   @ApiOperation({ summary: 'Update a single schedule cell' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Cell updated' })
-  async updateCell(@GetUser() user: any, @Body() updateCellDto: UpdateCellDto) {
+  async updateCell(
+    @GetUser() user: any,
+    @Body() updateCellDto: UpdateCellDto,
+    @Query('department_id') departmentId?: string,
+  ) {
     const { periodId, staffId, date, symbol } = updateCellDto;
-    await this.shiftsService.updateCell(user.restaurant_id, periodId, staffId, date, symbol);
+    await this.shiftsService.updateCell(user.restaurant_id, periodId, staffId, date, symbol, departmentId);
     return { success: true };
   }
 
   @Patch('schedule/:periodId/cells')
   @ApiOperation({ summary: 'Bulk update schedule cells' })
   @ApiParam({ name: 'periodId', description: 'Period ID' })
+  @ApiQuery({ name: 'department_id', required: false, description: 'Department ID for isolated schedule' })
   @ApiResponse({ status: 200, description: 'Cells updated' })
   async bulkUpdateCells(
     @GetUser() user: any,
     @Param('periodId') periodId: string,
     @Body() bulkUpdateDto: BulkUpdateCellsDto,
+    @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.bulkUpdateCells(user.restaurant_id, periodId, bulkUpdateDto.updates);
+    return this.shiftsService.bulkUpdateCells(user.restaurant_id, periodId, bulkUpdateDto.updates, departmentId);
   }
 
   @Delete('schedule/:periodId/cells')
   @ApiOperation({ summary: 'Clear all schedule cells for a period' })
   @ApiParam({ name: 'periodId', description: 'Period ID' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 204, description: 'Schedule cleared' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async clearSchedule(
     @GetUser() user: any,
     @Param('periodId') periodId: string,
+    @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.clearSchedule(user.restaurant_id, periodId);
+    return this.shiftsService.clearSchedule(user.restaurant_id, periodId, departmentId);
   }
 
   // ==================== OPTIMIZATION ENDPOINTS ====================
