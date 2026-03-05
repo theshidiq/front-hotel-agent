@@ -949,6 +949,12 @@ export async function resolveGuestAlert(id: string): Promise<GuestAlert> {
 
 // ── Staff ─────────────────────────────────────────────────
 
+export interface PeriodJson {
+	year: number;
+	month: number;
+	day: number;
+}
+
 export interface StaffMember {
 	id: string;
 	name: string;
@@ -959,6 +965,9 @@ export interface StaffMember {
 	is_admin: boolean;
 	role_id: string | null;
 	is_active: boolean;
+	employment_type: string | null;
+	start_period: PeriodJson | null;
+	end_period: PeriodJson | null;
 	created_at: string;
 }
 
@@ -1044,7 +1053,7 @@ export async function getAllStaffs(): Promise<StaffMember[]> {
 
 export async function updateStaffOrg(
 	id: string,
-	data: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean }
+	data: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: PeriodJson | null; end_period?: PeriodJson | null }
 ): Promise<StaffMember> {
 	const response = await fetch(`${API_URL}/staffs/${id}/org`, {
 		method: 'PATCH',

@@ -44,7 +44,7 @@ export class StaffsController {
   @ApiOperation({ summary: 'Update staff org fields (name, position, department_id, position_id, is_active)' })
   async updateOrg(
     @Param('id') id: string,
-    @Body() body: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean },
+    @Body() body: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: { year: number; month: number; day: number } | null; end_period?: { year: number; month: number; day: number } | null },
   ): Promise<Staff> {
     return this.staffsService.updateOrg(id, body);
   }

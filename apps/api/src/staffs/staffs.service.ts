@@ -7,7 +7,7 @@ interface PeriodJson {
   day: number;
 }
 
-const STAFF_FIELDS = 'id, restaurant_id, name, email, position, department_id, position_id, is_active, is_admin, role_id, start_period, end_period, created_at';
+const STAFF_FIELDS = 'id, restaurant_id, name, email, position, department_id, position_id, is_active, is_admin, role_id, employment_type, start_period, end_period, created_at';
 
 export interface Staff {
   id: string;
@@ -20,6 +20,7 @@ export interface Staff {
   is_active: boolean;
   is_admin: boolean;
   role_id: string | null;
+  employment_type: string | null;
   start_period: PeriodJson | null;
   end_period: PeriodJson | null;
   created_at: string;
@@ -117,7 +118,7 @@ export class StaffsService {
     return data;
   }
 
-  async updateOrg(id: string, updates: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean }): Promise<Staff> {
+  async updateOrg(id: string, updates: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: PeriodJson | null; end_period?: PeriodJson | null }): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();
 

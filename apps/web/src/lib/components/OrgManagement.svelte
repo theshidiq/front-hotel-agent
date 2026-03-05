@@ -4,7 +4,7 @@
 		createPosition, updatePosition, deletePosition,
 		getAllStaffs, createStaff, updateStaffOrg, updateStaffRole, updateStaffAdmin, deactivateStaff,
 		getRoles,
-		type OrgDepartment, type OrgPosition, type StaffMember, type Role,
+		type OrgDepartment, type OrgPosition, type StaffMember, type Role, type PeriodJson,
 	} from '$lib/api';
 
 	// ── State ───────────────────────────────────────────────────
@@ -35,7 +35,10 @@
 
 	// Staff editing (right panel)
 	let editingStaffId = $state<string | null>(null);
-	let editingStaff   = $state({ name: '', position_id: '', role_id: '', is_active: true });
+	let editingStaff   = $state<{ name: string; position_id: string; role_id: string; is_active: boolean; employment_type: string; start_period: PeriodJson | null; end_period: PeriodJson | null }>({
+		name: '', position_id: '', role_id: '', is_active: true,
+		employment_type: '', start_period: null, end_period: null,
+	});
 	let showNewStaff   = $state(false);
 	let newStaff       = $state({ name: '', email: '', position_id: '' });
 
@@ -173,7 +176,15 @@
 
 	function startEditStaff(s: StaffMember) {
 		editingStaffId = s.id;
-		editingStaff = { name: s.name, position_id: s.position_id ?? '', role_id: s.role_id ?? '', is_active: s.is_active };
+		editingStaff = {
+			name: s.name,
+			position_id: s.position_id ?? '',
+			role_id: s.role_id ?? '',
+			is_active: s.is_active,
+			employment_type: s.employment_type ?? '',
+			start_period: s.start_period ?? null,
+			end_period: s.end_period ?? null,
+		};
 	}
 
 	async function saveEditStaff(s: StaffMember) {
@@ -183,6 +194,9 @@
 				name: editingStaff.name.trim(),
 				position_id: editingStaff.position_id || null,
 				is_active: editingStaff.is_active,
+				employment_type: editingStaff.employment_type || null,
+				start_period: editingStaff.start_period,
+				end_period: editingStaff.end_period,
 			});
 			if (editingStaff.role_id !== (s.role_id ?? '')) {
 				await updateStaffRole(s.id, editingStaff.role_id || null);
@@ -220,6 +234,39 @@
 		'#eab308','#22c55e','#10b981','#06b6d4','#3b82f6',
 		'#64748b','#78716c',
 	];
+
+	const EMPLOYMENT_TYPES = [
+		{ value: '社員',  label: '社員' },
+		{ value: '派遣',  label: '派遣' },
+		{ value: 'パート', label: 'パート' },
+	];
+
+	const YEARS  = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
+	const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+	function daysInMonth(year: number, month: number) {
+		return new Date(year, month, 0).getDate();
+	}
+
+	function getPeriodDays(p: PeriodJson | null) {
+		if (!p) return Array.from({ length: 31 }, (_, i) => i + 1);
+		return Array.from({ length: daysInMonth(p.year, p.month) }, (_, i) => i + 1);
+	}
+
+	function setPeriodField(which: 'start_period' | 'end_period', field: 'year' | 'month' | 'day', val: string) {
+		const num = parseInt(val);
+		if (!val || isNaN(num)) {
+			// Clear entire period if year cleared
+			if (field === 'year') editingStaff[which] = null;
+			return;
+		}
+		const prev = editingStaff[which] ?? { year: new Date().getFullYear(), month: 1, day: 1 };
+		const next = { ...prev, [field]: num };
+		// Clamp day if month/year changed
+		const maxDay = daysInMonth(next.year, next.month);
+		if (next.day > maxDay) next.day = maxDay;
+		editingStaff[which] = next;
+	}
 </script>
 
 <div class="space-y-4">
@@ -332,10 +379,12 @@
 							</div>
 						</div>
 					{:else}
-						<button
-							type="button"
+						<div
+							role="button"
+							tabindex="0"
 							onclick={() => { selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; }}
-							class="w-full text-left rounded-xl border px-3 py-3 transition-all
+							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; } }}
+							class="w-full text-left rounded-xl border px-3 py-3 transition-all cursor-pointer
 								{selectedDeptId === dept.id
 									? 'border-blue-400 bg-blue-50 shadow-sm'
 									: 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'}"
@@ -366,7 +415,7 @@
 							<div class="mt-1 ml-5 text-xs text-gray-400">
 								{dept.positions.length}役職 · {staffCountByDept()[dept.id] ?? 0}名
 							</div>
-						</button>
+						</div>
 					{/if}
 				{/each}
 
@@ -635,6 +684,103 @@
 					</label>
 				</div>
 			</div>
+
+			<!-- Employment type + periods -->
+			<div class="border-t border-gray-200 pt-3 space-y-3">
+				<div>
+					<label class="block text-xs font-medium text-gray-600 mb-1.5">雇用形態</label>
+					<div class="flex gap-4">
+						{#each EMPLOYMENT_TYPES as et}
+							<label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+								<input
+									type="radio"
+									name="employment_type_{staff.id}"
+									value={et.value}
+									checked={editingStaff.employment_type === et.value}
+									onchange={() => editingStaff.employment_type = et.value}
+									class="accent-blue-600"
+								/>
+								{et.label}
+							</label>
+						{/each}
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<div>
+						<label class="block text-xs font-medium text-gray-600 mb-1">開始期間</label>
+						<div class="flex gap-1.5">
+							<select
+								value={editingStaff.start_period?.year ?? ""}
+								onchange={(e) => setPeriodField('start_period', 'year', (e.target as HTMLSelectElement).value)}
+								class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+							>
+								<option value="">年</option>
+								{#each YEARS as y}
+									<option value={y}>{y}</option>
+								{/each}
+							</select>
+							<select
+								value={editingStaff.start_period?.month ?? 1}
+								onchange={(e) => setPeriodField('start_period', 'month', (e.target as HTMLSelectElement).value)}
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								disabled={!editingStaff.start_period}
+							>
+								{#each MONTHS as m}
+									<option value={m}>{m}</option>
+								{/each}
+							</select>
+							<select
+								value={editingStaff.start_period?.day ?? 1}
+								onchange={(e) => setPeriodField('start_period', 'day', (e.target as HTMLSelectElement).value)}
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								disabled={!editingStaff.start_period}
+							>
+								{#each getPeriodDays(editingStaff.start_period) as d}
+									<option value={d}>{d}</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+
+					<div>
+						<label class="block text-xs font-medium text-gray-600 mb-1">終了期間</label>
+						<div class="flex gap-1.5">
+							<select
+								value={editingStaff.end_period?.year ?? ""}
+								onchange={(e) => setPeriodField('end_period', 'year', (e.target as HTMLSelectElement).value)}
+								class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+							>
+								<option value="">年</option>
+								{#each YEARS as y}
+									<option value={y}>{y}</option>
+								{/each}
+							</select>
+							<select
+								value={editingStaff.end_period?.month ?? 1}
+								onchange={(e) => setPeriodField('end_period', 'month', (e.target as HTMLSelectElement).value)}
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								disabled={!editingStaff.end_period}
+							>
+								{#each MONTHS as m}
+									<option value={m}>{m}</option>
+								{/each}
+							</select>
+							<select
+								value={editingStaff.end_period?.day ?? 1}
+								onchange={(e) => setPeriodField('end_period', 'day', (e.target as HTMLSelectElement).value)}
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								disabled={!editingStaff.end_period}
+							>
+								{#each getPeriodDays(editingStaff.end_period) as d}
+									<option value={d}>{d}</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<div class="flex gap-2">
 				<button
 					type="button"
@@ -671,6 +817,9 @@
 						{#if posName}
 							<span class="text-xs px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded-full">{posName}</span>
 						{/if}
+					{/if}
+					{#if staff.employment_type}
+						<span class="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-full">{staff.employment_type}</span>
 					{/if}
 				</div>
 				<div class="flex items-center gap-3 mt-0.5">
