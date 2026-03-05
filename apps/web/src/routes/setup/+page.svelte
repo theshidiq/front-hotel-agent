@@ -326,6 +326,7 @@
                 .insert({
                     name: name.trim(),
                     slug: slug.trim(),
+                    organization_id: org.id,
                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     settings: {
                         business_hours: { open: "09:00", close: "22:00" },
@@ -353,8 +354,9 @@
 
             await supabase.from("period_configuration").insert({
                 restaurant_id: restaurant.id,
-                start_day: periodStartDay,
-                end_day: periodEndDay,
+                organization_id: org.id,
+                start_day: 21,
+                end_day: 20,
                 period_length_days: 30,
             });
 
