@@ -28,7 +28,7 @@
     let slugLocked = $state(false);
     let businessType = $state("hotel");
     let country = $state("JP");
-    let timezone = $state("Asia/Tokyo");
+    let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
     let displayName = $state("");
     let address = $state("");
@@ -102,16 +102,6 @@
         },
         { value: "other", label: "Other", icon: "business", industry: "other" },
     ] as const;
-
-    const TIMEZONES = [
-        { value: "Asia/Tokyo", label: "Tokyo (JST, UTC+9)" },
-        { value: "Asia/Singapore", label: "Singapore (SGT, UTC+8)" },
-        { value: "Asia/Seoul", label: "Seoul (KST, UTC+9)" },
-        { value: "Asia/Bangkok", label: "Bangkok (ICT, UTC+7)" },
-        { value: "Europe/London", label: "London (GMT/BST)" },
-        { value: "America/New_York", label: "New York (ET)" },
-        { value: "UTC", label: "UTC" },
-    ];
 
     const BRAND_COLORS = [
         "#B8956A",
@@ -683,22 +673,6 @@
                                     {/each}
                                 </div>
                             </div>
-                            <div class="setup-field">
-                                <label for="timezone" class="setup-label"
-                                    >Timezone</label
-                                >
-                                <select
-                                    id="timezone"
-                                    bind:value={timezone}
-                                    class="setup-input"
-                                >
-                                    {#each TIMEZONES as tz}
-                                        <option value={tz.value}
-                                            >{tz.label}</option
-                                        >
-                                    {/each}
-                                </select>
-                            </div>
 
                             <!-- Summary card -->
                             <div class="setup-summary">
@@ -717,11 +691,6 @@
                                     <div class="setup-summary-row">
                                         <span>Type</span><span
                                             >{selectedBizType?.label}</span
-                                        >
-                                    </div>
-                                    <div class="setup-summary-row">
-                                        <span>Timezone</span><span
-                                            >{timezone}</span
                                         >
                                     </div>
                                     <div class="setup-summary-row">
