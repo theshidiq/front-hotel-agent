@@ -9,9 +9,10 @@
 		earlyShiftPreferences: EarlyShiftPreference[];
 		allStaff: ScheduleStaff[];
 		onSave: () => Promise<void>;
+		departmentId?: string;
 	}
 
-	let { earlyShiftPreferences, allStaff, onSave }: Props = $props();
+	let { earlyShiftPreferences, allStaff, onSave, departmentId }: Props = $props();
 
 	// Local state for preferences
 	let preferences = $state<Map<string, boolean>>(new Map());
@@ -98,7 +99,7 @@
 				can_do_early_shift
 			}));
 
-			await bulkUpsertEarlyShiftPreferences({ preferences: preferencesArray });
+			await bulkUpsertEarlyShiftPreferences({ preferences: preferencesArray }, departmentId);
 			hasChanges = false;
 			await onSave();
 		} catch (error) {

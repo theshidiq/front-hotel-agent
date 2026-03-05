@@ -19,9 +19,10 @@
 		staff: ScheduleStaff[];        // all active staff — for name lookups
 		periodStaff: ScheduleStaff[]; // staff active in current period — for chip pickers
 		onSave: () => Promise<void>;
+		departmentId?: string;
 	}
 
-	let { dailyLimits, monthlyLimits, solverConfig, staff = [], periodStaff = [], onSave }: Props = $props();
+	let { dailyLimits, monthlyLimits, solverConfig, staff = [], periodStaff = [], onSave, departmentId }: Props = $props();
 
 	// Active section
 	let activeSection = $state<'daily' | 'monthly' | 'staff_type' | 'solver'>('daily');
@@ -131,7 +132,7 @@
 	async function loadAllMonthlyLimits() {
 		loadingMonthlyRecords = true;
 		try {
-			allMonthlyLimitRecords = await getAllMonthlyLimits();
+			allMonthlyLimitRecords = await getAllMonthlyLimits(departmentId);
 		} catch {
 			// ignore — records are optional
 		} finally {
@@ -151,7 +152,7 @@
 				max_count: addForm.max_count,
 				is_hard_constraint: addForm.is_hard_constraint,
 				exclude_calendar_rules: addForm.exclude_calendar_rules,
-			});
+			}, departmentId);
 			showAddForm = false;
 			addForm = { scope: 'individual', targetIds: [], min_count: 6, max_count: 10, is_hard_constraint: false, exclude_calendar_rules: true };
 			await loadAllMonthlyLimits();
@@ -332,7 +333,7 @@
 		feedbackMessage = null;
 
 		try {
-			await updateDailyLimits(dailyForm);
+			await updateDailyLimits(dailyForm, departmentId);
 			feedbackMessage = { type: 'success', text: '日次制限を保存しました' };
 			hasChanges = false;
 			await onSave();
@@ -352,7 +353,7 @@
 		feedbackMessage = null;
 
 		try {
-			await updateMonthlyLimits(monthlyForm);
+			await updateMonthlyLimits(monthlyForm, departmentId);
 			feedbackMessage = { type: 'success', text: '月次制限を保存しました' };
 			hasChanges = false;
 			await onSave();
@@ -373,7 +374,7 @@
 
 		try {
 			// Staff type limits are stored inside daily_limits.limit_config.staffTypeLimits
-			await updateDailyLimits({ staffTypeLimits });
+			await updateDailyLimits({ staffTypeLimits }, departmentId);
 			feedbackMessage = { type: 'success', text: 'スタッフタイプ別制限を保存しました' };
 			hasChanges = false;
 			await onSave();

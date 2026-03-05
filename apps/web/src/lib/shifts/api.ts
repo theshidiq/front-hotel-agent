@@ -589,10 +589,11 @@ export async function deleteCalendarRule(id: string): Promise<void> {
 
 // ==================== DAILY LIMITS ====================
 
-export async function getDailyLimits(): Promise<DailyLimits | null> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/daily-limits`, {
-		headers: authHeaders()
-	});
+export async function getDailyLimits(departmentId?: string): Promise<DailyLimits | null> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/daily-limits?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/daily-limits`;
+	const response = await apiFetch(url, { headers: authHeaders() });
 	if (response.status === 404) return null;
 	return handleResponse(response);
 }
@@ -607,8 +608,11 @@ export interface UpdateDailyLimitsData {
 	staffTypeLimits?: Record<string, { minOff?: number; maxOff?: number; maxEarly?: number; maxMonthlyEarlyShifts?: number; isHard?: boolean }>;
 }
 
-export async function updateDailyLimits(data: UpdateDailyLimitsData): Promise<DailyLimits> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/daily-limits`, {
+export async function updateDailyLimits(data: UpdateDailyLimitsData, departmentId?: string): Promise<DailyLimits> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/daily-limits?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/daily-limits`;
+	const response = await apiFetch(url, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -618,10 +622,11 @@ export async function updateDailyLimits(data: UpdateDailyLimitsData): Promise<Da
 
 // ==================== MONTHLY LIMITS ====================
 
-export async function getMonthlyLimits(): Promise<MonthlyLimits | null> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits`, {
-		headers: authHeaders()
-	});
+export async function getMonthlyLimits(departmentId?: string): Promise<MonthlyLimits | null> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/monthly-limits?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/monthly-limits`;
+	const response = await apiFetch(url, { headers: authHeaders() });
 	if (response.status === 404) return null;
 	return handleResponse(response);
 }
@@ -633,8 +638,11 @@ export interface UpdateMonthlyLimitsData {
 	exclude_calendar_rules?: boolean;
 }
 
-export async function updateMonthlyLimits(data: UpdateMonthlyLimitsData): Promise<MonthlyLimits> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits`, {
+export async function updateMonthlyLimits(data: UpdateMonthlyLimitsData, departmentId?: string): Promise<MonthlyLimits> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/monthly-limits?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/monthly-limits`;
+	const response = await apiFetch(url, {
 		method: 'PATCH',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -668,15 +676,19 @@ export interface CreateMonthlyLimitRecordData {
 	exclude_calendar_rules?: boolean;
 }
 
-export async function getAllMonthlyLimits(): Promise<MonthlyLimitRecord[]> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits/all`, {
-		headers: authHeaders()
-	});
+export async function getAllMonthlyLimits(departmentId?: string): Promise<MonthlyLimitRecord[]> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/monthly-limits/all?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/monthly-limits/all`;
+	const response = await apiFetch(url, { headers: authHeaders() });
 	return handleResponse(response);
 }
 
-export async function createMonthlyLimitRecord(data: CreateMonthlyLimitRecordData): Promise<MonthlyLimitRecord> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/monthly-limits`, {
+export async function createMonthlyLimitRecord(data: CreateMonthlyLimitRecordData, departmentId?: string): Promise<MonthlyLimitRecord> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/monthly-limits?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/monthly-limits`;
+	const response = await apiFetch(url, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -753,10 +765,11 @@ export async function updateSolverConfig(data: UpdateSolverConfigData): Promise<
 
 // ==================== STAFF GROUPS ====================
 
-export async function getStaffGroups(): Promise<ScheduleStaffGroup[]> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups`, {
-		headers: authHeaders()
-	});
+export async function getStaffGroups(departmentId?: string): Promise<ScheduleStaffGroup[]> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/staff-groups?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/staff-groups`;
+	const response = await apiFetch(url, { headers: authHeaders() });
 	return handleResponse(response);
 }
 
@@ -767,8 +780,11 @@ export interface CreateStaffGroupData {
 	group_config?: Record<string, unknown>;
 }
 
-export async function createStaffGroup(data: CreateStaffGroupData): Promise<ScheduleStaffGroup> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/staff-groups`, {
+export async function createStaffGroup(data: CreateStaffGroupData, departmentId?: string): Promise<ScheduleStaffGroup> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/staff-groups?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/staff-groups`;
+	const response = await apiFetch(url, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -845,10 +861,11 @@ export interface PriorityRule {
 	updated_at: string;
 }
 
-export async function getPriorityRules(): Promise<PriorityRule[]> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/priority-rules`, {
-		headers: authHeaders()
-	});
+export async function getPriorityRules(departmentId?: string): Promise<PriorityRule[]> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/priority-rules?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/priority-rules`;
+	const response = await apiFetch(url, { headers: authHeaders() });
 	return handleResponse(response);
 }
 
@@ -867,8 +884,11 @@ export interface CreatePriorityRuleData {
 	effective_until?: string;
 }
 
-export async function createPriorityRule(data: CreatePriorityRuleData): Promise<PriorityRule> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/priority-rules`, {
+export async function createPriorityRule(data: CreatePriorityRuleData, departmentId?: string): Promise<PriorityRule> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/priority-rules?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/priority-rules`;
+	const response = await apiFetch(url, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)
@@ -925,10 +945,11 @@ export interface EarlyShiftPreference {
 	updated_at: string;
 }
 
-export async function getEarlyShiftPreferences(): Promise<EarlyShiftPreference[]> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/early-shift-preferences`, {
-		headers: authHeaders()
-	});
+export async function getEarlyShiftPreferences(departmentId?: string): Promise<EarlyShiftPreference[]> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/early-shift-preferences?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/early-shift-preferences`;
+	const response = await apiFetch(url, { headers: authHeaders() });
 	return handleResponse(response);
 }
 
@@ -956,8 +977,11 @@ export interface BulkEarlyShiftPreferenceData {
 	}>;
 }
 
-export async function bulkUpsertEarlyShiftPreferences(data: BulkEarlyShiftPreferenceData): Promise<void> {
-	const response = await apiFetch(`${API_URL}/shifts/settings/early-shift-preferences/bulk`, {
+export async function bulkUpsertEarlyShiftPreferences(data: BulkEarlyShiftPreferenceData, departmentId?: string): Promise<void> {
+	const url = departmentId
+		? `${API_URL}/shifts/settings/early-shift-preferences/bulk?department_id=${departmentId}`
+		: `${API_URL}/shifts/settings/early-shift-preferences/bulk`;
+	const response = await apiFetch(url, {
 		method: 'PUT',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify(data)

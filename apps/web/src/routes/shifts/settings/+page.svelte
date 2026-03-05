@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { authState, signInWithGoogle, isTokenExpiringSoon, refreshAuthToken } from '$lib/auth.svelte';
+	import { getDepartments, type OrgDepartment } from '$lib/api';
 	import {
 		getDailyLimits,
 		getMonthlyLimits,
@@ -39,6 +40,13 @@
 	// ── Tab Navigation ──
 	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods';
 	let activeTab: SettingsTab = $state('groups');
+
+	// ── Department State ──
+	let departments: OrgDepartment[] = $state([]);
+	let activeDepartmentId: string | null = $state(null);
+
+	// Dept-specific tabs
+	const DEPT_TABS: SettingsTab[] = ['limits', 'groups', 'priority', 'early'];
 
 	// ── Data State ──
 	let dailyLimits: DailyLimits | null = $state(null);
@@ -84,7 +92,7 @@
 		}
 
 		initialized = true;
-		loadAllSettings();
+		loadAllSettings(activeDepartmentId);
 
 		// Proactively refresh the token when the page becomes visible again
 		function handleVisibilityChange() {
@@ -98,22 +106,25 @@
 		return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
 	});
 
-	async function loadAllSettings() {
+	async function loadAllSettings(deptId?: string | null) {
 		try {
 			loading = true;
 			error = '';
 
-			const [daily, monthly, solver, rules, groups, staff, priority, early, period, periodsList] = await Promise.all([
-				getDailyLimits(),
-				getMonthlyLimits(),
+			const deptParam = deptId ?? undefined;
+
+			const [daily, monthly, solver, rules, groups, staff, priority, early, period, periodsList, depts] = await Promise.all([
+				getDailyLimits(deptParam),
+				getMonthlyLimits(deptParam),
 				getSolverConfig(),
 				getCalendarRules(),
-				getStaffGroups(),
-				getShiftStaff(),
-				getPriorityRules(),
-				getEarlyShiftPreferences(),
+				getStaffGroups(deptParam),
+				getShiftStaff(deptParam),
+				getPriorityRules(deptParam),
+				getEarlyShiftPreferences(deptParam),
 				getPeriodConfiguration(),
-				getShiftPeriods()
+				getShiftPeriods(),
+				getDepartments()
 			]);
 
 			dailyLimits = daily;
@@ -121,12 +132,16 @@
 			solverConfig = solver;
 			calendarRules = rules;
 			staffGroups = groups;
-			// Add staff_status alias for compatibility
 			allStaff = staff.map(s => ({ ...s, staff_status: s.status }));
 			priorityRules = priority;
 			earlyShiftPreferences = early;
 			periodConfig = period;
 			periods = periodsList;
+			departments = depts;
+
+			if (!activeDepartmentId && depts.length > 0) {
+				activeDepartmentId = depts[0].id;
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load settings';
 		} finally {
@@ -134,11 +149,31 @@
 		}
 	}
 
+	async function handleDepartmentChange(deptId: string) {
+		activeDepartmentId = deptId;
+		const deptParam = deptId;
+		const [daily, monthly, groups, staff, priority, early] = await Promise.all([
+			getDailyLimits(deptParam),
+			getMonthlyLimits(deptParam),
+			getStaffGroups(deptParam),
+			getShiftStaff(deptParam),
+			getPriorityRules(deptParam),
+			getEarlyShiftPreferences(deptParam),
+		]);
+		dailyLimits = daily;
+		monthlyLimits = monthly;
+		staffGroups = groups;
+		allStaff = staff.map(s => ({ ...s, staff_status: s.status }));
+		priorityRules = priority;
+		earlyShiftPreferences = early;
+	}
+
 	// ── Callback Functions for Components ──
 	async function handleLimitsSave() {
+		const deptParam = activeDepartmentId ?? undefined;
 		const [daily, monthly, solver] = await Promise.all([
-			getDailyLimits(),
-			getMonthlyLimits(),
+			getDailyLimits(deptParam),
+			getMonthlyLimits(deptParam),
 			getSolverConfig(),
 		]);
 		dailyLimits = daily;
@@ -155,15 +190,15 @@
 	}
 
 	async function handleGroupsChange() {
-		staffGroups = await getStaffGroups();
+		staffGroups = await getStaffGroups(activeDepartmentId ?? undefined);
 	}
 
 	async function handlePriorityRulesChange() {
-		priorityRules = await getPriorityRules();
+		priorityRules = await getPriorityRules(activeDepartmentId ?? undefined);
 	}
 
 	async function handleEarlyShiftSave() {
-		earlyShiftPreferences = await getEarlyShiftPreferences();
+		earlyShiftPreferences = await getEarlyShiftPreferences(activeDepartmentId ?? undefined);
 	}
 
 	async function handlePeriodsSave() {
@@ -190,14 +225,29 @@
 <div class="min-h-screen bg-gray-100">
 	<!-- Header -->
 	<header class="bg-white shadow">
-		<div class="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
+		<div class="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4 flex-wrap">
 			<a href="/shifts" class="text-gray-500 hover:text-gray-700 transition-colors">
 				<span class="material-symbols-rounded">arrow_back</span>
 			</a>
-			<div>
+			<div class="flex-1">
 				<h1 class="text-xl font-bold text-gray-900">シフト設定</h1>
 				<p class="text-sm text-gray-500">シフトスケジュールの各種設定を管理します</p>
 			</div>
+			{#if departments.length > 0}
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-gray-400">部署</span>
+					<div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+						{#each departments as dept}
+							<button
+								onclick={() => handleDepartmentChange(dept.id)}
+								class="px-3 py-1.5 rounded-md text-sm font-medium transition-all {activeDepartmentId === dept.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+							>
+								{dept.name}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	</header>
 
@@ -261,7 +311,12 @@
 									{tab.icon}
 								</span>
 								<div class="flex-1 min-w-0">
-									<div class="font-medium">{tab.label}</div>
+									<div class="flex items-center gap-1.5">
+										<span class="font-medium">{tab.label}</span>
+										{#if DEPT_TABS.includes(tab.id as SettingsTab)}
+											<span class="text-[10px] px-1 py-0.5 rounded bg-indigo-100 text-indigo-600 font-medium leading-none">部署</span>
+										{/if}
+									</div>
 									<div class="text-xs text-gray-500 truncate">{tab.description}</div>
 								</div>
 							</button>
@@ -293,6 +348,7 @@
 								staff={allStaff.filter(s => s.is_active)}
 								periodStaff={activeStaffForPeriod()}
 								onSave={handleLimitsSave}
+								departmentId={activeDepartmentId ?? undefined}
 							/>
 
 						{:else if activeTab === 'solver'}
@@ -312,6 +368,7 @@
 								{staffGroups}
 								{allStaff}
 								onGroupsChange={handleGroupsChange}
+								departmentId={activeDepartmentId ?? undefined}
 							/>
 
 						{:else if activeTab === 'priority'}
@@ -319,6 +376,7 @@
 								{priorityRules}
 								{allStaff}
 								onRulesChange={handlePriorityRulesChange}
+								departmentId={activeDepartmentId ?? undefined}
 							/>
 
 						{:else if activeTab === 'early'}
@@ -326,6 +384,7 @@
 								{earlyShiftPreferences}
 								{allStaff}
 								onSave={handleEarlyShiftSave}
+								departmentId={activeDepartmentId ?? undefined}
 							/>
 
 						{:else if activeTab === 'periods'}

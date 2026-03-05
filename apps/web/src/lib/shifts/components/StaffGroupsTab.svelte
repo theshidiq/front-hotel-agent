@@ -13,9 +13,10 @@ interface Props {
   staffGroups: ScheduleStaffGroup[];
   allStaff: ScheduleStaff[];
   onGroupsChange: () => Promise<void>;
+  departmentId?: string;
 }
 
-let { staffGroups, allStaff, onGroupsChange }: Props = $props();
+let { staffGroups, allStaff, onGroupsChange, departmentId }: Props = $props();
 
 const COLOR_PRESETS = [
   '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
@@ -146,7 +147,7 @@ async function handleAddGroup() {
       name: '新しいグループ',
       description: '',
       color: getUniqueColor()
-    });
+    }, departmentId);
     await onGroupsChange();
     showSuccess('グループを作成しました');
   } catch (err) {

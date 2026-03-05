@@ -237,49 +237,55 @@ export class ShiftsController {
   // Daily Limits
   @Get('settings/daily-limits')
   @ApiOperation({ summary: 'Get daily limits configuration' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Daily limits configuration' })
-  async getDailyLimits(@GetUser() user: any) {
-    const result = await this.shiftsService.getDailyLimits(user.restaurant_id);
+  async getDailyLimits(@GetUser() user: any, @Query('department_id') departmentId?: string) {
+    const result = await this.shiftsService.getDailyLimits(user.restaurant_id, departmentId);
     if (result === null) throw new NotFoundException('Daily limits not configured');
     return result;
   }
 
   @Patch('settings/daily-limits')
   @ApiOperation({ summary: 'Update daily limits configuration' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Daily limits updated' })
-  async updateDailyLimits(@GetUser() user: any, @Body() updateDto: UpdateDailyLimitsDto) {
-    return this.shiftsService.updateDailyLimits(user.restaurant_id, updateDto);
+  async updateDailyLimits(@GetUser() user: any, @Body() updateDto: UpdateDailyLimitsDto, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.updateDailyLimits(user.restaurant_id, updateDto, departmentId);
   }
 
   // Monthly Limits
   @Get('settings/monthly-limits')
   @ApiOperation({ summary: 'Get monthly limits configuration' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Monthly limits configuration' })
-  async getMonthlyLimits(@GetUser() user: any) {
-    const result = await this.shiftsService.getMonthlyLimits(user.restaurant_id);
+  async getMonthlyLimits(@GetUser() user: any, @Query('department_id') departmentId?: string) {
+    const result = await this.shiftsService.getMonthlyLimits(user.restaurant_id, departmentId);
     if (result === null) throw new NotFoundException('Monthly limits not configured');
     return result;
   }
 
   @Patch('settings/monthly-limits')
   @ApiOperation({ summary: 'Update monthly limits configuration' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Monthly limits updated' })
-  async updateMonthlyLimits(@GetUser() user: any, @Body() updateDto: UpdateMonthlyLimitsDto) {
-    return this.shiftsService.updateMonthlyLimits(user.restaurant_id, updateDto);
+  async updateMonthlyLimits(@GetUser() user: any, @Body() updateDto: UpdateMonthlyLimitsDto, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.updateMonthlyLimits(user.restaurant_id, updateDto, departmentId);
   }
 
   @Get('settings/monthly-limits/all')
   @ApiOperation({ summary: 'Get all monthly limit records (global + per-staff)' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'All monthly limit records' })
-  async getAllMonthlyLimits(@GetUser() user: any) {
-    return this.shiftsService.getAllMonthlyLimits(user.restaurant_id);
+  async getAllMonthlyLimits(@GetUser() user: any, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.getAllMonthlyLimits(user.restaurant_id, departmentId);
   }
 
   @Post('settings/monthly-limits')
   @ApiOperation({ summary: 'Create a new monthly limit record (per-staff or global)' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 201, description: 'Monthly limit record created' })
-  async createMonthlyLimitRecord(@GetUser() user: any, @Body() dto: CreateMonthlyLimitRecordDto) {
-    return this.shiftsService.createMonthlyLimitRecord(user.restaurant_id, dto);
+  async createMonthlyLimitRecord(@GetUser() user: any, @Body() dto: CreateMonthlyLimitRecordDto, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.createMonthlyLimitRecord(user.restaurant_id, dto, departmentId);
   }
 
   @Patch('settings/monthly-limits/:id')
@@ -317,16 +323,18 @@ export class ShiftsController {
   // Staff Groups
   @Get('settings/staff-groups')
   @ApiOperation({ summary: 'Get staff groups' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'List of staff groups' })
-  async getStaffGroups(@GetUser() user: any) {
-    return this.shiftsService.getStaffGroups(user.restaurant_id);
+  async getStaffGroups(@GetUser() user: any, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.getStaffGroups(user.restaurant_id, departmentId);
   }
 
   @Post('settings/staff-groups')
   @ApiOperation({ summary: 'Create a staff group' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 201, description: 'Staff group created' })
-  async createStaffGroup(@GetUser() user: any, @Body() createDto: CreateStaffGroupDto) {
-    return this.shiftsService.createStaffGroup(user.restaurant_id, createDto);
+  async createStaffGroup(@GetUser() user: any, @Body() createDto: CreateStaffGroupDto, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.createStaffGroup(user.restaurant_id, createDto, departmentId);
   }
 
   @Patch('settings/staff-groups/:id')
@@ -374,16 +382,18 @@ export class ShiftsController {
 
   @Get('settings/priority-rules')
   @ApiOperation({ summary: 'Get priority rules' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'List of priority rules' })
-  async getPriorityRules(@GetUser() user: any) {
-    return this.shiftsService.getPriorityRules(user.restaurant_id);
+  async getPriorityRules(@GetUser() user: any, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.getPriorityRules(user.restaurant_id, departmentId);
   }
 
   @Post('settings/priority-rules')
   @ApiOperation({ summary: 'Create a priority rule' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 201, description: 'Priority rule created' })
-  async createPriorityRule(@GetUser() user: any, @Body() createDto: CreatePriorityRuleDto) {
-    return this.shiftsService.createPriorityRule(user.restaurant_id, createDto);
+  async createPriorityRule(@GetUser() user: any, @Body() createDto: CreatePriorityRuleDto, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.createPriorityRule(user.restaurant_id, createDto, departmentId);
   }
 
   @Patch('settings/priority-rules/:id')
@@ -410,29 +420,34 @@ export class ShiftsController {
 
   @Get('settings/early-shift-preferences')
   @ApiOperation({ summary: 'Get early shift preferences' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'List of early shift preferences' })
-  async getEarlyShiftPreferences(@GetUser() user: any) {
-    return this.shiftsService.getEarlyShiftPreferences(user.restaurant_id);
+  async getEarlyShiftPreferences(@GetUser() user: any, @Query('department_id') departmentId?: string) {
+    return this.shiftsService.getEarlyShiftPreferences(user.restaurant_id, departmentId);
   }
 
   @Post('settings/early-shift-preferences')
   @ApiOperation({ summary: 'Create an early shift preference' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 201, description: 'Early shift preference created' })
   async createEarlyShiftPreference(
     @GetUser() user: any,
     @Body() createDto: CreateEarlyShiftPreferenceDto,
+    @Query('department_id') departmentId?: string,
   ) {
     return this.shiftsService.createEarlyShiftPreference(user.restaurant_id, createDto);
   }
 
   @Put('settings/early-shift-preferences/bulk')
   @ApiOperation({ summary: 'Bulk upsert early shift preferences' })
+  @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Early shift preferences updated' })
   async bulkUpsertEarlyShiftPreferences(
     @GetUser() user: any,
     @Body() bulkDto: BulkEarlyShiftPreferenceDto,
+    @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.bulkUpsertEarlyShiftPreferences(user.restaurant_id, bulkDto);
+    return this.shiftsService.bulkUpsertEarlyShiftPreferences(user.restaurant_id, bulkDto, departmentId);
   }
 
   @Patch('settings/early-shift-preferences/:id')

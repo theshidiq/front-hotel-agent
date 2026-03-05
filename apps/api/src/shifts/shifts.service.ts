@@ -754,13 +754,20 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Daily Limits ====================
 
-  async getDailyLimits(restaurantId: string): Promise<DailyLimits | null> {
-    const { data, error } = await this.supabase
+  async getDailyLimits(restaurantId: string, departmentId?: string): Promise<DailyLimits | null> {
+    let query = this.supabase
       .from('daily_limits')
       .select('*')
       .eq('restaurant_id', restaurantId)
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query.single();
 
     if (error && error.code !== 'PGRST116') {
       this.logger.error('Failed to fetch daily limits', error);
@@ -772,8 +779,9 @@ export class ShiftsService {
   async updateDailyLimits(
     restaurantId: string,
     dto: UpdateDailyLimitsDto,
+    departmentId?: string,
   ): Promise<DailyLimits> {
-    const existing = await this.getDailyLimits(restaurantId);
+    const existing = await this.getDailyLimits(restaurantId, departmentId);
 
     const limitConfig = {
       ...(existing?.limit_config || {}),
@@ -816,6 +824,7 @@ export class ShiftsService {
           name: 'default',
           limit_config: limitConfig,
           is_hard_constraint: dto.is_hard_constraint ?? false,
+          department_id: departmentId ?? null,
           is_active: true,
         })
         .select()
@@ -831,13 +840,20 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Monthly Limits ====================
 
-  async getMonthlyLimits(restaurantId: string): Promise<MonthlyLimits | null> {
-    const { data, error } = await this.supabase
+  async getMonthlyLimits(restaurantId: string, departmentId?: string): Promise<MonthlyLimits | null> {
+    let query = this.supabase
       .from('monthly_limits')
       .select('*')
       .eq('restaurant_id', restaurantId)
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query.single();
 
     if (error && error.code !== 'PGRST116') {
       this.logger.error('Failed to fetch monthly limits', error);
@@ -846,13 +862,21 @@ export class ShiftsService {
     return data;
   }
 
-  async getAllMonthlyLimits(restaurantId: string): Promise<any[]> {
-    const { data, error } = await this.supabase
+  async getAllMonthlyLimits(restaurantId: string, departmentId?: string): Promise<any[]> {
+    let query = this.supabase
       .from('monthly_limits')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       this.logger.error('Failed to fetch all monthly limits', error);
@@ -865,8 +889,9 @@ export class ShiftsService {
   async updateMonthlyLimits(
     restaurantId: string,
     dto: UpdateMonthlyLimitsDto,
+    departmentId?: string,
   ): Promise<MonthlyLimits> {
-    const existing = await this.getMonthlyLimits(restaurantId);
+    const existing = await this.getMonthlyLimits(restaurantId, departmentId);
 
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -916,6 +941,7 @@ export class ShiftsService {
           limit_config: dto.exclude_calendar_rules !== undefined
             ? { exclude_calendar_rules: dto.exclude_calendar_rules }
             : {},
+          department_id: departmentId ?? null,
           is_active: true,
         })
         .select()
@@ -929,7 +955,7 @@ export class ShiftsService {
     }
   }
 
-  async createMonthlyLimitRecord(restaurantId: string, dto: any): Promise<any> {
+  async createMonthlyLimitRecord(restaurantId: string, dto: any, departmentId?: string): Promise<any> {
     const versionId = await this.getOrCreateConfigVersion(restaurantId);
     const { data, error } = await this.supabase
       .from('monthly_limits')
@@ -947,6 +973,7 @@ export class ShiftsService {
           maxCount: dto.max_count,
           exclude_calendar_rules: dto.exclude_calendar_rules ?? true,
         },
+        department_id: departmentId ?? null,
         is_active: true,
       })
       .select()
@@ -1119,12 +1146,20 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Staff Groups ====================
 
-  async getStaffGroups(restaurantId: string): Promise<ScheduleStaffGroup[]> {
-    const { data, error } = await this.supabase
+  async getStaffGroups(restaurantId: string, departmentId?: string): Promise<ScheduleStaffGroup[]> {
+    let query = this.supabase
       .from('staff_groups')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true);
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       this.logger.error('Failed to fetch staff groups', error);
@@ -1137,6 +1172,7 @@ export class ShiftsService {
   async createStaffGroup(
     restaurantId: string,
     dto: CreateStaffGroupDto,
+    departmentId?: string,
   ): Promise<ScheduleStaffGroup> {
     const versionId = await this.getOrCreateConfigVersion(restaurantId);
 
@@ -1158,6 +1194,7 @@ export class ShiftsService {
           color: dto.color || dto.group_config?.color || '#3B82F6',
           members,
         },
+        department_id: departmentId ?? null,
         is_active: true,
       })
       .select()
@@ -1317,12 +1354,20 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Priority Rules ====================
 
-  async getPriorityRules(restaurantId: string): Promise<any[]> {
-    const { data, error } = await this.supabase
+  async getPriorityRules(restaurantId: string, departmentId?: string): Promise<any[]> {
+    let query = this.supabase
       .from('priority_rules')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true);
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       this.logger.error('Failed to fetch priority rules', error);
@@ -1346,6 +1391,7 @@ export class ShiftsService {
   async createPriorityRule(
     restaurantId: string,
     dto: CreatePriorityRuleDto,
+    departmentId?: string,
   ): Promise<any> {
     const versionId = await this.getOrCreateConfigVersion(restaurantId);
 
@@ -1370,6 +1416,7 @@ export class ShiftsService {
         is_hard_constraint: dto.is_hard_constraint ?? false,
         effective_from: dto.effective_from,
         effective_until: dto.effective_until,
+        department_id: departmentId ?? null,
         is_active: true,
       })
       .select()
@@ -1449,11 +1496,19 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Early Shift Preferences ====================
 
-  async getEarlyShiftPreferences(restaurantId: string): Promise<any[]> {
-    const { data, error } = await this.supabase
+  async getEarlyShiftPreferences(restaurantId: string, departmentId?: string): Promise<any[]> {
+    let query = this.supabase
       .from('staff_early_shift_preferences')
       .select('*')
       .eq('restaurant_id', restaurantId);
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       this.logger.error('Failed to fetch early shift preferences', error);
@@ -1514,16 +1569,25 @@ export class ShiftsService {
   async bulkUpsertEarlyShiftPreferences(
     restaurantId: string,
     dto: BulkEarlyShiftPreferenceDto,
+    departmentId?: string,
   ): Promise<void> {
     // Delete existing preferences for these staff members
     const staffIds = dto.preferences.map((p) => p.staff_id);
 
-    await this.supabase
+    let deleteQuery = this.supabase
       .from('staff_early_shift_preferences')
       .delete()
       .eq('restaurant_id', restaurantId)
       .in('staff_id', staffIds)
       .is('applies_to_date', null); // Only delete general preferences, not date-specific
+
+    if (departmentId) {
+      deleteQuery = deleteQuery.eq('department_id', departmentId);
+    } else {
+      deleteQuery = deleteQuery.is('department_id', null);
+    }
+
+    await deleteQuery;
 
     // Insert new preferences
     const inserts = dto.preferences.map((p) => ({
@@ -1532,6 +1596,7 @@ export class ShiftsService {
       can_do_early_shift: p.can_do_early_shift,
       applies_to_date: p.applies_to_date || null,
       preference_source: 'bulk_assignment',
+      department_id: departmentId ?? null,
     }));
 
     const { error } = await this.supabase

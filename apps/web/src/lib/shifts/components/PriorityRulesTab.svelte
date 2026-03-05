@@ -7,9 +7,10 @@
 		priorityRules: PriorityRule[];
 		allStaff: ScheduleStaff[];
 		onRulesChange: () => Promise<void>;
+		departmentId?: string;
 	}
 
-	let { priorityRules, allStaff, onRulesChange }: Props = $props();
+	let { priorityRules, allStaff, onRulesChange, departmentId }: Props = $props();
 
 	// State
 	let isCreating = $state(false);
@@ -193,7 +194,7 @@
 			if (editingRuleId) {
 				await updatePriorityRule(editingRuleId, formData);
 			} else {
-				await createPriorityRule(formData);
+				await createPriorityRule(formData, departmentId);
 			}
 			await onRulesChange();
 			resetForm();
