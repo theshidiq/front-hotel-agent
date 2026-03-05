@@ -27,15 +27,21 @@
     let slug = $state("");
     let slugLocked = $state(false);
     let businessType = $state("hotel");
-    let country = $state("JP");
-    let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    let countryCode = $state("JP");
 
-    let displayName = $state("");
-    let address = $state("");
-    let phone = $state("");
+    let addressLine1 = $state("");
+    let addressLine2 = $state("");
+    let city = $state("");
+    let stateProvince = $state("");
+    let postalCode = $state("");
+    let localPhone = $state("");
     let ownerEmail = $state(authState.user?.email ?? "");
     let brandColor = $state("#B8956A");
     let plan = $state<"free" | "pro" | "business">("free");
+
+    // ─── Country dropdown UI ───────────────────────────────────────────────────
+    let countryOpen = $state(false);
+    let countrySearch = $state("");
 
     let hoursOpen = $state("09:00");
     let hoursClose = $state("22:00");
@@ -103,15 +109,47 @@
         { value: "other", label: "Other", icon: "business", industry: "other" },
     ] as const;
 
-    const BRAND_COLORS = [
-        "#B8956A",
-        "#1A2744",
-        "#2563EB",
-        "#16A34A",
-        "#D97706",
-        "#DC2626",
-        "#9333EA",
-        "#0891B2",
+    const COUNTRIES = [
+        { code: "JP", name: "Japan", flag: "🇯🇵", dialCode: "+81" },
+        { code: "US", name: "United States", flag: "🇺🇸", dialCode: "+1" },
+        { code: "GB", name: "United Kingdom", flag: "🇬🇧", dialCode: "+44" },
+        { code: "SG", name: "Singapore", flag: "🇸🇬", dialCode: "+65" },
+        { code: "TH", name: "Thailand", flag: "🇹🇭", dialCode: "+66" },
+        { code: "KR", name: "South Korea", flag: "🇰🇷", dialCode: "+82" },
+        { code: "CN", name: "China", flag: "🇨🇳", dialCode: "+86" },
+        { code: "HK", name: "Hong Kong", flag: "🇭🇰", dialCode: "+852" },
+        { code: "TW", name: "Taiwan", flag: "🇹🇼", dialCode: "+886" },
+        { code: "ID", name: "Indonesia", flag: "🇮🇩", dialCode: "+62" },
+        { code: "MY", name: "Malaysia", flag: "🇲🇾", dialCode: "+60" },
+        { code: "PH", name: "Philippines", flag: "🇵🇭", dialCode: "+63" },
+        { code: "VN", name: "Vietnam", flag: "🇻🇳", dialCode: "+84" },
+        { code: "IN", name: "India", flag: "🇮🇳", dialCode: "+91" },
+        { code: "AE", name: "UAE", flag: "🇦🇪", dialCode: "+971" },
+        { code: "SA", name: "Saudi Arabia", flag: "🇸🇦", dialCode: "+966" },
+        { code: "AU", name: "Australia", flag: "🇦🇺", dialCode: "+61" },
+        { code: "NZ", name: "New Zealand", flag: "🇳🇿", dialCode: "+64" },
+        { code: "FR", name: "France", flag: "🇫🇷", dialCode: "+33" },
+        { code: "DE", name: "Germany", flag: "🇩🇪", dialCode: "+49" },
+        { code: "IT", name: "Italy", flag: "🇮🇹", dialCode: "+39" },
+        { code: "ES", name: "Spain", flag: "🇪🇸", dialCode: "+34" },
+        { code: "PT", name: "Portugal", flag: "🇵🇹", dialCode: "+351" },
+        { code: "NL", name: "Netherlands", flag: "🇳🇱", dialCode: "+31" },
+        { code: "CH", name: "Switzerland", flag: "🇨🇭", dialCode: "+41" },
+        { code: "AT", name: "Austria", flag: "🇦🇹", dialCode: "+43" },
+        { code: "BE", name: "Belgium", flag: "🇧🇪", dialCode: "+32" },
+        { code: "SE", name: "Sweden", flag: "🇸🇪", dialCode: "+46" },
+        { code: "NO", name: "Norway", flag: "🇳🇴", dialCode: "+47" },
+        { code: "DK", name: "Denmark", flag: "🇩🇰", dialCode: "+45" },
+        { code: "FI", name: "Finland", flag: "🇫🇮", dialCode: "+358" },
+        { code: "CA", name: "Canada", flag: "🇨🇦", dialCode: "+1" },
+        { code: "MX", name: "Mexico", flag: "🇲🇽", dialCode: "+52" },
+        { code: "BR", name: "Brazil", flag: "🇧🇷", dialCode: "+55" },
+        { code: "ZA", name: "South Africa", flag: "🇿🇦", dialCode: "+27" },
+        { code: "EG", name: "Egypt", flag: "🇪🇬", dialCode: "+20" },
+        { code: "QA", name: "Qatar", flag: "🇶🇦", dialCode: "+974" },
+        { code: "TR", name: "Turkey", flag: "🇹🇷", dialCode: "+90" },
+        { code: "GR", name: "Greece", flag: "🇬🇷", dialCode: "+30" },
+        { code: "PL", name: "Poland", flag: "🇵🇱", dialCode: "+48" },
     ];
 
     const STEPS = [
@@ -186,6 +224,9 @@
     );
     const industry = $derived(selectedBizType?.industry ?? "other");
     const progressPct = $derived(((currentStep - 1) / TOTAL_STEPS) * 100);
+    const selectedCountry = $derived(
+        COUNTRIES.find((c) => c.code === countryCode) ?? COUNTRIES[0],
+    );
 
     // ─── Slug auto-gen ────────────────────────────────────────────────────────
     function toSlug(s: string) {
@@ -218,13 +259,7 @@
                 errs.ownerEmail = "Enter a valid email address";
         }
         if (step === 3) {
-            if (shiftDuration < 1 || shiftDuration > 24)
-                errs.shiftDuration = "1–24 hrs";
-            if (minStaff < 1) errs.minStaff = "At least 1";
-            if (periodStartDay < 1 || periodStartDay > 31)
-                errs.periodStartDay = "1–31";
-            if (periodEndDay < 1 || periodEndDay > 31)
-                errs.periodEndDay = "1–31";
+            // No required fields in step 3 (plan is always set)
         }
         fieldErrors = errs;
         return Object.keys(errs).length === 0;
@@ -250,18 +285,31 @@
             const authUserId = authState.user?.id ?? null;
             const resolvedEmail = ownerEmail || authState.user?.email || null;
 
+            const addressStr = [
+                addressLine1,
+                addressLine2,
+                city,
+                stateProvince,
+                postalCode,
+            ]
+                .filter(Boolean)
+                .join(", ");
+            const phoneStr = localPhone
+                ? `${selectedCountry.dialCode}${localPhone}`
+                : null;
+
             const { data: org, error: orgErr } = await supabase
                 .from("organizations")
                 .insert({
                     name: name.trim(),
                     slug: slug.trim(),
-                    display_name: displayName.trim() || name.trim(),
+                    display_name: name.trim(),
                     business_type: businessType,
                     industry,
-                    country,
-                    timezone,
-                    address: address.trim() || null,
-                    phone: phone.trim() || null,
+                    country: countryCode,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    address: addressStr || null,
+                    phone: phoneStr,
                     owner_email: resolvedEmail,
                     brand_color: brandColor,
                     plan,
@@ -278,16 +326,16 @@
                 .insert({
                     name: name.trim(),
                     slug: slug.trim(),
-                    timezone,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     settings: {
-                        business_hours: { open: hoursOpen, close: hoursClose },
-                        shift_duration: shiftDuration,
-                        min_staff_per_shift: minStaff,
-                        max_consecutive_days: maxConsecutiveDays,
+                        business_hours: { open: "09:00", close: "22:00" },
+                        shift_duration: 8,
+                        min_staff_per_shift: 2,
+                        max_consecutive_days: 6,
                     },
                     contact_info: {
-                        address: address.trim() || null,
-                        phone: phone.trim() || null,
+                        address: addressStr || null,
+                        phone: phoneStr,
                         email: resolvedEmail,
                     },
                 })
@@ -342,6 +390,12 @@
 <svelte:head>
     <title>Set up your workspace — Sinara</title>
 </svelte:head>
+
+<svelte:window
+    onclick={() => {
+        countryOpen = false;
+    }}
+/>
 
 <div class="setup-root">
     <!-- ── Left: Brand Panel ── -->
@@ -548,64 +602,190 @@
                         </div>
 
                         <div class="setup-fields">
+                            <!-- Address line 1 -->
                             <div class="setup-field">
-                                <label for="address" class="setup-label"
-                                    >Address</label
-                                >
-                                <textarea
-                                    id="address"
-                                    bind:value={address}
-                                    rows="3"
-                                    placeholder="123 Grand Avenue, Tokyo, Japan"
-                                    class="setup-input setup-textarea"
-                                ></textarea>
-                            </div>
-
-                            <div class="setup-field">
-                                <label for="country" class="setup-label"
-                                    >Country</label
+                                <label for="addr1" class="setup-label"
+                                    >Address line 1</label
                                 >
                                 <input
-                                    id="country"
+                                    id="addr1"
                                     type="text"
-                                    bind:value={country}
-                                    placeholder="JP"
+                                    bind:value={addressLine1}
+                                    placeholder="123 Grand Avenue"
                                     class="setup-input"
                                 />
                             </div>
 
+                            <!-- Address line 2 -->
+                            <div class="setup-field">
+                                <label for="addr2" class="setup-label"
+                                    >Address line 2 <span
+                                        style="font-weight:400;opacity:.6;"
+                                        >(optional)</span
+                                    ></label
+                                >
+                                <input
+                                    id="addr2"
+                                    type="text"
+                                    bind:value={addressLine2}
+                                    placeholder="Floor 12, Suite A"
+                                    class="setup-input"
+                                />
+                            </div>
+
+                            <!-- City + State -->
                             <div class="setup-row">
                                 <div class="setup-field" style="flex:1;">
-                                    <label for="phone" class="setup-label"
-                                        >Phone</label
+                                    <label for="city" class="setup-label"
+                                        >City</label
                                     >
                                     <input
-                                        id="phone"
-                                        type="tel"
-                                        bind:value={phone}
-                                        placeholder="+81-3-0000-0000"
+                                        id="city"
+                                        type="text"
+                                        bind:value={city}
+                                        placeholder="Tokyo"
                                         class="setup-input"
                                     />
                                 </div>
                                 <div class="setup-field" style="flex:1;">
-                                    <label for="owner-email" class="setup-label"
-                                        >Owner email</label
+                                    <label for="state" class="setup-label"
+                                        >State / Prefecture</label
                                     >
                                     <input
-                                        id="owner-email"
-                                        type="email"
-                                        bind:value={ownerEmail}
-                                        placeholder="you@example.com"
-                                        class="setup-input {fieldErrors.ownerEmail
-                                            ? 'setup-input-error'
-                                            : ''}"
+                                        id="state"
+                                        type="text"
+                                        bind:value={stateProvince}
+                                        placeholder="Tokyo"
+                                        class="setup-input"
                                     />
-                                    {#if fieldErrors.ownerEmail}<p
-                                            class="setup-field-error"
-                                        >
-                                            {fieldErrors.ownerEmail}
-                                        </p>{/if}
                                 </div>
+                            </div>
+
+                            <!-- Postal code -->
+                            <div class="setup-field">
+                                <label for="postal" class="setup-label"
+                                    >Postal code</label
+                                >
+                                <input
+                                    id="postal"
+                                    type="text"
+                                    bind:value={postalCode}
+                                    placeholder="100-0001"
+                                    class="setup-input"
+                                    style="max-width:220px;"
+                                />
+                            </div>
+
+                            <!-- Country + Phone -->
+                            <div class="setup-field">
+                                <p class="setup-label">Phone</p>
+                                <div class="setup-phone-row">
+                                    <!-- Searchable country dial-code picker -->
+                                    <div class="setup-country-wrap">
+                                        <button
+                                            type="button"
+                                            class="setup-country-btn"
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                countryOpen = !countryOpen;
+                                                countrySearch = "";
+                                            }}
+                                        >
+                                            <span
+                                                >{COUNTRIES.find(
+                                                    (c) =>
+                                                        c.code === countryCode,
+                                                )?.flag ?? "🌍"}</span
+                                            >
+                                            <span class="setup-country-dial"
+                                                >{COUNTRIES.find(
+                                                    (c) =>
+                                                        c.code === countryCode,
+                                                )?.dialCode ?? ""}</span
+                                            >
+                                            <span
+                                                class="material-symbols-rounded"
+                                                style="font-size:16px;color:#9ca3af;"
+                                                >expand_more</span
+                                            >
+                                        </button>
+                                        {#if countryOpen}
+                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                            <div
+                                                class="setup-country-dropdown"
+                                                onclick={(e) =>
+                                                    e.stopPropagation()}
+                                                onkeydown={() => {}}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    bind:value={countrySearch}
+                                                    placeholder="Search country..."
+                                                    class="setup-country-search"
+                                                />
+                                                <div class="setup-country-list">
+                                                    {#each COUNTRIES.filter((c) => !countrySearch || c.name
+                                                                .toLowerCase()
+                                                                .includes(countrySearch.toLowerCase()) || c.dialCode.includes(countrySearch)) as c}
+                                                        <button
+                                                            type="button"
+                                                            class="setup-country-option {countryCode ===
+                                                            c.code
+                                                                ? 'setup-country-option-active'
+                                                                : ''}"
+                                                            onclick={() => {
+                                                                countryCode =
+                                                                    c.code;
+                                                                countryOpen = false;
+                                                                countrySearch =
+                                                                    "";
+                                                            }}
+                                                        >
+                                                            <span>{c.flag}</span
+                                                            >
+                                                            <span
+                                                                class="setup-country-name"
+                                                                >{c.name}</span
+                                                            >
+                                                            <span
+                                                                class="setup-country-code"
+                                                                >{c.dialCode}</span
+                                                            >
+                                                        </button>
+                                                    {/each}
+                                                </div>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                    <input
+                                        id="phone"
+                                        type="tel"
+                                        bind:value={localPhone}
+                                        placeholder="3-0000-0000"
+                                        class="setup-input setup-phone-input"
+                                    />
+                                </div>
+                            </div>
+
+                            <!-- Owner email -->
+                            <div class="setup-field">
+                                <label for="owner-email" class="setup-label"
+                                    >Owner email</label
+                                >
+                                <input
+                                    id="owner-email"
+                                    type="email"
+                                    bind:value={ownerEmail}
+                                    placeholder="you@example.com"
+                                    class="setup-input {fieldErrors.ownerEmail
+                                        ? 'setup-input-error'
+                                        : ''}"
+                                />
+                                {#if fieldErrors.ownerEmail}<p
+                                        class="setup-field-error"
+                                    >
+                                        {fieldErrors.ownerEmail}
+                                    </p>{/if}
                             </div>
                         </div>
 
@@ -1217,11 +1397,6 @@
         border-color: #dc2626;
         background: #fef2f2;
     }
-    .setup-textarea {
-        height: auto;
-        padding: 16px 18px;
-        resize: none;
-    }
 
     /* Slug row */
     .setup-slug-wrap {
@@ -1426,6 +1601,117 @@
     .setup-plan-features li.muted::before {
         content: "—";
         color: #d1cac0;
+    }
+
+    /* Phone + Country picker row */
+    .setup-phone-row {
+        display: flex;
+        gap: 0;
+        align-items: stretch;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: visible;
+        transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
+    }
+    .setup-phone-row:focus-within {
+        border-color: #b8956a;
+        box-shadow: 0 0 0 3px rgba(184, 149, 106, 0.15);
+    }
+    .setup-country-wrap {
+        position: relative;
+        flex-shrink: 0;
+    }
+    .setup-country-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 14px;
+        height: 64px;
+        background: #f9fafb;
+        border: none;
+        border-right: 1.5px solid #e5e7eb;
+        border-radius: 10px 0 0 10px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 14px;
+        color: #1a2744;
+        white-space: nowrap;
+        transition: background 0.12s;
+    }
+    .setup-country-btn:hover {
+        background: #f3f4f6;
+    }
+    .setup-country-dial {
+        font-weight: 600;
+        font-size: 14px;
+        color: #1a2744;
+    }
+    .setup-phone-input {
+        flex: 1;
+        border: none !important;
+        border-radius: 0 10px 10px 0 !important;
+        box-shadow: none !important;
+        height: 64px;
+    }
+    .setup-country-dropdown {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        z-index: 50;
+        width: 280px;
+        background: #fff;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(26, 39, 68, 0.12);
+        overflow: hidden;
+    }
+    .setup-country-search {
+        width: 100%;
+        padding: 12px 16px;
+        border: none;
+        border-bottom: 1px solid #f0ede8;
+        font-size: 13px;
+        font-family: inherit;
+        color: #1a2744;
+        outline: none;
+        background: #fafafa;
+    }
+    .setup-country-list {
+        max-height: 220px;
+        overflow-y: auto;
+    }
+    .setup-country-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 16px;
+        background: none;
+        border: none;
+        text-align: left;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 13px;
+        color: #374151;
+        transition: background 0.1s;
+    }
+    .setup-country-option:hover {
+        background: #f9fafb;
+    }
+    .setup-country-option-active {
+        background: #fdfaf7;
+        color: #b8956a;
+        font-weight: 600;
+    }
+    .setup-country-name {
+        flex: 1;
+    }
+    .setup-country-code {
+        font-size: 12px;
+        color: #9ca3af;
+        font-weight: 500;
     }
 
     /* Summary card */
