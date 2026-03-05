@@ -646,7 +646,7 @@
 							</div>
 							<button
 								type="button"
-								onclick={() => { showNewStaff = !showNewStaff; newStaff = { name: '', email: '', position_id: '' }; }}
+								onclick={() => { showNewStaff = !showNewStaff; newStaff = { name: '', email: '', position_id: '', role_id: '', is_admin: false, employment_type: '', start_period: null, end_period: null }; }}
 								class="flex items-center gap-1 px-2.5 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
 							>
 								<span class="material-symbols-rounded text-sm">person_add</span>
@@ -741,19 +741,13 @@
 								<div class="border-t border-gray-200 pt-3 space-y-3">
 									<div>
 										<label class="block text-xs font-medium text-gray-600 mb-1.5">雇用形態</label>
-										<div class="flex gap-4">
+										<div class="flex gap-2 flex-wrap">
 											{#each EMPLOYMENT_TYPES as et}
-												<label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
-													<input
-														type="radio"
-														name="new_employment_type"
-														value={et.value}
-														checked={newStaff.employment_type === et.value}
-														onchange={() => newStaff.employment_type = et.value}
-														class="accent-blue-600"
-													/>
-													{et.label}
-												</label>
+												<button
+													type="button"
+													onclick={() => newStaff.employment_type = et.value}
+													class="px-3 py-1 text-xs rounded-full border transition-all {newStaff.employment_type === et.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}"
+												>{et.label}</button>
 											{/each}
 										</div>
 									</div>
@@ -982,19 +976,13 @@
 			<div class="border-t border-gray-200 pt-3 space-y-3">
 				<div>
 					<label class="block text-xs font-medium text-gray-600 mb-1.5">雇用形態</label>
-					<div class="flex gap-4">
+					<div class="flex gap-2 flex-wrap">
 						{#each EMPLOYMENT_TYPES as et}
-							<label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
-								<input
-									type="radio"
-									name="employment_type_{staff.id}"
-									value={et.value}
-									checked={editingStaff.employment_type === et.value}
-									onchange={() => editingStaff.employment_type = et.value}
-									class="accent-blue-600"
-								/>
-								{et.label}
-							</label>
+							<button
+								type="button"
+								onclick={() => editingStaff.employment_type = et.value}
+								class="px-3 py-1 text-xs rounded-full border transition-all {editingStaff.employment_type === et.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}"
+							>{et.label}</button>
 						{/each}
 					</div>
 				</div>
