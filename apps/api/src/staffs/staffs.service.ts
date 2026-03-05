@@ -53,6 +53,41 @@ export class StaffsService {
     return true;
   }
 
+  private async autoDeactivateExpired(): Promise<void> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1;
+    const d = today.getDate();
+
+    // Use DB-side JSONB comparison to find expired staff
+    const { data, error } = await supabase
+      .from('staff')
+      .select('id, name')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true)
+      .not('end_period', 'is', null)
+      .or(
+        `end_period->year.lt.${y},` +
+        `and(end_period->year.eq.${y},end_period->month.lt.${m}),` +
+        `and(end_period->year.eq.${y},end_period->month.eq.${m},end_period->day.lt.${d})`,
+      );
+
+    if (error || !data?.length) return;
+
+    const ids = data.map((s) => s.id);
+
+    await supabase
+      .from('staff')
+      .update({ is_active: false })
+      .in('id', ids)
+      .eq('restaurant_id', restaurantId);
+
+    this.logger.log(`Auto-deactivated ${ids.length} expired staff: ${data.map((s) => s.name).join(', ')}`);
+  }
+
   async findAll(): Promise<Staff[]> {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();
@@ -139,6 +174,9 @@ export class StaffsService {
   }
 
   async findAllIncludingInactive(): Promise<Staff[]> {
+    // Auto-deactivate any staff whose end_period has passed before returning
+    await this.autoDeactivateExpired();
+
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();
 

@@ -33,6 +33,9 @@
 	let showNewPos     = $state(false);
 	let newPosName     = $state('');
 
+	// Confirm modal
+	let confirmModal = $state<{ message: string; detail?: string; onConfirm: () => void } | null>(null);
+
 	// Staff editing (right panel)
 	let editingStaffId = $state<string | null>(null);
 	let editingStaff   = $state<{ name: string; position_id: string; role_id: string; is_active: boolean; employment_type: string; start_period: PeriodJson | null; end_period: PeriodJson | null }>({
@@ -41,13 +44,23 @@
 	});
 	let showNewStaff   = $state(false);
 	let newStaff       = $state({ name: '', email: '', position_id: '' });
+	let staffFilter    = $state<'active' | 'inactive' | 'all'>('active');
 
 	// ── Derived ─────────────────────────────────────────────────
 	const selectedDept = $derived(() => departments.find(d => d.id === selectedDeptId) ?? null);
 
 	const deptStaff = $derived(() => {
 		if (!selectedDeptId) return [];
-		return allStaff.filter(s => s.department_id === selectedDeptId);
+		const inDept = allStaff.filter(s => s.department_id === selectedDeptId);
+		if (staffFilter === 'active') return inDept.filter(s => s.is_active);
+		if (staffFilter === 'inactive') return inDept.filter(s => !s.is_active);
+		return inDept;
+	});
+
+	const deptStaffCounts = $derived(() => {
+		if (!selectedDeptId) return { active: 0, inactive: 0, all: 0 };
+		const inDept = allStaff.filter(s => s.department_id === selectedDeptId);
+		return { active: inDept.filter(s => s.is_active).length, inactive: inDept.filter(s => !s.is_active).length, all: inDept.length };
 	});
 
 	const unassignedStaff = $derived(() => allStaff.filter(s => !s.department_id));
@@ -110,15 +123,20 @@
 	}
 
 	async function removeDept(id: string, name: string) {
-		if (!confirm(`「${name}」を削除しますか？`)) return;
-		saving = true;
-		try {
-			await deleteDepartment(id);
-			if (selectedDeptId === id) selectedDeptId = null;
-			await load();
-			showFeedback('success', '部署を削除しました');
-		} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
-		finally { saving = false; }
+		confirmModal = {
+			message: `「${name}」を削除しますか？`,
+			detail: 'この部署に所属するスタッフは部署未設定になります。',
+			onConfirm: async () => {
+				saving = true;
+				try {
+					await deleteDepartment(id);
+					if (selectedDeptId === id) selectedDeptId = null;
+					await load();
+					showFeedback('success', '部署を削除しました');
+				} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
+				finally { saving = false; }
+			},
+		};
 	}
 
 	// ── Position actions ─────────────────────────────────────────
@@ -146,14 +164,18 @@
 	}
 
 	async function removePos(id: string, name: string) {
-		if (!confirm(`「${name}」を削除しますか？`)) return;
-		saving = true;
-		try {
-			await deletePosition(id);
-			await load();
-			showFeedback('success', '役職を削除しました');
-		} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
-		finally { saving = false; }
+		confirmModal = {
+			message: `「${name}」を削除しますか？`,
+			onConfirm: async () => {
+				saving = true;
+				try {
+					await deletePosition(id);
+					await load();
+					showFeedback('success', '役職を削除しました');
+				} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
+				finally { saving = false; }
+			},
+		};
 	}
 
 	// ── Staff actions ────────────────────────────────────────────
@@ -219,14 +241,19 @@
 	}
 
 	async function softDelete(s: StaffMember) {
-		if (!confirm(`「${s.name}」を無効化しますか？`)) return;
-		saving = true;
-		try {
-			await deactivateStaff(s.id);
-			await load();
-			showFeedback('success', 'スタッフを無効化しました');
-		} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
-		finally { saving = false; }
+		confirmModal = {
+			message: `「${s.name}」を無効化しますか？`,
+			detail: 'スタッフを無効化します。後から再有効化できます。',
+			onConfirm: async () => {
+				saving = true;
+				try {
+					await deactivateStaff(s.id);
+					await load();
+					showFeedback('success', 'スタッフを無効化しました');
+				} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
+				finally { saving = false; }
+			},
+		};
 	}
 
 	const COLORS = [
@@ -382,8 +409,8 @@
 						<div
 							role="button"
 							tabindex="0"
-							onclick={() => { selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; }}
-							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; } }}
+							onclick={() => { selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; staffFilter = 'active'; }}
+							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; staffFilter = 'active'; } }}
 							class="w-full text-left rounded-xl border px-3 py-3 transition-all cursor-pointer
 								{selectedDeptId === dept.id
 									? 'border-blue-400 bg-blue-50 shadow-sm'
@@ -567,6 +594,18 @@
 							</button>
 						</div>
 
+						<!-- Filter tabs -->
+						<div class="flex gap-1 p-1 bg-gray-100 rounded-lg mb-3 w-fit">
+							{#each ([["active", "在籍中", deptStaffCounts().active], ["inactive", "無効", deptStaffCounts().inactive], ["all", "すべて", deptStaffCounts().all]] as const) as [val, label, count]}
+								<button
+									type="button"
+									onclick={() => staffFilter = val}
+									class="px-3 py-1 text-xs font-medium rounded-md transition-all
+										{staffFilter === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+								>{label} <span class="ml-1 opacity-60">{count}</span></button>
+							{/each}
+						</div>
+
 						<!-- New staff form -->
 						{#if showNewStaff}
 							<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3 mb-3">
@@ -622,7 +661,9 @@
 						{#if deptStaff().length === 0 && !showNewStaff}
 							<div class="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
 								<span class="material-symbols-rounded text-3xl text-gray-300 block mb-1">person_outline</span>
-								<p class="text-sm text-gray-400">スタッフがいません</p>
+								<p class="text-sm text-gray-400">
+									{staffFilter === 'inactive' ? '無効なスタッフはいません' : staffFilter === 'active' ? '在籍中のスタッフがいません' : 'スタッフがいません'}
+								</p>
 							</div>
 						{:else}
 							<div class="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100 overflow-hidden">
@@ -639,6 +680,54 @@
 		</div>
 	{/if}
 </div>
+
+<!-- ── Confirm Modal ── -->
+{#if confirmModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4"
+		role="dialog"
+		aria-modal="true"
+	>
+		<!-- Backdrop -->
+		<div
+			class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+			onclick={() => confirmModal = null}
+		></div>
+
+		<!-- Modal card -->
+		<div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+			<!-- Icon -->
+			<div class="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto">
+				<span class="material-symbols-rounded text-2xl text-red-500">warning</span>
+			</div>
+
+			<!-- Text -->
+			<div class="text-center space-y-1.5">
+				<p class="font-semibold text-gray-900 text-base">{confirmModal.message}</p>
+				{#if confirmModal.detail}
+					<p class="text-sm text-gray-500">{confirmModal.detail}</p>
+				{/if}
+			</div>
+
+			<!-- Divider -->
+			<hr class="border-gray-100" />
+
+			<!-- Buttons -->
+			<div class="flex gap-3">
+				<button
+					type="button"
+					onclick={() => confirmModal = null}
+					class="flex-1 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+				>キャンセル</button>
+				<button
+					type="button"
+					onclick={() => { const fn = confirmModal!.onConfirm; confirmModal = null; fn(); }}
+					class="flex-1 py-2.5 text-sm font-medium text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors"
+				>確認</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <!-- ── Staff row snippet ── -->
 {#snippet staffRow(staff: StaffMember, positions: OrgPosition[])}
