@@ -14,7 +14,7 @@ export class ReservationsService {
     private readonly supabaseService: SupabaseService,
     private readonly roomsService: RoomsService,
     private readonly allergensService: AllergensService,
-  ) {}
+  ) { }
 
   async findAll(date?: string, status?: string): Promise<ReservationResponse[]> {
     let query = this.supabaseService
@@ -25,7 +25,9 @@ export class ReservationsService {
       .order('room_number');
 
     if (date) {
-      query = query.eq('check_in_date', date);
+      // Include any reservation that is active on this date:
+      // check_in_date <= date AND check_out_date >= date
+      query = query.lte('check_in_date', date).gte('check_out_date', date);
     }
 
     if (status) {
@@ -93,13 +95,14 @@ export class ReservationsService {
 
   async search(dto: SearchReservationDto): Promise<ReservationResponse[]> {
     const today = new Date().toISOString().split('T')[0];
-
+    const targetDate = dto.date || today;
     let query = this.supabaseService
       .getClient()
       .from('reservations')
       .select('*')
       .eq('restaurant_id', this.supabaseService.getRestaurantId())
-      .eq('check_in_date', dto.date || today);
+      .lte('check_in_date', targetDate)
+      .gte('check_out_date', targetDate);
 
     if (dto.name) {
       query = query.ilike('guest_name', `%${dto.name}%`);
@@ -215,7 +218,7 @@ export class ReservationsService {
     ];
 
     const hasAllergens = (dto.allergen_details && dto.allergen_details.length > 0) ||
-                        (dto.allergen_ids && dto.allergen_ids.length > 0);
+      (dto.allergen_ids && dto.allergen_ids.length > 0);
     if (hasAllergens) {
       tasks.push(this.createCheckInAlert(data, updateData.allergen_details));
     }
@@ -326,7 +329,7 @@ export class ReservationsService {
           message: 'ゲストがアレルギー情報を更新しました',
           status: 'new',
         })
-        .then(() => {});
+        .then(() => { });
     }
 
     return this.enrichWithAllergens(data);

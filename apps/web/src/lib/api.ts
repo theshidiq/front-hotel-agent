@@ -1078,6 +1078,17 @@ export async function deactivateStaff(id: string): Promise<void> {
 	}
 }
 
+export async function deleteStaffPermanent(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/staffs/${id}/permanent`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to permanently delete staff');
+	}
+}
+
 // ── Departments & Positions ────────────────────────────────
 
 export interface OrgPosition {

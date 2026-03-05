@@ -2,7 +2,7 @@
 	import {
 		getDepartments, createDepartment, updateDepartment, deleteDepartment,
 		createPosition, updatePosition, deletePosition,
-		getAllStaffs, createStaff, updateStaffOrg, updateStaffRole, updateStaffAdmin, deactivateStaff,
+		getAllStaffs, createStaff, updateStaffOrg, updateStaffRole, updateStaffAdmin, deactivateStaff, deleteStaffPermanent,
 		getRoles,
 		type OrgDepartment, type OrgPosition, type StaffMember, type Role, type PeriodJson,
 	} from '$lib/api';
@@ -38,13 +38,19 @@
 
 	// Staff editing (right panel)
 	let editingStaffId = $state<string | null>(null);
-	let editingStaff   = $state<{ name: string; position_id: string; role_id: string; is_active: boolean; employment_type: string; start_period: PeriodJson | null; end_period: PeriodJson | null }>({
-		name: '', position_id: '', role_id: '', is_active: true,
+	let editingStaff   = $state<{ name: string; position_id: string; role_id: string; is_active: boolean; is_admin: boolean; employment_type: string; start_period: PeriodJson | null; end_period: PeriodJson | null }>({
+		name: '', position_id: '', role_id: '', is_active: true, is_admin: false,
 		employment_type: '', start_period: null, end_period: null,
 	});
 	let showNewStaff   = $state(false);
-	let newStaff       = $state({ name: '', email: '', position_id: '' });
+	let newStaff       = $state<{ name: string; email: string; position_id: string; role_id: string; is_admin: boolean; employment_type: string; start_period: PeriodJson | null; end_period: PeriodJson | null }>({
+		name: '', email: '', position_id: '', role_id: '', is_admin: false,
+		employment_type: '', start_period: null, end_period: null,
+	});
 	let staffFilter    = $state<'active' | 'inactive' | 'all'>('active');
+
+	// Checkbox bulk delete
+	let selectedStaffIds = $state<Set<string>>(new Set());
 
 	// ── Derived ─────────────────────────────────────────────────
 	const selectedDept = $derived(() => departments.find(d => d.id === selectedDeptId) ?? null);
@@ -183,13 +189,29 @@
 		if (!newStaff.name.trim() || !newStaff.email.trim() || !selectedDeptId) return;
 		saving = true;
 		try {
-			await createStaff({
+			const created = await createStaff({
 				name: newStaff.name.trim(),
 				email: newStaff.email.trim(),
 				department_id: selectedDeptId,
 				position_id: newStaff.position_id || null,
 			});
-			newStaff = { name: '', email: '', position_id: '' }; showNewStaff = false;
+			// Apply extra fields in parallel after creation
+			const extra: Promise<unknown>[] = [];
+			if (newStaff.role_id || newStaff.employment_type || newStaff.start_period || newStaff.end_period) {
+				extra.push(updateStaffOrg(created.id, {
+					name: newStaff.name.trim(),
+					position_id: newStaff.position_id || null,
+					is_active: true,
+					employment_type: newStaff.employment_type || null,
+					start_period: newStaff.start_period,
+					end_period: newStaff.end_period,
+				}));
+			}
+			if (newStaff.role_id) extra.push(updateStaffRole(created.id, newStaff.role_id));
+			if (newStaff.is_admin) extra.push(updateStaffAdmin(created.id, true));
+			if (extra.length) await Promise.all(extra);
+			newStaff = { name: '', email: '', position_id: '', role_id: '', is_admin: false, employment_type: '', start_period: null, end_period: null };
+			showNewStaff = false;
 			await load();
 			showFeedback('success', 'スタッフを追加しました');
 		} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
@@ -203,6 +225,7 @@
 			position_id: s.position_id ?? '',
 			role_id: s.role_id ?? '',
 			is_active: s.is_active,
+			is_admin: s.is_admin ?? false,
 			employment_type: s.employment_type ?? '',
 			start_period: s.start_period ?? null,
 			end_period: s.end_period ?? null,
@@ -212,17 +235,23 @@
 	async function saveEditStaff(s: StaffMember) {
 		saving = true;
 		try {
-			await updateStaffOrg(s.id, {
-				name: editingStaff.name.trim(),
-				position_id: editingStaff.position_id || null,
-				is_active: editingStaff.is_active,
-				employment_type: editingStaff.employment_type || null,
-				start_period: editingStaff.start_period,
-				end_period: editingStaff.end_period,
-			});
+			const ops: Promise<unknown>[] = [
+				updateStaffOrg(s.id, {
+					name: editingStaff.name.trim(),
+					position_id: editingStaff.position_id || null,
+					is_active: editingStaff.is_active,
+					employment_type: editingStaff.employment_type || null,
+					start_period: editingStaff.start_period,
+					end_period: editingStaff.end_period,
+				}),
+			];
 			if (editingStaff.role_id !== (s.role_id ?? '')) {
-				await updateStaffRole(s.id, editingStaff.role_id || null);
+				ops.push(updateStaffRole(s.id, editingStaff.role_id || null));
 			}
+			if (editingStaff.is_admin !== (s.is_admin ?? false)) {
+				ops.push(updateStaffAdmin(s.id, editingStaff.is_admin));
+			}
+			await Promise.all(ops);
 			editingStaffId = null;
 			await load();
 			showFeedback('success', 'スタッフを更新しました');
@@ -230,26 +259,46 @@
 		finally { saving = false; }
 	}
 
-	async function toggleAdmin(s: StaffMember) {
-		saving = true;
-		try {
-			await updateStaffAdmin(s.id, !s.is_admin);
-			await load();
-			showFeedback('success', `管理者権限を${!s.is_admin ? '付与' : '削除'}しました`);
-		} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
-		finally { saving = false; }
+	function toggleCheckbox(id: string) {
+		const next = new Set(selectedStaffIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		selectedStaffIds = next;
 	}
 
-	async function softDelete(s: StaffMember) {
+	function clearSelection() {
+		selectedStaffIds = new Set();
+	}
+
+	async function bulkDelete() {
+		const ids = [...selectedStaffIds];
+		const selected = deptStaff().filter(s => ids.includes(s.id));
+		const activeOnes  = selected.filter(s => s.is_active);
+		const inactiveOnes = selected.filter(s => !s.is_active);
+
+		let message = `${ids.length}名を削除しますか？`;
+		let detail = '';
+		if (activeOnes.length > 0 && inactiveOnes.length > 0) {
+			detail = `在籍中 ${activeOnes.length}名は無効化、無効 ${inactiveOnes.length}名は完全削除されます。`;
+		} else if (activeOnes.length > 0) {
+			detail = `${activeOnes.length}名を無効化します。後から再有効化できます。`;
+		} else {
+			detail = `${inactiveOnes.length}名を完全削除します。この操作は取り消せません。`;
+		}
+
 		confirmModal = {
-			message: `「${s.name}」を無効化しますか？`,
-			detail: 'スタッフを無効化します。後から再有効化できます。',
+			message,
+			detail,
 			onConfirm: async () => {
 				saving = true;
 				try {
-					await deactivateStaff(s.id);
+					await Promise.all([
+						...activeOnes.map(s => deactivateStaff(s.id)),
+						...inactiveOnes.map(s => deleteStaffPermanent(s.id)),
+					]);
+					clearSelection();
 					await load();
-					showFeedback('success', 'スタッフを無効化しました');
+					showFeedback('success', '選択したスタッフを処理しました');
 				} catch (e) { showFeedback('error', e instanceof Error ? e.message : '失敗しました'); }
 				finally { saving = false; }
 			},
@@ -283,16 +332,27 @@
 	function setPeriodField(which: 'start_period' | 'end_period', field: 'year' | 'month' | 'day', val: string) {
 		const num = parseInt(val);
 		if (!val || isNaN(num)) {
-			// Clear entire period if year cleared
 			if (field === 'year') editingStaff[which] = null;
 			return;
 		}
 		const prev = editingStaff[which] ?? { year: new Date().getFullYear(), month: 1, day: 1 };
 		const next = { ...prev, [field]: num };
-		// Clamp day if month/year changed
 		const maxDay = daysInMonth(next.year, next.month);
 		if (next.day > maxDay) next.day = maxDay;
 		editingStaff[which] = next;
+	}
+
+	function setNewPeriodField(which: 'start_period' | 'end_period', field: 'year' | 'month' | 'day', val: string) {
+		const num = parseInt(val);
+		if (!val || isNaN(num)) {
+			if (field === 'year') newStaff[which] = null;
+			return;
+		}
+		const prev = newStaff[which] ?? { year: new Date().getFullYear(), month: 1, day: 1 };
+		const next = { ...prev, [field]: num };
+		const maxDay = daysInMonth(next.year, next.month);
+		if (next.day > maxDay) next.day = maxDay;
+		newStaff[which] = next;
 	}
 </script>
 
@@ -409,8 +469,8 @@
 						<div
 							role="button"
 							tabindex="0"
-							onclick={() => { selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; staffFilter = 'active'; }}
-							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; staffFilter = 'active'; } }}
+							onclick={() => { selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; staffFilter = 'active'; clearSelection(); }}
+							onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedDeptId = dept.id; showNewPos = false; showNewStaff = false; editingPosId = null; editingStaffId = null; staffFilter = 'active'; clearSelection(); } }}
 							class="w-full text-left rounded-xl border px-3 py-3 transition-all cursor-pointer
 								{selectedDeptId === dept.id
 									? 'border-blue-400 bg-blue-50 shadow-sm'
@@ -594,16 +654,33 @@
 							</button>
 						</div>
 
-						<!-- Filter tabs -->
-						<div class="flex gap-1 p-1 bg-gray-100 rounded-lg mb-3 w-fit">
-							{#each ([["active", "在籍中", deptStaffCounts().active], ["inactive", "無効", deptStaffCounts().inactive], ["all", "すべて", deptStaffCounts().all]] as const) as [val, label, count]}
+						<!-- Filter tabs + bulk delete -->
+						<div class="flex items-center gap-2 mb-3 flex-wrap">
+							<div class="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+								{#each ([["active", "在籍中", deptStaffCounts().active], ["inactive", "無効", deptStaffCounts().inactive], ["all", "すべて", deptStaffCounts().all]] as const) as [val, label, count]}
+									<button
+										type="button"
+										onclick={() => { staffFilter = val; clearSelection(); }}
+										class="px-3 py-1 text-xs font-medium rounded-md transition-all
+											{staffFilter === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+									>{label} <span class="ml-1 opacity-60">{count}</span></button>
+								{/each}
+							</div>
+							{#if selectedStaffIds.size > 0}
 								<button
 									type="button"
-									onclick={() => staffFilter = val}
-									class="px-3 py-1 text-xs font-medium rounded-md transition-all
-										{staffFilter === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
-								>{label} <span class="ml-1 opacity-60">{count}</span></button>
-							{/each}
+									onclick={bulkDelete}
+									class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 border border-red-200 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+								>
+									<span class="material-symbols-rounded text-sm">delete</span>
+									{selectedStaffIds.size}名を削除
+								</button>
+								<button
+									type="button"
+									onclick={clearSelection}
+									class="text-xs text-gray-400 hover:text-gray-600 px-1"
+								>選択解除</button>
+							{/if}
 						</div>
 
 						<!-- New staff form -->
@@ -628,7 +705,7 @@
 											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
 										/>
 									</div>
-									<div class="sm:col-span-2">
+									<div>
 										<label class="block text-xs font-medium text-gray-600 mb-1">役職</label>
 										<select
 											bind:value={newStaff.position_id}
@@ -640,18 +717,132 @@
 											{/each}
 										</select>
 									</div>
+									<div>
+										<label class="block text-xs font-medium text-gray-600 mb-1">ロール</label>
+										<select
+											bind:value={newStaff.role_id}
+											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+										>
+											<option value="">— ロールなし —</option>
+											{#each roles as r}
+												<option value={r.id}>{r.name}</option>
+											{/each}
+										</select>
+									</div>
+									<div class="sm:col-span-2 flex gap-4">
+										<label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+											<input type="checkbox" bind:checked={newStaff.is_admin} class="rounded accent-amber-500" />
+											管理者権限
+										</label>
+									</div>
 								</div>
+
+								<!-- Employment type + periods -->
+								<div class="border-t border-gray-200 pt-3 space-y-3">
+									<div>
+										<label class="block text-xs font-medium text-gray-600 mb-1.5">雇用形態</label>
+										<div class="flex gap-4">
+											{#each EMPLOYMENT_TYPES as et}
+												<label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+													<input
+														type="radio"
+														name="new_employment_type"
+														value={et.value}
+														checked={newStaff.employment_type === et.value}
+														onchange={() => newStaff.employment_type = et.value}
+														class="accent-blue-600"
+													/>
+													{et.label}
+												</label>
+											{/each}
+										</div>
+									</div>
+
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+										<div>
+											<label class="block text-xs font-medium text-gray-600 mb-1">開始期間</label>
+											<div class="flex gap-1.5">
+												<select
+													value={newStaff.start_period?.year ?? ""}
+													onchange={(e) => setNewPeriodField('start_period', 'year', (e.target as HTMLSelectElement).value)}
+													class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+												>
+													<option value="">年</option>
+													{#each YEARS as y}
+														<option value={y}>{y}</option>
+													{/each}
+												</select>
+												<select
+													value={newStaff.start_period?.month ?? 1}
+													onchange={(e) => setNewPeriodField('start_period', 'month', (e.target as HTMLSelectElement).value)}
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													disabled={!newStaff.start_period}
+												>
+													{#each MONTHS as m}
+														<option value={m}>{m}</option>
+													{/each}
+												</select>
+												<select
+													value={newStaff.start_period?.day ?? 1}
+													onchange={(e) => setNewPeriodField('start_period', 'day', (e.target as HTMLSelectElement).value)}
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													disabled={!newStaff.start_period}
+												>
+													{#each getPeriodDays(newStaff.start_period) as d}
+														<option value={d}>{d}</option>
+													{/each}
+												</select>
+											</div>
+										</div>
+										<div>
+											<label class="block text-xs font-medium text-gray-600 mb-1">終了期間</label>
+											<div class="flex gap-1.5">
+												<select
+													value={newStaff.end_period?.year ?? ""}
+													onchange={(e) => setNewPeriodField('end_period', 'year', (e.target as HTMLSelectElement).value)}
+													class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+												>
+													<option value="">年</option>
+													{#each YEARS as y}
+														<option value={y}>{y}</option>
+													{/each}
+												</select>
+												<select
+													value={newStaff.end_period?.month ?? 1}
+													onchange={(e) => setNewPeriodField('end_period', 'month', (e.target as HTMLSelectElement).value)}
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													disabled={!newStaff.end_period}
+												>
+													{#each MONTHS as m}
+														<option value={m}>{m}</option>
+													{/each}
+												</select>
+												<select
+													value={newStaff.end_period?.day ?? 1}
+													onchange={(e) => setNewPeriodField('end_period', 'day', (e.target as HTMLSelectElement).value)}
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													disabled={!newStaff.end_period}
+												>
+													{#each getPeriodDays(newStaff.end_period) as d}
+														<option value={d}>{d}</option>
+													{/each}
+												</select>
+											</div>
+										</div>
+									</div>
+								</div>
+
 								<div class="flex gap-2">
 									<button
 										type="button"
 										onclick={saveNewStaff}
 										disabled={saving || !newStaff.name.trim() || !newStaff.email.trim()}
-										class="flex-1 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+										class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
 									>追加</button>
 									<button
 										type="button"
 										onclick={() => showNewStaff = false}
-										class="px-4 text-sm text-gray-600 rounded-lg hover:bg-gray-100"
+										class="px-4 py-1.5 text-sm text-gray-600 rounded-lg hover:bg-gray-100"
 									>キャンセル</button>
 								</div>
 							</div>
@@ -680,6 +871,15 @@
 		</div>
 	{/if}
 </div>
+
+<!-- ── Click-outside backdrop for staff edit ── -->
+{#if editingStaffId}
+	<div
+		class="fixed inset-0 z-10"
+		onclick={() => editingStaffId = null}
+		role="presentation"
+	></div>
+{/if}
 
 <!-- ── Confirm Modal ── -->
 {#if confirmModal}
@@ -732,7 +932,7 @@
 <!-- ── Staff row snippet ── -->
 {#snippet staffRow(staff: StaffMember, positions: OrgPosition[])}
 	{#if editingStaffId === staff.id}
-		<div class="p-4 bg-blue-50 space-y-3">
+		<div class="relative z-20 p-4 bg-blue-50 space-y-3">
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				<div>
 					<label class="block text-xs font-medium text-gray-600 mb-1">名前</label>
@@ -766,10 +966,14 @@
 						{/each}
 					</select>
 				</div>
-				<div class="flex items-end pb-2">
+				<div class="flex flex-col gap-2 justify-end pb-1">
 					<label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
 						<input type="checkbox" bind:checked={editingStaff.is_active} class="rounded" />
 						在籍中（アクティブ）
+					</label>
+					<label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+						<input type="checkbox" bind:checked={editingStaff.is_admin} class="rounded accent-amber-500" />
+						管理者権限
 					</label>
 				</div>
 			</div>
@@ -885,9 +1089,24 @@
 			</div>
 		</div>
 	{:else}
-		<div class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+		<div
+			role="button"
+			tabindex="0"
+			onclick={() => startEditStaff(staff)}
+			onkeydown={(e) => { if (e.key === 'Enter') startEditStaff(staff); }}
+			class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+		>
+			<!-- Checkbox (stop propagation so clicking it doesn't open edit) -->
+			<div onclick={(e) => { e.stopPropagation(); toggleCheckbox(staff.id); }} role="presentation">
+				<input
+					type="checkbox"
+					checked={selectedStaffIds.has(staff.id)}
+					class="rounded border-gray-300 text-red-500 accent-red-500 cursor-pointer"
+					tabindex="-1"
+				/>
+			</div>
 			<!-- Avatar -->
-			<div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0
+			<div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0
 				{staff.is_admin ? 'bg-amber-500' : staff.is_active ? 'bg-blue-600' : 'bg-gray-300'}">
 				{staff.name.charAt(0).toUpperCase()}
 			</div>
@@ -923,29 +1142,8 @@
 					{/if}
 				</div>
 			</div>
-			<!-- Actions -->
-			<div class="flex items-center gap-0.5 shrink-0">
-				<button
-					type="button"
-					onclick={() => startEditStaff(staff)}
-					class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-					title="編集"
-				><span class="material-symbols-rounded text-base">edit</span></button>
-				<button
-					type="button"
-					onclick={() => toggleAdmin(staff)}
-					class="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-					title={staff.is_admin ? '管理者権限を削除' : '管理者権限を付与'}
-				><span class="material-symbols-rounded text-base">{staff.is_admin ? 'shield' : 'shield_with_heart'}</span></button>
-				{#if staff.is_active}
-					<button
-						type="button"
-						onclick={() => softDelete(staff)}
-						class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-						title="無効化"
-					><span class="material-symbols-rounded text-base">person_off</span></button>
-				{/if}
-			</div>
+			<!-- Edit hint -->
+			<span class="material-symbols-rounded text-sm text-gray-300 shrink-0">chevron_right</span>
 		</div>
 	{/if}
 {/snippet}

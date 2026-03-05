@@ -49,6 +49,13 @@ export class StaffsController {
     return this.staffsService.updateOrg(id, body);
   }
 
+  @Delete(':id/permanent')
+  @RequirePermission('staff.manage')
+  @ApiOperation({ summary: 'Permanently delete an inactive staff member (hard delete)' })
+  async hardDelete(@Param('id') id: string): Promise<void> {
+    return this.staffsService.hardDeleteStaff(id);
+  }
+
   @Delete(':id')
   @RequirePermission('staff.manage')
   @ApiOperation({ summary: 'Deactivate a staff member (soft delete)' })

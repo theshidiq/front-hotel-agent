@@ -228,6 +228,62 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
+	// Room status options
+	const roomStatusOptions = [
+		{ value: "all", label: "全て" },
+		{ value: "available", label: "空室" },
+		{ value: "occupied", label: "利用中" },
+		{ value: "cleaning", label: "清掃中" },
+		{ value: "maintenance", label: "メンテナンス中" },
+		{ value: "out_of_order", label: "故障中" },
+	];
+
+	const roomStatusColors: Record<string, string> = {
+		available: "bg-emerald-100 text-emerald-800 border-emerald-200",
+		occupied: "bg-blue-100 text-blue-800 border-blue-200",
+		cleaning: "bg-amber-100 text-amber-800 border-amber-200",
+		maintenance: "bg-purple-100 text-purple-800 border-purple-200",
+		out_of_order: "bg-red-100 text-red-800 border-red-200",
+	};
+
+	const roomStatusLabels: Record<string, string> = {
+		available: "空室",
+		occupied: "利用中",
+		cleaning: "清掃中",
+		maintenance: "メンテナンス",
+		out_of_order: "故障中",
+	};
+
+	let roomFilterStatus = $state("all");
+	let roomSearchQuery = $state("");
+
+	// Derived state for rooms
+	let filteredRooms = $derived(
+		rooms.filter((room) => {
+			if (roomFilterStatus !== "all" && room.status !== roomFilterStatus)
+				return false;
+			if (roomSearchQuery) {
+				const q = roomSearchQuery.toLowerCase();
+				return (
+					room.room_number.toLowerCase().includes(q) ||
+					(room.room_name || "").toLowerCase().includes(q)
+				);
+			}
+			return true;
+		}),
+	);
+
+	// Derived room stats
+	let roomStats = $derived({
+		total: rooms.length,
+		available: rooms.filter((r) => r.status === "available").length,
+		occupied: rooms.filter((r) => r.status === "occupied").length,
+		cleaning: rooms.filter((r) => r.status === "cleaning").length,
+		maintenance: rooms.filter(
+			(r) => r.status === "maintenance" || r.status === "out_of_order",
+		).length,
+	});
+
 	// Date filter
 	type DateFilter = "today" | "past3" | "past7" | "past30" | "all";
 	let dateFilter = $state<DateFilter>("today");
@@ -1767,8 +1823,300 @@
 						</div>
 					{/if}
 				</div>
+			{:else if activeNav === "rooms" && canViewRooms}
+				<!-- Room Status View -->
+				<div class="space-y-4">
+					<div class="flex items-center justify-between mb-6">
+						<h2 class="text-lg font-bold text-gray-900">
+							客室状況
+						</h2>
+					</div>
+
+					<!-- Room Stats Cards -->
+					<div class="grid grid-cols-5 gap-4 mb-6">
+						<div
+							class="bg-white rounded-lg border border-gray-200 p-4"
+						>
+							<p class="text-sm text-gray-500">全客室</p>
+							<p class="text-2xl font-bold text-gray-900 mt-1">
+								{roomStats.total}
+							</p>
+						</div>
+						<div
+							class="bg-emerald-50 rounded-lg border border-emerald-300 p-4"
+						>
+							<p class="text-sm text-emerald-700">空室</p>
+							<p class="text-2xl font-bold text-emerald-700 mt-1">
+								{roomStats.available}
+							</p>
+						</div>
+						<div
+							class="bg-blue-50 rounded-lg border border-blue-300 p-4"
+						>
+							<p class="text-sm text-blue-700">利用中</p>
+							<p class="text-2xl font-bold text-blue-700 mt-1">
+								{roomStats.occupied}
+							</p>
+						</div>
+						<div
+							class="bg-amber-50 rounded-lg border border-amber-300 p-4"
+						>
+							<p class="text-sm text-amber-700">清掃中</p>
+							<p class="text-2xl font-bold text-amber-700 mt-1">
+								{roomStats.cleaning}
+							</p>
+						</div>
+						<div
+							class="bg-purple-50 rounded-lg border border-purple-300 p-4"
+						>
+							<p class="text-sm text-purple-700">
+								メンテナンス他
+							</p>
+							<p class="text-2xl font-bold text-purple-700 mt-1">
+								{roomStats.maintenance}
+							</p>
+						</div>
+					</div>
+
+					<!-- Room Filters Row -->
+					<div class="flex items-center justify-between mb-4">
+						<div class="flex gap-2 bg-gray-100 p-1 rounded-lg">
+							{#each roomStatusOptions as option}
+								<button
+									onclick={() =>
+										(roomFilterStatus = option.value)}
+									class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors {roomFilterStatus ===
+									option.value
+										? 'bg-white text-gray-900 shadow-sm'
+										: 'text-gray-600 hover:text-gray-900'}"
+								>
+									{option.label}
+								</button>
+							{/each}
+						</div>
+
+						<div class="relative">
+							<span
+								class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+								>search</span
+							>
+							<input
+								type="text"
+								bind:value={roomSearchQuery}
+								placeholder="部屋番号・部屋名..."
+								class="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							/>
+						</div>
+					</div>
+
+					<!-- Loading State -->
+					{#if loading}
+						<div
+							class="bg-white rounded-lg border border-gray-200 p-12 text-center"
+						>
+							<div
+								class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"
+							></div>
+							<p class="mt-4 text-gray-500">読み込み中...</p>
+						</div>
+					{:else if error}
+						<div
+							class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+						>
+							<p class="text-red-800">{error}</p>
+							<button
+								onclick={() => loadData()}
+								class="mt-4 text-red-600 hover:text-red-800 font-medium"
+							>
+								再試行
+							</button>
+						</div>
+					{:else}
+						<!-- Room Grid -->
+						<div
+							class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+						>
+							{#each filteredRooms as room (room.id)}
+								{@const activeRes = reservations.find(
+									(r) =>
+										r.room_number === room.room_number &&
+										r.status === "checked_in",
+								)}
+								{@const pendingRes = reservations.find(
+									(r) =>
+										r.room_number === room.room_number &&
+										r.status === "confirmed" &&
+										r.check_in_date === todayFormatted,
+								)}
+								<div
+									class="bg-white rounded-xl border border-gray-200 hover:shadow-md transition-shadow overflow-hidden flex flex-col"
+								>
+									<!-- Card Header -->
+									<div
+										class="p-4 border-b border-gray-100 flex items-start justify-between"
+									>
+										<div>
+											<div
+												class="flex items-center gap-2"
+											>
+												<h3
+													class="text-lg font-bold text-gray-900 font-['Plus_Jakarta_Sans']"
+												>
+													{room.room_number}
+												</h3>
+												{#if room.room_name}
+													<span
+														class="text-sm font-medium text-gray-600"
+														>{room.room_name}</span
+													>
+												{/if}
+											</div>
+											{#if room.room_type}
+												<p
+													class="text-xs text-gray-500 mt-0.5"
+												>
+													{room.room_type}
+												</p>
+											{/if}
+										</div>
+										<span
+											class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold border {roomStatusColors[
+												room.status
+											]}"
+										>
+											{roomStatusLabels[room.status]}
+										</span>
+									</div>
+
+									<!-- Card Body -->
+									<div class="p-4 flex-1">
+										{#if room.status === "occupied" && activeRes}
+											<div class="space-y-3">
+												<div
+													class="flex items-start gap-2"
+												>
+													<span
+														class="material-symbols-rounded text-blue-500 text-lg"
+														>person</span
+													>
+													<div>
+														<p
+															class="text-sm font-bold text-gray-900"
+														>
+															{activeRes.guest_name}
+															様
+														</p>
+														{#if activeRes.guest_name_kana}
+															<p
+																class="text-xs text-gray-500"
+															>
+																{activeRes.guest_name_kana}
+															</p>
+														{/if}
+													</div>
+												</div>
+												<div
+													class="text-sm text-gray-600 pl-7 space-y-1"
+												>
+													<p>
+														<span
+															class="text-gray-400 w-12 inline-block"
+															>人数:</span
+														>
+														{activeRes.party_size}名
+													</p>
+													<p>
+														<span
+															class="text-gray-400 w-12 inline-block"
+															>期間:</span
+														>
+														<span
+															class="font-['Plus_Jakarta_Sans']"
+															>{formatDate(
+																activeRes.check_in_date,
+															)}</span
+														>
+														-
+														<span
+															class="font-['Plus_Jakarta_Sans']"
+															>{formatDate(
+																activeRes.check_out_date,
+															)}</span
+														>
+													</p>
+													{#if activeRes.total_nights && activeRes.current_stay_night}
+														<p
+															class="text-xs text-blue-600 font-medium"
+														>
+															滞在中（{activeRes.current_stay_night}泊目
+															/ {activeRes.total_nights}泊）
+														</p>
+													{/if}
+												</div>
+											</div>
+										{:else if room.status === "available"}
+											{#if pendingRes}
+												<div
+													class="h-full flex flex-col justify-center items-center text-center p-2 bg-blue-50/50 rounded-lg border border-blue-100/50"
+												>
+													<span
+														class="material-symbols-rounded text-blue-400 mb-2"
+														>schedule</span
+													>
+													<p
+														class="text-sm font-medium text-blue-800"
+													>
+														本日のチェックイン予定
+													</p>
+													<p
+														class="text-sm text-blue-600 mt-1"
+													>
+														{pendingRes.guest_name} 様
+														({pendingRes.party_size}名)
+													</p>
+												</div>
+											{:else}
+												<div
+													class="h-full flex flex-col justify-center items-center text-center p-2"
+												>
+													<span
+														class="material-symbols-rounded text-gray-300 text-3xl mb-2"
+														>meeting_room</span
+													>
+													<p
+														class="text-sm text-gray-500"
+													>
+														次の予約はありません
+													</p>
+												</div>
+											{/if}
+										{:else}
+											<div
+												class="h-full flex flex-col justify-center items-center text-center p-2"
+											>
+												<span
+													class="material-symbols-rounded text-gray-300 text-3xl mb-2"
+												>
+													{room.status === "cleaning"
+														? "cleaning_services"
+														: "handyman"}
+												</span>
+												<p
+													class="text-sm text-gray-500"
+												>
+													{room.status === "cleaning"
+														? "清掃作業中"
+														: "メンテナンス作業中"}
+												</p>
+											</div>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			{:else}
-				<!-- Reservations View (default) -->
 				{#if alerts.length > 0}
 					<div
 						class="mb-6 bg-amber-50 border border-amber-200 rounded-lg overflow-hidden"

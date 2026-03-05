@@ -210,6 +210,23 @@ export class StaffsService {
     }
   }
 
+  async hardDeleteStaff(id: string): Promise<void> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const { error } = await supabase
+      .from('staff')
+      .delete()
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', false); // Safety: only allow deleting inactive staff
+
+    if (error) {
+      this.logger.error(`Failed to hard delete staff: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to hard delete staff: ${error.message}`);
+    }
+  }
+
   async updateRole(id: string, roleId: string | null): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();

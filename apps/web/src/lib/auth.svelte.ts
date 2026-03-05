@@ -164,12 +164,14 @@ async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | 
 }
 
 let signingInProgress = false;
+let authInitialized = false;
 
 async function handleSignedIn(email: string): Promise<void> {
 	// Guard against concurrent calls (getSession + onAuthStateChange both fire on OAuth redirect)
 	if (signingInProgress) return;
 	signingInProgress = true;
-	authState.loading = true;
+	// Only show loading spinner on first auth, not on subsequent token refreshes
+	if (!authInitialized) authState.loading = true;
 
 	try {
 		const staff = await checkStaffStatus(email);
@@ -239,6 +241,7 @@ async function handleSignedIn(email: string): Promise<void> {
 		}
 
 		authState.loading = false;
+		authInitialized = true;
 	} finally {
 		signingInProgress = false;
 	}
@@ -289,6 +292,11 @@ export async function initAuth(): Promise<void> {
 		authState.user = session?.user ?? null;
 
 		if (event === 'SIGNED_IN' && session?.user?.email) {
+			// Skip if already authenticated as the same user — avoids re-running on tab focus
+			if (authState.isStaff && authState.staff?.email === session.user.email) {
+				authState.session = session; // still update the session token
+				return;
+			}
 			await handleSignedIn(session.user.email);
 		} else if (event === 'TOKEN_REFRESHED' && session?.user?.email) {
 			// On token refresh, re-verify staff is still in active period
