@@ -232,6 +232,8 @@
 
         <div class="nav-actions">
             <a href="/login" class="nav-login">Log in</a>
+            <a href="/setup" class="btn-secondary nav-start">Get started free</a
+            >
             <a href="#contact" class="btn-primary">Book a Demo</a>
         </div>
     </div>
@@ -267,10 +269,9 @@
                         fully present.
                     </p>
                     <div class="hero-ctas">
-                        <a href="#contact" class="btn-primary">Book a Demo</a>
-                        <a href="#features" class="btn-secondary"
-                            >See how it works</a
+                        <a href="/setup" class="btn-primary">Get started free</a
                         >
+                        <a href="#contact" class="btn-secondary">Book a Demo</a>
                     </div>
                     <div class="hero-trust">
                         <span class="trust-item">🏨 Hotel</span>
