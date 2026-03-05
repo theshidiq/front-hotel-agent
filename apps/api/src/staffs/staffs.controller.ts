@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { StaffsService, Staff } from './staffs.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
@@ -16,6 +16,13 @@ export class StaffsController {
     return this.staffsService.findAll();
   }
 
+  @Get('all')
+  @RequirePermission('staff.manage')
+  @ApiOperation({ summary: 'Get all staff including inactive (admin use)' })
+  async findAllIncludingInactive(): Promise<Staff[]> {
+    return this.staffsService.findAllIncludingInactive();
+  }
+
   @Patch(':id/email')
   @ApiOperation({ summary: 'Update staff email address' })
   async updateEmail(
@@ -29,7 +36,24 @@ export class StaffsController {
   @RequirePermission('staff.manage')
   @ApiOperation({ summary: 'Register a new staff member' })
   async create(@Body() dto: CreateStaffDto): Promise<Staff> {
-    return this.staffsService.create(dto.name, dto.email, dto.position);
+    return this.staffsService.create(dto.name, dto.email, dto.position ?? '', (dto as any).department_id, (dto as any).position_id);
+  }
+
+  @Patch(':id/org')
+  @RequirePermission('staff.manage')
+  @ApiOperation({ summary: 'Update staff org fields (name, position, department_id, position_id, is_active)' })
+  async updateOrg(
+    @Param('id') id: string,
+    @Body() body: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean },
+  ): Promise<Staff> {
+    return this.staffsService.updateOrg(id, body);
+  }
+
+  @Delete(':id')
+  @RequirePermission('staff.manage')
+  @ApiOperation({ summary: 'Deactivate a staff member (soft delete)' })
+  async remove(@Param('id') id: string): Promise<void> {
+    return this.staffsService.deleteStaff(id);
   }
 
   @Patch(':id/role')

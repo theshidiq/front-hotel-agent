@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { authState } from '$lib/auth.svelte';
 	import {
-		getStaffs,
 		getRoles,
 		getRolePermissionsList,
 		createRole,
@@ -10,31 +9,19 @@
 		deleteRole,
 		setRoleAsDefault,
 		clearRoleDefault,
-		createStaff,
-		updateStaffRole,
-		updateStaffAdmin,
-		type StaffMember,
 		type Role,
-		type CreateStaffData,
 	} from '$lib/api';
+	import OrgManagement from '$lib/components/OrgManagement.svelte';
 
 	// ── Navigation State ──
 	type AdminSection = 'menu' | 'staff' | 'roles';
 	let activeSection: AdminSection = $state('menu');
 
 	// ── State ──
-	let staffList: StaffMember[] = $state([]);
 	let roles: Role[] = $state([]);
 	let allPermissions: string[] = $state([]);
 	let loading = $state(false);
 	let error = $state('');
-
-	// Staff form
-	let showAddStaff = $state(false);
-	let newStaffName = $state('');
-	let newStaffEmail = $state('');
-	let newStaffPosition = $state('');
-	let staffSaving = $state(false);
 
 	// Role management
 	let editingRole: Role | null = $state(null);
@@ -52,10 +39,6 @@
 	let newRolePermissionSearch = $state('');
 	let collapsedSections: Set<string> = $state(new Set());
 	let newRoleCollapsedSections: Set<string> = $state(new Set());
-
-	// Staff detail modal
-	let selectedStaff: StaffMember | null = $state(null);
-	let staffDetailSaving = $state(false);
 
 	// Permission groups organized by page
 	interface PermGroup { label: string; permissions: { key: string; label: string }[] }
@@ -158,18 +141,6 @@
 	}
 
 	// ── Load data ──
-	async function loadStaffData() {
-		loading = true;
-		error = '';
-		try {
-			staffList = await getStaffs();
-		} catch (e: any) {
-			error = e.message;
-		} finally {
-			loading = false;
-		}
-	}
-
 	async function loadRolesData() {
 		loading = true;
 		error = '';
@@ -186,11 +157,7 @@
 
 	// Load data when section changes
 	$effect(() => {
-		if (activeSection === 'staff') {
-			// Staff section needs both staff data AND roles data (for the role dropdown)
-			if (staffList.length === 0) loadStaffData();
-			if (roles.length === 0) loadRolesData();
-		} else if (activeSection === 'roles' && roles.length === 0) {
+		if (activeSection === 'roles' && roles.length === 0) {
 			loadRolesData();
 		}
 	});
@@ -204,52 +171,7 @@
 			window.location.href = '/';
 			return;
 		}
-		// Don't auto-load data - let user choose section
 	});
-
-	// ── Staff actions ──
-	async function handleCreateStaff() {
-		if (!newStaffName.trim() || !newStaffEmail.trim()) return;
-		staffSaving = true;
-		try {
-			await createStaff({
-				name: newStaffName.trim(),
-				email: newStaffEmail.trim(),
-				position: newStaffPosition.trim(),
-			});
-			newStaffName = '';
-			newStaffEmail = '';
-			newStaffPosition = '';
-			showAddStaff = false;
-			await loadStaffData(); await loadRolesData();
-		} catch (e: any) {
-			error = e.message;
-		} finally {
-			staffSaving = false;
-		}
-	}
-
-	async function handleChangeRole(staffId: string, roleId: string) {
-		try {
-			await updateStaffRole(staffId, roleId || null);
-			await loadStaffData(); await loadRolesData();
-		} catch (e: any) {
-			error = e.message;
-		}
-	}
-
-	async function handleToggleAdmin(staff: StaffMember) {
-		staffDetailSaving = true;
-		try {
-			await updateStaffAdmin(staff.id, !staff.is_admin);
-			await loadStaffData(); await loadRolesData();
-			selectedStaff = null;
-		} catch (e: any) {
-			error = e.message;
-		} finally {
-			staffDetailSaving = false;
-		}
-	}
 
 	// ── Role actions ──
 	function startEditingRole(role: Role) {
@@ -461,11 +383,11 @@
 				>
 					<div class="flex items-center gap-4">
 						<div class="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-							<span class="material-symbols-rounded text-2xl text-blue-600">group</span>
+							<span class="material-symbols-rounded text-2xl text-blue-600">corporate_fare</span>
 						</div>
 						<div>
-							<h3 class="text-lg font-semibold text-gray-900">Staff Management</h3>
-							<p class="text-sm text-gray-500 mt-1">Manage staff accounts and permissions</p>
+							<h3 class="text-lg font-semibold text-gray-900">Organization</h3>
+							<p class="text-sm text-gray-500 mt-1">Departments, positions &amp; staff hierarchy</p>
 						</div>
 					</div>
 				</button>
@@ -489,118 +411,13 @@
 			<!-- Back button -->
 			<button
 				onclick={() => activeSection = 'menu'}
-				class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+				class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-6"
 			>
 				<span class="material-symbols-rounded text-xl">arrow_back</span>
 				<span class="text-sm">Back to Menu</span>
 			</button>
 
-			{#if loading}
-				<div class="flex items-center justify-center py-20">
-					<svg class="w-8 h-8 animate-spin text-blue-600" viewBox="0 0 24 24">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-					</svg>
-				</div>
-			{:else}
-			<!-- ══════ STAFF MANAGEMENT ══════ -->
-			<section class="bg-white rounded-xl shadow-sm border border-gray-200">
-				<div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-					<h2 class="text-base font-semibold text-gray-900 flex items-center gap-2">
-						<span class="material-symbols-rounded text-lg text-gray-500">group</span>
-						Staff Management
-					</h2>
-					<button
-						onclick={() => showAddStaff = !showAddStaff}
-						class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-					>
-						<span class="material-symbols-rounded text-lg">person_add</span>
-						Add Staff
-					</button>
-				</div>
-
-				{#if showAddStaff}
-					<div class="px-5 py-4 bg-blue-50/50 border-b border-gray-100">
-						<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-							<input
-								bind:value={newStaffName}
-								placeholder="Name"
-								class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							/>
-							<input
-								bind:value={newStaffEmail}
-								type="email"
-								placeholder="Email"
-								class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							/>
-							<input
-								bind:value={newStaffPosition}
-								placeholder="Position"
-								class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							/>
-						</div>
-						<div class="flex justify-end gap-2 mt-3">
-							<button
-								onclick={() => { showAddStaff = false; newStaffName = ''; newStaffEmail = ''; newStaffPosition = ''; }}
-								class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-							>
-								Cancel
-							</button>
-							<button
-								onclick={handleCreateStaff}
-								disabled={staffSaving || !newStaffName.trim() || !newStaffEmail.trim()}
-								class="px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-							>
-								{staffSaving ? 'Adding...' : 'Add'}
-							</button>
-						</div>
-					</div>
-				{/if}
-
-				<div class="divide-y divide-gray-100">
-					{#each staffList as staff}
-						<div class="px-5 py-3 flex items-center gap-4">
-							<div class="w-9 h-9 rounded-full {staff.is_admin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center text-white text-sm font-bold shrink-0">
-								{staff.name.charAt(0).toUpperCase()}
-							</div>
-							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-2">
-									<p class="text-sm font-medium text-gray-900 truncate">{staff.name}</p>
-									{#if staff.is_admin}
-										<span class="px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded">Admin</span>
-									{/if}
-								</div>
-								<p class="text-xs text-gray-500 truncate">{staff.email || '-'}</p>
-							</div>
-							<div class="flex items-center gap-3">
-								{#if !staff.is_admin}
-									<select
-										value={staff.role_id || ''}
-										onchange={(e) => handleChangeRole(staff.id, (e.target as HTMLSelectElement).value)}
-										class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:ring-2 focus:ring-blue-500"
-									>
-										<option value="">No role</option>
-										{#each roles as role}
-											<option value={role.id}>{role.name}</option>
-										{/each}
-									</select>
-								{:else}
-									<span class="text-xs text-amber-600 font-medium">All Access</span>
-								{/if}
-								<button
-									onclick={() => selectedStaff = staff}
-									class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-									title="Details"
-								>
-									<span class="material-symbols-rounded text-lg">more_horiz</span>
-								</button>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</section>
-			{/if}
-
+			<OrgManagement />
 		{:else if activeSection === 'roles'}
 			<!-- Back button -->
 			<button
@@ -892,81 +709,6 @@
 			{/if}
 		{/if}
 
-<!-- Staff detail modal -->
-{#if selectedStaff}
-	<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-		<div class="bg-white rounded-xl shadow-xl max-w-md w-full">
-			<div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-				<h3 class="text-base font-semibold text-gray-900">Staff Details</h3>
-				<button
-					onclick={() => selectedStaff = null}
-					class="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
-				>
-					<span class="material-symbols-rounded text-xl">close</span>
-				</button>
-			</div>
-			<div class="px-5 py-4 space-y-4">
-				<div class="flex items-center gap-3">
-					<div class="w-12 h-12 rounded-full {selectedStaff.is_admin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center text-white text-lg font-bold">
-						{selectedStaff.name.charAt(0).toUpperCase()}
-					</div>
-					<div>
-						<p class="font-medium text-gray-900">{selectedStaff.name}</p>
-						<p class="text-sm text-gray-500">{selectedStaff.email || '-'}</p>
-					</div>
-				</div>
-
-				<div class="grid grid-cols-2 gap-3 text-sm">
-					<div>
-						<p class="text-gray-500">Position</p>
-						<p class="font-medium">{selectedStaff.position || '-'}</p>
-					</div>
-					<div>
-						<p class="text-gray-500">Role</p>
-						<p class="font-medium">{getRoleName(selectedStaff.role_id)}</p>
-					</div>
-				</div>
-
-				<!-- Admin toggle -->
-				<div class="border border-gray-200 rounded-lg p-4">
-					<div class="flex items-center justify-between">
-						<div>
-							<p class="text-sm font-medium text-gray-900 flex items-center gap-1.5">
-								<span class="material-symbols-rounded text-amber-500 text-lg">star</span>
-								Admin Access
-							</p>
-							<p class="text-xs text-gray-500 mt-0.5">Grants full access to all features</p>
-						</div>
-						{#if selectedStaff.id === authState.staff?.id}
-							<span class="text-xs text-gray-400">Cannot change own status</span>
-						{:else}
-							<button
-								onclick={() => handleToggleAdmin(selectedStaff!)}
-								disabled={staffDetailSaving}
-								aria-label="Toggle admin access"
-								class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-									{selectedStaff.is_admin ? 'bg-amber-500' : 'bg-gray-300'}"
-							>
-								<span
-									class="inline-block h-4 w-4 rounded-full bg-white transition-transform
-										{selectedStaff.is_admin ? 'translate-x-6' : 'translate-x-1'}"
-								></span>
-							</button>
-						{/if}
-					</div>
-				</div>
-			</div>
-			<div class="px-5 py-3 border-t border-gray-100 flex justify-end">
-				<button
-					onclick={() => selectedStaff = null}
-					class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-				>
-					Close
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
 
 	</main>
 </div>

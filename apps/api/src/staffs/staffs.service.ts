@@ -7,7 +7,7 @@ interface PeriodJson {
   day: number;
 }
 
-const STAFF_FIELDS = 'id, restaurant_id, name, email, position, is_active, is_admin, role_id, start_period, end_period, created_at';
+const STAFF_FIELDS = 'id, restaurant_id, name, email, position, department_id, position_id, is_active, is_admin, role_id, start_period, end_period, created_at';
 
 export interface Staff {
   id: string;
@@ -15,6 +15,8 @@ export interface Staff {
   name: string;
   email: string;
   position: string | null;
+  department_id: string | null;
+  position_id: string | null;
   is_active: boolean;
   is_admin: boolean;
   role_id: string | null;
@@ -90,13 +92,20 @@ export class StaffsService {
     return data;
   }
 
-  async create(name: string, email: string, position: string): Promise<Staff> {
+  async create(name: string, email: string, position: string, departmentId?: string | null, positionId?: string | null): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
     const restaurantId = this.supabaseService.getRestaurantId();
 
     const { data, error } = await supabase
       .from('staff')
-      .insert({ restaurant_id: restaurantId, name: name.trim(), email: email.trim().toLowerCase(), position: position.trim() })
+      .insert({
+        restaurant_id: restaurantId,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        position: position.trim(),
+        department_id: departmentId ?? null,
+        position_id: positionId ?? null,
+      })
       .select(STAFF_FIELDS)
       .single();
 
@@ -106,6 +115,60 @@ export class StaffsService {
     }
 
     return data;
+  }
+
+  async updateOrg(id: string, updates: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean }): Promise<Staff> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const { data, error } = await supabase
+      .from('staff')
+      .update(updates)
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId)
+      .select(STAFF_FIELDS)
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to update staff: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to update staff: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async findAllIncludingInactive(): Promise<Staff[]> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const { data, error } = await supabase
+      .from('staff')
+      .select(STAFF_FIELDS)
+      .eq('restaurant_id', restaurantId)
+      .order('name');
+
+    if (error) {
+      this.logger.error(`Failed to fetch staff: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to fetch staff: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async deleteStaff(id: string): Promise<void> {
+    const supabase = this.supabaseService.getClient();
+    const restaurantId = this.supabaseService.getRestaurantId();
+
+    const { error } = await supabase
+      .from('staff')
+      .update({ is_active: false })
+      .eq('id', id)
+      .eq('restaurant_id', restaurantId);
+
+    if (error) {
+      this.logger.error(`Failed to deactivate staff: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to deactivate staff: ${error.message}`);
+    }
   }
 
   async updateRole(id: string, roleId: string | null): Promise<Staff> {

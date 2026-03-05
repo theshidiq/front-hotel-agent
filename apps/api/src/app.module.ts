@@ -20,6 +20,7 @@ import { SeasonalMenusModule } from './seasonal-menus/seasonal-menus.module';
 import { ProductAlternatesModule } from './product-alternates/product-alternates.module';
 import { RolesModule } from './roles/roles.module';
 import { ShiftsModule } from './shifts/shifts.module';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ShiftsModule } from './shifts/shifts.module';
     ProductAlternatesModule,
     RolesModule,
     ShiftsModule,
+    DepartmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

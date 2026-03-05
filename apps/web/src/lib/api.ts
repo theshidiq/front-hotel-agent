@@ -954,6 +954,8 @@ export interface StaffMember {
 	name: string;
 	email: string | null;
 	position: string | null;
+	department_id: string | null;
+	position_id: string | null;
 	is_admin: boolean;
 	role_id: string | null;
 	is_active: boolean;
@@ -963,7 +965,9 @@ export interface StaffMember {
 export interface CreateStaffData {
 	name: string;
 	email: string;
-	position: string;
+	position?: string;
+	department_id?: string | null;
+	position_id?: string | null;
 }
 
 export async function getStaffs(): Promise<StaffMember[]> {
@@ -1025,6 +1029,148 @@ export async function updateStaffAdmin(id: string, isAdmin: boolean): Promise<St
 		throw new Error(error.message || 'Failed to update admin status');
 	}
 	return response.json();
+}
+
+export async function getAllStaffs(): Promise<StaffMember[]> {
+	const response = await fetch(`${API_URL}/staffs/all`, {
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch all staff');
+	}
+	return response.json();
+}
+
+export async function updateStaffOrg(
+	id: string,
+	data: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean }
+): Promise<StaffMember> {
+	const response = await fetch(`${API_URL}/staffs/${id}/org`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to update staff');
+	}
+	return response.json();
+}
+
+export async function deactivateStaff(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/staffs/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to deactivate staff');
+	}
+}
+
+// ── Departments & Positions ────────────────────────────────
+
+export interface OrgPosition {
+	id: string;
+	restaurant_id: string;
+	department_id: string;
+	name: string;
+	sort_order: number;
+	created_at: string;
+}
+
+export interface OrgDepartment {
+	id: string;
+	restaurant_id: string;
+	name: string;
+	color: string;
+	sort_order: number;
+	created_at: string;
+	positions: OrgPosition[];
+}
+
+export async function getDepartments(): Promise<OrgDepartment[]> {
+	const response = await fetch(`${API_URL}/departments`);
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch departments');
+	}
+	return response.json();
+}
+
+export async function createDepartment(name: string, color: string): Promise<OrgDepartment> {
+	const response = await fetch(`${API_URL}/departments`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ name, color }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create department failed');
+	}
+	return response.json();
+}
+
+export async function updateDepartment(id: string, data: { name?: string; color?: string }): Promise<OrgDepartment> {
+	const response = await fetch(`${API_URL}/departments/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update department failed');
+	}
+	return response.json();
+}
+
+export async function deleteDepartment(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/departments/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete department failed');
+	}
+}
+
+export async function createPosition(departmentId: string, name: string): Promise<OrgPosition> {
+	const response = await fetch(`${API_URL}/departments/${departmentId}/positions`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ name }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create position failed');
+	}
+	return response.json();
+}
+
+export async function updatePosition(id: string, data: { name?: string }): Promise<OrgPosition> {
+	const response = await fetch(`${API_URL}/departments/positions/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update position failed');
+	}
+	return response.json();
+}
+
+export async function deletePosition(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/departments/positions/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete position failed');
+	}
 }
 
 // ── Roles ─────────────────────────────────────────────────
