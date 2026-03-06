@@ -70,8 +70,12 @@ export class StaffAuthGuard implements CanActivate {
       throw new UnauthorizedException('No email associated with this account');
     }
 
+    // Resolve organization ID: prefer request header, fall back to env var
+    const organizationId =
+      (request.headers['x-organization-id'] as string) ||
+      this.supabaseService.getOrganizationId();
+
     // Check if this user is a staff member
-    const organizationId = this.supabaseService.getOrganizationId();
     const { data: staff, error: staffError } = await supabase
       .from('staff')
       .select('id, name, email, position, is_admin, role_id')

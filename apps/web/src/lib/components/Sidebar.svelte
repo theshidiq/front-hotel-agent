@@ -27,6 +27,16 @@
 		mobileOpen?: boolean;
 	} = $props();
 
+	const orgName = $derived(
+		authState.organization?.name ?? authState.organization?.display_name ?? null
+	);
+	const orgSubtitle = $derived(
+		authState.organization?.display_name && authState.organization.display_name !== authState.organization?.name
+			? authState.organization.display_name
+			: null
+	);
+	const orgInitial = $derived(orgName ? orgName.charAt(0).toUpperCase() : "S");
+
 	onMount(() => {
 		const saved = localStorage.getItem("sidebar-collapsed");
 		if (saved !== null) {
@@ -60,11 +70,13 @@
 		>
 			<div>
 				<h1 class="text-2xl font-bold text-white whitespace-nowrap">
-					湖南荘
+					{orgName ?? "Sinara"}
 				</h1>
-				<p class="text-xs text-slate-400 mt-0.5 whitespace-nowrap">
-					Konan-so Ryokan
-				</p>
+				{#if orgSubtitle}
+					<p class="text-xs text-slate-400 mt-0.5 whitespace-nowrap">
+						{orgSubtitle}
+					</p>
+				{/if}
 			</div>
 			<button
 				onclick={closeMobile}
@@ -217,7 +229,7 @@
 			: 'p-4 flex items-center justify-between'}"
 	>
 		{#if collapsed}
-			<span class="text-xl font-bold text-white">湖</span>
+			<span class="text-xl font-bold text-white">{orgInitial}</span>
 			<button
 				onclick={toggle}
 				class="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -230,11 +242,13 @@
 		{:else}
 			<div>
 				<h1 class="text-2xl font-bold text-white whitespace-nowrap">
-					湖南荘
+					{orgName ?? "Sinara"}
 				</h1>
-				<p class="text-xs text-slate-400 mt-0.5 whitespace-nowrap">
-					Konan-so Ryokan
-				</p>
+				{#if orgSubtitle}
+					<p class="text-xs text-slate-400 mt-0.5 whitespace-nowrap">
+						{orgSubtitle}
+					</p>
+				{/if}
 			</div>
 			<button
 				onclick={toggle}

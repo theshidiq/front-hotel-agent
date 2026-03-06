@@ -173,7 +173,7 @@
 </script>
 
 <svelte:head>
-    <title>ダッシュボード — 湖南荘</title>
+    <title>ダッシュボード — {authState.organization?.name ?? 'Sinara'}</title>
 </svelte:head>
 
 <div class="min-h-screen bg-gray-50 flex flex-col">
@@ -183,8 +183,10 @@
     >
         <div class="flex items-center gap-4">
             <div>
-                <h1 class="text-xl font-bold text-white">湖南荘</h1>
-                <p class="text-xs text-slate-400">Konan-so Ryokan</p>
+                <h1 class="text-xl font-bold text-white">{authState.organization?.name ?? 'Sinara'}</h1>
+                {#if authState.organization?.display_name && authState.organization.display_name !== authState.organization.name}
+                    <p class="text-xs text-slate-400">{authState.organization.display_name}</p>
+                {/if}
             </div>
             <div class="h-6 w-px bg-slate-700"></div>
             <span class="text-sm font-medium text-slate-300"
@@ -375,7 +377,7 @@
 
         <!-- Footer -->
         <p class="text-center text-xs text-gray-400 mt-12">
-            湖南荘 Hotel Management System &middot; {new Date().getFullYear()}
+            {authState.organization?.name ?? 'Sinara'} &middot; {new Date().getFullYear()}
         </p>
     </main>
 </div>

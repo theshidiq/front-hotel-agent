@@ -24,6 +24,14 @@ interface StaffWithPeriod extends Staff {
 	end_period: PeriodJson | null;
 	is_admin: boolean;
 	role_id: string | null;
+	organization_id: string | null;
+}
+
+interface Organization {
+	id: string;
+	name: string;
+	display_name: string | null;
+	slug: string | null;
 }
 
 interface AuthState {
@@ -37,6 +45,8 @@ interface AuthState {
 	role: StaffRole | null;
 	error: string | null;
 	guestPermissions: string[];
+	organizationId: string | null;
+	organization: Organization | null;
 }
 
 // Module-level reactive state (Svelte 5 runes)
@@ -51,6 +61,8 @@ export let authState: AuthState = $state({
 	role: null,
 	error: null,
 	guestPermissions: [],
+	organizationId: null,
+	organization: null,
 });
 
 export function can(permission: string): boolean {
@@ -63,6 +75,7 @@ export function can(permission: string): boolean {
 
 const PENDING_EMAIL_KEY = 'pending_staff_email';
 const STAFF_END_PERIOD_KEY = 'staff_end_period';
+const ORG_ID_KEY = 'org_id';
 
 export function setPendingStaffEmail(email: string): void {
 	if (typeof window !== 'undefined') {
@@ -128,6 +141,23 @@ function clearStaffPeriod(): void {
 	}
 }
 
+function saveOrgId(orgId: string): void {
+	if (typeof window !== 'undefined') {
+		localStorage.setItem(ORG_ID_KEY, orgId);
+	}
+}
+
+function getStoredOrgId(): string | null {
+	if (typeof window === 'undefined') return null;
+	return localStorage.getItem(ORG_ID_KEY);
+}
+
+function clearOrgId(): void {
+	if (typeof window !== 'undefined') {
+		localStorage.removeItem(ORG_ID_KEY);
+	}
+}
+
 /** Check if the stored end period has passed (quick local check, no DB call) */
 function isStoredPeriodExpired(): boolean {
 	const endPeriod = getStoredEndPeriod();
@@ -138,7 +168,7 @@ function isStoredPeriodExpired(): boolean {
 async function checkStaffStatus(email: string): Promise<StaffWithPeriod | null> {
 	const { data, error } = await supabase
 		.from('staff')
-		.select('id, name, email, position, start_period, end_period, is_admin, role_id')
+		.select('id, name, email, position, start_period, end_period, is_admin, role_id, organization_id')
 		.eq('email', email)
 		.eq('is_active', true)
 		.limit(1)
@@ -148,6 +178,32 @@ async function checkStaffStatus(email: string): Promise<StaffWithPeriod | null> 
 		return null;
 	}
 	return data as StaffWithPeriod;
+}
+
+async function fetchOrganization(orgId: string): Promise<Organization | null> {
+	const { data, error } = await supabase
+		.from('organizations')
+		.select('id, name, display_name, slug')
+		.eq('id', orgId)
+		.single();
+	if (error || !data) return null;
+	return data as Organization;
+}
+
+async function resolveOrganizationId(authUserId: string, staffOrgId: string | null): Promise<string | null> {
+	// Prefer org from staff record (most specific)
+	if (staffOrgId) return staffOrgId;
+
+	// Fall back to organization_members lookup
+	const { data } = await supabase
+		.from('organization_members')
+		.select('organization_id')
+		.eq('auth_user_id', authUserId)
+		.eq('is_active', true)
+		.limit(1)
+		.single();
+
+	return data?.organization_id ?? null;
 }
 
 async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | null; permissions: string[] }> {
@@ -166,7 +222,7 @@ async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | 
 let signingInProgress = false;
 let authInitialized = false;
 
-async function handleSignedIn(email: string): Promise<void> {
+async function handleSignedIn(email: string, authUserId?: string): Promise<void> {
 	// Guard against concurrent calls (getSession + onAuthStateChange both fire on OAuth redirect)
 	if (signingInProgress) return;
 	signingInProgress = true;
@@ -218,6 +274,25 @@ async function handleSignedIn(email: string): Promise<void> {
 		// Save end period for local expiry checks
 		saveStaffPeriod(staff.end_period);
 
+		// Resolve organization ID
+		const uid = authUserId ?? authState.user?.id;
+		const orgId = uid
+			? await resolveOrganizationId(uid, staff.organization_id)
+			: staff.organization_id;
+
+		if (orgId) {
+			authState.organizationId = orgId;
+			saveOrgId(orgId);
+			authState.organization = await fetchOrganization(orgId);
+		} else {
+			// Fall back to stored org or env fallback
+			const fallbackId = getStoredOrgId() ?? import.meta.env.VITE_ORGANIZATION_ID ?? null;
+			authState.organizationId = fallbackId;
+			if (fallbackId) {
+				authState.organization = await fetchOrganization(fallbackId);
+			}
+		}
+
 		authState.staff = { id: staff.id, name: staff.name, email: staff.email, position: staff.position };
 		authState.isStaff = true;
 		authState.isAdmin = staff.is_admin ?? false;
@@ -265,10 +340,15 @@ export async function initAuth(): Promise<void> {
 	// Quick local check: if stored period has expired, sign out immediately
 	if (isStoredPeriodExpired()) {
 		clearStaffPeriod();
+		clearOrgId();
 		await supabase.auth.signOut();
 		authState.loading = false;
 		return;
 	}
+
+	// Restore cached org ID immediately so headers are ready before DB resolves
+	const cachedOrgId = getStoredOrgId();
+	if (cachedOrgId) authState.organizationId = cachedOrgId;
 
 	// Parallel: load guest permissions + get session (independent operations)
 	const [, sessionResult] = await Promise.all([
@@ -281,7 +361,7 @@ export async function initAuth(): Promise<void> {
 	if (session?.user?.email) {
 		authState.user = session.user;
 		authState.session = session;
-		await handleSignedIn(session.user.email);
+		await handleSignedIn(session.user.email, session.user.id);
 	} else {
 		authState.loading = false;
 	}
@@ -297,7 +377,7 @@ export async function initAuth(): Promise<void> {
 				authState.session = session; // still update the session token
 				return;
 			}
-			await handleSignedIn(session.user.email);
+			await handleSignedIn(session.user.email, session.user.id);
 		} else if (event === 'TOKEN_REFRESHED' && session?.user?.email) {
 			// On token refresh, re-verify staff is still in active period
 			if (isStoredPeriodExpired()) {
@@ -305,14 +385,18 @@ export async function initAuth(): Promise<void> {
 				authState.isStaff = false;
 				authState.staff = null;
 				clearStaffPeriod();
+				clearOrgId();
 				await supabase.auth.signOut();
 			}
 		} else if (event === 'SIGNED_OUT') {
 			authState.staff = null;
 			authState.isStaff = false;
 			authState.error = null;
+			authState.organizationId = null;
+			authState.organization = null;
 			clearPendingStaffEmail();
 			clearStaffPeriod();
+			clearOrgId();
 		}
 	});
 }
@@ -347,7 +431,7 @@ export async function signInWithGoogleIdToken(credential: string): Promise<boole
 	if (data.session?.user?.email) {
 		authState.user = data.session.user;
 		authState.session = data.session;
-		await handleSignedIn(data.session.user.email);
+		await handleSignedIn(data.session.user.email, data.session.user.id);
 		return authState.isStaff;
 	}
 	return false;
@@ -363,17 +447,24 @@ export async function signOut(): Promise<void> {
 	authState.permissions = [];
 	authState.role = null;
 	authState.error = null;
+	authState.organizationId = null;
+	authState.organization = null;
 	clearPendingStaffEmail();
 	clearStaffPeriod();
+	clearOrgId();
 	// Reload guest permissions for non-logged-in view
 	loadGuestPermissions();
 }
 
 export function getAuthHeaders(): Record<string, string> {
+	const headers: Record<string, string> = {};
 	if (authState.session?.access_token) {
-		return { Authorization: `Bearer ${authState.session.access_token}` };
+		headers['Authorization'] = `Bearer ${authState.session.access_token}`;
 	}
-	return {};
+	if (authState.organizationId) {
+		headers['X-Organization-Id'] = authState.organizationId;
+	}
+	return headers;
 }
 
 /**
