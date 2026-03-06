@@ -52,11 +52,18 @@ With the database safely prepared, the next phase is entirely within the applica
 Before updating any read queries, we must ensure all new data being created writes *both* IDs.
 
 **The Initial Tenant Creation (The Setup Wizard):**
-We have successfully implemented a dedicated onboarding flow (`apps/web/src/routes/setup/+page.svelte`). This Wizard is now the gateway for multi-tenancy. When a new user signs up:
-1. It creates the master `organization` record.
-2. It creates the default `restaurant` workspace linked to that organization.
-3. It creates the `organization_members` record granting the user Ownership.
-4. It initializes `period_configuration` using both IDs.
+We have successfully implemented a dedicated onboarding flow to serve as the gateway for multi-tenancy. 
+
+**Relevant Codebase Files:**
+- `apps/web/src/routes/setup/+page.svelte` (Wizard UI & DB write logic)
+- `apps/web/src/routes/setup/+page.ts` (Already-onboarded route guard)
+
+**Supabase Tables Written During Setup:**
+When a new user completes the wizard, the following tables are inserted atomically:
+1. `public.organizations` (The master tenant record)
+2. `public.restaurants` (The default workspace, linked to the organization)
+3. `public.organization_members` (Grants the `auth.users` user 'owner' role)
+4. `public.period_configuration` (Initializes schedule periods, linked to both org and restaurant)
 
 **Next Action for Developers:** When a user creates a *new* data point (e.g., a reservation or a shift), the server/client code must pass both `{ restaurant_id: X, organization_id: Y }`.
 
