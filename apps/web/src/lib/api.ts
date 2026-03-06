@@ -83,11 +83,31 @@ export interface ScanExtractResult {
 	image_url: string;
 }
 
-export async function scanExtract(imageUrl: string): Promise<ScanExtractResult> {
+export async function scanExtract(imageUrl: string, signal?: AbortSignal): Promise<ScanExtractResult> {
 	const response = await fetch(`${API_URL}/scan/extract`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
 		body: JSON.stringify({ imageUrl }),
+		signal,
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Scan failed');
+	}
+
+	return response.json();
+}
+
+export async function scanExtractUpload(file: File, signal?: AbortSignal): Promise<ScanExtractResult> {
+	const formData = new FormData();
+	formData.append('file', file);
+
+	const response = await fetch(`${API_URL}/scan/extract-upload`, {
+		method: 'POST',
+		headers: authHeaders(),
+		body: formData,
+		signal,
 	});
 
 	if (!response.ok) {

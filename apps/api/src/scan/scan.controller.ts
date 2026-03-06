@@ -1,5 +1,16 @@
-import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { ScanService } from './scan.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanExtractResponse, ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
@@ -30,6 +41,24 @@ export class ScanController {
   })
   async extractOnly(@Body() createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
     return this.scanService.extractOnly(createScanDto);
+  }
+
+  @Post('extract-upload')
+  @RequirePermission('products.scan')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Upload image and extract product data without saving',
+    description:
+      'Accepts image file directly, uploads to storage, runs OCR, and returns extracted data for review',
+  })
+  async extractFromUpload(
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<ScanExtractResponse> {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+    return this.scanService.extractFromFile(file);
   }
 
   @Get()
