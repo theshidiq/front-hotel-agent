@@ -330,6 +330,29 @@ export async function signInWithGoogle(redirectTo?: string): Promise<void> {
 	}
 }
 
+/**
+ * Sign in with a Google ID token (from Google One Tap).
+ * Returns true on success, false if the account is not registered as staff.
+ */
+export async function signInWithGoogleIdToken(credential: string): Promise<boolean> {
+	authState.error = null;
+	const { data, error } = await supabase.auth.signInWithIdToken({
+		provider: 'google',
+		token: credential,
+	});
+	if (error) {
+		authState.error = error.message;
+		return false;
+	}
+	if (data.session?.user?.email) {
+		authState.user = data.session.user;
+		authState.session = data.session;
+		await handleSignedIn(data.session.user.email);
+		return authState.isStaff;
+	}
+	return false;
+}
+
 export async function signOut(): Promise<void> {
 	await supabase.auth.signOut();
 	authState.user = null;
