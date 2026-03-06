@@ -3,7 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 export interface ProductAlternate {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   product_id: string;
   alternate_product_id: string;
   created_at: string;
@@ -15,12 +15,12 @@ export class ProductAlternatesService {
 
   async findAll(): Promise<ProductAlternate[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('product_alternates')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -32,12 +32,12 @@ export class ProductAlternatesService {
 
   async findByProduct(productId: string): Promise<ProductAlternate[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('product_alternates')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('product_id', productId);
 
     if (error) {
@@ -49,12 +49,12 @@ export class ProductAlternatesService {
 
   async create(productId: string, alternateProductId: string): Promise<ProductAlternate> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('product_alternates')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         product_id: productId,
         alternate_product_id: alternateProductId,
       })
@@ -70,12 +70,12 @@ export class ProductAlternatesService {
 
   async delete(productId: string, alternateProductId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('product_alternates')
       .delete()
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('product_id', productId)
       .eq('alternate_product_id', alternateProductId);
 

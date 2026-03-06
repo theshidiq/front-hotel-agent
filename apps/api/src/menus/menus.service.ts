@@ -11,7 +11,7 @@ export class MenusService {
 
   async create(createMenuDto: CreateMenuDto): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { product_ids, ...menuData } = createMenuDto;
 
@@ -19,7 +19,7 @@ export class MenusService {
     const { data: menu, error } = await supabase
       .from('menus')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         ...menuData,
         is_available: menuData.is_available ?? true,
       })
@@ -45,12 +45,12 @@ export class MenusService {
 
   async findAll(limit = 50): Promise<MenuResponse[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: menus, error } = await supabase
       .from('menus')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(limit);
 

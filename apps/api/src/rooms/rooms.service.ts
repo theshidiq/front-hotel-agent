@@ -12,7 +12,7 @@ export class RoomsService {
       .getClient()
       .from('rooms')
       .select('*')
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .order('room_number');
 
     if (error) {
@@ -28,7 +28,7 @@ export class RoomsService {
       .from('rooms')
       .select('*')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (error || !data) {
@@ -44,7 +44,7 @@ export class RoomsService {
       .from('rooms')
       .select('*')
       .eq('room_number', roomNumber)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (error || !data) {
@@ -63,7 +63,7 @@ export class RoomsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .select()
       .single();
 
@@ -88,7 +88,7 @@ export class RoomsService {
         updated_at: new Date().toISOString(),
       })
       .eq('room_number', roomNumber)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .select()
       .single();
 
@@ -109,7 +109,7 @@ export class RoomsService {
         updated_at: new Date().toISOString(),
       })
       .eq('room_number', roomNumber)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .select()
       .single();
 

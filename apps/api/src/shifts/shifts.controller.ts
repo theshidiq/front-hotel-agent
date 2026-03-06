@@ -69,14 +69,14 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false, description: 'Filter by department' })
   @ApiResponse({ status: 200, description: 'List of staff members' })
   async getStaff(@GetUser() user: any, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.getStaff(user.restaurant_id, departmentId);
+    return this.shiftsService.getStaff(user.organization_id, departmentId);
   }
 
   @Post('staff')
   @ApiOperation({ summary: 'Create a new staff member' })
   @ApiResponse({ status: 201, description: 'Staff member created' })
   async createStaff(@GetUser() user: any, @Body() createStaffDto: CreateStaffDto) {
-    return this.shiftsService.createStaff(user.restaurant_id, createStaffDto);
+    return this.shiftsService.createStaff(user.organization_id, createStaffDto);
   }
 
   @Patch('staff/:id')
@@ -88,7 +88,7 @@ export class ShiftsController {
     @Param('id') id: string,
     @Body() updateStaffDto: UpdateStaffDto,
   ) {
-    return this.shiftsService.updateStaff(user.restaurant_id, id, updateStaffDto);
+    return this.shiftsService.updateStaff(user.organization_id, id, updateStaffDto);
   }
 
   @Delete('staff/:id')
@@ -96,14 +96,14 @@ export class ShiftsController {
   @ApiParam({ name: 'id', description: 'Staff member ID' })
   @ApiResponse({ status: 200, description: 'Staff member deleted' })
   async deleteStaff(@GetUser() user: any, @Param('id') id: string) {
-    return this.shiftsService.deleteStaff(user.restaurant_id, id);
+    return this.shiftsService.deleteStaff(user.organization_id, id);
   }
 
   @Put('staff/reorder')
   @ApiOperation({ summary: 'Reorder staff members' })
   @ApiResponse({ status: 200, description: 'Staff members reordered' })
   async reorderStaff(@GetUser() user: any, @Body() reorderDto: ReorderStaffDto) {
-    return this.shiftsService.reorderStaff(user.restaurant_id, reorderDto.staffIds);
+    return this.shiftsService.reorderStaff(user.organization_id, reorderDto.staffIds);
   }
 
   // ==================== PERIOD ENDPOINTS ====================
@@ -112,14 +112,14 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get all schedule periods' })
   @ApiResponse({ status: 200, description: 'List of periods' })
   async getPeriods(@GetUser() user: any) {
-    return this.shiftsService.getPeriods(user.restaurant_id);
+    return this.shiftsService.getPeriods(user.organization_id);
   }
 
   @Post('periods')
   @ApiOperation({ summary: 'Create a new period' })
   @ApiResponse({ status: 201, description: 'Period created' })
   async createPeriod(@GetUser() user: any, @Body() createPeriodDto: CreatePeriodDto) {
-    return this.shiftsService.createPeriod(user.restaurant_id, createPeriodDto);
+    return this.shiftsService.createPeriod(user.organization_id, createPeriodDto);
   }
 
   @Delete('periods/:id')
@@ -127,7 +127,7 @@ export class ShiftsController {
   @ApiParam({ name: 'id', description: 'Period ID' })
   @ApiResponse({ status: 200, description: 'Period deleted' })
   async deletePeriod(@GetUser() user: any, @Param('id') id: string) {
-    return this.shiftsService.deletePeriod(user.restaurant_id, id);
+    return this.shiftsService.deletePeriod(user.organization_id, id);
   }
 
   // ==================== SCHEDULE ENDPOINTS ====================
@@ -142,7 +142,7 @@ export class ShiftsController {
     @Param('periodId') periodId: string,
     @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.getSchedule(user.restaurant_id, periodId, departmentId);
+    return this.shiftsService.getSchedule(user.organization_id, periodId, departmentId);
   }
 
   @Patch('schedule/cell')
@@ -155,7 +155,7 @@ export class ShiftsController {
     @Query('department_id') departmentId?: string,
   ) {
     const { periodId, staffId, date, symbol } = updateCellDto;
-    await this.shiftsService.updateCell(user.restaurant_id, periodId, staffId, date, symbol, departmentId);
+    await this.shiftsService.updateCell(user.organization_id, periodId, staffId, date, symbol, departmentId);
     return { success: true };
   }
 
@@ -170,7 +170,7 @@ export class ShiftsController {
     @Body() bulkUpdateDto: BulkUpdateCellsDto,
     @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.bulkUpdateCells(user.restaurant_id, periodId, bulkUpdateDto.updates, departmentId);
+    return this.shiftsService.bulkUpdateCells(user.organization_id, periodId, bulkUpdateDto.updates, departmentId);
   }
 
   @Delete('schedule/:periodId/cells')
@@ -184,7 +184,7 @@ export class ShiftsController {
     @Param('periodId') periodId: string,
     @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.clearSchedule(user.restaurant_id, periodId, departmentId);
+    return this.shiftsService.clearSchedule(user.organization_id, periodId, departmentId);
   }
 
   // ==================== OPTIMIZATION ENDPOINTS ====================
@@ -193,7 +193,7 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Optimize schedule using OR-Tools' })
   @ApiResponse({ status: 200, description: 'Optimization result', type: OptimizeResponseDto })
   async optimizeSchedule(@GetUser() user: any, @Body() optimizeDto: OptimizeRequestDto) {
-    return this.shiftsService.optimizeSchedule(user.restaurant_id, optimizeDto);
+    return this.shiftsService.optimizeSchedule(user.organization_id, optimizeDto);
   }
 
   @Get('optimize/health')
@@ -216,14 +216,14 @@ export class ShiftsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.shiftsService.getCalendarRules(user.restaurant_id, startDate, endDate);
+    return this.shiftsService.getCalendarRules(user.organization_id, startDate, endDate);
   }
 
   @Post('settings/calendar-rules')
   @ApiOperation({ summary: 'Create a calendar rule' })
   @ApiResponse({ status: 201, description: 'Calendar rule created' })
   async createCalendarRule(@GetUser() user: any, @Body() createDto: CreateCalendarRuleDto) {
-    return this.shiftsService.createCalendarRule(user.restaurant_id, createDto);
+    return this.shiftsService.createCalendarRule(user.organization_id, createDto);
   }
 
   @Delete('settings/calendar-rules/:id')
@@ -231,7 +231,7 @@ export class ShiftsController {
   @ApiParam({ name: 'id', description: 'Calendar rule ID' })
   @ApiResponse({ status: 200, description: 'Calendar rule deleted' })
   async deleteCalendarRule(@GetUser() user: any, @Param('id') id: string) {
-    return this.shiftsService.deleteCalendarRule(user.restaurant_id, id);
+    return this.shiftsService.deleteCalendarRule(user.organization_id, id);
   }
 
   // Daily Limits
@@ -240,7 +240,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Daily limits configuration' })
   async getDailyLimits(@GetUser() user: any, @Query('department_id') departmentId?: string) {
-    const result = await this.shiftsService.getDailyLimits(user.restaurant_id, departmentId);
+    const result = await this.shiftsService.getDailyLimits(user.organization_id, departmentId);
     if (result === null) throw new NotFoundException('Daily limits not configured');
     return result;
   }
@@ -250,7 +250,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Daily limits updated' })
   async updateDailyLimits(@GetUser() user: any, @Body() updateDto: UpdateDailyLimitsDto, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.updateDailyLimits(user.restaurant_id, updateDto, departmentId);
+    return this.shiftsService.updateDailyLimits(user.organization_id, updateDto, departmentId);
   }
 
   // Monthly Limits
@@ -259,7 +259,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Monthly limits configuration' })
   async getMonthlyLimits(@GetUser() user: any, @Query('department_id') departmentId?: string) {
-    const result = await this.shiftsService.getMonthlyLimits(user.restaurant_id, departmentId);
+    const result = await this.shiftsService.getMonthlyLimits(user.organization_id, departmentId);
     if (result === null) throw new NotFoundException('Monthly limits not configured');
     return result;
   }
@@ -269,7 +269,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'Monthly limits updated' })
   async updateMonthlyLimits(@GetUser() user: any, @Body() updateDto: UpdateMonthlyLimitsDto, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.updateMonthlyLimits(user.restaurant_id, updateDto, departmentId);
+    return this.shiftsService.updateMonthlyLimits(user.organization_id, updateDto, departmentId);
   }
 
   @Get('settings/monthly-limits/all')
@@ -277,7 +277,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'All monthly limit records' })
   async getAllMonthlyLimits(@GetUser() user: any, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.getAllMonthlyLimits(user.restaurant_id, departmentId);
+    return this.shiftsService.getAllMonthlyLimits(user.organization_id, departmentId);
   }
 
   @Post('settings/monthly-limits')
@@ -285,14 +285,14 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 201, description: 'Monthly limit record created' })
   async createMonthlyLimitRecord(@GetUser() user: any, @Body() dto: CreateMonthlyLimitRecordDto, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.createMonthlyLimitRecord(user.restaurant_id, dto, departmentId);
+    return this.shiftsService.createMonthlyLimitRecord(user.organization_id, dto, departmentId);
   }
 
   @Patch('settings/monthly-limits/:id')
   @ApiOperation({ summary: 'Update an individual monthly limit record' })
   @ApiResponse({ status: 200, description: 'Monthly limit record updated' })
   async updateMonthlyLimitRecord(@GetUser() user: any, @Param('id') id: string, @Body() dto: any) {
-    return this.shiftsService.updateMonthlyLimitRecord(user.restaurant_id, id, dto);
+    return this.shiftsService.updateMonthlyLimitRecord(user.organization_id, id, dto);
   }
 
   @Delete('settings/monthly-limits/:id')
@@ -300,7 +300,7 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Delete a monthly limit record' })
   @ApiResponse({ status: 204, description: 'Monthly limit record deleted' })
   async deleteMonthlyLimitRecord(@GetUser() user: any, @Param('id') id: string) {
-    return this.shiftsService.deleteMonthlyLimitRecord(user.restaurant_id, id);
+    return this.shiftsService.deleteMonthlyLimitRecord(user.organization_id, id);
   }
 
   // Solver Config
@@ -308,7 +308,7 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get solver configuration' })
   @ApiResponse({ status: 200, description: 'Solver configuration' })
   async getSolverConfig(@GetUser() user: any) {
-    const result = await this.shiftsService.getSolverConfig(user.restaurant_id);
+    const result = await this.shiftsService.getSolverConfig(user.organization_id);
     if (result === null) throw new NotFoundException('Solver config not configured');
     return result;
   }
@@ -317,7 +317,7 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Update solver configuration' })
   @ApiResponse({ status: 200, description: 'Solver configuration updated' })
   async updateSolverConfig(@GetUser() user: any, @Body() updateDto: UpdateSolverConfigDto) {
-    return this.shiftsService.updateSolverConfig(user.restaurant_id, updateDto);
+    return this.shiftsService.updateSolverConfig(user.organization_id, updateDto);
   }
 
   // Staff Groups
@@ -326,7 +326,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'List of staff groups' })
   async getStaffGroups(@GetUser() user: any, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.getStaffGroups(user.restaurant_id, departmentId);
+    return this.shiftsService.getStaffGroups(user.organization_id, departmentId);
   }
 
   @Post('settings/staff-groups')
@@ -334,7 +334,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 201, description: 'Staff group created' })
   async createStaffGroup(@GetUser() user: any, @Body() createDto: CreateStaffGroupDto, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.createStaffGroup(user.restaurant_id, createDto, departmentId);
+    return this.shiftsService.createStaffGroup(user.organization_id, createDto, departmentId);
   }
 
   @Patch('settings/staff-groups/:id')
@@ -346,7 +346,7 @@ export class ShiftsController {
     @Param('id') id: string,
     @Body() updateDto: UpdateStaffGroupDto,
   ) {
-    return this.shiftsService.updateStaffGroup(user.restaurant_id, id, updateDto);
+    return this.shiftsService.updateStaffGroup(user.organization_id, id, updateDto);
   }
 
   @Delete('settings/staff-groups/:id')
@@ -354,7 +354,7 @@ export class ShiftsController {
   @ApiParam({ name: 'id', description: 'Staff group ID' })
   @ApiResponse({ status: 200, description: 'Staff group deleted' })
   async deleteStaffGroup(@GetUser() user: any, @Param('id') id: string) {
-    return this.shiftsService.deleteStaffGroup(user.restaurant_id, id);
+    return this.shiftsService.deleteStaffGroup(user.organization_id, id);
   }
 
   // Staff Group Members
@@ -363,7 +363,7 @@ export class ShiftsController {
   @ApiParam({ name: 'id', description: 'Staff group ID' })
   @ApiResponse({ status: 200, description: 'List of staff group members' })
   async getStaffGroupMembers(@GetUser() user: any, @Param('id') groupId: string) {
-    return this.shiftsService.getStaffGroupMembers(user.restaurant_id, groupId);
+    return this.shiftsService.getStaffGroupMembers(user.organization_id, groupId);
   }
 
   @Put('settings/staff-groups/:id/members')
@@ -375,7 +375,7 @@ export class ShiftsController {
     @Param('id') groupId: string,
     @Body() body: { staffIds: string[] },
   ) {
-    return this.shiftsService.setStaffGroupMembers(user.restaurant_id, groupId, body.staffIds);
+    return this.shiftsService.setStaffGroupMembers(user.organization_id, groupId, body.staffIds);
   }
 
   // ==================== PRIORITY RULES ====================
@@ -385,7 +385,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'List of priority rules' })
   async getPriorityRules(@GetUser() user: any, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.getPriorityRules(user.restaurant_id, departmentId);
+    return this.shiftsService.getPriorityRules(user.organization_id, departmentId);
   }
 
   @Post('settings/priority-rules')
@@ -393,7 +393,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 201, description: 'Priority rule created' })
   async createPriorityRule(@GetUser() user: any, @Body() createDto: CreatePriorityRuleDto, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.createPriorityRule(user.restaurant_id, createDto, departmentId);
+    return this.shiftsService.createPriorityRule(user.organization_id, createDto, departmentId);
   }
 
   @Patch('settings/priority-rules/:id')
@@ -405,7 +405,7 @@ export class ShiftsController {
     @Param('id') id: string,
     @Body() updateDto: UpdatePriorityRuleDto,
   ) {
-    return this.shiftsService.updatePriorityRule(user.restaurant_id, id, updateDto);
+    return this.shiftsService.updatePriorityRule(user.organization_id, id, updateDto);
   }
 
   @Delete('settings/priority-rules/:id')
@@ -413,7 +413,7 @@ export class ShiftsController {
   @ApiParam({ name: 'id', description: 'Priority rule ID' })
   @ApiResponse({ status: 200, description: 'Priority rule deleted' })
   async deletePriorityRule(@GetUser() user: any, @Param('id') id: string) {
-    return this.shiftsService.deletePriorityRule(user.restaurant_id, id);
+    return this.shiftsService.deletePriorityRule(user.organization_id, id);
   }
 
   // ==================== EARLY SHIFT PREFERENCES ====================
@@ -423,7 +423,7 @@ export class ShiftsController {
   @ApiQuery({ name: 'department_id', required: false })
   @ApiResponse({ status: 200, description: 'List of early shift preferences' })
   async getEarlyShiftPreferences(@GetUser() user: any, @Query('department_id') departmentId?: string) {
-    return this.shiftsService.getEarlyShiftPreferences(user.restaurant_id, departmentId);
+    return this.shiftsService.getEarlyShiftPreferences(user.organization_id, departmentId);
   }
 
   @Post('settings/early-shift-preferences')
@@ -435,7 +435,7 @@ export class ShiftsController {
     @Body() createDto: CreateEarlyShiftPreferenceDto,
     @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.createEarlyShiftPreference(user.restaurant_id, createDto);
+    return this.shiftsService.createEarlyShiftPreference(user.organization_id, createDto);
   }
 
   @Put('settings/early-shift-preferences/bulk')
@@ -447,7 +447,7 @@ export class ShiftsController {
     @Body() bulkDto: BulkEarlyShiftPreferenceDto,
     @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.bulkUpsertEarlyShiftPreferences(user.restaurant_id, bulkDto, departmentId);
+    return this.shiftsService.bulkUpsertEarlyShiftPreferences(user.organization_id, bulkDto, departmentId);
   }
 
   @Patch('settings/early-shift-preferences/:id')
@@ -459,7 +459,7 @@ export class ShiftsController {
     @Param('id') id: string,
     @Body() updateDto: UpdateEarlyShiftPreferenceDto,
   ) {
-    return this.shiftsService.updateEarlyShiftPreference(user.restaurant_id, id, updateDto);
+    return this.shiftsService.updateEarlyShiftPreference(user.organization_id, id, updateDto);
   }
 
   @Delete('settings/early-shift-preferences/:id')
@@ -467,7 +467,7 @@ export class ShiftsController {
   @ApiParam({ name: 'id', description: 'Early shift preference ID' })
   @ApiResponse({ status: 200, description: 'Early shift preference deleted' })
   async deleteEarlyShiftPreference(@GetUser() user: any, @Param('id') id: string) {
-    return this.shiftsService.deleteEarlyShiftPreference(user.restaurant_id, id);
+    return this.shiftsService.deleteEarlyShiftPreference(user.organization_id, id);
   }
 
   // ==================== PERIOD CONFIGURATION ====================
@@ -476,7 +476,7 @@ export class ShiftsController {
   @ApiOperation({ summary: 'Get period configuration' })
   @ApiResponse({ status: 200, description: 'Period configuration' })
   async getPeriodConfiguration(@GetUser() user: any) {
-    const result = await this.shiftsService.getPeriodConfiguration(user.restaurant_id);
+    const result = await this.shiftsService.getPeriodConfiguration(user.organization_id);
     if (result === null) throw new NotFoundException('Period configuration not found');
     return result;
   }
@@ -488,13 +488,13 @@ export class ShiftsController {
     @GetUser() user: any,
     @Body() updateDto: UpdatePeriodConfigurationDto,
   ) {
-    return this.shiftsService.updatePeriodConfiguration(user.restaurant_id, updateDto);
+    return this.shiftsService.updatePeriodConfiguration(user.organization_id, updateDto);
   }
 
   @Post('settings/periods/regenerate')
   @ApiOperation({ summary: 'Regenerate periods based on configuration' })
   @ApiResponse({ status: 200, description: 'Periods regenerated' })
   async regeneratePeriods(@GetUser() user: any) {
-    return this.shiftsService.regeneratePeriods(user.restaurant_id);
+    return this.shiftsService.regeneratePeriods(user.organization_id);
   }
 }

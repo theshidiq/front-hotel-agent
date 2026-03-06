@@ -3,7 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 export interface SeasonalMenu {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   name: string;
   start_date: string | null;
   end_date: string | null;
@@ -20,12 +20,12 @@ export class SeasonalMenusService {
 
   async findAll(): Promise<SeasonalMenu[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('seasonal_menus')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('sort_order')
       .order('name');
 
@@ -39,13 +39,13 @@ export class SeasonalMenusService {
 
   async create(data: { name: string; start_date?: string; end_date?: string }): Promise<SeasonalMenu> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Get max sort_order for auto-increment
     const { data: existing } = await supabase
       .from('seasonal_menus')
       .select('sort_order')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('sort_order', { ascending: false })
       .limit(1);
 
@@ -54,7 +54,7 @@ export class SeasonalMenusService {
     const { data: created, error } = await supabase
       .from('seasonal_menus')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         name: data.name.trim(),
         start_date: data.start_date || null,
         end_date: data.end_date || null,

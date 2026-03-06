@@ -21,7 +21,7 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .select('*')
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .order('room_number');
 
     if (date) {
@@ -59,7 +59,7 @@ export class ReservationsService {
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (error || !data) {
@@ -100,7 +100,7 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .select('*')
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .lte('check_in_date', targetDate)
       .gte('check_out_date', targetDate);
 
@@ -134,7 +134,7 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .insert({
-        restaurant_id: this.supabaseService.getRestaurantId(),
+        organization_id: this.supabaseService.getOrganizationId(),
         ...dto,
         allergen_ids: allergenIds,
         allergen_details: dto.allergen_details || [],
@@ -156,7 +156,7 @@ export class ReservationsService {
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (fetchError || !reservation) {
@@ -235,7 +235,7 @@ export class ReservationsService {
       .from('reservations')
       .select('id, status, room_number')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (fetchError || !reservation) {
@@ -268,7 +268,7 @@ export class ReservationsService {
           updated_at: new Date().toISOString(),
         })
         .eq('room_number', reservation.room_number)
-        .eq('restaurant_id', this.supabaseService.getRestaurantId()),
+        .eq('organization_id', this.supabaseService.getOrganizationId()),
     ]);
 
     if (updateResult.error) {
@@ -317,7 +317,7 @@ export class ReservationsService {
         .getClient()
         .from('guest_alerts')
         .insert({
-          restaurant_id: this.supabaseService.getRestaurantId(),
+          organization_id: this.supabaseService.getOrganizationId(),
           reservation_id: reservation.id,
           alert_type: 'allergy_update',
           room_number: reservation.room_number,
@@ -341,7 +341,7 @@ export class ReservationsService {
       .getClient()
       .from('rooms')
       .update({ current_reservation_id: null })
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .not('current_reservation_id', 'is', null);
 
     // Now delete all reservations
@@ -349,7 +349,7 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .delete()
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .select();
 
     if (error) {
@@ -364,7 +364,7 @@ export class ReservationsService {
       .getClient()
       .from('guest_alerts')
       .insert({
-        restaurant_id: this.supabaseService.getRestaurantId(),
+        organization_id: this.supabaseService.getOrganizationId(),
         reservation_id: reservation.id,
         alert_type: 'check_in',
         room_number: reservation.room_number,

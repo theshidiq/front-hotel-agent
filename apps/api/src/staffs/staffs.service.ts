@@ -7,11 +7,11 @@ interface PeriodJson {
   day: number;
 }
 
-const STAFF_FIELDS = 'id, restaurant_id, name, email, position, department_id, position_id, is_active, is_admin, role_id, employment_type, start_period, end_period, created_at';
+const STAFF_FIELDS = 'id, organization_id, name, email, position, department_id, position_id, is_active, is_admin, role_id, employment_type, start_period, end_period, created_at';
 
 export interface Staff {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   name: string;
   email: string;
   position: string | null;
@@ -55,7 +55,7 @@ export class StaffsService {
 
   private async autoDeactivateExpired(): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const today = new Date();
     const y = today.getFullYear();
@@ -66,7 +66,7 @@ export class StaffsService {
     const { data, error } = await supabase
       .from('staff')
       .select('id, name')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .not('end_period', 'is', null)
       .or(
@@ -83,19 +83,19 @@ export class StaffsService {
       .from('staff')
       .update({ is_active: false })
       .in('id', ids)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     this.logger.log(`Auto-deactivated ${ids.length} expired staff: ${data.map((s) => s.name).join(', ')}`);
   }
 
   async findAll(): Promise<Staff[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
       .select(STAFF_FIELDS)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .order('name');
 
@@ -110,13 +110,13 @@ export class StaffsService {
 
   async updateEmail(id: string, email: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
       .update({ email: email.trim().toLowerCase() })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select(STAFF_FIELDS)
       .single();
 
@@ -130,12 +130,12 @@ export class StaffsService {
 
   async create(name: string, email: string, position: string, departmentId?: string | null, positionId?: string | null): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         name: name.trim(),
         email: email.trim().toLowerCase(),
         position: position.trim(),
@@ -155,13 +155,13 @@ export class StaffsService {
 
   async updateOrg(id: string, updates: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: PeriodJson | null; end_period?: PeriodJson | null }): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
       .update(updates)
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select(STAFF_FIELDS)
       .single();
 
@@ -178,12 +178,12 @@ export class StaffsService {
     await this.autoDeactivateExpired();
 
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
       .select(STAFF_FIELDS)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('name');
 
     if (error) {
@@ -196,13 +196,13 @@ export class StaffsService {
 
   async deleteStaff(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('staff')
       .update({ is_active: false })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error(`Failed to deactivate staff: ${error.message}`);
@@ -212,13 +212,13 @@ export class StaffsService {
 
   async hardDeleteStaff(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('staff')
       .delete()
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', false); // Safety: only allow deleting inactive staff
 
     if (error) {
@@ -229,13 +229,13 @@ export class StaffsService {
 
   async updateRole(id: string, roleId: string | null): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
       .update({ role_id: roleId })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select(STAFF_FIELDS)
       .single();
 
@@ -249,7 +249,7 @@ export class StaffsService {
 
   async updateAdmin(id: string, isAdmin: boolean, requestingStaffId: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Safety: cannot demote yourself
     if (!isAdmin && id === requestingStaffId) {
@@ -261,7 +261,7 @@ export class StaffsService {
       const { data: admins } = await supabase
         .from('staff')
         .select('id')
-        .eq('restaurant_id', restaurantId)
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .eq('is_admin', true);
 
@@ -274,7 +274,7 @@ export class StaffsService {
       .from('staff')
       .update({ is_admin: isAdmin })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select(STAFF_FIELDS)
       .single();
 

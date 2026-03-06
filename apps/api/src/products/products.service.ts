@@ -10,7 +10,7 @@ export class ProductsService {
 
   async create(createProductDto: CreateProductDto): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { allergen_ids, ...productData } = createProductDto;
 
@@ -18,7 +18,7 @@ export class ProductsService {
     const { data: product, error } = await supabase
       .from('products')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         ...productData,
         is_vegetarian: productData.is_vegetarian ?? false,
         is_vegan: productData.is_vegan ?? false,
@@ -65,12 +65,12 @@ export class ProductsService {
 
   async findAll(limit = 50): Promise<ProductResponse[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: products, error } = await supabase
       .from('products')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(limit);
 

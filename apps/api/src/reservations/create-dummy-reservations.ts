@@ -24,10 +24,10 @@ async function createDummyReservations() {
   // Initialize Supabase client
   const supabaseUrl = process.env.SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-  const restaurantId = process.env.RESTAURANT_ID;
+  const organizationId = process.env.ORGANIZATION_ID;
 
-  if (!supabaseUrl || !supabaseServiceKey || !restaurantId) {
-    throw new Error('Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_KEY, RESTAURANT_ID');
+  if (!supabaseUrl || !supabaseServiceKey || !organizationId) {
+    throw new Error('Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_KEY, ORGANIZATION_ID');
   }
 
   const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -250,7 +250,7 @@ async function createDummyReservations() {
       const { error } = await supabase
         .from('reservations')
         .insert({
-          restaurant_id: restaurantId,
+          organization_id: organizationId,
           booking_source: reservation.booking_source,
           guest_name: reservation.guest_name,
           guest_name_kana: reservation.guest_name_kana,

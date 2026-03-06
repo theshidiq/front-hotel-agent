@@ -3,7 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 export interface Category {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   type: 'product' | 'menu';
   name: string;
   value: string;
@@ -26,12 +26,12 @@ export class CategoriesService {
 
   async findAll(type?: 'product' | 'menu'): Promise<Category[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     let query = supabase
       .from('categories')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('name');
 
     if (type) {
@@ -49,12 +49,12 @@ export class CategoriesService {
 
   async create(name: string, type: 'product' | 'menu'): Promise<Category> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
     const value = name.trim().toLowerCase().replace(/\s+/g, '-');
 
     const { data, error } = await supabase
       .from('categories')
-      .insert({ restaurant_id: restaurantId, type, name: name.trim(), value })
+      .insert({ organization_id: organizationId, type, name: name.trim(), value })
       .select()
       .single();
 

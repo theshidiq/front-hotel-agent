@@ -43,11 +43,11 @@ export class ShiftsService {
 
   // ==================== STAFF MANAGEMENT ====================
 
-  async getStaff(restaurantId: string, departmentId?: string): Promise<ScheduleStaff[]> {
+  async getStaff(organizationId: string, departmentId?: string): Promise<ScheduleStaff[]> {
     let query = this.supabase
       .from('staff')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .order('staff_order', { ascending: true });
 
@@ -65,12 +65,12 @@ export class ShiftsService {
     return data || [];
   }
 
-  async getStaffById(restaurantId: string, id: string): Promise<ScheduleStaff> {
+  async getStaffById(organizationId: string, id: string): Promise<ScheduleStaff> {
     const { data, error } = await this.supabase
       .from('staff')
       .select('*')
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !data) {
@@ -80,12 +80,12 @@ export class ShiftsService {
     return data;
   }
 
-  async createStaff(restaurantId: string, dto: CreateStaffDto): Promise<ScheduleStaff> {
+  async createStaff(organizationId: string, dto: CreateStaffDto): Promise<ScheduleStaff> {
     // Get max staff_order
     const { data: maxOrder } = await this.supabase
       .from('staff')
       .select('staff_order')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('staff_order', { ascending: false })
       .limit(1)
       .single();
@@ -96,7 +96,7 @@ export class ShiftsService {
       .from('staff')
       .insert({
         ...dto,
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         staff_order: dto.staff_order ?? newOrder,
         is_active: true,
       })
@@ -111,12 +111,12 @@ export class ShiftsService {
     return data;
   }
 
-  async updateStaff(restaurantId: string, id: string, dto: UpdateStaffDto): Promise<ScheduleStaff> {
+  async updateStaff(organizationId: string, id: string, dto: UpdateStaffDto): Promise<ScheduleStaff> {
     const { data, error } = await this.supabase
       .from('staff')
       .update({ ...dto, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -128,13 +128,13 @@ export class ShiftsService {
     return data;
   }
 
-  async deleteStaff(restaurantId: string, id: string): Promise<void> {
+  async deleteStaff(organizationId: string, id: string): Promise<void> {
     // Soft delete - just mark as inactive
     const { error } = await this.supabase
       .from('staff')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to delete staff', error);
@@ -142,7 +142,7 @@ export class ShiftsService {
     }
   }
 
-  async reorderStaff(restaurantId: string, staffIds: string[]): Promise<void> {
+  async reorderStaff(organizationId: string, staffIds: string[]): Promise<void> {
     const updates = staffIds.map((id, index) => ({
       id,
       staff_order: index,
@@ -154,7 +154,7 @@ export class ShiftsService {
         .from('staff')
         .update({ staff_order: update.staff_order, updated_at: update.updated_at })
         .eq('id', update.id)
-        .eq('restaurant_id', restaurantId);
+        .eq('organization_id', organizationId);
 
       if (error) {
         this.logger.error('Failed to reorder staff', error);
@@ -165,7 +165,7 @@ export class ShiftsService {
 
   // ==================== PERIODS ====================
 
-  async getPeriods(restaurantId: string): Promise<SchedulePeriod[]> {
+  async getPeriods(organizationId: string): Promise<SchedulePeriod[]> {
     const { data, error } = await this.supabase
       .from('periods')
       .select('*')
@@ -179,7 +179,7 @@ export class ShiftsService {
     return data || [];
   }
 
-  async getPeriodById(restaurantId: string, id: string): Promise<SchedulePeriod> {
+  async getPeriodById(organizationId: string, id: string): Promise<SchedulePeriod> {
     const { data, error } = await this.supabase
       .from('periods')
       .select('*')
@@ -193,7 +193,7 @@ export class ShiftsService {
     return data;
   }
 
-  async createPeriod(restaurantId: string, dto: CreatePeriodDto): Promise<SchedulePeriod> {
+  async createPeriod(organizationId: string, dto: CreatePeriodDto): Promise<SchedulePeriod> {
     const { data, error } = await this.supabase
       .from('periods')
       .insert({
@@ -212,7 +212,7 @@ export class ShiftsService {
     return data;
   }
 
-  async deletePeriod(restaurantId: string, id: string): Promise<void> {
+  async deletePeriod(organizationId: string, id: string): Promise<void> {
     const { error } = await this.supabase
       .from('periods')
       .delete()
@@ -226,13 +226,13 @@ export class ShiftsService {
 
   // ==================== SCHEDULE ====================
 
-  async getSchedule(restaurantId: string, periodId: string, departmentId?: string): Promise<{
+  async getSchedule(organizationId: string, periodId: string, departmentId?: string): Promise<{
     period: SchedulePeriod;
     schedule: Schedule | null;
     staff: ScheduleStaff[];
   }> {
-    const period = await this.getPeriodById(restaurantId, periodId);
-    const staff = await this.getStaff(restaurantId, departmentId);
+    const period = await this.getPeriodById(organizationId, periodId);
+    const staff = await this.getStaff(organizationId, departmentId);
 
     // Load schedule for the specific period+department combination
     let scheduleQuery = this.supabase
@@ -324,7 +324,7 @@ export class ShiftsService {
   }
 
   async updateCell(
-    restaurantId: string,
+    organizationId: string,
     periodId: string,
     staffId: string,
     date: string,
@@ -332,7 +332,7 @@ export class ShiftsService {
     departmentId?: string,
   ): Promise<void> {
     // Get or create schedule for period+department
-    let schedule = await this.getOrCreateSchedule(restaurantId, periodId, departmentId);
+    let schedule = await this.getOrCreateSchedule(organizationId, periodId, departmentId);
 
     // Update the cell
     const scheduleData = schedule.schedule_data || {};
@@ -356,12 +356,12 @@ export class ShiftsService {
   }
 
   async bulkUpdateCells(
-    restaurantId: string,
+    organizationId: string,
     periodId: string,
     updates: Array<{ staffId: string; date: string; symbol: string }>,
     departmentId?: string,
   ): Promise<void> {
-    let schedule = await this.getOrCreateSchedule(restaurantId, periodId, departmentId);
+    let schedule = await this.getOrCreateSchedule(organizationId, periodId, departmentId);
 
     const scheduleData = schedule.schedule_data || {};
     for (const update of updates) {
@@ -385,8 +385,8 @@ export class ShiftsService {
     }
   }
 
-  private async getOrCreateSchedule(restaurantId: string, periodId: string, departmentId?: string): Promise<Schedule> {
-    const period = await this.getPeriodById(restaurantId, periodId);
+  private async getOrCreateSchedule(organizationId: string, periodId: string, departmentId?: string): Promise<Schedule> {
+    const period = await this.getPeriodById(organizationId, periodId);
 
     // Try to find existing schedule for this period+department
     let existingQuery = this.supabase
@@ -453,11 +453,11 @@ export class ShiftsService {
 
   // ==================== OPTIMIZATION ====================
 
-  async optimizeSchedule(restaurantId: string, dto: OptimizeRequestDto): Promise<any> {
+  async optimizeSchedule(organizationId: string, dto: OptimizeRequestDto): Promise<any> {
     const deptId = dto.departmentId;
-    const period = await this.getPeriodById(restaurantId, dto.periodId);
-    const staff = await this.getStaff(restaurantId, deptId);
-    const { schedule } = await this.getSchedule(restaurantId, dto.periodId, deptId);
+    const period = await this.getPeriodById(organizationId, dto.periodId);
+    const staff = await this.getStaff(organizationId, deptId);
+    const { schedule } = await this.getSchedule(organizationId, dto.periodId, deptId);
 
     // Fetch all constraint configurations
     const [
@@ -470,14 +470,14 @@ export class ShiftsService {
       earlyShiftPreferences,
       backupAssignments,
     ] = await Promise.all([
-      this.getCalendarRules(restaurantId),
-      this.getDailyLimits(restaurantId, deptId),
-      this.getAllMonthlyLimits(restaurantId, deptId),
-      this.getSolverConfig(restaurantId),
-      this.getStaffGroups(restaurantId, deptId),
-      this.getPriorityRules(restaurantId, deptId),
-      this.getEarlyShiftPreferences(restaurantId, deptId),
-      this.getBackupAssignments(restaurantId, deptId),
+      this.getCalendarRules(organizationId),
+      this.getDailyLimits(organizationId, deptId),
+      this.getAllMonthlyLimits(organizationId, deptId),
+      this.getSolverConfig(organizationId),
+      this.getStaffGroups(organizationId, deptId),
+      this.getPriorityRules(organizationId, deptId),
+      this.getEarlyShiftPreferences(organizationId, deptId),
+      this.getBackupAssignments(organizationId, deptId),
     ]);
 
     // Staff groups: members stored in group_config.members JSONB
@@ -637,7 +637,7 @@ export class ShiftsService {
 
     if (result.success && result.schedule) {
       await this.bulkUpdateCells(
-        restaurantId,
+        organizationId,
         dto.periodId,
         this.scheduleToUpdates(result.schedule),
         deptId,
@@ -647,8 +647,8 @@ export class ShiftsService {
     return result;
   }
 
-  async clearSchedule(restaurantId: string, periodId: string, departmentId?: string): Promise<void> {
-    const schedule = await this.getOrCreateSchedule(restaurantId, periodId, departmentId);
+  async clearSchedule(organizationId: string, periodId: string, departmentId?: string): Promise<void> {
+    const schedule = await this.getOrCreateSchedule(organizationId, periodId, departmentId);
     const { error } = await this.supabase
       .from('schedules')
       .update({ schedule_data: {}, updated_at: new Date().toISOString() })
@@ -696,14 +696,14 @@ export class ShiftsService {
   // ==================== SETTINGS: Calendar Rules ====================
 
   async getCalendarRules(
-    restaurantId: string,
+    organizationId: string,
     startDate?: string,
     endDate?: string,
   ): Promise<CalendarRule[]> {
     let query = this.supabase
       .from('calendar_rules')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('date', { ascending: true });
 
     if (startDate) {
@@ -724,13 +724,13 @@ export class ShiftsService {
   }
 
   async createCalendarRule(
-    restaurantId: string,
+    organizationId: string,
     dto: CreateCalendarRuleDto,
   ): Promise<CalendarRule> {
     const { data, error } = await this.supabase
       .from('calendar_rules')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         date: dto.date,
         rule_type: dto.rule_type,
         reason: dto.reason,
@@ -746,12 +746,12 @@ export class ShiftsService {
     return data;
   }
 
-  async deleteCalendarRule(restaurantId: string, id: string): Promise<void> {
+  async deleteCalendarRule(organizationId: string, id: string): Promise<void> {
     const { error } = await this.supabase
       .from('calendar_rules')
       .delete()
       .eq('id', id)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to delete calendar rule', error);
@@ -761,11 +761,11 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Daily Limits ====================
 
-  async getDailyLimits(restaurantId: string, departmentId?: string): Promise<DailyLimits | null> {
+  async getDailyLimits(organizationId: string, departmentId?: string): Promise<DailyLimits | null> {
     let query = this.supabase
       .from('daily_limits')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true);
 
     if (departmentId) {
@@ -784,11 +784,11 @@ export class ShiftsService {
   }
 
   async updateDailyLimits(
-    restaurantId: string,
+    organizationId: string,
     dto: UpdateDailyLimitsDto,
     departmentId?: string,
   ): Promise<DailyLimits> {
-    const existing = await this.getDailyLimits(restaurantId, departmentId);
+    const existing = await this.getDailyLimits(organizationId, departmentId);
 
     const limitConfig = {
       ...(existing?.limit_config || {}),
@@ -821,12 +821,12 @@ export class ShiftsService {
       return data;
     } else {
       // Get or create config version
-      const versionId = await this.getOrCreateConfigVersion(restaurantId);
+      const versionId = await this.getOrCreateConfigVersion(organizationId);
 
       const { data, error } = await this.supabase
         .from('daily_limits')
         .insert({
-          restaurant_id: restaurantId,
+          organization_id: organizationId,
           version_id: versionId,
           name: 'default',
           limit_config: limitConfig,
@@ -847,11 +847,11 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Monthly Limits ====================
 
-  async getMonthlyLimits(restaurantId: string, departmentId?: string): Promise<MonthlyLimits | null> {
+  async getMonthlyLimits(organizationId: string, departmentId?: string): Promise<MonthlyLimits | null> {
     let query = this.supabase
       .from('monthly_limits')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true);
 
     if (departmentId) {
@@ -869,11 +869,11 @@ export class ShiftsService {
     return data;
   }
 
-  async getAllMonthlyLimits(restaurantId: string, departmentId?: string): Promise<any[]> {
+  async getAllMonthlyLimits(organizationId: string, departmentId?: string): Promise<any[]> {
     let query = this.supabase
       .from('monthly_limits')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
 
@@ -894,11 +894,11 @@ export class ShiftsService {
   }
 
   async updateMonthlyLimits(
-    restaurantId: string,
+    organizationId: string,
     dto: UpdateMonthlyLimitsDto,
     departmentId?: string,
   ): Promise<MonthlyLimits> {
-    const existing = await this.getMonthlyLimits(restaurantId, departmentId);
+    const existing = await this.getMonthlyLimits(organizationId, departmentId);
 
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -934,12 +934,12 @@ export class ShiftsService {
 
       return data;
     } else {
-      const versionId = await this.getOrCreateConfigVersion(restaurantId);
+      const versionId = await this.getOrCreateConfigVersion(organizationId);
 
       const { data, error } = await this.supabase
         .from('monthly_limits')
         .insert({
-          restaurant_id: restaurantId,
+          organization_id: organizationId,
           version_id: versionId,
           name: 'default',
           min_count: dto.min_count,
@@ -962,12 +962,12 @@ export class ShiftsService {
     }
   }
 
-  async createMonthlyLimitRecord(restaurantId: string, dto: any, departmentId?: string): Promise<any> {
-    const versionId = await this.getOrCreateConfigVersion(restaurantId);
+  async createMonthlyLimitRecord(organizationId: string, dto: any, departmentId?: string): Promise<any> {
+    const versionId = await this.getOrCreateConfigVersion(organizationId);
     const { data, error } = await this.supabase
       .from('monthly_limits')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         version_id: versionId,
         name: dto.name || (dto.scope === 'all' ? 'default' : dto.targetIds?.[0] || dto.scope),
         min_count: dto.min_count,
@@ -990,12 +990,12 @@ export class ShiftsService {
     return data;
   }
 
-  async updateMonthlyLimitRecord(restaurantId: string, limitId: string, dto: any): Promise<any> {
+  async updateMonthlyLimitRecord(organizationId: string, limitId: string, dto: any): Promise<any> {
     const { data: existing } = await this.supabase
       .from('monthly_limits')
       .select('limit_config')
       .eq('id', limitId)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .single();
 
     const existingConfig = (existing?.limit_config as any) || {};
@@ -1023,7 +1023,7 @@ export class ShiftsService {
       .from('monthly_limits')
       .update(updateData)
       .eq('id', limitId)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -1031,23 +1031,23 @@ export class ShiftsService {
     return data;
   }
 
-  async deleteMonthlyLimitRecord(restaurantId: string, limitId: string): Promise<void> {
+  async deleteMonthlyLimitRecord(organizationId: string, limitId: string): Promise<void> {
     const { error } = await this.supabase
       .from('monthly_limits')
       .delete()
       .eq('id', limitId)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) throw new BadRequestException('Failed to delete monthly limit record');
   }
 
   // ==================== SETTINGS: Solver Config ====================
 
-  async getSolverConfig(restaurantId: string): Promise<ORToolsSolverConfig | null> {
+  async getSolverConfig(organizationId: string): Promise<ORToolsSolverConfig | null> {
     const { data, error } = await this.supabase
       .from('ortools_solver_config')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .single();
 
@@ -1059,10 +1059,10 @@ export class ShiftsService {
   }
 
   async updateSolverConfig(
-    restaurantId: string,
+    organizationId: string,
     dto: UpdateSolverConfigDto,
   ): Promise<ORToolsSolverConfig> {
-    const existing = await this.getSolverConfig(restaurantId);
+    const existing = await this.getSolverConfig(organizationId);
 
     const updateData: any = { updated_at: new Date().toISOString() };
 
@@ -1111,12 +1111,12 @@ export class ShiftsService {
 
       return data;
     } else {
-      const versionId = await this.getOrCreateConfigVersion(restaurantId);
+      const versionId = await this.getOrCreateConfigVersion(organizationId);
 
       const { data, error } = await this.supabase
         .from('ortools_solver_config')
         .insert({
-          restaurant_id: restaurantId,
+          organization_id: organizationId,
           version_id: versionId,
           name: 'default',
           preset: 'balanced',
@@ -1153,11 +1153,11 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Staff Groups ====================
 
-  async getStaffGroups(restaurantId: string, departmentId?: string): Promise<ScheduleStaffGroup[]> {
+  async getStaffGroups(organizationId: string, departmentId?: string): Promise<ScheduleStaffGroup[]> {
     let query = this.supabase
       .from('staff_groups')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true);
 
     if (departmentId) {
@@ -1177,11 +1177,11 @@ export class ShiftsService {
   }
 
   async createStaffGroup(
-    restaurantId: string,
+    organizationId: string,
     dto: CreateStaffGroupDto,
     departmentId?: string,
   ): Promise<ScheduleStaffGroup> {
-    const versionId = await this.getOrCreateConfigVersion(restaurantId);
+    const versionId = await this.getOrCreateConfigVersion(organizationId);
 
     // Ensure members is always a clean string[]
     const rawMembers = dto.group_config?.members;
@@ -1192,7 +1192,7 @@ export class ShiftsService {
     const { data, error } = await this.supabase
       .from('staff_groups')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         version_id: versionId,
         name: dto.name,
         description: dto.description,
@@ -1216,7 +1216,7 @@ export class ShiftsService {
   }
 
   async updateStaffGroup(
-    restaurantId: string,
+    organizationId: string,
     id: string,
     dto: UpdateStaffGroupDto,
   ): Promise<ScheduleStaffGroup> {
@@ -1225,7 +1225,7 @@ export class ShiftsService {
       .from('staff_groups')
       .select('group_config')
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .single();
 
     const updatePayload: any = { updated_at: new Date().toISOString() };
@@ -1255,7 +1255,7 @@ export class ShiftsService {
       .from('staff_groups')
       .update(updatePayload)
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -1267,12 +1267,12 @@ export class ShiftsService {
     return data;
   }
 
-  async deleteStaffGroup(restaurantId: string, id: string): Promise<void> {
+  async deleteStaffGroup(organizationId: string, id: string): Promise<void> {
     const { error } = await this.supabase
       .from('staff_groups')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to delete staff group', error);
@@ -1281,7 +1281,7 @@ export class ShiftsService {
   }
 
   async getStaffGroupMembers(
-    restaurantId: string,
+    organizationId: string,
     groupId: string,
   ): Promise<Array<{ staff_id: string; group_id: string }>> {
     // Members are stored in group_config.members JSONB array on the staff_groups table
@@ -1289,7 +1289,7 @@ export class ShiftsService {
       .from('staff_groups')
       .select('id, group_config')
       .eq('id', groupId)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .single();
 
     if (error) {
@@ -1302,16 +1302,16 @@ export class ShiftsService {
   }
 
   async setStaffGroupMembers(
-    restaurantId: string,
+    organizationId: string,
     groupId: string,
     staffIds: string[],
   ): Promise<void> {
-    // Validate all provided IDs belong to active staff in this restaurant
+    // Validate all provided IDs belong to active staff in this organization
     if (staffIds.length > 0) {
       const { data: validStaff, error: staffError } = await this.supabase
         .from('staff')
         .select('id')
-        .eq('restaurant_id', restaurantId)
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .in('id', staffIds);
 
@@ -1334,7 +1334,7 @@ export class ShiftsService {
       .from('staff_groups')
       .select('group_config')
       .eq('id', groupId)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .single();
 
     if (fetchError) {
@@ -1351,7 +1351,7 @@ export class ShiftsService {
       .from('staff_groups')
       .update({ group_config: updatedConfig, updated_at: new Date().toISOString() })
       .eq('id', groupId)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to set staff group members', error);
@@ -1361,11 +1361,11 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Priority Rules ====================
 
-  async getPriorityRules(restaurantId: string, departmentId?: string): Promise<any[]> {
+  async getPriorityRules(organizationId: string, departmentId?: string): Promise<any[]> {
     let query = this.supabase
       .from('priority_rules')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true);
 
     if (departmentId) {
@@ -1396,11 +1396,11 @@ export class ShiftsService {
   }
 
   async createPriorityRule(
-    restaurantId: string,
+    organizationId: string,
     dto: CreatePriorityRuleDto,
     departmentId?: string,
   ): Promise<any> {
-    const versionId = await this.getOrCreateConfigVersion(restaurantId);
+    const versionId = await this.getOrCreateConfigVersion(organizationId);
 
     const ruleDefinition = {
       staff_ids: dto.staff_ids || [],
@@ -1413,7 +1413,7 @@ export class ShiftsService {
     const { data, error } = await this.supabase
       .from('priority_rules')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         version_id: versionId,
         name: dto.name,
         description: dto.description,
@@ -1438,7 +1438,7 @@ export class ShiftsService {
   }
 
   async updatePriorityRule(
-    restaurantId: string,
+    organizationId: string,
     id: string,
     dto: UpdatePriorityRuleDto,
   ): Promise<any> {
@@ -1475,7 +1475,7 @@ export class ShiftsService {
       .from('priority_rules')
       .update(updateData)
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -1487,13 +1487,13 @@ export class ShiftsService {
     return data;
   }
 
-  async deletePriorityRule(restaurantId: string, id: string): Promise<void> {
+  async deletePriorityRule(organizationId: string, id: string): Promise<void> {
     // Soft delete
     const { error } = await this.supabase
       .from('priority_rules')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to delete priority rule', error);
@@ -1503,11 +1503,11 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Early Shift Preferences ====================
 
-  async getEarlyShiftPreferences(restaurantId: string, departmentId?: string): Promise<any[]> {
+  async getEarlyShiftPreferences(organizationId: string, departmentId?: string): Promise<any[]> {
     let query = this.supabase
       .from('staff_early_shift_preferences')
       .select('*')
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (departmentId) {
       query = query.eq('department_id', departmentId);
@@ -1526,13 +1526,13 @@ export class ShiftsService {
   }
 
   async createEarlyShiftPreference(
-    restaurantId: string,
+    organizationId: string,
     dto: CreateEarlyShiftPreferenceDto,
   ): Promise<any> {
     const { data, error } = await this.supabase
       .from('staff_early_shift_preferences')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         staff_id: dto.staff_id,
         can_do_early_shift: dto.can_do_early_shift,
         applies_to_date: dto.applies_to_date,
@@ -1550,7 +1550,7 @@ export class ShiftsService {
   }
 
   async updateEarlyShiftPreference(
-    restaurantId: string,
+    organizationId: string,
     id: string,
     dto: UpdateEarlyShiftPreferenceDto,
   ): Promise<any> {
@@ -1561,7 +1561,7 @@ export class ShiftsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -1574,7 +1574,7 @@ export class ShiftsService {
   }
 
   async bulkUpsertEarlyShiftPreferences(
-    restaurantId: string,
+    organizationId: string,
     dto: BulkEarlyShiftPreferenceDto,
     departmentId?: string,
   ): Promise<void> {
@@ -1584,7 +1584,7 @@ export class ShiftsService {
     let deleteQuery = this.supabase
       .from('staff_early_shift_preferences')
       .delete()
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .in('staff_id', staffIds)
       .is('applies_to_date', null); // Only delete general preferences, not date-specific
 
@@ -1598,7 +1598,7 @@ export class ShiftsService {
 
     // Insert new preferences
     const inserts = dto.preferences.map((p) => ({
-      restaurant_id: restaurantId,
+      organization_id: organizationId,
       staff_id: p.staff_id,
       can_do_early_shift: p.can_do_early_shift,
       applies_to_date: p.applies_to_date || null,
@@ -1616,12 +1616,12 @@ export class ShiftsService {
     }
   }
 
-  async deleteEarlyShiftPreference(restaurantId: string, id: string): Promise<void> {
+  async deleteEarlyShiftPreference(organizationId: string, id: string): Promise<void> {
     const { error } = await this.supabase
       .from('staff_early_shift_preferences')
       .delete()
       .eq('id', id)
-      .eq('restaurant_id', restaurantId);
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to delete early shift preference', error);
@@ -1631,11 +1631,11 @@ export class ShiftsService {
 
   // ==================== SETTINGS: Period Configuration ====================
 
-  async getPeriodConfiguration(restaurantId: string): Promise<any | null> {
+  async getPeriodConfiguration(organizationId: string): Promise<any | null> {
     const { data, error } = await this.supabase
       .from('period_configuration')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -1646,10 +1646,10 @@ export class ShiftsService {
   }
 
   async updatePeriodConfiguration(
-    restaurantId: string,
+    organizationId: string,
     dto: UpdatePeriodConfigurationDto,
   ): Promise<any> {
-    const existing = await this.getPeriodConfiguration(restaurantId);
+    const existing = await this.getPeriodConfiguration(organizationId);
 
     if (existing) {
       const { data, error } = await this.supabase
@@ -1671,7 +1671,7 @@ export class ShiftsService {
       const { data, error } = await this.supabase
         .from('period_configuration')
         .insert({
-          restaurant_id: restaurantId,
+          organization_id: organizationId,
           start_day: dto.start_day || 21,
           end_day: dto.end_day || 20,
           period_length_days: dto.period_length_days || 30,
@@ -1687,8 +1687,8 @@ export class ShiftsService {
     }
   }
 
-  async regeneratePeriods(restaurantId: string): Promise<SchedulePeriod[]> {
-    const config = await this.getPeriodConfiguration(restaurantId);
+  async regeneratePeriods(organizationId: string): Promise<SchedulePeriod[]> {
+    const config = await this.getPeriodConfiguration(organizationId);
     if (!config) {
       throw new BadRequestException('Period configuration not found');
     }
@@ -1740,7 +1740,7 @@ export class ShiftsService {
 
   // ==================== BACKUP ASSIGNMENTS ====================
 
-  async getBackupAssignments(restaurantId: string, departmentId?: string): Promise<Array<{
+  async getBackupAssignments(organizationId: string, departmentId?: string): Promise<Array<{
     id: string;
     staffId: string;
     groupId: string;
@@ -1751,7 +1751,7 @@ export class ShiftsService {
     let query = this.supabase
       .from('staff_backup_assignments')
       .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true);
 
     // Filter by department if provided — join via staff table
@@ -1767,7 +1767,7 @@ export class ShiftsService {
 
     // If departmentId provided, filter to assignments where the backup staff is in that department
     if (departmentId) {
-      const deptStaff = await this.getStaff(restaurantId, departmentId);
+      const deptStaff = await this.getStaff(organizationId, departmentId);
       const deptStaffIds = new Set(deptStaff.map((s) => s.id));
       return data
         .filter((a: any) => deptStaffIds.has(a.staff_id))
@@ -1793,12 +1793,12 @@ export class ShiftsService {
 
   // ==================== HELPERS ====================
 
-  private async getOrCreateConfigVersion(restaurantId: string): Promise<string> {
+  private async getOrCreateConfigVersion(organizationId: string): Promise<string> {
     // Try to find existing active version
     const { data: existing } = await this.supabase
       .from('config_versions')
       .select('id')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .single();
 
@@ -1810,7 +1810,7 @@ export class ShiftsService {
     const { data: version, error } = await this.supabase
       .from('config_versions')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         version_number: 1,
         name: 'Default Configuration',
         is_active: true,

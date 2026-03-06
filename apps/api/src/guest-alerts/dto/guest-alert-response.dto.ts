@@ -5,7 +5,7 @@ export class GuestAlertResponse {
   id: string;
 
   @ApiProperty()
-  restaurant_id: string;
+  organization_id: string;
 
   @ApiProperty()
   reservation_id: string;

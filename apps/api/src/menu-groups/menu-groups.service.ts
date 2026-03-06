@@ -10,7 +10,7 @@ export interface AllowedCourse {
 
 export interface MenuGroup {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   name: string;
   display_title: string | null;
   seasonal_menu_id: string | null;
@@ -59,12 +59,12 @@ export class MenuGroupsService {
 
   async findAll(seasonalMenuId?: string): Promise<MenuGroup[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     let query = supabase
       .from('menu_groups')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('sort_order')
       .order('name');
 
@@ -90,13 +90,13 @@ export class MenuGroupsService {
 
   async create(data: { name: string; seasonal_menu_id?: string; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Get max sort_order for auto-increment
     const { data: existing } = await supabase
       .from('menu_groups')
       .select('sort_order')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('sort_order', { ascending: false })
       .limit(1);
 
@@ -105,7 +105,7 @@ export class MenuGroupsService {
     const { data: created, error } = await supabase
       .from('menu_groups')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         name: data.name.trim(),
         seasonal_menu_id: data.seasonal_menu_id || null,
         sort_order: nextOrder,
@@ -208,12 +208,12 @@ export class MenuGroupsService {
 
   async findByStayPeriod(nights: number, seasonalMenuId?: string): Promise<MenuGroup[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     let query = supabase
       .from('menu_groups')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('sort_order')
       .order('name');
 

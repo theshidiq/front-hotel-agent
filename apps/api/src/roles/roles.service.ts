@@ -38,7 +38,7 @@ export type Permission = (typeof ALL_PERMISSIONS)[number];
 
 export interface Role {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   name: string;
   description: string | null;
   is_default: boolean;
@@ -54,12 +54,12 @@ export class RolesService {
 
   async findAll(): Promise<Role[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: roles, error } = await supabase
       .from('roles')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('name');
 
     if (error) {
@@ -115,12 +115,12 @@ export class RolesService {
     permissions?: string[],
   ): Promise<Role> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: role, error } = await supabase
       .from('roles')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         name: name.trim(),
         description: description?.trim() || null,
       })
@@ -215,12 +215,12 @@ export class RolesService {
 
   async findDefault(): Promise<Role | null> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: role } = await supabase
       .from('roles')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_default', true)
       .single();
 
@@ -239,14 +239,14 @@ export class RolesService {
 
   async setDefault(id: string): Promise<Role> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Clear existing default + validate role exists in parallel
     const [, roleResult] = await Promise.all([
       supabase
         .from('roles')
         .update({ is_default: false })
-        .eq('restaurant_id', restaurantId)
+        .eq('organization_id', organizationId)
         .eq('is_default', true),
       this.findOne(id),
     ]);
@@ -271,25 +271,25 @@ export class RolesService {
 
   async clearDefault(): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     await supabase
       .from('roles')
       .update({ is_default: false })
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_default', true);
   }
 
   async remove(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Check if any staff are assigned to this role
     const { data: assignedStaff } = await supabase
       .from('staff')
       .select('id')
       .eq('role_id', id)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .limit(1);
 

@@ -1220,12 +1220,12 @@
 	let realtimeChannel: any = null;
 
 	function setupRealtimeSubscriptions() {
-		// Get restaurant ID from environment
-		const restaurantId = import.meta.env.VITE_RESTAURANT_ID;
+		// Get organization ID from environment
+		const organizationId = import.meta.env.VITE_ORGANIZATION_ID;
 
 		console.log(
-			"🔌 Setting up real-time subscriptions for restaurant:",
-			restaurantId,
+			"🔌 Setting up real-time subscriptions for organization:",
+			organizationId,
 		);
 
 		// Use a single channel with multiple event listeners to minimize connections
@@ -1238,7 +1238,7 @@
 					event: "*",
 					schema: "public",
 					table: "reservations",
-					filter: `restaurant_id=eq.${restaurantId}`,
+					filter: `organization_id=eq.${organizationId}`,
 				},
 				(payload) => {
 					console.log(
@@ -1257,7 +1257,7 @@
 					event: "*",
 					schema: "public",
 					table: "guest_alerts",
-					filter: `restaurant_id=eq.${restaurantId}`,
+					filter: `organization_id=eq.${organizationId}`,
 				},
 				async (payload) => {
 					console.log("Alert change:", payload.eventType);
@@ -1277,7 +1277,7 @@
 					event: "*",
 					schema: "public",
 					table: "rooms",
-					filter: `restaurant_id=eq.${restaurantId}`,
+					filter: `organization_id=eq.${organizationId}`,
 				},
 				async (payload) => {
 					console.log("Room change:", payload.eventType);

@@ -29,7 +29,7 @@ export const SHIFT_LABELS: Record<ShiftSymbol, string> = {
 
 export interface ScheduleStaff {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	position?: string;
 	department?: string;
@@ -48,7 +48,7 @@ export interface ScheduleStaff {
 
 export interface ScheduleStaffGroup {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	version_id: string;
 	name: string;
 	description?: string;
@@ -94,7 +94,7 @@ export interface ScheduleMetadata {
 
 export interface CalendarRule {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	date: string;
 	rule_type: 'must_work' | 'must_day_off';
 	reason?: string;
@@ -104,7 +104,7 @@ export interface CalendarRule {
 
 export interface DailyLimits {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	version_id: string;
 	name: string;
 	limit_config: {
@@ -125,7 +125,7 @@ export interface DailyLimits {
 
 export interface MonthlyLimits {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	version_id: string;
 	name: string;
 	limit_config: Record<string, unknown>;
@@ -140,7 +140,7 @@ export interface MonthlyLimits {
 
 export interface ORToolsSolverConfig {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	version_id?: string;
 	name: string;
 	preset: string;

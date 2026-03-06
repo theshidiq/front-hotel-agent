@@ -71,12 +71,12 @@ export class StaffAuthGuard implements CanActivate {
     }
 
     // Check if this user is a staff member
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
     const { data: staff, error: staffError } = await supabase
       .from('staff')
       .select('id, name, email, position, is_admin, role_id')
       .eq('email', email)
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .eq('is_active', true)
       .single();
 
@@ -114,7 +114,7 @@ export class StaffAuthGuard implements CanActivate {
       roleId: staff.role_id,
       roleName,
       permissions,
-      restaurant_id: restaurantId,
+      organization_id: organizationId,
     };
 
     this.setCached(token, userData);

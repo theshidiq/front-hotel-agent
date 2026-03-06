@@ -3,7 +3,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 
 export interface Department {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   name: string;
   color: string;
   sort_order: number;
@@ -13,7 +13,7 @@ export interface Department {
 
 export interface Position {
   id: string;
-  restaurant_id: string;
+  organization_id: string;
   department_id: string;
   name: string;
   sort_order: number;
@@ -28,8 +28,8 @@ export class DepartmentsService {
     return this.supabaseService.getClient();
   }
 
-  private get restaurantId() {
-    return this.supabaseService.getRestaurantId();
+  private get organizationId() {
+    return this.supabaseService.getOrganizationId();
   }
 
   // ── Departments ────────────────────────────────────────────
@@ -38,7 +38,7 @@ export class DepartmentsService {
     const { data, error } = await this.db
       .from('departments')
       .select('*, positions(*)')
-      .eq('restaurant_id', this.restaurantId)
+      .eq('organization_id', this.organizationId)
       .order('sort_order')
       .order('name');
 
@@ -54,7 +54,7 @@ export class DepartmentsService {
   async createDepartment(name: string, color: string, sortOrder: number): Promise<Department> {
     const { data, error } = await this.db
       .from('departments')
-      .insert({ restaurant_id: this.restaurantId, name: name.trim(), color, sort_order: sortOrder })
+      .insert({ organization_id: this.organizationId, name: name.trim(), color, sort_order: sortOrder })
       .select()
       .single();
 
@@ -70,7 +70,7 @@ export class DepartmentsService {
       .from('departments')
       .update(updates)
       .eq('id', id)
-      .eq('restaurant_id', this.restaurantId)
+      .eq('organization_id', this.organizationId)
       .select()
       .single();
 
@@ -87,7 +87,7 @@ export class DepartmentsService {
       .from('departments')
       .delete()
       .eq('id', id)
-      .eq('restaurant_id', this.restaurantId);
+      .eq('organization_id', this.organizationId);
 
     if (error) throw new InternalServerErrorException(error.message);
   }
@@ -99,7 +99,7 @@ export class DepartmentsService {
       .from('positions')
       .select('*')
       .eq('department_id', departmentId)
-      .eq('restaurant_id', this.restaurantId)
+      .eq('organization_id', this.organizationId)
       .order('sort_order')
       .order('name');
 
@@ -110,7 +110,7 @@ export class DepartmentsService {
   async createPosition(departmentId: string, name: string, sortOrder: number): Promise<Position> {
     const { data, error } = await this.db
       .from('positions')
-      .insert({ restaurant_id: this.restaurantId, department_id: departmentId, name: name.trim(), sort_order: sortOrder })
+      .insert({ organization_id: this.organizationId, department_id: departmentId, name: name.trim(), sort_order: sortOrder })
       .select()
       .single();
 
@@ -126,7 +126,7 @@ export class DepartmentsService {
       .from('positions')
       .update(updates)
       .eq('id', id)
-      .eq('restaurant_id', this.restaurantId)
+      .eq('organization_id', this.organizationId)
       .select()
       .single();
 
@@ -143,7 +143,7 @@ export class DepartmentsService {
       .from('positions')
       .delete()
       .eq('id', id)
-      .eq('restaurant_id', this.restaurantId);
+      .eq('organization_id', this.organizationId);
 
     if (error) throw new InternalServerErrorException(error.message);
   }

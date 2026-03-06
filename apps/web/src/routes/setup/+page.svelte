@@ -353,7 +353,6 @@
                 .eq("id", org.id);
 
             await supabase.from("period_configuration").insert({
-                restaurant_id: restaurant.id,
                 organization_id: org.id,
                 start_day: 21,
                 end_day: 20,

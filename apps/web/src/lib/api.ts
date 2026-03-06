@@ -219,7 +219,7 @@ export async function deleteAllergen(id: string): Promise<void> {
 // Category Types
 export interface Category {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	type: 'product' | 'menu';
 	name: string;
 	value: string;
@@ -291,7 +291,7 @@ export async function deleteCategoryApi(id: string): Promise<void> {
 // Seasonal Menu Types
 export interface SeasonalMenu {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	start_date: string | null;
 	end_date: string | null;
@@ -371,7 +371,7 @@ export interface AllowedCourse {
 
 export interface MenuGroup {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	display_title: string | null;
 	seasonal_menu_id: string | null;
@@ -466,7 +466,7 @@ export interface MenuProduct {
 
 export interface Menu {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	description: string | null;
 	price: number | null;
@@ -562,7 +562,7 @@ export async function deleteMenu(id: string): Promise<void> {
 
 export interface Room {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	room_number: string;
 	room_name: string | null;
 	room_type: string | null;
@@ -620,7 +620,7 @@ export async function updateRoomStatus(
 
 export interface Reservation {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	booking_source: string;
 	external_booking_id: string | null;
 	guest_token: string | null;
@@ -843,7 +843,7 @@ export async function updateReservationByToken(
 
 export interface GuestAlert {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	reservation_id: string;
 	alert_type: 'check_in' | 'allergy_update' | 'special_request' | 'other';
 	room_number: string;
@@ -1093,7 +1093,7 @@ export async function deleteStaffPermanent(id: string): Promise<void> {
 
 export interface OrgPosition {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	department_id: string;
 	name: string;
 	sort_order: number;
@@ -1102,7 +1102,7 @@ export interface OrgPosition {
 
 export interface OrgDepartment {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	color: string;
 	sort_order: number;
@@ -1197,7 +1197,7 @@ export async function deletePosition(id: string): Promise<void> {
 
 export interface Role {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	description: string | null;
 	is_default: boolean;
@@ -1321,7 +1321,7 @@ export async function clearRoleDefault(id: string): Promise<void> {
 // Product Alternates
 export interface ProductAlternate {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	product_id: string;
 	alternate_product_id: string;
 	created_at: string;

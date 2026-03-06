@@ -13,6 +13,7 @@ services:
       - PORT=3002
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - ORGANIZATION_ID=${ORGANIZATION_ID}
       - RESTAURANT_ID=${RESTAURANT_ID}
       - ORTOOLS_URL=http://ortools:5000
     depends_on:

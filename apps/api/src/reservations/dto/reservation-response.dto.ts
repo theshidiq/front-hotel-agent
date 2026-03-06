@@ -5,7 +5,7 @@ export class ReservationResponse {
   id: string;
 
   @ApiProperty()
-  restaurant_id: string;
+  organization_id: string;
 
   @ApiProperty({ enum: ['rakuten', 'jalan', 'booking_com', 'expedia', 'agoda', 'direct', 'phone', 'walk_in'] })
   booking_source: string;

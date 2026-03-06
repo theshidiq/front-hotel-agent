@@ -843,7 +843,7 @@ export async function setStaffGroupMembers(groupId: string, staffIds: string[]):
 
 export interface PriorityRule {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	description?: string;
 	staff_ids?: string[];
@@ -936,7 +936,7 @@ export async function deletePriorityRule(id: string): Promise<void> {
 
 export interface EarlyShiftPreference {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	staff_id: string;
 	can_do_early_shift: boolean;
 	applies_to_date?: string;
@@ -1022,7 +1022,7 @@ export async function deleteEarlyShiftPreference(id: string): Promise<void> {
 
 export interface PeriodConfiguration {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	start_day: number;
 	end_day: number;
 	period_length_days?: number;
