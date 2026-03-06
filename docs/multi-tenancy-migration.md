@@ -48,10 +48,17 @@ Phase 1 of our migration was purely additive at the database layer.
 
 With the database safely prepared, the next phase is entirely within the application layer (`apps/web/...`).
 
-### Step 1: Write Operations (Dual Writes)
+### Step 1: Write Operations (Dual Writes) & The Setup Wizard
 Before updating any read queries, we must ensure all new data being created writes *both* IDs.
-- Our Setup Wizard (`/setup/+page.svelte`) currently creates the initial `restaurant` and `period_configuration` using the new `organization_id`.
-- **Next Action:** When a user creates a *new* reservation, the server/client code must pass both `{ restaurant_id: X, organization_id: Y }`.
+
+**The Initial Tenant Creation (The Setup Wizard):**
+We have successfully implemented a dedicated onboarding flow (`apps/web/src/routes/setup/+page.svelte`). This Wizard is now the gateway for multi-tenancy. When a new user signs up:
+1. It creates the master `organization` record.
+2. It creates the default `restaurant` workspace linked to that organization.
+3. It creates the `organization_members` record granting the user Ownership.
+4. It initializes `period_configuration` using both IDs.
+
+**Next Action for Developers:** When a user creates a *new* data point (e.g., a reservation or a shift), the server/client code must pass both `{ restaurant_id: X, organization_id: Y }`.
 
 ### Step 2: Read Operations
 Currently, the UI filters data by checking `restaurant_id`. When building organization-level dashboards (e.g., viewing cross-restaurant statistics), you simply query using `.eq('organization_id', orgId)`.
