@@ -2,6 +2,11 @@
     import { onMount } from "svelte";
     import { cubicOut } from "svelte/easing";
     import ConstellationCanvas from "$lib/components/ConstellationCanvas.svelte";
+    import { signInWithGoogle } from "$lib/auth.svelte";
+
+    function startSetup() {
+        signInWithGoogle(window.location.origin + "/setup");
+    }
 
     let emailInput = $state("");
     let submitted = $state(false);
@@ -232,8 +237,7 @@
 
         <div class="nav-actions">
             <a href="/login" class="nav-login">Log in</a>
-            <a href="/setup" class="btn-secondary nav-start">Get started free</a
-            >
+            <button onclick={startSetup} class="btn-secondary nav-start">Get started free</button>
             <a href="#contact" class="btn-primary">Book a Demo</a>
         </div>
     </div>
@@ -269,8 +273,7 @@
                         fully present.
                     </p>
                     <div class="hero-ctas">
-                        <a href="/setup" class="btn-primary">Get started free</a
-                        >
+                        <button onclick={startSetup} class="btn-primary">Get started free</button>
                         <a href="#contact" class="btn-secondary">Book a Demo</a>
                     </div>
                     <div class="hero-trust">

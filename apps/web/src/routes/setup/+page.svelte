@@ -2,10 +2,11 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { supabase } from "$lib/supabase";
-    import { authState } from "$lib/auth.svelte";
+    import { authState, initAuth } from "$lib/auth.svelte";
 
-    // ─── Already-onboarded guard ──────────────────────────────────────────────
+    // ─── Init auth + already-onboarded guard ─────────────────────────────────
     onMount(async () => {
+        await initAuth();
         const userId = authState.user?.id;
         if (userId) {
             const { data: membership } = await supabase
@@ -35,9 +36,9 @@
     let stateProvince = $state("");
     let postalCode = $state("");
     let localPhone = $state("");
-    let ownerEmail = $state(authState.user?.email ?? "");
+    const ownerEmail = $derived(authState.user?.email ?? "");
     let brandColor = $state("#B8956A");
-    let plan = $state<"free" | "pro" | "business">("free");
+    let plan = $state<"free" | "pro" | "enterprise">("free");
 
     // ─── Country dropdown UI ───────────────────────────────────────────────────
     let countryOpen = $state(false);
@@ -55,6 +56,9 @@
     let submitting = $state(false);
     let submitError = $state<string | null>(null);
     let fieldErrors = $state<Record<string, string>>({});
+
+    // ─── Email confirmation state ──────────────────────────────────────────────
+    let createdOrgId = $state<string | null>(null);
 
     // ─── Constants ────────────────────────────────────────────────────────────
     const BUSINESS_TYPES = [
@@ -198,8 +202,8 @@
             locked: ["Unlimited divisions", "Priority support"],
         },
         {
-            value: "business" as const,
-            tier: "Business",
+            value: "enterprise" as const,
+            tier: "Enterprise",
             name: "Business",
             price: "¥12,800",
             priceNote: "≈ $85 USD · Billed monthly",
@@ -255,8 +259,7 @@
                 errs.slug = "Lowercase letters, numbers, hyphens only";
         }
         if (step === 2) {
-            if (ownerEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ownerEmail))
-                errs.ownerEmail = "Enter a valid email address";
+            // no validation needed — email comes from Google auth
         }
         if (step === 3) {
             // No required fields in step 3 (plan is always set)
@@ -283,7 +286,7 @@
         submitError = null;
         try {
             const authUserId = authState.user?.id ?? null;
-            const resolvedEmail = ownerEmail || authState.user?.email || null;
+            const resolvedEmail = ownerEmail || null;
 
             const addressStr = [
                 addressLine1,
@@ -316,10 +319,19 @@
                 })
                 .select("id")
                 .single();
-            if (orgErr || !org)
+            if (orgErr || !org) {
+                if (orgErr?.message?.includes("organizations_slug_key")) {
+                    fieldErrors = {
+                        slug: "This workspace URL is already taken. Please choose a different one.",
+                    };
+                    currentStep = 1;
+                    submitting = false;
+                    return;
+                }
                 throw new Error(
                     orgErr?.message ?? "Failed to create organization",
                 );
+            }
 
             const { data: restaurant, error: restErr } = await supabase
                 .from("restaurants")
@@ -367,11 +379,23 @@
                 is_active: true,
             });
 
+            // Create a staff record for the owner so they can log in to the dashboard
+            await supabase.from("staff").insert({
+                restaurant_id: restaurant.id,
+                organization_id: org.id,
+                name: name.trim(),
+                email: resolvedEmail,
+                is_active: true,
+                is_admin: true,
+                hire_date: new Date().toISOString().split("T")[0],
+            });
+
+            createdOrgId = org.id;
+
             await supabase
                 .from("organizations")
                 .update({ onboarded_at: new Date().toISOString() })
                 .eq("id", org.id);
-
             currentStep = TOTAL_STEPS;
         } catch (err: unknown) {
             submitError =
@@ -383,7 +407,8 @@
         }
     }
 
-    function goToDashboard() {
+    async function goToDashboard() {
+        await initAuth();
         goto("/dashboard");
     }
 </script>
@@ -489,8 +514,12 @@
         <div class="setup-main-area">
             <div class="setup-scroll">
                 <div class="setup-form-content">
-                    <!-- step content unchanged -->
-                    {#if currentStep === 1}
+                    {#if authState.loading}
+                        <div class="setup-done" style="gap:16px;">
+                            <span class="material-symbols-rounded" style="font-size:32px;color:#B8956A;animation:spin 1s linear infinite;">progress_activity</span>
+                            <p style="color:#6B7280;font-size:14px;">Loading…</p>
+                        </div>
+                    {:else if currentStep === 1}
                         <div class="setup-step-header">
                             <p class="setup-step-tag">Step 1 of 3</p>
                             <h2 class="setup-step-title">Business identity</h2>
@@ -768,26 +797,6 @@
                                 </div>
                             </div>
 
-                            <!-- Owner email -->
-                            <div class="setup-field">
-                                <label for="owner-email" class="setup-label"
-                                    >Owner email</label
-                                >
-                                <input
-                                    id="owner-email"
-                                    type="email"
-                                    bind:value={ownerEmail}
-                                    placeholder="you@example.com"
-                                    class="setup-input {fieldErrors.ownerEmail
-                                        ? 'setup-input-error'
-                                        : ''}"
-                                />
-                                {#if fieldErrors.ownerEmail}<p
-                                        class="setup-field-error"
-                                    >
-                                        {fieldErrors.ownerEmail}
-                                    </p>{/if}
-                            </div>
                         </div>
 
                         <!-- ── STEP 3 ── -->
@@ -828,6 +837,7 @@
                                                       ? "Pro"
                                                       : "Business"}
                                             </div>
+
                                             <div class="setup-plan-name">
                                                 {p.name}
                                             </div>
@@ -1851,6 +1861,28 @@
     }
     .setup-btn-primary:hover {
         background: #243561;
+    }
+    .setup-btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    .setup-btn-ghost {
+        padding: 8px 16px;
+        border-radius: 6px;
+        background: transparent;
+        color: #6b7280;
+        border: 1px solid #e5e7eb;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.15s, color 0.15s;
+    }
+    .setup-btn-ghost:hover:not(:disabled) {
+        background: #f3f4f6;
+        color: #1a2744;
+    }
+    .setup-btn-ghost:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
     .setup-btn-gold {
         padding: 10px 24px;

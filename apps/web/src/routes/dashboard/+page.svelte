@@ -22,8 +22,8 @@
         });
     }
 
-    onMount(() => {
-        if (!isStaff) {
+    $effect(() => {
+        if (!authState.loading && !authState.isStaff) {
             window.location.href = "/login";
         }
     });

@@ -248,6 +248,26 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 		}
 
 		if (!staff) {
+			// Check if this is a new user going through setup (has no org yet)
+			const { data: membership } = authUserId
+				? await supabase
+						.from('organization_members')
+						.select('id')
+						.eq('auth_user_id', authUserId)
+						.limit(1)
+						.maybeSingle()
+				: { data: null };
+
+			if (!membership) {
+				// New user — let them proceed to setup without signing out
+				authState.isStaff = false;
+				authState.staff = null;
+				authState.error = null;
+				authState.loading = false;
+				authInitialized = true;
+				return;
+			}
+
 			authState.error = 'このアカウントはスタッフとして登録されていません';
 			authState.isStaff = false;
 			authState.staff = null;
