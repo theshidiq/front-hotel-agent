@@ -6,7 +6,7 @@ WORKDIR /app
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json apps/api/
-RUN echo "shamefully-hoist=true" > .npmrc && pnpm install --frozen-lockfile
+RUN echo "shamefully-hoist=true" > .npmrc && pnpm install --no-frozen-lockfile
 
 # Build
 FROM deps AS build
