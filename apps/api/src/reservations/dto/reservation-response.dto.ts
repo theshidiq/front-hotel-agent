@@ -5,7 +5,7 @@ export class ReservationResponse {
   id: string;
 
   @ApiProperty()
-  restaurant_id: string;
+  organization_id: string;
 
   @ApiProperty({ enum: ['rakuten', 'jalan', 'booking_com', 'expedia', 'agoda', 'direct', 'phone', 'walk_in'] })
   booking_source: string;
@@ -58,10 +58,21 @@ export class ReservationResponse {
   @ApiPropertyOptional()
   breakfast_time?: string;
 
-  @ApiProperty({ type: [String] })
+  @ApiProperty({ type: [String], deprecated: true, description: 'DEPRECATED: Use allergen_details instead' })
   allergen_ids: string[];
 
-  @ApiPropertyOptional({ type: Array })
+  @ApiPropertyOptional({
+    type: Array,
+    description: 'Allergens with person counts',
+    example: [{ allergen_id: '123...', person_count: 2, allergen: { id: '123...', name: 'かに', category: 'shellfish' } }]
+  })
+  allergen_details?: Array<{
+    allergen_id: string;
+    person_count: number;
+    allergen?: any;
+  }>;
+
+  @ApiPropertyOptional({ type: Array, description: 'Full allergen objects (populated from allergen_ids or allergen_details)' })
   allergens?: any[];
 
   @ApiPropertyOptional()

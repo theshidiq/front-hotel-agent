@@ -5,7 +5,7 @@ export class RoomResponse {
   id: string;
 
   @ApiProperty()
-  restaurant_id: string;
+  organization_id: string;
 
   @ApiProperty()
   room_number: string;

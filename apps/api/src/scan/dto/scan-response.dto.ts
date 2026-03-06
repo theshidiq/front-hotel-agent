@@ -6,7 +6,7 @@ export class ScanSessionResponse {
   id: string;
 
   @ApiProperty()
-  restaurant_id: string;
+  organization_id: string;
 
   @ApiProperty()
   image_url: string;

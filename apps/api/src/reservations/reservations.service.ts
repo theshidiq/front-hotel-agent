@@ -14,18 +14,20 @@ export class ReservationsService {
     private readonly supabaseService: SupabaseService,
     private readonly roomsService: RoomsService,
     private readonly allergensService: AllergensService,
-  ) {}
+  ) { }
 
   async findAll(date?: string, status?: string): Promise<ReservationResponse[]> {
     let query = this.supabaseService
       .getClient()
       .from('reservations')
       .select('*')
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .order('room_number');
 
     if (date) {
-      query = query.eq('check_in_date', date);
+      // Include any reservation that is active on this date:
+      // check_in_date <= date AND check_out_date >= date
+      query = query.lte('check_in_date', date).gte('check_out_date', date);
     }
 
     if (status) {
@@ -57,7 +59,7 @@ export class ReservationsService {
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (error || !data) {
@@ -93,13 +95,14 @@ export class ReservationsService {
 
   async search(dto: SearchReservationDto): Promise<ReservationResponse[]> {
     const today = new Date().toISOString().split('T')[0];
-
+    const targetDate = dto.date || today;
     let query = this.supabaseService
       .getClient()
       .from('reservations')
       .select('*')
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
-      .eq('check_in_date', dto.date || today);
+      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .lte('check_in_date', targetDate)
+      .gte('check_out_date', targetDate);
 
     if (dto.name) {
       query = query.ilike('guest_name', `%${dto.name}%`);
@@ -124,12 +127,17 @@ export class ReservationsService {
   }
 
   async create(dto: CreateReservationDto): Promise<ReservationResponse> {
+    // Extract allergen_ids for backward compatibility
+    const allergenIds = dto.allergen_details?.map(a => a.allergen_id) || [];
+
     const { data, error } = await this.supabaseService
       .getClient()
       .from('reservations')
       .insert({
-        restaurant_id: this.supabaseService.getRestaurantId(),
+        organization_id: this.supabaseService.getOrganizationId(),
         ...dto,
+        allergen_ids: allergenIds,
+        allergen_details: dto.allergen_details || [],
       })
       .select()
       .single();
@@ -138,7 +146,7 @@ export class ReservationsService {
       throw new InternalServerErrorException(error.message);
     }
 
-    return data;
+    return this.enrichWithAllergens(data);
   }
 
   async checkIn(id: string, dto: CheckInDto): Promise<ReservationResponse> {
@@ -148,7 +156,7 @@ export class ReservationsService {
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (fetchError || !reservation) {
@@ -163,21 +171,39 @@ export class ReservationsService {
       throw new BadRequestException('Cannot check in a reservation with status: ' + reservation.status);
     }
 
-    // Update reservation with check-in data
+    // Prepare update data - support both old and new formats
+    const updateData: any = {
+      dinner_time: dto.dinner_time || null,
+      breakfast_time: dto.breakfast_time || null,
+      dietary_notes: dto.dietary_notes || null,
+      special_requests: dto.special_requests || null,
+      status: 'checked_in',
+      checked_in_at: new Date().toISOString(),
+      checked_in_by: dto.checked_in_by || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Handle allergen data - prefer new format, fallback to old
+    if (dto.allergen_details && dto.allergen_details.length > 0) {
+      updateData.allergen_details = dto.allergen_details;
+      // Also update old format for backward compatibility
+      updateData.allergen_ids = dto.allergen_details.map(a => a.allergen_id);
+    } else if (dto.allergen_ids) {
+      updateData.allergen_ids = dto.allergen_ids;
+      // If using old format, convert to new format (assume all party members have the allergen)
+      updateData.allergen_details = dto.allergen_ids.map(allergen_id => ({
+        allergen_id,
+        person_count: reservation.party_size
+      }));
+    } else {
+      updateData.allergen_ids = [];
+      updateData.allergen_details = [];
+    }
+
     const { data, error } = await this.supabaseService
       .getClient()
       .from('reservations')
-      .update({
-        dinner_time: dto.dinner_time || null,
-        breakfast_time: dto.breakfast_time || null,
-        allergen_ids: dto.allergen_ids || [],
-        dietary_notes: dto.dietary_notes || null,
-        special_requests: dto.special_requests || null,
-        status: 'checked_in',
-        checked_in_at: new Date().toISOString(),
-        checked_in_by: dto.checked_in_by || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -191,8 +217,10 @@ export class ReservationsService {
       this.roomsService.setOccupied(reservation.room_number, id),
     ];
 
-    if (dto.allergen_ids && dto.allergen_ids.length > 0) {
-      tasks.push(this.createCheckInAlert(data, dto.allergen_ids));
+    const hasAllergens = (dto.allergen_details && dto.allergen_details.length > 0) ||
+      (dto.allergen_ids && dto.allergen_ids.length > 0);
+    if (hasAllergens) {
+      tasks.push(this.createCheckInAlert(data, updateData.allergen_details));
     }
 
     await Promise.all(tasks);
@@ -207,7 +235,7 @@ export class ReservationsService {
       .from('reservations')
       .select('id, status, room_number')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (fetchError || !reservation) {
@@ -240,7 +268,7 @@ export class ReservationsService {
           updated_at: new Date().toISOString(),
         })
         .eq('room_number', reservation.room_number)
-        .eq('restaurant_id', this.supabaseService.getRestaurantId()),
+        .eq('organization_id', this.supabaseService.getOrganizationId()),
     ]);
 
     if (updateResult.error) {
@@ -289,7 +317,7 @@ export class ReservationsService {
         .getClient()
         .from('guest_alerts')
         .insert({
-          restaurant_id: this.supabaseService.getRestaurantId(),
+          organization_id: this.supabaseService.getOrganizationId(),
           reservation_id: reservation.id,
           alert_type: 'allergy_update',
           room_number: reservation.room_number,
@@ -301,7 +329,7 @@ export class ReservationsService {
           message: 'ゲストがアレルギー情報を更新しました',
           status: 'new',
         })
-        .then(() => {});
+        .then(() => { });
     }
 
     return this.enrichWithAllergens(data);
@@ -313,7 +341,7 @@ export class ReservationsService {
       .getClient()
       .from('rooms')
       .update({ current_reservation_id: null })
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .not('current_reservation_id', 'is', null);
 
     // Now delete all reservations
@@ -321,7 +349,7 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .delete()
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .select();
 
     if (error) {
@@ -331,19 +359,20 @@ export class ReservationsService {
     return { deleted: data?.length || 0 };
   }
 
-  private async createCheckInAlert(reservation: any, allergenIds: string[]): Promise<void> {
+  private async createCheckInAlert(reservation: any, allergenDetails: any[]): Promise<void> {
     await this.supabaseService
       .getClient()
       .from('guest_alerts')
       .insert({
-        restaurant_id: this.supabaseService.getRestaurantId(),
+        organization_id: this.supabaseService.getOrganizationId(),
         reservation_id: reservation.id,
         alert_type: 'check_in',
         room_number: reservation.room_number,
         guest_name: reservation.guest_name,
         party_size: reservation.party_size,
         dinner_time: reservation.dinner_time,
-        allergen_ids: allergenIds,
+        allergen_details: allergenDetails,
+        allergen_ids: allergenDetails.map((a: any) => a.allergen_id), // Backward compatibility
         dietary_notes: reservation.dietary_notes || null,
         message: null,
         status: 'new',
@@ -377,11 +406,38 @@ export class ReservationsService {
       }
     }
 
-    // Enrich with allergens
+    // Enrich with allergens - support both old and new formats
     let allergens: any[] = [];
-    if (reservation.allergen_ids && reservation.allergen_ids.length > 0) {
+    let enrichedAllergenDetails: any[] = [];
+
+    // Prefer new format
+    if (reservation.allergen_details && Array.isArray(reservation.allergen_details) && reservation.allergen_details.length > 0) {
+      try {
+        const allergenIds = reservation.allergen_details.map((a: any) => a.allergen_id);
+        const allergenObjects = await this.allergensService.findByIds(allergenIds);
+
+        // Enrich allergen_details with full allergen objects
+        enrichedAllergenDetails = reservation.allergen_details.map((detail: any) => ({
+          ...detail,
+          allergen: allergenObjects.find((a: any) => a.id === detail.allergen_id)
+        }));
+
+        // For backward compatibility, also populate allergens array
+        allergens = allergenObjects;
+      } catch {
+        enrichedAllergenDetails = reservation.allergen_details;
+      }
+    }
+    // Fallback to old format
+    else if (reservation.allergen_ids && reservation.allergen_ids.length > 0) {
       try {
         allergens = await this.allergensService.findByIds(reservation.allergen_ids);
+        // Convert to new format for consistency (assume all party members have it)
+        enrichedAllergenDetails = reservation.allergen_ids.map((allergen_id: string) => ({
+          allergen_id,
+          person_count: reservation.party_size,
+          allergen: allergens.find((a: any) => a.id === allergen_id)
+        }));
       } catch {
         allergens = [];
       }
@@ -390,6 +446,7 @@ export class ReservationsService {
     return {
       ...reservation,
       allergens,
+      allergen_details: enrichedAllergenDetails.length > 0 ? enrichedAllergenDetails : undefined,
       total_nights,
       current_stay_night,
     };

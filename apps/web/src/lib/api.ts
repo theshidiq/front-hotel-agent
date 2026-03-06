@@ -219,7 +219,7 @@ export async function deleteAllergen(id: string): Promise<void> {
 // Category Types
 export interface Category {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	type: 'product' | 'menu';
 	name: string;
 	value: string;
@@ -291,7 +291,7 @@ export async function deleteCategoryApi(id: string): Promise<void> {
 // Seasonal Menu Types
 export interface SeasonalMenu {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	start_date: string | null;
 	end_date: string | null;
@@ -371,7 +371,7 @@ export interface AllowedCourse {
 
 export interface MenuGroup {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	display_title: string | null;
 	seasonal_menu_id: string | null;
@@ -466,7 +466,7 @@ export interface MenuProduct {
 
 export interface Menu {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	description: string | null;
 	price: number | null;
@@ -562,7 +562,7 @@ export async function deleteMenu(id: string): Promise<void> {
 
 export interface Room {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	room_number: string;
 	room_name: string | null;
 	room_type: string | null;
@@ -620,7 +620,7 @@ export async function updateRoomStatus(
 
 export interface Reservation {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	booking_source: string;
 	external_booking_id: string | null;
 	guest_token: string | null;
@@ -638,7 +638,12 @@ export interface Reservation {
 	meal_plan: string | null;
 	dinner_time: string | null;
 	breakfast_time: string | null;
-	allergen_ids: string[];
+	allergen_ids: string[]; // DEPRECATED: Use allergen_details instead
+	allergen_details?: Array<{
+		allergen_id: string;
+		person_count: number;
+		allergen?: Allergen;
+	}>;
 	allergens?: Allergen[];
 	dietary_notes: string | null;
 	special_requests: string | null;
@@ -652,10 +657,16 @@ export interface Reservation {
 	current_stay_night: number;
 }
 
+export interface AllergenWithCount {
+	allergen_id: string;
+	person_count: number;
+}
+
 export interface CheckInData {
 	dinner_time?: string;
 	breakfast_time?: string;
-	allergen_ids?: string[];
+	allergen_ids?: string[]; // DEPRECATED: Use allergen_details instead
+	allergen_details?: AllergenWithCount[];
 	dietary_notes?: string;
 	special_requests?: string;
 	checked_in_by?: string;
@@ -682,6 +693,7 @@ export interface CreateReservationData {
 	plan_name?: string;
 	meal_plan?: string;
 	status?: string;
+	allergen_details?: AllergenWithCount[];
 }
 
 export async function getReservations(date?: string, status?: string): Promise<Reservation[]> {
@@ -831,7 +843,7 @@ export async function updateReservationByToken(
 
 export interface GuestAlert {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	reservation_id: string;
 	alert_type: 'check_in' | 'allergy_update' | 'special_request' | 'other';
 	room_number: string;
@@ -937,21 +949,34 @@ export async function resolveGuestAlert(id: string): Promise<GuestAlert> {
 
 // ── Staff ─────────────────────────────────────────────────
 
+export interface PeriodJson {
+	year: number;
+	month: number;
+	day: number;
+}
+
 export interface StaffMember {
 	id: string;
 	name: string;
 	email: string | null;
 	position: string | null;
+	department_id: string | null;
+	position_id: string | null;
 	is_admin: boolean;
 	role_id: string | null;
 	is_active: boolean;
+	employment_type: string | null;
+	start_period: PeriodJson | null;
+	end_period: PeriodJson | null;
 	created_at: string;
 }
 
 export interface CreateStaffData {
 	name: string;
 	email: string;
-	position: string;
+	position?: string;
+	department_id?: string | null;
+	position_id?: string | null;
 }
 
 export async function getStaffs(): Promise<StaffMember[]> {
@@ -1015,11 +1040,164 @@ export async function updateStaffAdmin(id: string, isAdmin: boolean): Promise<St
 	return response.json();
 }
 
+export async function getAllStaffs(): Promise<StaffMember[]> {
+	const response = await fetch(`${API_URL}/staffs/all`, {
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch all staff');
+	}
+	return response.json();
+}
+
+export async function updateStaffOrg(
+	id: string,
+	data: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: PeriodJson | null; end_period?: PeriodJson | null }
+): Promise<StaffMember> {
+	const response = await fetch(`${API_URL}/staffs/${id}/org`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to update staff');
+	}
+	return response.json();
+}
+
+export async function deactivateStaff(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/staffs/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to deactivate staff');
+	}
+}
+
+export async function deleteStaffPermanent(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/staffs/${id}/permanent`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to permanently delete staff');
+	}
+}
+
+// ── Departments & Positions ────────────────────────────────
+
+export interface OrgPosition {
+	id: string;
+	organization_id: string;
+	department_id: string;
+	name: string;
+	sort_order: number;
+	created_at: string;
+}
+
+export interface OrgDepartment {
+	id: string;
+	organization_id: string;
+	name: string;
+	color: string;
+	sort_order: number;
+	created_at: string;
+	positions: OrgPosition[];
+}
+
+export async function getDepartments(): Promise<OrgDepartment[]> {
+	const response = await fetch(`${API_URL}/departments`);
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to fetch departments');
+	}
+	return response.json();
+}
+
+export async function createDepartment(name: string, color: string): Promise<OrgDepartment> {
+	const response = await fetch(`${API_URL}/departments`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ name, color }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create department failed');
+	}
+	return response.json();
+}
+
+export async function updateDepartment(id: string, data: { name?: string; color?: string }): Promise<OrgDepartment> {
+	const response = await fetch(`${API_URL}/departments/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update department failed');
+	}
+	return response.json();
+}
+
+export async function deleteDepartment(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/departments/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete department failed');
+	}
+}
+
+export async function createPosition(departmentId: string, name: string): Promise<OrgPosition> {
+	const response = await fetch(`${API_URL}/departments/${departmentId}/positions`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ name }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Create position failed');
+	}
+	return response.json();
+}
+
+export async function updatePosition(id: string, data: { name?: string }): Promise<OrgPosition> {
+	const response = await fetch(`${API_URL}/departments/positions/${id}`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Update position failed');
+	}
+	return response.json();
+}
+
+export async function deletePosition(id: string): Promise<void> {
+	const response = await fetch(`${API_URL}/departments/positions/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Delete position failed');
+	}
+}
+
 // ── Roles ─────────────────────────────────────────────────
 
 export interface Role {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	name: string;
 	description: string | null;
 	is_default: boolean;
@@ -1143,7 +1321,7 @@ export async function clearRoleDefault(id: string): Promise<void> {
 // Product Alternates
 export interface ProductAlternate {
 	id: string;
-	restaurant_id: string;
+	organization_id: string;
 	product_id: string;
 	alternate_product_id: string;
 	created_at: string;

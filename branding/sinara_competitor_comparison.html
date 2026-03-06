@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sinara — Competitor Comparison</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Gloock&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Instrument Sans', sans-serif;
+      background: #F5F1EC;
+      color: #1A2744;
+      padding: 48px 24px;
+    }
+
+    .page-header {
+      max-width: 1100px;
+      margin: 0 auto 12px;
+    }
+
+    h1 {
+      font-family: 'Gloock', serif;
+      font-size: 2rem;
+      color: #1A2744;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #6B7280;
+      margin-bottom: 8px;
+    }
+
+    .disclaimer {
+      font-size: 0.78rem;
+      color: #9CA3AF;
+      margin-bottom: 40px;
+      font-style: italic;
+    }
+
+    /* Verdict banner */
+    .verdict {
+      max-width: 1100px;
+      margin: 0 auto 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .verdict-card {
+      border-radius: 12px;
+      padding: 20px 22px;
+      border: 1.5px solid;
+    }
+
+    .verdict-card.behind {
+      background: #FFF8F0;
+      border-color: #F5C992;
+    }
+
+    .verdict-card.ahead {
+      background: #F0F7F4;
+      border-color: #86C9A8;
+    }
+
+    .verdict-card h3 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .verdict-card.behind h3 { color: #C47A1E; }
+    .verdict-card.ahead h3 { color: #2E7D56; }
+
+    .verdict-card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .verdict-card ul li {
+      font-size: 0.83rem;
+      color: #374151;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.4;
+    }
+
+    .verdict-card.behind ul li::before { content: '↓'; color: #C47A1E; font-weight: 700; }
+    .verdict-card.ahead ul li::before { content: '★'; color: #2E7D56; font-weight: 700; }
+
+    /* Table */
+    .section-label {
+      font-family: 'Gloock', serif;
+      font-size: 1.3rem;
+      color: #1A2744;
+      max-width: 1100px;
+      margin: 0 auto 16px;
+    }
+
+    .table-wrap {
+      max-width: 1100px;
+      margin: 0 auto 48px;
+      overflow-x: auto;
+      border-radius: 14px;
+      border: 1.5px solid #E5E1DA;
+      box-shadow: 0 2px 12px rgba(26,39,68,0.06);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.82rem;
+      min-width: 860px;
+    }
+
+    thead th {
+      padding: 14px 16px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid #E5E1DA;
+      position: sticky;
+      top: 0;
+    }
+
+    thead th:first-child {
+      text-align: left;
+      background: #F9F7F4;
+      color: #1A2744;
+      width: 220px;
+    }
+
+    thead th.sinara-col {
+      background: #1A2744;
+      color: #F5F1EC;
+    }
+
+    thead th.competitor {
+      background: #F9F7F4;
+      color: #4B5563;
+    }
+
+    .category-row td {
+      background: #F5F1EC;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #B8956A;
+      padding: 10px 16px;
+      border-top: 2px solid #E5E1DA;
+    }
+
+    tbody tr:not(.category-row) {
+      border-bottom: 1px solid #F0EDE8;
+    }
+
+    tbody tr:not(.category-row):hover { background: #FAFAF9; }
+
+    tbody td {
+      padding: 11px 16px;
+      text-align: center;
+      vertical-align: middle;
+      color: #374151;
+    }
+
+    tbody td:first-child {
+      text-align: left;
+      color: #1A2744;
+      font-weight: 500;
+      font-size: 0.83rem;
+    }
+
+    td.sinara-cell {
+      background: rgba(26,39,68,0.03);
+    }
+
+    .yes { color: #2E7D56; font-weight: 700; font-size: 0.95rem; }
+    .no { color: #D1CAC0; font-size: 0.95rem; }
+    .partial { color: #9CA3AF; font-size: 0.75rem; font-style: italic; }
+    .unique {
+      color: #B8956A;
+      font-weight: 700;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: #FEF3E2;
+      padding: 2px 8px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+    .soon {
+      color: #6366F1;
+      font-size: 0.72rem;
+      font-style: italic;
+    }
+
+    /* Price row */
+    .price-row td {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #1A2744;
+      padding: 14px 16px;
+      background: #F9F7F4;
+      border-top: 2px solid #E5E1DA;
+    }
+
+    .price-row td:first-child {
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #B8956A;
+    }
+
+    /* Insight cards */
+    .insights {
+      max-width: 1100px;
+      margin: 0 auto 48px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .insight {
+      background: #fff;
+      border: 1.5px solid #E5E1DA;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .insight-icon {
+      font-size: 1.4rem;
+      margin-bottom: 10px;
+    }
+
+    .insight h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #1A2744;
+      margin-bottom: 6px;
+    }
+
+    .insight p {
+      font-size: 0.78rem;
+      color: #6B7280;
+      line-height: 1.6;
+    }
+
+    .insight.highlight {
+      border-color: #B8956A;
+      background: linear-gradient(135deg, #FEF9F3, #fff);
+    }
+
+    @media (max-width: 800px) {
+      .verdict { grid-template-columns: 1fr; }
+      .insights { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>Sinara vs. Competitors</h1>
+    <p class="subtitle">Shift scheduling & hospitality operations — feature comparison</p>
+    <p class="disclaimer">Competitor data based on publicly available feature lists as of early 2026. Prices converted to approximate JPY for comparison.</p>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict">
+    <div class="verdict-card behind">
+      <h3>Where Sinara is behind</h3>
+      <ul>
+        <li>No mobile app yet (competitors have iOS + Android)</li>
+        <li>No clock in / time tracking</li>
+        <li>No payroll integration</li>
+        <li>No in-app team messaging</li>
+        <li>No demand forecasting</li>
+        <li>No leave / absence management</li>
+        <li>Smaller user community, less social proof</li>
+      </ul>
+    </div>
+    <div class="verdict-card ahead">
+      <h3>Where Sinara is uniquely ahead</h3>
+      <ul>
+        <li>Only scheduler with built-in Japanese allergen OCR scanning</li>
+        <li>Auto-derives menu allergens from linked ingredients</li>
+        <li>True constraint optimization (OR-Tools CP-SAT) vs. simple heuristics</li>
+        <li>Scheduling + food safety in a single platform — no one else does this</li>
+        <li>Designed specifically for Japan hospitality compliance</li>
+        <li>Flat pricing — not per-user (huge savings for large teams)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Main comparison table -->
+  <div class="section-label">Feature-by-Feature Comparison</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th class="sinara-col">Sinara</th>
+          <th class="competitor">Deputy</th>
+          <th class="competitor">7shifts</th>
+          <th class="competitor">When I Work</th>
+          <th class="competitor">Sling</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Scheduling -->
+        <tr class="category-row"><td colspan="6">Shift Scheduling</td></tr>
+        <tr>
+          <td>Manual schedule builder</td>
+          <td class="sinara-cell"><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+        </tr>
+        <tr>
+          <td>Auto-scheduler</td>
+          <td class="sinara-cell"><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="partial">Basic</span></td>
+        </tr>
+        <tr>
+          <td>Constraint optimization engine</td>
+          <td class="sinara-cell"><span class="unique">OR-Tools CP-SAT</span></td>
+          <td><span class="partial">Heuristic</span></td>
+          <td><span class="partial">Heuristic</span></td>
+          <td><span class="partial">Heuristic</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+        <tr>
+          <td>Custom shift rules / constraints</td>
+          <td class="sinara-cell"><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="partial">Limited</span></td>
+          <td><span class="partial">Basic</span></td>
+        </tr>
+        <tr>
+          <td>Multi-division / department</td>
+          <td class="sinara-cell"><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+        </tr>
+        <tr>
+          <td>Role / skill-based assignment</td>
+          <td class="sinara-cell"><span class="soon">Planned</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="partial">Basic</span></td>
+        </tr>
+        <tr>
+          <td>Demand forecasting</td>
+          <td class="sinara-cell"><span class="no">—</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+
+        <!-- Staff management -->
+        <tr class="category-row"><td colspan="6">Staff Management</td></tr>
+        <tr>
+          <td>Staff profiles & availability</td>
+          <td class="sinara-cell"><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+        </tr>
+        <tr>
+          <td>Leave / absence management</td>
+          <td class="sinara-cell"><span class="no">—</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="partial">Basic</span></td>
+        </tr>
+        <tr>
+          <td>Clock in / time tracking</td>
+          <td class="sinara-cell"><span class="no">—</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+        </tr>
+        <tr>
+          <td>Payroll integration</td>
+          <td class="sinara-cell"><span class="no">—</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+        <tr>
+          <td>Team messaging / notifications</td>
+          <td class="sinara-cell"><span class="no">—</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+        </tr>
+        <tr>
+          <td>Mobile app (iOS / Android)</td>
+          <td class="sinara-cell"><span class="no">—</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+        </tr>
+
+        <!-- Food & allergen — Sinara's unique zone -->
+        <tr class="category-row"><td colspan="6">Food Safety & Allergen Management</td></tr>
+        <tr>
+          <td>Allergen database</td>
+          <td class="sinara-cell"><span class="unique">43 JP allergens</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+        <tr>
+          <td>OCR label scanning (Japanese)</td>
+          <td class="sinara-cell"><span class="unique">Stella / Qwen</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+        <tr>
+          <td>Product ingredient database</td>
+          <td class="sinara-cell"><span class="yes">✓</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+        <tr>
+          <td>Menu management</td>
+          <td class="sinara-cell"><span class="yes">✓</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="partial">Basic</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+        <tr>
+          <td>Auto-derived menu allergens</td>
+          <td class="sinara-cell"><span class="unique">Unique to Sinara</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+        <tr>
+          <td>Japan food labeling compliance</td>
+          <td class="sinara-cell"><span class="unique">Built-in</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+          <td><span class="no">—</span></td>
+        </tr>
+
+        <!-- Analytics -->
+        <tr class="category-row"><td colspan="6">Analytics & Reporting</td></tr>
+        <tr>
+          <td>Basic reports</td>
+          <td class="sinara-cell"><span class="soon">Planned</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="partial">Basic</span></td>
+        </tr>
+        <tr>
+          <td>Labor cost tracking</td>
+          <td class="sinara-cell"><span class="no">—</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="partial">Basic</span></td>
+        </tr>
+        <tr>
+          <td>CSV / PDF export</td>
+          <td class="sinara-cell"><span class="soon">Planned</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="yes">✓</span></td>
+          <td><span class="partial">Limited</span></td>
+        </tr>
+
+        <!-- Pricing -->
+        <tr class="price-row">
+          <td>Pricing model</td>
+          <td class="sinara-cell">Flat / property</td>
+          <td>Per user/month</td>
+          <td>Per user/month</td>
+          <td>Per user/month</td>
+          <td>Per user/month</td>
+        </tr>
+        <tr class="price-row">
+          <td>Starting price</td>
+          <td class="sinara-cell">¥0 free tier</td>
+          <td>~¥700/user</td>
+          <td>~¥600/user</td>
+          <td>~¥400/user</td>
+          <td>¥0 / ~¥300/user</td>
+        </tr>
+        <tr class="price-row">
+          <td>Cost for 30-staff hotel</td>
+          <td class="sinara-cell">¥4,980 flat</td>
+          <td>~¥21,000/mo</td>
+          <td>~¥18,000/mo</td>
+          <td>~¥12,000/mo</td>
+          <td>~¥9,000/mo</td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Insight cards -->
+  <div class="section-label">Strategic Takeaways</div>
+  <div class="insights">
+    <div class="insight highlight">
+      <div class="insight-icon">★</div>
+      <h3>Your moat is the allergen layer</h3>
+      <p>No competitor — Deputy, 7shifts, When I Work, Sling — has any allergen or food safety feature. This is a completely uncontested space. A hotel in Japan needs this by law. You own that niche.</p>
+    </div>
+    <div class="insight highlight">
+      <div class="insight-icon">¥</div>
+      <h3>Flat pricing is a structural advantage</h3>
+      <p>Competitors charge per user. A 30-person hotel pays ¥12,000–¥21,000/month with them. With Sinara Pro at ¥4,980 flat, you're 60–75% cheaper. That's the pitch — not "we're better at scheduling," but "we cost less AND handle allergens."</p>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">↑</div>
+      <h3>What to build next to close the gap</h3>
+      <p>The biggest missing pieces are: (1) mobile view for staff to see their schedule, (2) shift swap / time-off requests, (3) basic labor cost tracking. These would make Sinara credible for a paid pilot.</p>
+    </div>
+  </div>
+
+</body>
+</html>

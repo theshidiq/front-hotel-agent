@@ -23,7 +23,7 @@ export class MenuResponse {
   id: string;
 
   @ApiProperty()
-  restaurant_id: string;
+  organization_id: string;
 
   @ApiProperty()
   name: string;

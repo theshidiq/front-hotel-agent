@@ -1,426 +1,214 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { authState, signInWithGoogle, setPendingStaffEmail } from '$lib/auth.svelte';
-	import { getStaffs, updateStaffEmail, createStaff, type StaffMember } from '$lib/api';
+	import { onMount } from "svelte";
+	import { goto } from "$app/navigation";
+	import {
+		authState,
+		signInWithGoogle,
+		signInWithGoogleIdToken,
+	} from "$lib/auth.svelte";
 
-	let staffList = $state<StaffMember[]>([]);
-	let loading = $state(true);
-	let searchQuery = $state('');
-	let error = $state<string | null>(null);
+	const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-	// Email input modal
-	let selectedStaff = $state<StaffMember | null>(null);
-	let emailInput = $state('');
-	let emailSaving = $state(false);
-
-	// Registration form
-	let showRegForm = $state(false);
-	let regName = $state('');
-	let regEmail = $state('');
-	let regPosition = $state('スタッフ');
-	let regLoading = $state(false);
-
-	// Signing in state
-	let signingInEmail = $state<string | null>(null);
+	let oneTapDismissed = $state(false);
+	let signingIn = $state(false);
+	let redirected = false;
 
 	const isStaff = $derived(authState.isStaff);
 
-	// Redirect to home when authenticated as staff
+	// Auto-redirect if already authenticated
 	$effect(() => {
-		if (isStaff && !authState.loading) {
-			goto('/');
+		if (isStaff && !authState.loading && !redirected) {
+			redirected = true;
+			goto("/dashboard");
 		}
 	});
 
-	const filteredStaffs = $derived(
-		staffList.filter(
-			(s) =>
-				s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				(s.email && s.email.toLowerCase().includes(searchQuery.toLowerCase()))
-		)
-	);
+	async function handleOneTapCredential(credential: string) {
+		signingIn = true;
+		await signInWithGoogleIdToken(credential);
+		signingIn = false;
+		// If successful, $effect above will redirect
+	}
 
-	async function loadStaffs() {
-		loading = true;
-		error = null;
-		try {
-			staffList = await getStaffs();
-		} catch (err: unknown) {
-			error = err instanceof Error ? err.message : 'スタッフリストの取得に失敗しました';
-		} finally {
-			loading = false;
+	function initOneTap() {
+		if (!GOOGLE_CLIENT_ID || !window.google?.accounts?.id) {
+			oneTapDismissed = true;
+			return;
 		}
-	}
 
-	function openEmailModal(staff: StaffMember) {
-		selectedStaff = staff;
-		emailInput = staff.email || '';
-		error = null;
-	}
+		window.google.accounts.id.initialize({
+			client_id: GOOGLE_CLIENT_ID,
+			callback: (response: { credential: string }) => {
+				handleOneTapCredential(response.credential);
+			},
+			auto_select: true,
+			cancel_on_tap_outside: false,
+		});
 
-	function closeEmailModal() {
-		selectedStaff = null;
-		emailInput = '';
-		emailSaving = false;
-	}
-
-	async function handleEmailSubmit() {
-		if (!selectedStaff || !emailInput.trim()) return;
-
-		const email = emailInput.trim().toLowerCase();
-		emailSaving = true;
-		error = null;
-
-		try {
-			// Update email in DB if changed or new
-			if (email !== (selectedStaff.email || '').toLowerCase()) {
-				const updated = await updateStaffEmail(selectedStaff.id, email);
-				// Update local list
-				staffList = staffList.map((s) => (s.id === updated.id ? updated : s));
+		window.google.accounts.id.prompt((notification: any) => {
+			// Show fallback button if One Tap is not displayed or dismissed
+			if (
+				notification.isNotDisplayed?.() ||
+				notification.isDismissedMoment?.()
+			) {
+				oneTapDismissed = true;
 			}
+		});
 
-			// Proceed with Google OAuth
-			signingInEmail = email;
-			setPendingStaffEmail(email);
-			closeEmailModal();
-			signInWithGoogle(window.location.origin + '/login');
-		} catch (err: unknown) {
-			error = err instanceof Error ? err.message : 'メールアドレスの更新に失敗しました';
-			emailSaving = false;
-		}
-	}
-
-	async function handleRegister() {
-		if (!regName.trim() || !regEmail.trim()) return;
-		regLoading = true;
-		error = null;
-		try {
-			const newStaff = await createStaff({
-				name: regName.trim(),
-				email: regEmail.trim().toLowerCase(),
-				position: regPosition,
-			});
-			staffList = [...staffList, newStaff];
-			regName = '';
-			regEmail = '';
-			regPosition = 'スタッフ';
-			showRegForm = false;
-		} catch (err: unknown) {
-			error = err instanceof Error ? err.message : 'スタッフ登録に失敗しました';
-		} finally {
-			regLoading = false;
-		}
-	}
-
-	function getInitial(name: string): string {
-		return name.charAt(0).toUpperCase();
-	}
-
-	const avatarColors = [
-		'bg-blue-600',
-		'bg-emerald-600',
-		'bg-purple-600',
-		'bg-rose-600',
-		'bg-amber-600',
-		'bg-cyan-600',
-		'bg-indigo-600',
-		'bg-pink-600',
-	];
-
-	function getAvatarColor(index: number): string {
-		return avatarColors[index % avatarColors.length];
+		// Fallback: show button after 3s in case prompt() never fires the callback
+		setTimeout(() => {
+			if (!signingIn) oneTapDismissed = true;
+		}, 3000);
 	}
 
 	onMount(() => {
-		loadStaffs();
+		// Already authenticated — $effect will handle redirect
+		if (authState.isStaff) return;
+
+		if (!GOOGLE_CLIENT_ID) {
+			oneTapDismissed = true;
+			return;
+		}
+
+		// Load Google Identity Services script
+		if (window.google?.accounts?.id) {
+			initOneTap();
+		} else {
+			const script = document.createElement("script");
+			script.src = "https://accounts.google.com/gsi/client";
+			script.async = true;
+			script.defer = true;
+			script.onload = () => initOneTap();
+			script.onerror = () => { oneTapDismissed = true; };
+			document.head.appendChild(script);
+		}
 	});
+
+	function handleFallbackLogin() {
+		signInWithGoogle(window.location.origin + "/login");
+	}
 </script>
 
-<div class="min-h-screen bg-slate-900 flex flex-col">
-	<!-- Header -->
-	<header class="border-b border-slate-700 px-6 py-4">
-		<div class="max-w-4xl mx-auto flex items-center justify-between">
-			<div class="flex items-center gap-4">
+<svelte:head>
+	<title>ログイン — Sinara</title>
+</svelte:head>
+
+<div class="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4">
+	<!-- Logo / Brand -->
+	<div class="mb-10 text-center">
+		<a href="/" class="inline-block">
+			<h1 class="text-3xl font-bold text-white tracking-tight">Sinara</h1>
+		</a>
+		<p class="mt-2 text-sm text-slate-400">スタッフポータル</p>
+	</div>
+
+	<!-- Card -->
+	<div class="w-full max-w-sm">
+		<!-- Auth error -->
+		{#if authState.error}
+			<div
+				class="mb-5 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3"
+			>
+				<span class="material-symbols-rounded text-red-400 shrink-0 text-lg"
+					>error</span
+				>
+				<p class="text-sm text-red-300">{authState.error}</p>
+			</div>
+		{/if}
+
+		<!-- Loading / signing in -->
+		{#if authState.loading || signingIn}
+			<div class="flex flex-col items-center gap-4 py-12">
+				<span
+					class="material-symbols-rounded text-4xl text-blue-400 animate-spin"
+					>progress_activity</span
+				>
+				<p class="text-sm text-slate-400">
+					{authState.loading ? "確認中..." : "ログイン中..."}
+				</p>
+			</div>
+		{:else if !isStaff}
+			<div
+				class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl text-center"
+			>
+				<div
+					class="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-5"
+				>
+					<span class="material-symbols-rounded text-2xl text-slate-300"
+						>lock</span
+					>
+				</div>
+
+				<h2 class="text-lg font-semibold text-white mb-1">ログイン</h2>
+				<p class="text-sm text-slate-400 mb-7">
+					{#if oneTapDismissed}
+						Googleアカウントでサインインしてください
+					{:else}
+						Googleアカウントを確認中...
+					{/if}
+				</p>
+
+				<!-- Google One Tap renders here automatically — show fallback button when dismissed -->
+				{#if oneTapDismissed || !GOOGLE_CLIENT_ID}
+					<button
+						onclick={handleFallbackLogin}
+						class="w-full flex items-center justify-center gap-3 px-4 py-3
+							bg-white hover:bg-gray-50 text-gray-800 font-medium rounded-xl
+							border border-gray-200 transition-colors shadow-sm"
+					>
+						<!-- Google "G" icon -->
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 48 48"
+							class="w-5 h-5 shrink-0"
+						>
+							<path
+								fill="#EA4335"
+								d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+							/>
+							<path
+								fill="#4285F4"
+								d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+							/>
+							<path
+								fill="#FBBC05"
+								d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+							/>
+							<path
+								fill="#34A853"
+								d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+							/>
+							<path fill="none" d="M0 0h48v48H0z" />
+						</svg>
+						Googleでログイン
+					</button>
+				{:else}
+					<!-- Placeholder while One Tap prompt is loading -->
+					<div class="flex items-center justify-center gap-2 py-3 text-slate-500 text-sm">
+						<span class="material-symbols-rounded text-base animate-pulse"
+							>hourglass_empty</span
+						>
+						Googleアカウントを確認中...
+					</div>
+					<!-- Show fallback link after a delay -->
+					<button
+						onclick={() => (oneTapDismissed = true)}
+						class="mt-4 text-xs text-slate-600 hover:text-slate-400 transition-colors underline"
+					>
+						別のアカウントでログイン
+					</button>
+				{/if}
+			</div>
+
+			<!-- Back link -->
+			<div class="mt-6 text-center">
 				<a
 					href="/"
-					class="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+					class="text-xs text-slate-600 hover:text-slate-400 transition-colors"
 				>
-					<span class="material-symbols-rounded text-lg">arrow_back</span>
-					<span class="text-sm">戻る</span>
+					← トップページに戻る
 				</a>
 			</div>
-			<div class="text-center">
-				<h1 class="text-xl font-bold text-white">湖南荘</h1>
-				<p class="text-xs text-slate-400">スタッフログイン</p>
-			</div>
-			<div class="w-16"></div>
-		</div>
-	</header>
-
-	<!-- Main Content -->
-	<main class="flex-1 px-6 py-8">
-		<div class="max-w-4xl mx-auto">
-			<!-- Auth Error -->
-			{#if authState.error}
-				<div class="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-					<span class="material-symbols-rounded text-red-400 shrink-0">error</span>
-					<div>
-						<p class="text-sm text-red-300">{authState.error}</p>
-					</div>
-				</div>
-			{/if}
-
-			<!-- Local Error -->
-			{#if error}
-				<div class="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-					<span class="material-symbols-rounded text-red-400 shrink-0">error</span>
-					<p class="text-sm text-red-300">{error}</p>
-				</div>
-			{/if}
-
-			<!-- Auth Loading -->
-			{#if authState.loading}
-				<div class="flex flex-col items-center justify-center py-16 gap-4">
-					<span class="material-symbols-rounded text-4xl text-blue-400 animate-pulse">hourglass_empty</span>
-					<p class="text-slate-400">認証中...</p>
-				</div>
-			{:else}
-				<!-- Search -->
-				<div class="mb-6">
-					<div class="relative">
-						<span class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-						<input
-							type="text"
-							bind:value={searchQuery}
-							placeholder="スタッフを検索..."
-							class="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white
-								placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-						/>
-					</div>
-				</div>
-
-				<!-- Staff Grid -->
-				{#if loading}
-					<div class="flex flex-col items-center justify-center py-16 gap-4">
-						<span class="material-symbols-rounded text-4xl text-slate-400 animate-pulse">group</span>
-						<p class="text-slate-400">スタッフを読み込み中...</p>
-					</div>
-				{:else if filteredStaffs.length === 0}
-					<div class="flex flex-col items-center justify-center py-16 gap-4">
-						<span class="material-symbols-rounded text-4xl text-slate-500">person_off</span>
-						<p class="text-slate-400">
-							{searchQuery ? 'スタッフが見つかりません' : 'スタッフが登録されていません'}
-						</p>
-					</div>
-				{:else}
-					<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
-						{#each filteredStaffs as staff, i}
-							<button
-								onclick={() => openEmailModal(staff)}
-								disabled={signingInEmail !== null}
-								class="flex flex-col items-center gap-3 p-5 bg-slate-800 border border-slate-700
-									rounded-xl hover:bg-slate-750 hover:border-blue-500/50 transition-all
-									disabled:opacity-50 disabled:cursor-not-allowed group"
-							>
-								<div
-									class="w-14 h-14 rounded-full {getAvatarColor(i)} flex items-center justify-center
-										text-white text-xl font-bold group-hover:scale-110 transition-transform"
-								>
-									{getInitial(staff.name)}
-								</div>
-								<div class="text-center min-w-0 w-full">
-									<p class="text-sm font-medium text-white truncate">{staff.name}</p>
-									<p class="text-xs text-slate-400 truncate">{staff.position || 'スタッフ'}</p>
-								</div>
-								{#if signingInEmail && signingInEmail === (staff.email || '')}
-									<span class="text-xs text-blue-400 flex items-center gap-1">
-										<span class="material-symbols-rounded text-sm animate-spin">progress_activity</span>
-										ログイン中...
-									</span>
-								{:else}
-									<span
-										class="text-xs text-slate-500 group-hover:text-blue-400 flex items-center gap-1 transition-colors"
-									>
-										<span class="material-symbols-rounded text-sm">login</span>
-										{staff.email ? 'ログイン' : 'メール設定'}
-									</span>
-								{/if}
-							</button>
-						{/each}
-					</div>
-				{/if}
-
-				<!-- Staff Registration (only for authenticated staff) -->
-				{#if isStaff}
-					<div class="border-t border-slate-700 pt-6">
-						{#if showRegForm}
-							<div class="bg-slate-800 border border-slate-700 rounded-xl p-6">
-								<div class="flex items-center justify-between mb-4">
-									<h3 class="text-sm font-medium text-white flex items-center gap-2">
-										<span class="material-symbols-rounded text-lg">person_add</span>
-										新しいスタッフを登録
-									</h3>
-									<button
-										onclick={() => (showRegForm = false)}
-										class="p-1 text-slate-400 hover:text-white transition-colors"
-									>
-										<span class="material-symbols-rounded text-lg">close</span>
-									</button>
-								</div>
-								<form
-									onsubmit={(e) => {
-										e.preventDefault();
-										handleRegister();
-									}}
-									class="grid grid-cols-1 sm:grid-cols-2 gap-4"
-								>
-									<div>
-										<label for="reg-name" class="block text-xs text-slate-400 mb-1">名前</label>
-										<input
-											id="reg-name"
-											type="text"
-											bind:value={regName}
-											required
-											placeholder="山田 太郎"
-											class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md text-white text-sm
-												placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-										/>
-									</div>
-									<div>
-										<label for="reg-email" class="block text-xs text-slate-400 mb-1">メールアドレス</label>
-										<input
-											id="reg-email"
-											type="email"
-											bind:value={regEmail}
-											required
-											placeholder="tanaka@example.com"
-											class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md text-white text-sm
-												placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-										/>
-									</div>
-									<div>
-										<label for="reg-position" class="block text-xs text-slate-400 mb-1">役職</label>
-										<input
-											id="reg-position"
-											type="text"
-											bind:value={regPosition}
-											required
-											placeholder="スタッフ"
-											class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md text-white text-sm
-												placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-										/>
-									</div>
-									<div class="flex items-end">
-										<button
-											type="submit"
-											disabled={regLoading || !regName.trim() || !regEmail.trim()}
-											class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium
-												rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-												flex items-center justify-center gap-2"
-										>
-											{#if regLoading}
-												<span class="material-symbols-rounded text-sm animate-spin">progress_activity</span>
-												登録中...
-											{:else}
-												<span class="material-symbols-rounded text-sm">person_add</span>
-												登録
-											{/if}
-										</button>
-									</div>
-								</form>
-							</div>
-						{:else}
-							<button
-								onclick={() => (showRegForm = true)}
-								class="w-full flex items-center justify-center gap-2 py-3 text-sm text-slate-400
-									hover:text-blue-400 transition-colors border border-dashed border-slate-700
-									hover:border-blue-500/50 rounded-xl"
-							>
-								<span class="material-symbols-rounded text-lg">person_add</span>
-								新しいスタッフを追加
-							</button>
-						{/if}
-					</div>
-				{/if}
-			{/if}
-		</div>
-	</main>
-</div>
-
-<!-- Email Input Modal -->
-{#if selectedStaff}
-	<div class="fixed inset-0 z-50 flex items-center justify-center">
-		<!-- Backdrop -->
-		<button
-			class="absolute inset-0 bg-black/60 backdrop-blur-sm"
-			onclick={closeEmailModal}
-			aria-label="閉じる"
-		></button>
-
-		<!-- Modal -->
-		<div class="relative bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
-			<button
-				onclick={closeEmailModal}
-				class="absolute top-4 right-4 p-1 text-slate-400 hover:text-white transition-colors"
-			>
-				<span class="material-symbols-rounded text-lg">close</span>
-			</button>
-
-			<!-- Staff info -->
-			<div class="flex flex-col items-center gap-3 mb-6">
-				<div
-					class="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center
-						text-white text-2xl font-bold"
-				>
-					{getInitial(selectedStaff.name)}
-				</div>
-				<div class="text-center">
-					<p class="text-lg font-medium text-white">{selectedStaff.name}</p>
-					<p class="text-sm text-slate-400">{selectedStaff.position || 'スタッフ'}</p>
-				</div>
-			</div>
-
-			<!-- Email form -->
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleEmailSubmit();
-				}}
-			>
-				<label for="staff-email" class="block text-sm text-slate-300 mb-2">
-					Googleアカウントのメールアドレス
-				</label>
-				<input
-					id="staff-email"
-					type="email"
-					bind:value={emailInput}
-					required
-					placeholder="example@gmail.com"
-					class="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white
-						placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-				/>
-				{#if selectedStaff.email}
-					<p class="text-xs text-slate-500 mb-4 -mt-2">
-						現在のメール: {selectedStaff.email}
-					</p>
-				{/if}
-				<button
-					type="submit"
-					disabled={emailSaving || !emailInput.trim()}
-					class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium
-						rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-						flex items-center justify-center gap-2"
-				>
-					{#if emailSaving}
-						<span class="material-symbols-rounded text-sm animate-spin">progress_activity</span>
-						保存中...
-					{:else}
-						<span class="material-symbols-rounded text-sm">login</span>
-						Googleでログイン
-					{/if}
-				</button>
-			</form>
-		</div>
+		{/if}
 	</div>
-{/if}
+</div>

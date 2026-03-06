@@ -19,7 +19,7 @@ export class ProductResponse {
   id: string;
 
   @ApiProperty()
-  restaurant_id: string;
+  organization_id: string;
 
   @ApiProperty()
   name: string;

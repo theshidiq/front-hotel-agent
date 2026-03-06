@@ -1,0 +1,1264 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "sw-root",
+      "x": 0,
+      "y": 0,
+      "name": "Setup Wizard — Step 1 Business Identity",
+      "clip": true,
+      "width": 1440,
+      "height": 900,
+      "fill": "#FFFFFF",
+      "layout": "horizontal",
+      "children": [
+
+        {
+          "type": "frame",
+          "id": "sidebar",
+          "name": "Sidebar",
+          "width": 340,
+          "height": "fill_container",
+          "fill": "#1A2744",
+          "layout": "vertical",
+          "padding": [40, 32],
+          "gap": 0,
+          "children": [
+            {
+              "type": "frame",
+              "id": "logo-row",
+              "name": "Logo",
+              "width": "fill_container",
+              "layout": "horizontal",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "logo-icon",
+                  "name": "Logo Icon",
+                  "width": 36,
+                  "height": 36,
+                  "fill": "#B8956A",
+                  "cornerRadius": 8,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "logo-s",
+                      "name": "S",
+                      "fill": "#FFFFFF",
+                      "content": "S",
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "logo-wordmark",
+                  "name": "Sinara Wordmark",
+                  "fill": "#FFFFFF",
+                  "content": "Sinara",
+                  "fontFamily": "Inter",
+                  "fontSize": 17,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+
+            {
+              "type": "frame",
+              "id": "sidebar-spacer-1",
+              "name": "Spacer",
+              "width": "fill_container",
+              "height": 48
+            },
+
+            {
+              "type": "frame",
+              "id": "sidebar-body",
+              "name": "Sidebar Body",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 0,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "getting-started-label",
+                  "name": "Getting Started Label",
+                  "fill": "#A8B8D8",
+                  "content": "GETTING STARTED",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "600",
+                  "letterSpacing": 1.5
+                },
+                {
+                  "type": "frame",
+                  "id": "title-spacer",
+                  "name": "Spacer",
+                  "width": "fill_container",
+                  "height": 14
+                },
+                {
+                  "type": "frame",
+                  "id": "sidebar-title-block",
+                  "name": "Title Block",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "title-line-1",
+                      "name": "Set up your",
+                      "fill": "#FFFFFF",
+                      "content": "Set up your",
+                      "fontFamily": "Inter",
+                      "fontSize": 26,
+                      "fontWeight": "700",
+                      "lineHeight": 1.3
+                    },
+                    {
+                      "type": "text",
+                      "id": "title-line-2",
+                      "name": "workspace (gold)",
+                      "fill": "#B8956A",
+                      "content": "workspace",
+                      "fontFamily": "Inter",
+                      "fontSize": 26,
+                      "fontWeight": "700",
+                      "lineHeight": 1.3
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "desc-spacer",
+                  "name": "Spacer",
+                  "width": "fill_container",
+                  "height": 12
+                },
+                {
+                  "type": "text",
+                  "id": "sidebar-desc",
+                  "name": "Description",
+                  "fill": "#A8B8D8",
+                  "content": "A few details to personalize Sinara for your business — takes less than 2 minutes.",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal",
+                  "lineHeight": 1.6
+                },
+                {
+                  "type": "frame",
+                  "id": "steps-spacer",
+                  "name": "Spacer",
+                  "width": "fill_container",
+                  "height": 36
+                },
+                {
+                  "type": "frame",
+                  "id": "step-list",
+                  "name": "Step List",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "step-1-item",
+                      "name": "Step 1 (Active)",
+                      "width": "fill_container",
+                      "layout": "horizontal",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "step-1-circle",
+                          "name": "Step Circle Active",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "rgba(255,255,255,0.12)",
+                          "cornerRadius": 14,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 2,
+                            "fill": "#B8956A"
+                          },
+                          "layout": "vertical",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "step-1-num",
+                              "name": "1",
+                              "fill": "#FFFFFF",
+                              "content": "1",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "step-1-label",
+                          "name": "Step 1 Label",
+                          "fill": "#FFFFFF",
+                          "content": "Business identity",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "step-2-item",
+                      "name": "Step 2",
+                      "width": "fill_container",
+                      "layout": "horizontal",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "step-2-circle",
+                          "name": "Step Circle Future",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "rgba(255,255,255,0.06)",
+                          "cornerRadius": 14,
+                          "layout": "vertical",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "step-2-num",
+                              "name": "2",
+                              "fill": "#A8B8D8",
+                              "content": "2",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "step-2-label",
+                          "name": "Step 2 Label",
+                          "fill": "#A8B8D8",
+                          "content": "Contact & branding",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "step-3-item",
+                      "name": "Step 3",
+                      "width": "fill_container",
+                      "layout": "horizontal",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "step-3-circle",
+                          "name": "Step Circle Future",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "rgba(255,255,255,0.06)",
+                          "cornerRadius": 14,
+                          "layout": "vertical",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "step-3-num",
+                              "name": "3",
+                              "fill": "#A8B8D8",
+                              "content": "3",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "step-3-label",
+                          "name": "Step 3 Label",
+                          "fill": "#A8B8D8",
+                          "content": "Workspace settings",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "step-4-item",
+                      "name": "Step 4",
+                      "width": "fill_container",
+                      "layout": "horizontal",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "step-4-circle",
+                          "name": "Step Circle Future",
+                          "width": 28,
+                          "height": 28,
+                          "fill": "rgba(255,255,255,0.06)",
+                          "cornerRadius": 14,
+                          "layout": "vertical",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "step-4-num",
+                              "name": "4",
+                              "fill": "#A8B8D8",
+                              "content": "4",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "step-4-label",
+                          "name": "Step 4 Label",
+                          "fill": "#A8B8D8",
+                          "content": "Launch",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+
+            {
+              "type": "frame",
+              "id": "sidebar-footer-spacer",
+              "name": "Grow Spacer",
+              "width": "fill_container",
+              "height": "fill_container"
+            },
+            {
+              "type": "text",
+              "id": "sidebar-footer",
+              "name": "Footer",
+              "fill": "#A8B8D8",
+              "content": "Sinara · presence, by design",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+
+        {
+          "type": "frame",
+          "id": "form-panel",
+          "name": "Form Panel",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "progress-bar-track",
+              "name": "Progress Bar",
+              "width": "fill_container",
+              "height": 3,
+              "fill": "#F3F4F6",
+              "layout": "none",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "progress-fill",
+                  "name": "Progress Fill (0%)",
+                  "x": 0,
+                  "y": 0,
+                  "width": 0,
+                  "height": 3,
+                  "fill": "#B8956A"
+                }
+              ]
+            },
+
+            {
+              "type": "frame",
+              "id": "form-scroll",
+              "name": "Form Scroll Area",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "padding": [48, 52, 64, 52],
+              "gap": 32,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "step-header",
+                  "name": "Step Header",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "step-tag",
+                      "name": "Step Tag",
+                      "fill": "#B8956A",
+                      "content": "STEP 1 OF 3",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "600",
+                      "letterSpacing": 1.2
+                    },
+                    {
+                      "type": "text",
+                      "id": "step-title",
+                      "name": "Step Title",
+                      "fill": "#1A2744",
+                      "content": "Business identity",
+                      "fontFamily": "Inter",
+                      "fontSize": 22,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "step-desc",
+                      "name": "Step Description",
+                      "fill": "#6B7280",
+                      "content": "Tell us about your organization.",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+
+                {
+                  "type": "frame",
+                  "id": "fields-block",
+                  "name": "Fields",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 24,
+                  "children": [
+
+                    {
+                      "type": "frame",
+                      "id": "field-name",
+                      "name": "Field: Organization Name",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "field-name-label",
+                          "name": "Label",
+                          "fill": "#1A2744",
+                          "content": "Organization name *",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "field-name-input",
+                          "name": "Input",
+                          "width": "fill_container",
+                          "height": 42,
+                          "fill": "#FFFFFF",
+                          "cornerRadius": 6,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#E8E8E8"
+                          },
+                          "padding": [0, 14],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "field-name-placeholder",
+                              "name": "Placeholder",
+                              "fill": "#D1D5DB",
+                              "content": "Konan-so Ryokan",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+
+                    {
+                      "type": "frame",
+                      "id": "field-slug",
+                      "name": "Field: Workspace URL",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "field-slug-label",
+                          "name": "Label",
+                          "fill": "#1A2744",
+                          "content": "Workspace URL *",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "field-slug-row",
+                          "name": "Slug Input Row",
+                          "width": "fill_container",
+                          "height": 42,
+                          "cornerRadius": 6,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "#E8E8E8"
+                          },
+                          "layout": "horizontal",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "slug-prefix",
+                              "name": "Prefix",
+                              "height": "fill_container",
+                              "fill": "#F9FAFB",
+                              "stroke": {
+                                "align": "inside",
+                                "thickness": {
+                                  "right": 1
+                                },
+                                "fill": "#E8E8E8"
+                              },
+                              "padding": [0, 12],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "slug-prefix-text",
+                                  "name": "sinara.app/",
+                                  "fill": "#9CA3AF",
+                                  "content": "sinara.app/",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "slug-input",
+                              "name": "Slug Input",
+                              "width": "fill_container",
+                              "height": "fill_container",
+                              "fill": "#FFFFFF",
+                              "padding": [0, 12],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "slug-placeholder",
+                                  "name": "Placeholder",
+                                  "fill": "#D1D5DB",
+                                  "content": "my-workspace",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "slug-hint",
+                          "name": "Hint",
+                          "fill": "#9CA3AF",
+                          "content": "Lowercase letters, numbers, hyphens",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+
+                    {
+                      "type": "frame",
+                      "id": "field-biz-type",
+                      "name": "Field: Business Type",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "biz-type-label",
+                          "name": "Label",
+                          "fill": "#1A2744",
+                          "content": "Business type *",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "biz-grid",
+                          "name": "Business Type Grid",
+                          "width": "fill_container",
+                          "layout": "horizontal",
+                          "gap": 8,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "biz-col-1",
+                              "name": "Column 1",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "card-hotel",
+                                  "name": "Hotel (Selected)",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#F5EDE3",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#B8956A"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "hotel-icon",
+                                      "name": "Icon",
+                                      "fill": "#B8956A",
+                                      "content": "🏨",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "hotel-label",
+                                      "name": "Hotel",
+                                      "fill": "#B8956A",
+                                      "content": "Hotel",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "card-izakaya",
+                                  "name": "Izakaya",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "izakaya-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "🍶",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "izakaya-label",
+                                      "name": "Izakaya",
+                                      "fill": "#6B7280",
+                                      "content": "Izakaya",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "card-spa",
+                                  "name": "Spa",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "spa-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "🧖",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "spa-label",
+                                      "name": "Spa",
+                                      "fill": "#6B7280",
+                                      "content": "Spa",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "biz-col-2",
+                              "name": "Column 2",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "card-ryokan",
+                                  "name": "Ryokan",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "ryokan-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "🏯",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "ryokan-label",
+                                      "name": "Ryokan",
+                                      "fill": "#6B7280",
+                                      "content": "Ryokan",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "card-cafe",
+                                  "name": "Café",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "cafe-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "☕",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "cafe-label",
+                                      "name": "Café",
+                                      "fill": "#6B7280",
+                                      "content": "Café",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "card-event",
+                                  "name": "Event Venue",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "event-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "🎉",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "event-label",
+                                      "name": "Event Venue",
+                                      "fill": "#6B7280",
+                                      "content": "Event Venue",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "biz-col-3",
+                              "name": "Column 3",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "card-restaurant",
+                                  "name": "Restaurant",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "rest-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "🍽️",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "rest-label",
+                                      "name": "Restaurant",
+                                      "fill": "#6B7280",
+                                      "content": "Restaurant",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "card-clinic",
+                                  "name": "Clinic",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "clinic-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "🏥",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "clinic-label",
+                                      "name": "Clinic",
+                                      "fill": "#6B7280",
+                                      "content": "Clinic",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "card-other",
+                                  "name": "Other",
+                                  "width": "fill_container",
+                                  "height": 68,
+                                  "fill": "#FFFFFF",
+                                  "cornerRadius": 8,
+                                  "stroke": {
+                                    "align": "inside",
+                                    "thickness": 1.5,
+                                    "fill": "#E8E8E8"
+                                  },
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "other-icon",
+                                      "name": "Icon",
+                                      "fill": "#6B7280",
+                                      "content": "🏢",
+                                      "fontSize": 18
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "other-label",
+                                      "name": "Other",
+                                      "fill": "#6B7280",
+                                      "content": "Other",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+
+                    {
+                      "type": "frame",
+                      "id": "field-country-tz",
+                      "name": "Country + Timezone Row",
+                      "width": "fill_container",
+                      "layout": "horizontal",
+                      "gap": 16,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "field-country",
+                          "name": "Field: Country",
+                          "width": 110,
+                          "layout": "vertical",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "country-label",
+                              "name": "Label",
+                              "fill": "#1A2744",
+                              "content": "Country",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "country-input",
+                              "name": "Input",
+                              "width": "fill_container",
+                              "height": 42,
+                              "fill": "#FFFFFF",
+                              "cornerRadius": 6,
+                              "stroke": {
+                                "align": "inside",
+                                "thickness": 1,
+                                "fill": "#E8E8E8"
+                              },
+                              "padding": [0, 14],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "country-value",
+                                  "name": "Value",
+                                  "fill": "#1A2744",
+                                  "content": "JP",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "field-timezone",
+                          "name": "Field: Timezone",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "tz-label",
+                              "name": "Label",
+                              "fill": "#1A2744",
+                              "content": "Timezone",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "tz-select",
+                              "name": "Select",
+                              "width": "fill_container",
+                              "height": 42,
+                              "fill": "#FFFFFF",
+                              "cornerRadius": 6,
+                              "stroke": {
+                                "align": "inside",
+                                "thickness": 1,
+                                "fill": "#E8E8E8"
+                              },
+                              "padding": [0, 14],
+                              "justifyContent": "space_between",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "tz-value",
+                                  "name": "Value",
+                                  "fill": "#1A2744",
+                                  "content": "Tokyo (JST, UTC+9)",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "tz-chevron",
+                                  "name": "Chevron",
+                                  "fill": "#9CA3AF",
+                                  "content": "▾",
+                                  "fontSize": 12
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+
+        {
+          "type": "frame",
+          "id": "side-nav",
+          "name": "Side Nav",
+          "width": 152,
+          "height": "fill_container",
+          "fill": "#FFFFFF",
+          "stroke": {
+            "align": "inside",
+            "thickness": {
+              "left": 1
+            },
+            "fill": "#F3F4F6"
+          },
+          "layout": "vertical",
+          "padding": [48, 20],
+          "gap": 10,
+          "children": [
+            {
+              "type": "frame",
+              "id": "btn-continue",
+              "name": "Button: Continue",
+              "width": "fill_container",
+              "height": 40,
+              "fill": "#1A2744",
+              "cornerRadius": 6,
+              "layout": "horizontal",
+              "gap": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "btn-continue-label",
+                  "name": "Continue",
+                  "fill": "#FFFFFF",
+                  "content": "Continue",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "btn-continue-arrow",
+                  "name": "Arrow",
+                  "fill": "#FFFFFF",
+                  "content": "→",
+                  "fontSize": 14
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "btn-back",
+              "name": "Button: Back",
+              "width": "fill_container",
+              "height": 40,
+              "fill": "#F9FAFB",
+              "cornerRadius": 6,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E8E8E8"
+              },
+              "layout": "horizontal",
+              "gap": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "btn-back-arrow",
+                  "name": "Arrow",
+                  "fill": "#9CA3AF",
+                  "content": "←",
+                  "fontSize": 14
+                },
+                {
+                  "type": "text",
+                  "id": "btn-back-label",
+                  "name": "Back",
+                  "fill": "#6B7280",
+                  "content": "Back",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "step-counter-spacer",
+              "name": "Spacer",
+              "width": "fill_container",
+              "height": 8
+            },
+            {
+              "type": "text",
+              "id": "step-counter",
+              "name": "Step Counter",
+              "fill": "#C0C0C0",
+              "content": "1 / 3",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal",
+              "textAlignHorizontal": "center",
+              "width": "fill_container",
+              "textGrowth": "fixed-width"
+            }
+          ]
+        }
+
+      ]
+    }
+  ]
+}

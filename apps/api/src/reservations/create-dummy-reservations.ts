@@ -14,16 +14,20 @@ interface DummyReservation {
   plan_name: string;
   meal_plan: string;
   status: string;
+  allergen_details?: Array<{
+    allergen_id: string;
+    person_count: number;
+  }>;
 }
 
 async function createDummyReservations() {
   // Initialize Supabase client
   const supabaseUrl = process.env.SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-  const restaurantId = process.env.RESTAURANT_ID;
+  const organizationId = process.env.ORGANIZATION_ID;
 
-  if (!supabaseUrl || !supabaseServiceKey || !restaurantId) {
-    throw new Error('Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_KEY, RESTAURANT_ID');
+  if (!supabaseUrl || !supabaseServiceKey || !organizationId) {
+    throw new Error('Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_KEY, ORGANIZATION_ID');
   }
 
   const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -32,6 +36,19 @@ async function createDummyReservations() {
   const DAYS_TO_GENERATE = 7;
   // Decreasing reservation count per day: [20, 15, 12, 10, 8, 6, 4]
   const RESERVATIONS_BY_DAY = [20, 15, 12, 10, 8, 6, 4];
+  const ALLERGEN_PERCENTAGE = 0.3; // 30% of reservations will have allergens
+
+  // Fetch allergens from database
+  console.log('📋 Fetching allergens from database...\n');
+  const { data: allergens, error: allergenError } = await supabase
+    .from('allergens')
+    .select('id, name');
+
+  if (allergenError || !allergens || allergens.length === 0) {
+    console.warn('⚠️  Warning: Could not fetch allergens. Reservations will be created without allergen data.');
+  } else {
+    console.log(`✅ Found ${allergens.length} allergens\n`);
+  }
 
   // Get today's date - force to current local date
   const now = new Date();
@@ -141,6 +158,35 @@ async function createDummyReservations() {
     return distribution.sort(() => Math.random() - 0.5);
   };
 
+  // Generate random allergen details for a reservation
+  const generateAllergenDetails = (partySize: number): Array<{ allergen_id: string; person_count: number }> | undefined => {
+    if (!allergens || allergens.length === 0) return undefined;
+
+    // 30% chance of having allergens
+    if (Math.random() > ALLERGEN_PERCENTAGE) return undefined;
+
+    // Random number of allergens (1-3)
+    const allergenCount = randomInt(1, Math.min(3, allergens.length));
+    const selectedAllergens = new Set<string>();
+    const allergenDetails: Array<{ allergen_id: string; person_count: number }> = [];
+
+    // Pick random unique allergens
+    while (selectedAllergens.size < allergenCount) {
+      const allergen = random(allergens);
+      selectedAllergens.add(allergen.id);
+    }
+
+    // Assign random person counts (1 to party_size)
+    selectedAllergens.forEach(allergenId => {
+      allergenDetails.push({
+        allergen_id: allergenId,
+        person_count: randomInt(1, partySize)
+      });
+    });
+
+    return allergenDetails;
+  };
+
   const totalReservations = RESERVATIONS_BY_DAY.reduce((sum, count) => sum + count, 0);
   console.log(`Creating ${totalReservations} dummy reservations across ${DAYS_TO_GENERATE} days...\n`);
 
@@ -165,13 +211,16 @@ async function createDummyReservations() {
       const guestNum = (guestIndex % guestNames.length) + 1;
       const uniqueSuffix = dayOffset > 0 || guestIndex >= guestNames.length ? `${guestNum}` : '';
 
+      const partySize = randomInt(1, 4);
+      const allergenDetails = generateAllergenDetails(partySize);
+
       allReservations.push({
         booking_source: random(bookingSources),
         guest_name: `${guest.name}${uniqueSuffix}`,
         guest_name_kana: `${guest.kana}${uniqueSuffix}`,
         phone: randomPhone(),
         email: `guest${guestIndex + 1}@example.com`,
-        party_size: randomInt(1, 4),
+        party_size: partySize,
         room_number: room.number,
         room_name: room.name,
         check_in_date: formatDate(checkInDate),
@@ -179,6 +228,7 @@ async function createDummyReservations() {
         plan_name: random(plans),
         meal_plan: random(mealPlans),
         status: 'confirmed',
+        allergen_details: allergenDetails,
       });
 
       guestIndex++;
@@ -189,16 +239,33 @@ async function createDummyReservations() {
 
   let successCount = 0;
   let errorCount = 0;
+  let allergenCount = 0;
   const nightsCount: Record<number, number> = {};
 
   for (const reservation of allReservations) {
     try {
+      // Extract allergen_ids for backward compatibility
+      const allergenIds = reservation.allergen_details?.map(a => a.allergen_id) || [];
+
       const { error } = await supabase
         .from('reservations')
         .insert({
-          restaurant_id: restaurantId,
-          ...reservation,
-          allergen_ids: [],
+          organization_id: organizationId,
+          booking_source: reservation.booking_source,
+          guest_name: reservation.guest_name,
+          guest_name_kana: reservation.guest_name_kana,
+          phone: reservation.phone,
+          email: reservation.email,
+          party_size: reservation.party_size,
+          room_number: reservation.room_number,
+          room_name: reservation.room_name,
+          check_in_date: reservation.check_in_date,
+          check_out_date: reservation.check_out_date,
+          plan_name: reservation.plan_name,
+          meal_plan: reservation.meal_plan,
+          status: reservation.status,
+          allergen_ids: allergenIds,
+          allergen_details: reservation.allergen_details || [],
         })
         .select()
         .single();
@@ -210,6 +277,9 @@ async function createDummyReservations() {
         const nights = calculateNights(reservation.check_in_date, reservation.check_out_date);
         nightsCount[nights] = (nightsCount[nights] || 0) + 1;
         successCount++;
+        if (reservation.allergen_details && reservation.allergen_details.length > 0) {
+          allergenCount++;
+        }
       }
     } catch (err) {
       console.error(`❌ Exception: ${reservation.guest_name}:`, err);
@@ -218,12 +288,18 @@ async function createDummyReservations() {
   }
 
   console.log(`\n📊 Summary: ${successCount} successful, ${errorCount} failed\n`);
+
   console.log('Breakdown by stay duration:');
   Object.keys(nightsCount)
     .sort((a, b) => parseInt(a) - parseInt(b))
     .forEach(nights => {
       console.log(`  ${nights} night${parseInt(nights) > 1 ? 's' : ''}: ${nightsCount[parseInt(nights)]} reservations`);
     });
+
+  const allergenPercentage = successCount > 0 ? ((allergenCount / successCount) * 100).toFixed(1) : '0.0';
+  console.log(`\nAllergen data:`);
+  console.log(`  ${allergenCount} reservations with allergens (${allergenPercentage}%)`);
+  console.log(`  ${successCount - allergenCount} reservations without allergens`);
 }
 
 function calculateNights(checkIn: string, checkOut: string): number {

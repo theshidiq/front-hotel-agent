@@ -17,7 +17,7 @@ export class GuestAlertsService {
       .getClient()
       .from('guest_alerts')
       .select('*')
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -43,7 +43,7 @@ export class GuestAlertsService {
       .from('guest_alerts')
       .select('*')
       .eq('id', id)
-      .eq('restaurant_id', this.supabaseService.getRestaurantId())
+      .eq('organization_id', this.supabaseService.getOrganizationId())
       .single();
 
     if (error || !data) {
@@ -58,7 +58,7 @@ export class GuestAlertsService {
       .getClient()
       .from('guest_alerts')
       .insert({
-        restaurant_id: this.supabaseService.getRestaurantId(),
+        organization_id: this.supabaseService.getOrganizationId(),
         ...dto,
         status: 'new',
       })

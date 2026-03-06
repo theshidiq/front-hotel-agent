@@ -3,9 +3,9 @@ import { SupabaseClient, createClient } from '@supabase/supabase-js';
 async function cleanupTestData() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-  const restaurantId = process.env.RESTAURANT_ID;
+  const organizationId = process.env.ORGANIZATION_ID;
 
-  if (!supabaseUrl || !supabaseServiceKey || !restaurantId) {
+  if (!supabaseUrl || !supabaseServiceKey || !organizationId) {
     throw new Error('Missing required environment variables');
   }
 
@@ -17,7 +17,7 @@ async function cleanupTestData() {
   const { error: roomsError } = await supabase
     .from('rooms')
     .update({ current_reservation_id: null })
-    .eq('restaurant_id', restaurantId)
+    .eq('organization_id', organizationId)
     .not('current_reservation_id', 'is', null);
 
   if (roomsError) {
@@ -29,7 +29,7 @@ async function cleanupTestData() {
   const { data, error } = await supabase
     .from('reservations')
     .delete()
-    .eq('restaurant_id', restaurantId)
+    .eq('organization_id', organizationId)
     .select();
 
   if (error) {

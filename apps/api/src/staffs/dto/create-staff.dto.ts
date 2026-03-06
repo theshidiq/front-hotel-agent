@@ -1,5 +1,5 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsString, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateStaffDto {
   @ApiProperty({ example: 'Tanaka Taro' })
@@ -11,8 +11,18 @@ export class CreateStaffDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'スタッフ' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 'スタッフ' })
+  @IsOptional()
   @IsString()
-  position: string;
+  position?: string;
+
+  @ApiPropertyOptional({ description: 'Department UUID' })
+  @IsOptional()
+  @IsString()
+  department_id?: string;
+
+  @ApiPropertyOptional({ description: 'Position UUID' })
+  @IsOptional()
+  @IsString()
+  position_id?: string;
 }

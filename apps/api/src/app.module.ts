@@ -19,6 +19,8 @@ import { StaffsModule } from './staffs/staffs.module';
 import { SeasonalMenusModule } from './seasonal-menus/seasonal-menus.module';
 import { ProductAlternatesModule } from './product-alternates/product-alternates.module';
 import { RolesModule } from './roles/roles.module';
+import { ShiftsModule } from './shifts/shifts.module';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { RolesModule } from './roles/roles.module';
     SeasonalMenusModule,
     ProductAlternatesModule,
     RolesModule,
+    ShiftsModule,
+    DepartmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

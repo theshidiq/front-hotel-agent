@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sinara — Pricing Strategy</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Gloock&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Instrument Sans', sans-serif;
+      background: #F5F1EC;
+      color: #1A2744;
+      padding: 48px 24px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-family: 'Gloock', serif;
+      font-size: 2.2rem;
+      color: #1A2744;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      color: #6B7280;
+      font-size: 0.95rem;
+      margin-bottom: 48px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 960px;
+      margin: 0 auto 56px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 24px 32px;
+      border: 1.5px solid #E5E1DA;
+      position: relative;
+    }
+
+    .card.recommended {
+      border-color: #B8956A;
+      box-shadow: 0 4px 24px rgba(184,149,106,0.15);
+    }
+
+    .badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #B8956A;
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    .plan-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #B8956A;
+      margin-bottom: 8px;
+    }
+
+    .plan-title {
+      font-family: 'Gloock', serif;
+      font-size: 1.5rem;
+      color: #1A2744;
+      margin-bottom: 4px;
+    }
+
+    .plan-desc {
+      font-size: 0.83rem;
+      color: #6B7280;
+      margin-bottom: 20px;
+      min-height: 36px;
+    }
+
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .price {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 2rem;
+      font-weight: 500;
+      color: #1A2744;
+    }
+
+    .price-unit {
+      font-size: 0.82rem;
+      color: #9CA3AF;
+    }
+
+    .price-note {
+      font-size: 0.78rem;
+      color: #B8956A;
+      margin-bottom: 24px;
+      min-height: 18px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #F0EDE8;
+      margin-bottom: 20px;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feature-list li {
+      font-size: 0.85rem;
+      color: #374151;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.4;
+    }
+
+    .feature-list li::before {
+      content: '✓';
+      color: #B8956A;
+      font-weight: 700;
+      font-size: 0.8rem;
+      margin-top: 1px;
+      flex-shrink: 0;
+    }
+
+    .feature-list li.muted {
+      color: #9CA3AF;
+    }
+    .feature-list li.muted::before {
+      content: '—';
+      color: #D1CAC0;
+    }
+
+    /* CTA buttons */
+    .btn {
+      display: block;
+      width: 100%;
+      margin-top: 24px;
+      padding: 11px 0;
+      border-radius: 8px;
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+      text-decoration: none;
+    }
+
+    .btn-free {
+      background: #F0EDE8;
+      color: #1A2744;
+    }
+    .btn-free:hover { opacity: 0.8; }
+
+    .btn-primary {
+      background: #1A2744;
+      color: #F5F1EC;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+
+    .btn-coming-soon {
+      background: #F0EDE8;
+      color: #9CA3AF;
+      cursor: default;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .soon-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #B8956A;
+      display: inline-block;
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* Waitlist modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(26,39,68,0.5);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px 32px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(26,39,68,0.18);
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      color: #9CA3AF;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-close:hover { color: #1A2744; }
+
+    .modal-tag {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #B8956A;
+      margin-bottom: 8px;
+    }
+
+    .modal h2 {
+      font-family: 'Gloock', serif;
+      font-size: 1.4rem;
+      color: #1A2744;
+      margin-bottom: 8px;
+    }
+
+    .modal p {
+      font-size: 0.83rem;
+      color: #6B7280;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .modal input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #E5E1DA;
+      border-radius: 8px;
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 0.875rem;
+      color: #1A2744;
+      margin-bottom: 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .modal input:focus { border-color: #B8956A; }
+
+    .modal-submit {
+      width: 100%;
+      padding: 11px;
+      background: #1A2744;
+      color: #F5F1EC;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .modal-submit:hover { opacity: 0.85; }
+
+    .modal-success {
+      display: none;
+      text-align: center;
+      padding: 12px 0 4px;
+    }
+    .modal-success .tick {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+    .modal-success p {
+      color: #1A2744;
+      font-weight: 500;
+      margin-bottom: 0;
+    }
+
+    .plan-badge-coming {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: #FEF3E2;
+      color: #B8956A;
+      padding: 2px 8px;
+      border-radius: 99px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* Comparison table */
+    .section-title {
+      font-family: 'Gloock', serif;
+      font-size: 1.4rem;
+      color: #1A2744;
+      max-width: 960px;
+      margin: 0 auto 20px;
+    }
+
+    .table-wrap {
+      max-width: 960px;
+      margin: 0 auto 56px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1.5px solid #E5E1DA;
+      font-size: 0.85rem;
+    }
+
+    thead th {
+      background: #1A2744;
+      color: #F5F1EC;
+      padding: 14px 18px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+    }
+
+    thead th:first-child { border-radius: 0; }
+
+    thead th.highlight {
+      background: #B8956A;
+      color: #fff;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #F0EDE8;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+
+    tbody tr:hover { background: #FAFAF9; }
+
+    tbody td {
+      padding: 12px 18px;
+      color: #374151;
+      vertical-align: middle;
+    }
+
+    tbody td:first-child {
+      color: #1A2744;
+      font-weight: 500;
+    }
+
+    .check { color: #B8956A; font-weight: 700; }
+    .cross { color: #D1CAC0; }
+    .partial { color: #9CA3AF; font-style: italic; font-size: 0.8rem; }
+
+    /* Rationale section */
+    .rationale {
+      max-width: 960px;
+      margin: 0 auto 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .note-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px 22px;
+      border: 1.5px solid #E5E1DA;
+    }
+
+    .note-card h3 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #B8956A;
+      margin-bottom: 8px;
+    }
+
+    .note-card p {
+      font-size: 0.83rem;
+      color: #4B5563;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      .rationale { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div style="max-width:960px;margin:0 auto 40px;">
+    <h1>Sinara Pricing Strategy</h1>
+    <p class="subtitle">Hospitality Operations Platform — Pricing tiers &amp; feature comparison</p>
+  </div>
+
+  <!-- Cards -->
+  <div class="grid">
+
+    <!-- Free -->
+    <div class="card">
+      <div class="plan-name">Free</div>
+      <div class="plan-title">Starter</div>
+      <div class="plan-desc">For small teams trying Sinara for the first time.</div>
+      <div class="price-row">
+        <span class="price">¥0</span>
+        <span class="price-unit">/ month</span>
+      </div>
+      <div class="price-note">Forever free. No credit card.</div>
+      <hr class="divider" />
+      <ul class="feature-list">
+        <li>1 division only</li>
+        <li>Up to 20 staff</li>
+        <li>Intelligent auto-scheduler (basic rules)</li>
+        <li>Basic shift constraints</li>
+        <li class="muted">OCR allergen scanning</li>
+        <li class="muted">Multiple divisions</li>
+        <li class="muted">Menu management</li>
+        <li class="muted">Analytics &amp; reports</li>
+        <li class="muted">Priority support</li>
+      </ul>
+      <a href="#" class="btn btn-free">Get Started Free</a>
+    </div>
+
+    <!-- Pro — recommended -->
+    <div class="card recommended">
+      <div class="badge">Most Popular</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-title">Professional</div>
+      <div class="plan-desc">For hotels actively managing ops across departments.</div>
+      <div class="price-row">
+        <span class="price">¥4,980</span>
+        <span class="price-unit">/ month</span>
+      </div>
+      <div class="price-note">≈ $33 USD · Billed monthly</div>
+      <hr class="divider" />
+      <ul class="feature-list">
+        <li>Up to 3 divisions</li>
+        <li>Up to 80 staff</li>
+        <li>Intelligent auto-scheduler</li>
+        <li>Advanced shift constraints</li>
+        <li>OCR allergen scanning</li>
+        <li>Menu management</li>
+        <li>Basic analytics</li>
+        <li class="muted">Unlimited divisions</li>
+        <li class="muted">Priority support</li>
+      </ul>
+      <button class="btn btn-coming-soon" onclick="openModal('Pro')">
+        <span class="soon-dot"></span> Coming Soon — Join Waitlist
+      </button>
+    </div>
+
+    <!-- Business -->
+    <div class="card">
+      <div class="plan-name">Business</div>
+      <div class="plan-title">Business</div>
+      <div class="plan-desc">For full-property management with multiple outlets.</div>
+      <div class="price-row">
+        <span class="price">¥12,800</span>
+        <span class="price-unit">/ month</span>
+      </div>
+      <div class="price-note">≈ $85 USD · Billed monthly</div>
+      <hr class="divider" />
+      <ul class="feature-list">
+        <li>Unlimited divisions</li>
+        <li>Unlimited staff</li>
+        <li>Intelligent auto-scheduler</li>
+        <li>Custom shift constraints</li>
+        <li>OCR allergen scanning</li>
+        <li>Full menu management</li>
+        <li>Advanced analytics &amp; exports</li>
+        <li>Priority support (email + chat)</li>
+        <li>Early access to new features</li>
+      </ul>
+      <button class="btn btn-coming-soon" onclick="openModal('Business')">
+        <span class="soon-dot"></span> Coming Soon — Join Waitlist
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Feature comparison table -->
+  <div class="section-title">Feature Comparison</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Starter</th>
+          <th class="highlight">Pro</th>
+          <th>Business</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Divisions</td>
+          <td>1</td>
+          <td>Up to 3</td>
+          <td>Unlimited</td>
+        </tr>
+        <tr>
+          <td>Staff per division</td>
+          <td>Max 20</td>
+          <td>Max 80 total</td>
+          <td>Unlimited</td>
+        </tr>
+        <tr>
+          <td>Intelligent auto-scheduler</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Shift rule customization</td>
+          <td><span class="partial">Basic</span></td>
+          <td><span class="partial">Advanced</span></td>
+          <td><span class="partial">Custom</span></td>
+        </tr>
+        <tr>
+          <td>OCR allergen scanning (Stella)</td>
+          <td><span class="cross">—</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Menu management</td>
+          <td><span class="cross">—</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Product &amp; allergen database</td>
+          <td><span class="cross">—</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Analytics &amp; reports</td>
+          <td><span class="cross">—</span></td>
+          <td><span class="partial">Basic</span></td>
+          <td><span class="partial">Advanced + exports</span></td>
+        </tr>
+        <tr>
+          <td>Data export (CSV / PDF)</td>
+          <td><span class="cross">—</span></td>
+          <td><span class="cross">—</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Priority support</td>
+          <td><span class="cross">—</span></td>
+          <td><span class="cross">—</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Early feature access</td>
+          <td><span class="cross">—</span></td>
+          <td><span class="cross">—</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Price / month</td>
+          <td><strong>¥0</strong></td>
+          <td><strong>¥4,980</strong></td>
+          <td><strong>¥12,800</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Rationale notes -->
+  <div class="section-title">Pricing Rationale</div>
+  <div class="rationale">
+    <div class="note-card">
+      <h3>Why ¥4,980 for Pro?</h3>
+      <p>Hotel operations managers have a monthly software budget. ¥4,980 (~$33) is below the "needs approval" threshold in most small hotels. Low enough to self-purchase, high enough to signal real value. Comparable to Deputy or When I Work internationally.</p>
+    </div>
+    <div class="note-card">
+      <h3>Why OCR behind a paywall?</h3>
+      <p>Qwen VL-OCR has a per-call cost. Keeping it Pro+ protects your margins. Also, OCR is a strong upgrade motivator — once a manager sees how fast scanning works vs. manual entry, the paywall converts.</p>
+    </div>
+    <div class="note-card">
+      <h3>Why 3 divisions on Pro?</h3>
+      <p>Most mid-size hotels have F&amp;B, Front Desk, and Housekeeping — exactly 3. This makes Pro feel like it was designed for them without going unlimited, which keeps Business tier appealing for full properties.</p>
+    </div>
+    <div class="note-card">
+      <h3>Future: per-property pricing</h3>
+      <p>When targeting hotel chains or groups, consider switching to a per-property model (¥4,980 × N properties). Chains will expect volume discounts — have a custom quote option ready by then.</p>
+    </div>
+  </div>
+
+  <!-- Waitlist Modal -->
+  <div class="modal-overlay" id="waitlistModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-tag" id="modalTag">Pro Plan</div>
+      <h2>Join the Waitlist</h2>
+      <p>We're launching paid plans soon. Drop your email and we'll notify you first — with an early adopter discount.</p>
+      <div id="modalForm">
+        <input type="text" placeholder="Your name" id="waitlistName" />
+        <input type="email" placeholder="your@email.com" id="waitlistEmail" />
+        <button class="modal-submit" onclick="submitWaitlist()">Notify Me →</button>
+      </div>
+      <div class="modal-success" id="modalSuccess">
+        <div class="tick">✦</div>
+        <p>You're on the list. We'll be in touch.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openModal(plan) {
+      document.getElementById('modalTag').textContent = plan + ' Plan';
+      document.getElementById('waitlistModal').classList.add('open');
+      document.getElementById('modalForm').style.display = 'block';
+      document.getElementById('modalSuccess').style.display = 'none';
+      document.getElementById('waitlistEmail').value = '';
+      document.getElementById('waitlistName').value = '';
+    }
+    function closeModal() {
+      document.getElementById('waitlistModal').classList.remove('open');
+    }
+    function submitWaitlist() {
+      const email = document.getElementById('waitlistEmail').value;
+      if (!email || !email.includes('@')) {
+        document.getElementById('waitlistEmail').style.borderColor = '#ef4444';
+        return;
+      }
+      document.getElementById('modalForm').style.display = 'none';
+      document.getElementById('modalSuccess').style.display = 'block';
+    }
+    document.getElementById('waitlistModal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+  </script>
+
+</body>
+</html>

@@ -17,13 +17,13 @@ export class ScanService {
 
   async createScan(createScanDto: CreateScanDto): Promise<ScanResultResponse> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // 1. Create scan session (pending)
     const { data: scanSession, error: scanError } = await supabase
       .from('scan_sessions')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         image_url: createScanDto.imageUrl,
         status: 'pending',
       })
@@ -56,7 +56,7 @@ export class ScanService {
         supabase
           .from('products')
           .insert({
-            restaurant_id: restaurantId,
+            organization_id: organizationId,
             name: extractedData.product_name || 'Unknown Product',
             brand: extractedData.brand,
             category: extractedData.category,
@@ -88,7 +88,7 @@ export class ScanService {
           ? supabase
               .from('products')
               .select('id, name, brand, image_url')
-              .eq('restaurant_id', restaurantId)
+              .eq('organization_id', organizationId)
               .ilike('name', productName)
               .neq('id', product.id)
               .limit(1)
@@ -200,13 +200,13 @@ export class ScanService {
 
   async extractOnly(createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // 1. Create scan session
     const { data: scanSession, error: scanError } = await supabase
       .from('scan_sessions')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         image_url: createScanDto.imageUrl,
         status: 'pending',
       })
@@ -374,12 +374,12 @@ export class ScanService {
 
   async findAll(limit = 20): Promise<ScanSessionResponse[]> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('scan_sessions')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(limit);
 
