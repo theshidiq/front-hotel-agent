@@ -40,7 +40,7 @@
 			penalty_weights: {
 				staffGroup: 100,
 				fiveDayRest: 200,
-				monthlyLimit: 80,
+				monthlyLimit: 350,
 				dailyLimitMax: 50,
 				dailyLimitMin: 50,
 				adjacentConflict: 30
@@ -79,7 +79,7 @@
 		penalty_weights: {
 			staffGroup: 100,
 			fiveDayRest: 200,
-			monthlyLimit: 80,
+			monthlyLimit: 350,
 			dailyLimitMax: 50,
 			dailyLimitMin: 50,
 			adjacentConflict: 30
@@ -99,6 +99,8 @@
 	let selectedPreset = $state<'strict' | 'balanced' | 'flexible' | null>('balanced');
 	let isSaving = $state(false);
 	let hasChanges = $state(false);
+	let saveError = $state<string | null>(null);
+	let saveSuccess = $state(false);
 
 	// Initialize from props — writes to localConfig wrapped in untrack to avoid reactive cycle
 	$effect(() => {
@@ -147,13 +149,30 @@
 		if (!hasChanges) return;
 
 		isSaving = true;
+		saveError = null;
+		saveSuccess = false;
 		try {
-			await updateSolverConfig(localConfig);
+			const payload = {
+				penalty_weights: localConfig.penalty_weights,
+				hard_constraints: localConfig.hard_constraints,
+				timeout: localConfig.solver_settings?.timeout,
+				numWorkers: localConfig.solver_settings?.numWorkers,
+				disableStaffStatusShiftRestrictions: localConfig.solver_settings?.disableStaffStatusShiftRestrictions,
+				postPeriodEnabled: localConfig.solver_settings?.postPeriodEnabled,
+				postPeriodDays: localConfig.solver_settings?.postPeriodDays,
+				postPeriodIsHard: localConfig.solver_settings?.postPeriodIsHard,
+				postPeriodMinLength: localConfig.solver_settings?.postPeriodMinLength,
+				disableAdjacentConflict: localConfig.solver_settings?.disableAdjacentConflict
+			};
+			await updateSolverConfig(payload);
 			await onSave();
 			hasChanges = false;
+			saveSuccess = true;
+			setTimeout(() => { saveSuccess = false; }, 3000);
 		} catch (error) {
 			console.error('Failed to save solver config:', error);
-			alert('保存に失敗しました');
+			saveError = error instanceof Error ? error.message : '保存に失敗しました';
+			setTimeout(() => { saveError = null; }, 5000);
 		} finally {
 			isSaving = false;
 		}
@@ -250,7 +269,7 @@
 					max="300"
 					step="5"
 					bind:value={localConfig.penalty_weights.staffGroup}
-					onchange={() => detectPreset()}
+					onchange={() => { detectPreset(); hasChanges = true; }}
 					class="w-full accent-blue-600"
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
@@ -272,7 +291,7 @@
 					max="500"
 					step="10"
 					bind:value={localConfig.penalty_weights.fiveDayRest}
-					onchange={() => detectPreset()}
+					onchange={() => { detectPreset(); hasChanges = true; }}
 					class="w-full accent-red-600"
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
@@ -294,7 +313,7 @@
 					max="200"
 					step="5"
 					bind:value={localConfig.penalty_weights.monthlyLimit}
-					onchange={() => detectPreset()}
+					onchange={() => { detectPreset(); hasChanges = true; }}
 					class="w-full accent-purple-600"
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
@@ -318,7 +337,7 @@
 					max="150"
 					step="5"
 					bind:value={localConfig.penalty_weights.dailyLimitMax}
-					onchange={() => detectPreset()}
+					onchange={() => { detectPreset(); hasChanges = true; }}
 					class="w-full accent-orange-600"
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
@@ -342,7 +361,7 @@
 					max="150"
 					step="5"
 					bind:value={localConfig.penalty_weights.dailyLimitMin}
-					onchange={() => detectPreset()}
+					onchange={() => { detectPreset(); hasChanges = true; }}
 					class="w-full accent-teal-600"
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
@@ -364,7 +383,7 @@
 					max="100"
 					step="5"
 					bind:value={localConfig.penalty_weights.adjacentConflict}
-					onchange={() => detectPreset()}
+					onchange={() => { detectPreset(); hasChanges = true; }}
 					class="w-full accent-gray-600"
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
@@ -394,7 +413,7 @@
 					<input
 						type="checkbox"
 						bind:checked={localConfig.hard_constraints.dailyLimits}
-						onchange={() => detectPreset()}
+						onchange={() => { detectPreset(); hasChanges = true; }}
 						class="peer sr-only"
 					/>
 					<div
@@ -415,7 +434,7 @@
 					<input
 						type="checkbox"
 						bind:checked={localConfig.hard_constraints.fiveDayRest}
-						onchange={() => detectPreset()}
+						onchange={() => { detectPreset(); hasChanges = true; }}
 						class="peer sr-only"
 					/>
 					<div
@@ -436,7 +455,7 @@
 					<input
 						type="checkbox"
 						bind:checked={localConfig.hard_constraints.staffGroups}
-						onchange={() => detectPreset()}
+						onchange={() => { detectPreset(); hasChanges = true; }}
 						class="peer sr-only"
 					/>
 					<div
@@ -457,7 +476,7 @@
 					<input
 						type="checkbox"
 						bind:checked={localConfig.hard_constraints.monthlyLimits}
-						onchange={() => detectPreset()}
+						onchange={() => { detectPreset(); hasChanges = true; }}
 						class="peer sr-only"
 					/>
 					<div
@@ -510,6 +529,17 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Save Feedback -->
+	{#if saveError}
+		<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+			{saveError}
+		</div>
+	{:else if saveSuccess}
+		<div class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+			設定を保存しました
+		</div>
+	{/if}
 
 	<!-- Action Buttons -->
 	<div class="flex items-center justify-between border-t border-gray-200 pt-6 dark:border-gray-700">

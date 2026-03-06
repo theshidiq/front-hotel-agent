@@ -18,6 +18,8 @@
 	let preferences = $state<Map<string, boolean>>(new Map());
 	let isSaving = $state(false);
 	let hasChanges = $state(false);
+	let saveError = $state<string | null>(null);
+	let saveSuccess = $state(false);
 
 	// Collapsible sections state
 	let expandedSections = $state<Set<string>>(new Set(['社員', '派遣', 'パート']));
@@ -93,6 +95,8 @@
 
 	async function handleSave() {
 		isSaving = true;
+		saveError = null;
+		saveSuccess = false;
 		try {
 			const preferencesArray = Array.from(preferences.entries()).map(([staff_id, can_do_early_shift]) => ({
 				staff_id,
@@ -102,9 +106,12 @@
 			await bulkUpsertEarlyShiftPreferences({ preferences: preferencesArray }, departmentId);
 			hasChanges = false;
 			await onSave();
+			saveSuccess = true;
+			setTimeout(() => { saveSuccess = false; }, 3000);
 		} catch (error) {
 			console.error('Failed to save early shift preferences:', error);
-			alert('保存に失敗しました。もう一度お試しください。');
+			saveError = error instanceof Error ? error.message : '保存に失敗しました。もう一度お試しください。';
+			setTimeout(() => { saveError = null; }, 5000);
 		} finally {
 			isSaving = false;
 		}
@@ -271,6 +278,13 @@
 			</div>
 		{/each}
 	</div>
+
+	<!-- Feedback Banner -->
+	{#if saveError}
+		<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{saveError}</div>
+	{:else if saveSuccess}
+		<div class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">保存しました</div>
+	{/if}
 
 	<!-- Save Button -->
 	<div class="sticky bottom-0 bg-white border-t border-gray-200 pt-4 pb-2">

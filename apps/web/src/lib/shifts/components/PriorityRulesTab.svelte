@@ -18,6 +18,8 @@
 	let filterStaffId = $state<string>('');
 	let isLoading = $state(false);
 	let deleteConfirmRuleId = $state<string | null>(null);
+	let formError = $state<string | null>(null);
+	let formSuccess = $state<string | null>(null);
 
 	// Form state
 	let formData = $state<Partial<PriorityRule>>({
@@ -183,13 +185,16 @@
 	}
 
 	async function handleSave() {
-		const error = validateForm();
-		if (error) {
-			alert(error);
+		const validationError = validateForm();
+		if (validationError) {
+			formError = validationError;
+			setTimeout(() => { formError = null; }, 5000);
 			return;
 		}
 
 		isLoading = true;
+		formError = null;
+		formSuccess = null;
 		try {
 			if (editingRuleId) {
 				await updatePriorityRule(editingRuleId, formData);
@@ -198,9 +203,12 @@
 			}
 			await onRulesChange();
 			resetForm();
+			formSuccess = editingRuleId ? 'ルールを更新しました' : 'ルールを追加しました';
+			setTimeout(() => { formSuccess = null; }, 3000);
 		} catch (err) {
 			console.error('Failed to save priority rule:', err);
-			alert('ルールの保存に失敗しました');
+			formError = err instanceof Error ? err.message : 'ルールの保存に失敗しました';
+			setTimeout(() => { formError = null; }, 5000);
 		} finally {
 			isLoading = false;
 		}
@@ -214,13 +222,15 @@
 		if (!deleteConfirmRuleId) return;
 
 		isLoading = true;
+		formError = null;
 		try {
 			await deletePriorityRule(deleteConfirmRuleId);
 			await onRulesChange();
 			deleteConfirmRuleId = null;
 		} catch (err) {
 			console.error('Failed to delete priority rule:', err);
-			alert('ルールの削除に失敗しました');
+			formError = err instanceof Error ? err.message : 'ルールの削除に失敗しました';
+			setTimeout(() => { formError = null; }, 5000);
 		} finally {
 			isLoading = false;
 		}
@@ -494,7 +504,14 @@
 					</label>
 				</div>
 
-				<!-- Actions -->
+				<!-- Feedback -->
+			{#if formError}
+				<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{formError}</div>
+			{:else if formSuccess}
+				<div class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">{formSuccess}</div>
+			{/if}
+
+			<!-- Actions -->
 				<div class="flex gap-3 pt-4 border-t">
 					<button
 						onclick={handleSave}

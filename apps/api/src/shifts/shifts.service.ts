@@ -454,9 +454,10 @@ export class ShiftsService {
   // ==================== OPTIMIZATION ====================
 
   async optimizeSchedule(restaurantId: string, dto: OptimizeRequestDto): Promise<any> {
+    const deptId = dto.departmentId;
     const period = await this.getPeriodById(restaurantId, dto.periodId);
-    const staff = await this.getStaff(restaurantId);
-    const { schedule } = await this.getSchedule(restaurantId, dto.periodId);
+    const staff = await this.getStaff(restaurantId, deptId);
+    const { schedule } = await this.getSchedule(restaurantId, dto.periodId, deptId);
 
     // Fetch all constraint configurations
     const [
@@ -467,14 +468,16 @@ export class ShiftsService {
       staffGroups,
       priorityRules,
       earlyShiftPreferences,
+      backupAssignments,
     ] = await Promise.all([
       this.getCalendarRules(restaurantId),
-      this.getDailyLimits(restaurantId),
-      this.getAllMonthlyLimits(restaurantId),
+      this.getDailyLimits(restaurantId, deptId),
+      this.getAllMonthlyLimits(restaurantId, deptId),
       this.getSolverConfig(restaurantId),
-      this.getStaffGroups(restaurantId),
-      this.getPriorityRules(restaurantId),
-      this.getEarlyShiftPreferences(restaurantId),
+      this.getStaffGroups(restaurantId, deptId),
+      this.getPriorityRules(restaurantId, deptId),
+      this.getEarlyShiftPreferences(restaurantId, deptId),
+      this.getBackupAssignments(restaurantId, deptId),
     ]);
 
     // Staff groups: members stored in group_config.members JSONB
@@ -534,7 +537,7 @@ export class ShiftsService {
     const penaltyWeights = dto.penaltyWeights || solverConfig?.penalty_weights || {
       staffGroup: 100,
       fiveDayRest: 200,
-      monthlyLimit: 80,
+      monthlyLimit: 350,
       dailyLimitMax: 50,
       dailyLimitMin: 50,
       adjacentConflict: 30,
@@ -594,6 +597,8 @@ export class ShiftsService {
         status: s.status || '社員',
         type: s.type || 'regular',
         staff_order: s.staff_order,
+        ...(s.start_period && { start_period: s.start_period }),
+        ...(s.end_period && { end_period: s.end_period }),
       })),
       dateRange,
       constraints: {
@@ -604,6 +609,7 @@ export class ShiftsService {
         ...(monthlyLimitsArray.length && { monthlyLimitsArray }),
         ...(normalizedPriorityRules.length && { priorityRules: normalizedPriorityRules }),
         ...(Object.keys(earlyShiftPrefsDict).length && { earlyShiftPreferences: earlyShiftPrefsDict }),
+        ...(backupAssignments.length && { backupAssignments }),
         ...(dto.preservePrefilled && schedule?.schedule_data && {
           prefilledSchedule: schedule.schedule_data,
         }),
@@ -634,6 +640,7 @@ export class ShiftsService {
         restaurantId,
         dto.periodId,
         this.scheduleToUpdates(result.schedule),
+        deptId,
       );
     }
 
@@ -1729,6 +1736,59 @@ export class ShiftsService {
     }
 
     return data || [];
+  }
+
+  // ==================== BACKUP ASSIGNMENTS ====================
+
+  async getBackupAssignments(restaurantId: string, departmentId?: string): Promise<Array<{
+    id: string;
+    staffId: string;
+    groupId: string;
+    isActive: boolean;
+    assignmentType?: string;
+    priorityOrder?: number;
+  }>> {
+    let query = this.supabase
+      .from('staff_backup_assignments')
+      .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
+      .eq('restaurant_id', restaurantId)
+      .eq('is_active', true);
+
+    // Filter by department if provided — join via staff table
+    // For simplicity, fetch all active assignments and filter by staff in the department
+    const { data, error } = await query;
+
+    if (error) {
+      this.logger.warn('Failed to fetch backup assignments', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) return [];
+
+    // If departmentId provided, filter to assignments where the backup staff is in that department
+    if (departmentId) {
+      const deptStaff = await this.getStaff(restaurantId, departmentId);
+      const deptStaffIds = new Set(deptStaff.map((s) => s.id));
+      return data
+        .filter((a: any) => deptStaffIds.has(a.staff_id))
+        .map((a: any) => ({
+          id: a.id,
+          staffId: a.staff_id,
+          groupId: a.group_id,
+          isActive: a.is_active,
+          assignmentType: a.assignment_type,
+          priorityOrder: a.priority_order,
+        }));
+    }
+
+    return data.map((a: any) => ({
+      id: a.id,
+      staffId: a.staff_id,
+      groupId: a.group_id,
+      isActive: a.is_active,
+      assignmentType: a.assignment_type,
+      priorityOrder: a.priority_order,
+    }));
   }
 
   // ==================== HELPERS ====================

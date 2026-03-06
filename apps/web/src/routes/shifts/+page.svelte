@@ -8,12 +8,6 @@
 		getSchedule,
 		bulkUpdateCells,
 		clearSchedule,
-		createShiftPeriod,
-		deleteShiftPeriod,
-		createShiftStaff,
-		updateShiftStaff,
-		deleteShiftStaff,
-		reorderShiftStaff,
 		optimizeSchedule,
 		checkOptimizerHealth,
 		prefetchManager,
@@ -69,8 +63,7 @@
 	];
 
 	// ── Navigation State ──
-	type ShiftSection = "schedule" | "settings";
-	let activeSection: ShiftSection = $state("schedule");
+
 
 	// ── Session cache helpers ──
 	// Persist staff/periods across tab discards so the skeleton never flashes on return.
@@ -221,23 +214,8 @@
 	}
 
 	// ── Staff Modal State ──
-	let showStaffModal = $state(false);
-	let editingStaff: ScheduleStaff | null = $state(null);
-	let staffForm = $state({
-		name: "",
-		position: "",
-		department: "",
-		type: "regular",
-		status: "",
-	});
 
-	// ── Period Modal State ──
-	let showPeriodModal = $state(false);
-	let periodForm = $state({
-		label: "",
-		start_date: "",
-		end_date: "",
-	});
+
 
 	// ── Computed ──
 	let selectedPeriod = $derived(
@@ -707,123 +685,9 @@
 		printSchedule(staff, dateRange, scheduleData, selectedPeriod);
 	}
 
-	// ── Staff Management ──
-	function openAddStaffModal() {
-		editingStaff = null;
-		staffForm = {
-			name: "",
-			position: "",
-			department: "",
-			type: "regular",
-			status: "",
-		};
-		showStaffModal = true;
-	}
-
-	function openEditStaffModal(s: ScheduleStaff) {
-		editingStaff = s;
-		staffForm = {
-			name: s.name,
-			position: s.position || "",
-			department: s.department || "",
-			type: s.type || "regular",
-			status: s.status || "",
-		};
-		showStaffModal = true;
-	}
-
-	async function saveStaff() {
-		try {
-			saving = true;
-
-			if (editingStaff) {
-				await updateShiftStaff(editingStaff.id, staffForm);
-			} else {
-				await createShiftStaff(staffForm);
-			}
-
-			// Reload staff
-			staff = await getShiftStaff();
-			showStaffModal = false;
-			showSuccess(
-				editingStaff
-					? "スタッフを更新しました"
-					: "スタッフを追加しました",
-			);
-		} catch (e) {
-			error = e instanceof Error ? e.message : "Failed to save staff";
-		} finally {
-			saving = false;
-		}
-	}
-
-	function handleDeleteStaff(s: ScheduleStaff) {
-		showConfirm({
-			title: 'スタッフを削除',
-			message: `${s.name} を削除しますか？この操作は元に戻せません。`,
-			confirmLabel: '削除する',
-			confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
-			icon: 'person_remove',
-			onConfirm: async () => {
-				try {
-					await deleteShiftStaff(s.id);
-					staff = await getShiftStaff();
-					showSuccess("スタッフを削除しました");
-				} catch (e) {
-					error = e instanceof Error ? e.message : "Failed to delete staff";
-				}
-			},
-		});
-	}
-
 	// ── Period Management ──
-	function openAddPeriodModal() {
-		periodForm = {
-			label: "",
-			start_date: "",
-			end_date: "",
-		};
-		showPeriodModal = true;
-	}
 
-	async function savePeriod() {
-		try {
-			saving = true;
-			await createShiftPeriod(periodForm);
-			periods = await getShiftPeriods();
-			showPeriodModal = false;
-			showSuccess("期間を作成しました");
-		} catch (e) {
-			error = e instanceof Error ? e.message : "Failed to create period";
-		} finally {
-			saving = false;
-		}
-	}
 
-	function handleDeletePeriod(p: SchedulePeriod) {
-		showConfirm({
-			title: '期間を削除',
-			message: `「${p.label}」を削除しますか？この操作は元に戻せません。`,
-			confirmLabel: '削除する',
-			confirmClass: 'bg-red-600 hover:bg-red-700 text-white',
-			icon: 'event_busy',
-			onConfirm: async () => {
-				try {
-					await deleteShiftPeriod(p.id);
-					periods = await getShiftPeriods();
-					if (selectedPeriodId === p.id) {
-						selectedPeriodId = periods[0]?.id || null;
-						if (selectedPeriodId) {
-							await loadSchedule(selectedPeriodId);
-						}
-					}
-					showSuccess("期間を削除しました");
-				} catch (e) {
-					error = e instanceof Error ? e.message : "Failed to delete period";
-				}
-			},
-		});
-	}
 
 	// ── Utilities ──
 	function showSuccess(message: string) {
@@ -900,35 +764,6 @@
 					{/if}
 				</div>
 
-				<!-- Navigation tabs -->
-				<div class="flex gap-2">
-					<button
-						class="px-4 py-2 rounded-lg font-medium transition-colors {activeSection ===
-						'schedule'
-							? 'bg-blue-600 text-white'
-							: 'text-gray-600 hover:bg-gray-100'}"
-						onclick={() => (activeSection = "schedule")}
-					>
-						<span
-							class="material-symbols-rounded text-sm align-middle mr-1"
-							>calendar_month</span
-						>
-						スケジュール
-					</button>
-					<button
-						class="px-4 py-2 rounded-lg font-medium transition-colors {activeSection ===
-						'settings'
-							? 'bg-blue-600 text-white'
-							: 'text-gray-600 hover:bg-gray-100'}"
-						onclick={() => (activeSection = "settings")}
-					>
-						<span
-							class="material-symbols-rounded text-sm align-middle mr-1"
-							>settings</span
-						>
-						設定
-					</button>
-				</div>
 
 				<div class="flex items-center gap-3">
 					{#if optimizerHealthy}
@@ -948,15 +783,6 @@
 							Optimizer Offline
 						</span>
 					{/if}
-					<button
-						class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-						onclick={openAddStaffModal}
-						title="スタッフ追加"
-					>
-						<span class="material-symbols-rounded text-xl"
-							>person_add</span
-						>
-					</button>
 				</div>
 			</div>
 		</header>
@@ -1064,7 +890,7 @@
 						</button>
 					</div>
 				</div>
-			{:else if activeSection === "schedule"}
+			{:else}
 				<!-- Schedule Section -->
 				<div class="p-4">
 					<!-- Toolbar -->
@@ -1204,8 +1030,6 @@
 								{scheduleData}
 								onCellUpdate={handleCellUpdate}
 								onBulkUpdate={handleBulkUpdate}
-								onStaffEdit={openEditStaffModal}
-								onStaffDelete={handleDeleteStaff}
 							/>
 						{/if}
 					</div>
@@ -1237,121 +1061,6 @@
 						1=早番(△), 2=出勤(○), 3=遅番(◇), 4/X=休み(×), S=管理(★),
 						Space/Delete=クリア, Escape=選択解除, Ctrl+C=コピー, Ctrl+V=ペースト,
 						矢印キー=移動
-					</div>
-				</div>
-			{:else}
-				<!-- Settings Section -->
-				<div class="p-4">
-					<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-						<!-- Staff List -->
-						<div class="bg-white rounded-lg shadow p-4">
-							<div class="flex items-center justify-between mb-4">
-								<h2 class="text-lg font-bold text-gray-900">
-									スタッフ一覧
-								</h2>
-								<button
-									class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-									onclick={openAddStaffModal}
-								>
-									追加
-								</button>
-							</div>
-							<div class="space-y-2">
-								{#each staff as s}
-									<div
-										class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-									>
-										<div>
-											<div class="font-medium">
-												{s.name}
-											</div>
-											<div class="text-sm text-gray-500">
-												{s.position || "-"}
-												{s.status
-													? `(${s.status})`
-													: ""}
-											</div>
-										</div>
-										<div class="flex items-center gap-2">
-											<button
-												class="p-1 text-gray-500 hover:text-blue-600"
-												onclick={() =>
-													openEditStaffModal(s)}
-											>
-												<span
-													class="material-symbols-rounded text-sm"
-													>edit</span
-												>
-											</button>
-											<button
-												class="p-1 text-gray-500 hover:text-red-600"
-												onclick={() =>
-													handleDeleteStaff(s)}
-											>
-												<span
-													class="material-symbols-rounded text-sm"
-													>delete</span
-												>
-											</button>
-										</div>
-									</div>
-								{/each}
-							</div>
-						</div>
-
-						<!-- Periods List -->
-						<div class="bg-white rounded-lg shadow p-4">
-							<div class="flex items-center justify-between mb-4">
-								<h2 class="text-lg font-bold text-gray-900">
-									期間一覧
-								</h2>
-								<button
-									class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-									onclick={openAddPeriodModal}
-								>
-									追加
-								</button>
-							</div>
-							<div class="space-y-2">
-								{#each periods as p}
-									<div
-										class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-									>
-										<div>
-											<div class="font-medium">
-												{p.label}
-											</div>
-											<div class="text-sm text-gray-500">
-												{p.start_date} 〜 {p.end_date}
-											</div>
-										</div>
-										<button
-											class="p-1 text-gray-500 hover:text-red-600"
-											onclick={() =>
-												handleDeletePeriod(p)}
-										>
-											<span
-												class="material-symbols-rounded text-sm"
-												>delete</span
-											>
-										</button>
-									</div>
-								{/each}
-							</div>
-						</div>
-					</div>
-
-					<!-- Additional Settings Link -->
-					<div class="mt-4">
-						<a
-							href="/shifts/settings"
-							class="text-blue-600 hover:underline flex items-center gap-1"
-						>
-							<span class="material-symbols-rounded text-sm"
-								>tune</span
-							>
-							詳細設定 (制約条件、最適化パラメータ)
-						</a>
 					</div>
 				</div>
 			{/if}
@@ -1394,164 +1103,6 @@
 					onclick={() => { const fn = confirmModal!.onConfirm; closeConfirmModal(); fn(); }}
 				>
 					{confirmModal.confirmLabel ?? '確認'}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Staff Modal -->
-{#if showStaffModal}
-	<div
-		class="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center"
-		role="dialog"
-	>
-		<div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-			<div class="p-4 border-b flex items-center justify-between">
-				<h2 class="text-lg font-bold">
-					{editingStaff ? "スタッフ編集" : "スタッフ追加"}
-				</h2>
-				<button
-					class="text-gray-500 hover:text-gray-700"
-					onclick={() => (showStaffModal = false)}
-				>
-					<span class="material-symbols-rounded">close</span>
-				</button>
-			</div>
-			<div class="p-4 space-y-4">
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1"
-						>名前 *</label
-					>
-					<input
-						type="text"
-						class="w-full border rounded-lg px-3 py-2"
-						bind:value={staffForm.name}
-						required
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1"
-						>役職</label
-					>
-					<input
-						type="text"
-						class="w-full border rounded-lg px-3 py-2"
-						bind:value={staffForm.position}
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1"
-						>部門</label
-					>
-					<input
-						type="text"
-						class="w-full border rounded-lg px-3 py-2"
-						bind:value={staffForm.department}
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1"
-						>雇用形態</label
-					>
-					<select
-						class="w-full border rounded-lg px-3 py-2"
-						bind:value={staffForm.status}
-					>
-						<option value="">選択してください</option>
-						<option value="社員">社員</option>
-						<option value="派遣">派遣</option>
-						<option value="パート">パート</option>
-					</select>
-				</div>
-			</div>
-			<div class="p-4 border-t flex justify-end gap-2">
-				<button
-					class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-					onclick={() => (showStaffModal = false)}
-				>
-					キャンセル
-				</button>
-				<button
-					class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-					onclick={saveStaff}
-					disabled={saving || !staffForm.name}
-				>
-					{saving ? "保存中..." : "保存"}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Period Modal -->
-{#if showPeriodModal}
-	<div
-		class="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center"
-		role="dialog"
-	>
-		<div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-			<div class="p-4 border-b flex items-center justify-between">
-				<h2 class="text-lg font-bold">新しい期間</h2>
-				<button
-					class="text-gray-500 hover:text-gray-700"
-					onclick={() => (showPeriodModal = false)}
-				>
-					<span class="material-symbols-rounded">close</span>
-				</button>
-			</div>
-			<div class="p-4 space-y-4">
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1"
-						>ラベル *</label
-					>
-					<input
-						type="text"
-						class="w-full border rounded-lg px-3 py-2"
-						bind:value={periodForm.label}
-						placeholder="例: 2024年3月"
-						required
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1"
-						>開始日 *</label
-					>
-					<input
-						type="date"
-						class="w-full border rounded-lg px-3 py-2"
-						bind:value={periodForm.start_date}
-						required
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1"
-						>終了日 *</label
-					>
-					<input
-						type="date"
-						class="w-full border rounded-lg px-3 py-2"
-						bind:value={periodForm.end_date}
-						required
-					/>
-				</div>
-			</div>
-			<div class="p-4 border-t flex justify-end gap-2">
-				<button
-					class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-					onclick={() => (showPeriodModal = false)}
-				>
-					キャンセル
-				</button>
-				<button
-					class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-					onclick={savePeriod}
-					disabled={saving ||
-						!periodForm.label ||
-						!periodForm.start_date ||
-						!periodForm.end_date}
-				>
-					{saving ? "作成中..." : "作成"}
 				</button>
 			</div>
 		</div>

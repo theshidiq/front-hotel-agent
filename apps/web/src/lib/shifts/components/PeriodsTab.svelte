@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { PeriodConfiguration } from '$lib/shifts/api';
 	import type { SchedulePeriod } from '$lib/shifts/types';
-	import { updatePeriodConfiguration, regeneratePeriods } from '$lib/shifts/api';
+	import { updatePeriodConfiguration, regeneratePeriods, createShiftPeriod, deleteShiftPeriod } from '$lib/shifts/api';
 
 	interface Props {
 		periodConfig: PeriodConfiguration | null;
@@ -19,6 +19,12 @@
 	let isRegenerating = $state(false);
 	let showConfirmModal = $state(false);
 	let feedbackMessage = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+
+	// Add period modal state
+	let showAddModal = $state(false);
+	let isAdding = $state(false);
+	let addForm = $state({ label: '', start_date: '', end_date: '' });
+	let deletingId = $state<string | null>(null);
 
 	// Update local state when props change
 	$effect(() => {
@@ -86,7 +92,6 @@
 				text: '期間設定を保存しました'
 			};
 
-			// Auto-hide success message after 3 seconds
 			setTimeout(() => {
 				feedbackMessage = null;
 			}, 3000);
@@ -115,7 +120,6 @@
 				text: '期間を再生成しました'
 			};
 
-			// Auto-hide success message after 3 seconds
 			setTimeout(() => {
 				feedbackMessage = null;
 			}, 3000);
@@ -126,6 +130,39 @@
 			};
 		} finally {
 			isRegenerating = false;
+		}
+	}
+
+	// Add period
+	async function handleAdd() {
+		isAdding = true;
+		try {
+			await createShiftPeriod(addForm);
+			await onSave();
+			showAddModal = false;
+			addForm = { label: '', start_date: '', end_date: '' };
+			feedbackMessage = { type: 'success', text: '期間を追加しました' };
+			setTimeout(() => { feedbackMessage = null; }, 3000);
+		} catch (error) {
+			feedbackMessage = { type: 'error', text: `追加に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}` };
+		} finally {
+			isAdding = false;
+		}
+	}
+
+	// Delete period
+	async function handleDelete(period: SchedulePeriod) {
+		if (!confirm(`「${period.label}」を削除しますか？`)) return;
+		deletingId = period.id;
+		try {
+			await deleteShiftPeriod(period.id);
+			await onSave();
+			feedbackMessage = { type: 'success', text: '期間を削除しました' };
+			setTimeout(() => { feedbackMessage = null; }, 3000);
+		} catch (error) {
+			feedbackMessage = { type: 'error', text: `削除に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}` };
+		} finally {
+			deletingId = null;
 		}
 	}
 
@@ -253,48 +290,59 @@
 		</div>
 	</div>
 
-	<!-- Current Periods Display -->
+	<!-- Periods List -->
 	<div class="rounded-lg border border-gray-200 bg-white p-6">
 		<div class="flex items-center justify-between mb-4">
-			<h3 class="text-lg font-semibold text-gray-900">現在の期間 (次の6ヶ月)</h3>
-			<button
-				type="button"
-				onclick={() => (showConfirmModal = true)}
-				class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-			>
-				期間を再生成
-			</button>
+			<h3 class="text-lg font-semibold text-gray-900">期間一覧</h3>
+			<div class="flex items-center gap-2">
+				<button
+					type="button"
+					onclick={() => (showConfirmModal = true)}
+					class="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+				>
+					再生成
+				</button>
+				<button
+					type="button"
+					onclick={() => { addForm = { label: '', start_date: '', end_date: '' }; showAddModal = true; }}
+					class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+				>
+					追加
+				</button>
+			</div>
 		</div>
 
 		{#if periods.length === 0}
 			<div class="text-center py-8 text-gray-500">
 				<p>期間が設定されていません</p>
-				<p class="text-sm mt-2">上記の設定を保存後、期間を再生成してください</p>
+				<p class="text-sm mt-2">上記の設定を保存後、再生成してください</p>
 			</div>
 		{:else}
-			<div class="space-y-3">
+			<div class="space-y-2">
 				{#each periods as period}
-					<div class="rounded-lg border border-gray-200 p-4 hover:border-gray-300 transition-colors">
-						<div class="flex items-center justify-between">
-							<div>
-								<h4 class="font-semibold text-gray-900">{period.label}</h4>
-								<p class="text-sm text-gray-600 mt-1">
-									{formatDate(period.start_date)} 〜 {formatDate(period.end_date)}
-								</p>
-							</div>
-							<div class="text-right">
-								<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-									{calculateDays(period.start_date, period.end_date)}日間
-								</span>
+					<div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+						<div>
+							<div class="font-medium text-gray-900">{period.label}</div>
+							<div class="text-sm text-gray-500">
+								{formatDate(period.start_date)} 〜 {formatDate(period.end_date)}
+								<span class="ml-2 text-xs text-gray-400">({calculateDays(period.start_date, period.end_date)}日間)</span>
 							</div>
 						</div>
+						<button
+							type="button"
+							onclick={() => handleDelete(period)}
+							disabled={deletingId === period.id}
+							class="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-40 transition-colors"
+						>
+							<span class="material-symbols-rounded text-sm">delete</span>
+						</button>
 					</div>
 				{/each}
 			</div>
 		{/if}
 	</div>
 
-	<!-- Info Box for Regeneration -->
+	<!-- Regeneration info -->
 	<div class="rounded-lg bg-yellow-50 p-4 border border-yellow-200">
 		<div class="flex items-start gap-3">
 			<svg class="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -314,7 +362,60 @@
 	</div>
 </div>
 
-<!-- Confirmation Modal -->
+<!-- Add Period Modal -->
+{#if showAddModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+		<div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+			<h3 class="text-lg font-semibold text-gray-900 mb-4">新しい期間</h3>
+			<div class="space-y-4">
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-1">ラベル *</label>
+					<input
+						type="text"
+						bind:value={addForm.label}
+						placeholder="例: 2026年4月"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+					/>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-1">開始日 *</label>
+					<input
+						type="date"
+						bind:value={addForm.start_date}
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+					/>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-gray-700 mb-1">終了日 *</label>
+					<input
+						type="date"
+						bind:value={addForm.end_date}
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+					/>
+				</div>
+			</div>
+			<div class="flex justify-end gap-3 mt-6">
+				<button
+					type="button"
+					onclick={() => (showAddModal = false)}
+					class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+				>
+					キャンセル
+				</button>
+				<button
+					type="button"
+					onclick={handleAdd}
+					disabled={isAdding || !addForm.label || !addForm.start_date || !addForm.end_date}
+					class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+				>
+					{isAdding ? '追加中...' : '追加'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Regenerate Confirmation Modal -->
 {#if showConfirmModal}
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
 		<div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -327,7 +428,7 @@
 					type="button"
 					onclick={() => (showConfirmModal = false)}
 					disabled={isRegenerating}
-					class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					キャンセル
 				</button>
@@ -335,7 +436,7 @@
 					type="button"
 					onclick={handleRegenerate}
 					disabled={isRegenerating}
-					class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					{isRegenerating ? '再生成中...' : '再生成する'}
 				</button>

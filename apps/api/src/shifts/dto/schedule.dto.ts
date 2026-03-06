@@ -45,6 +45,11 @@ export class OptimizeRequestDto {
   @IsString()
   periodId: string;
 
+  @ApiPropertyOptional({ description: 'Department ID to filter staff/constraints' })
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
   @ApiPropertyOptional({ description: 'Solver timeout in seconds (default: 30)' })
   @IsOptional()
   @IsNumber()
