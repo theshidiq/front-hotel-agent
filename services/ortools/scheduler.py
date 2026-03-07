@@ -94,6 +94,7 @@ class ShiftScheduleOptimizer:
         self.constraints_config = {}
         self.calendar_off_dates = set()  # Track must_day_off dates
         self.calendar_work_dates = set()  # Track must_work dates (for skipping priority rules)
+        self.required_off_cells = set()  # Track (staff_id, date) pairs forced off by required_off rules
         self.prefilled_cells = set()  # Track pre-filled cells (staff_id, date) for reference
         self.prefilled_star_equiv_by_staff = {}  # Track ★ symbols per staff for monthly limits (★ is WORK but counts as off-equivalent)
         self.backup_unavailable_slots = {}  # Track (staff_id, date) -> any_member_off bool var for backup unavailability
@@ -201,6 +202,7 @@ class ShiftScheduleOptimizer:
         self.date_range = date_range
         self.constraints_config = constraints
         self.calendar_off_dates = set()
+        self.required_off_cells = set()  # Reset required_off cells tracking
         self.prefilled_cells = set()  # Reset pre-filled cells tracking
         self.prefilled_star_equiv_by_staff = {}  # Reset star equivalent tracking
         self.backup_unavailable_slots = {}  # Reset backup unavailable slots tracking
@@ -290,6 +292,7 @@ class ShiftScheduleOptimizer:
             self._add_basic_constraints()                    # One shift per staff per day
             self._add_prefilled_constraints()                # PRE-PHASE: Lock user-edited cells as HARD constraints
             self._add_calendar_rules()                       # PRE-PHASE + Phase 3 Integration
+            self._add_required_off_constraints()             # PRE-PHASE: required_off priority rules as HARD constraints
             self._add_backup_staff_constraints()             # Backup staff can never have off days
             self._add_staff_status_shift_restrictions()      # 派遣/パート can only have work/off shifts
             self._add_staff_group_constraints()              # PHASE 2
@@ -746,6 +749,77 @@ class ShiftScheduleOptimizer:
         self._japanese_holidays_cache = set()
         self._japanese_holidays_names = {}
         return self._japanese_holidays_cache
+
+    def _add_required_off_constraints(self):
+        """
+        PRE-PHASE: Apply required_off priority rules as HARD constraints.
+
+        required_off rules are treated like calendar rules — they override all
+        other soft constraints (daily limits, monthly limits, etc.).
+
+        Mirrors the React BusinessRuleValidator.js behavior where preferredShifts
+        with shift="off" are directly SET in the schedule, not competed against
+        other constraints as penalties.
+
+        Populates self.required_off_cells: set of (staff_id, date) pairs that
+        are locked to OFF. Daily limits and other constraints skip these cells.
+        """
+        priority_rules = self.constraints_config.get('priorityRules', [])
+        if not isinstance(priority_rules, list) or not priority_rules:
+            return
+
+        day_index_to_name = {
+            0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday',
+            4: 'thursday', 5: 'friday', 6: 'saturday'
+        }
+        valid_staff_ids = {s['id'] for s in self.staff_members}
+        constraint_count = 0
+
+        for rule in priority_rules:
+            if not rule.get('isActive', True):
+                continue
+            if rule.get('ruleType', '') != 'required_off':
+                continue
+
+            # Collect target staff IDs
+            staff_ids = rule.get('staffIds') or rule.get('staff_ids') or []
+            single_id = rule.get('staffId') or rule.get('staff_id')
+            if single_id and single_id not in staff_ids:
+                staff_ids = list(staff_ids) + [single_id]
+
+            # Build target day names (JS 0=Sunday convention)
+            days_of_week = rule.get('daysOfWeek', [])
+            target_days = set()
+            for d in days_of_week:
+                if isinstance(d, int) and d in day_index_to_name:
+                    target_days.add(day_index_to_name[d])
+                elif isinstance(d, str):
+                    target_days.add(d.lower())
+
+            if not staff_ids or not target_days:
+                continue
+
+            rule_name = rule.get('name', 'unnamed')
+            for staff_id in staff_ids:
+                if staff_id not in valid_staff_ids:
+                    continue
+                for date in self.date_range:
+                    # Calendar rules take highest precedence — skip if already locked
+                    if date in self.calendar_off_dates or date in self.calendar_work_dates:
+                        continue
+                    if self._get_day_of_week(date) not in target_days:
+                        continue
+                    if not self._staff_works_on_date(staff_id, date) or not self._has_shift_var(staff_id, date):
+                        continue
+
+                    # Force OFF — HARD constraint
+                    self.model.Add(self.shifts[(staff_id, date, self.SHIFT_OFF)] == 1)
+                    self.required_off_cells.add((staff_id, date))
+                    constraint_count += 1
+                    logger.debug(f"  [REQUIRED_OFF HARD] {staff_id} on {date} ({rule_name})")
+
+        if constraint_count > 0:
+            logger.info(f"[OR-TOOLS] ✅ Added {constraint_count} required_off HARD constraints ({len(self.required_off_cells)} unique staff-days)")
 
     def _add_backup_staff_constraints(self):
         """
@@ -1326,38 +1400,17 @@ class ShiftScheduleOptimizer:
         calendar_rules = self.constraints_config.get('calendarRules', {})
         constraint_count = 0
 
-        # Build required_off lookup: {date -> set of staff_ids that must be off}
+        # Build per-date lookup from required_off_cells (populated by _add_required_off_constraints)
         # These staff are excluded from the daily-max count so their mandatory off-day
         # doesn't trigger an over-max violation when the limit is tight.
-        _day_idx_map = {0:'sunday',1:'monday',2:'tuesday',3:'wednesday',4:'thursday',5:'friday',6:'saturday'}
-        required_off_by_date = {}  # date -> set of staff_ids
-        _pr_list = self.constraints_config.get('priorityRules', [])
-        if isinstance(_pr_list, list):
-            for _pr in _pr_list:
-                if not _pr.get('isActive', True):
-                    continue
-                if _pr.get('ruleType', '') != 'required_off':
-                    continue
-                _sids = _pr.get('staffIds') or _pr.get('staff_ids') or []
-                _single = _pr.get('staffId') or _pr.get('staff_id')
-                if _single and _single not in _sids:
-                    _sids = list(_sids) + [_single]
-                _dow = _pr.get('daysOfWeek', [])
-                _target_days = set()
-                for _d in _dow:
-                    if isinstance(_d, int) and _d in _day_idx_map:
-                        _target_days.add(_day_idx_map[_d])
-                    elif isinstance(_d, str):
-                        _target_days.add(_d.lower())
-                for _date in self.date_range:
-                    if self._get_day_of_week(_date) in _target_days:
-                        if _date not in required_off_by_date:
-                            required_off_by_date[_date] = set()
-                        required_off_by_date[_date].update(_sids)
+        required_off_by_date = {}
+        for (sid, date) in self.required_off_cells:
+            if date not in required_off_by_date:
+                required_off_by_date[date] = set()
+            required_off_by_date[date].add(sid)
 
         if required_off_by_date:
-            total = sum(len(v) for v in required_off_by_date.values())
-            logger.info(f"[OR-TOOLS] Daily limits: excluding {total} required_off staff-days from max constraint")
+            logger.info(f"[OR-TOOLS] Daily limits: excluding {len(self.required_off_cells)} required_off staff-days from max constraint")
 
         for date in self.date_range:
             # Skip calendar rule dates - they override daily limits
@@ -1733,22 +1786,23 @@ class ShiftScheduleOptimizer:
 
             logger.info(f"[PRIORITY-PRE] Processing rule '{rule_name}': keys={list(rule.keys())}")
 
-            # Only process HARD constraints that force shifts
-            is_hard = rule.get('isHardConstraint', False)
-            if not is_hard:
-                constraints = rule.get('constraints', {})
-                is_hard = constraints.get('isHardConstraint', False)
-
-            logger.info(f"[PRIORITY-PRE]   isHardConstraint={is_hard}")
-
-            if not is_hard:
-                continue  # Skip SOFT rules - they don't guarantee shifts
-
             if not rule.get('isActive', True):
                 logger.info(f"[PRIORITY-PRE]   Skipping inactive rule")
                 continue  # Skip inactive rules
 
             rule_type = rule.get('ruleType', '')
+
+            # required_off rules are always HARD (enforced as HARD constraints in pre-phase)
+            # Other rule types: only process if is_hard_constraint=true
+            is_required_off = (rule_type == 'required_off')
+            if not is_required_off:
+                is_hard = rule.get('isHardConstraint', False)
+                if not is_hard:
+                    constraints = rule.get('constraints', {})
+                    is_hard = constraints.get('isHardConstraint', False)
+                logger.info(f"[PRIORITY-PRE]   isHardConstraint={is_hard}")
+                if not is_hard:
+                    continue  # Skip SOFT rules - they don't guarantee shifts
 
             # Count preferred_shift and required_off rules that force shifts
             # avoided_shift and blocked rules force shift=0, not counted toward off-equivalent
@@ -3065,17 +3119,9 @@ class ShiftScheduleOptimizer:
                             # Soft constraint: avoid this shift
                             self.avoided_vars.append((shift_var, priority_level))
                     elif rule_type == 'required_off':
-                        # required_off: force day off on target days (high penalty soft constraint)
-                        rule_name = rule.get('name', 'unnamed')
-                        not_off = self.model.NewBoolVar(f'not_off_{target_staff_id}_{date}')
-                        self.model.Add(not_off == 1 - shift_var)
-                        penalty = 500 if is_hard else max(priority_level * 50, 500)
-                        self.violation_vars.append((
-                            not_off,
-                            penalty,
-                            f'required_off_{rule_name}_{target_staff_id}_{date}'
-                        ))
-                        logger.info(f"  [REQUIRED_OFF] staff={target_staff_id} date={date} penalty={penalty} is_hard={is_hard}")
+                        # required_off is now handled as a HARD constraint in _add_required_off_constraints()
+                        # Skip here to avoid duplicate/conflicting constraints
+                        pass
                     else:
                         # preferred_shift: softly prefer this shift type
                         if is_hard:
