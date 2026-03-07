@@ -155,12 +155,7 @@
 		}
 	}
 
-	// Load data when section changes (wait for auth to be ready)
-	$effect(() => {
-		if (activeSection === 'roles' && roles.length === 0 && !authState.loading && authState.isStaff) {
-			loadRolesData();
-		}
-	});
+	// Roles data is loaded explicitly when the user navigates to the roles section
 
 	let initialized = $state(false);
 
@@ -393,7 +388,7 @@
 				</button>
 
 				<button
-					onclick={() => activeSection = 'roles'}
+					onclick={() => { activeSection = 'roles'; loadRolesData(); }}
 					class="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-300 transition-all text-left"
 				>
 					<div class="flex items-center gap-4">

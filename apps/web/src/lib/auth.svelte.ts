@@ -337,6 +337,10 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 
 		authState.loading = false;
 		authInitialized = true;
+	} catch (err) {
+		authState.loading = false;
+		authInitialized = true;
+		throw err;
 	} finally {
 		signingInProgress = false;
 	}
