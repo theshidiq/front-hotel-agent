@@ -2965,23 +2965,31 @@ class ShiftScheduleOptimizer:
                         else:
                             # Soft constraint: avoid this shift
                             self.avoided_vars.append((shift_var, priority_level))
+                    elif rule_type == 'required_off':
+                        # required_off: force day off on target days (high penalty soft constraint)
+                        rule_name = rule.get('name', 'unnamed')
+                        not_off = self.model.NewBoolVar(f'not_off_{target_staff_id}_{date}')
+                        self.model.Add(not_off == 1 - shift_var)
+                        penalty = 500 if is_hard else max(priority_level * 5, 200)
+                        self.violation_vars.append((
+                            not_off,
+                            penalty,
+                            f'required_off_{rule_name}_{target_staff_id}_{date}'
+                        ))
+                        logger.debug(f"  [REQUIRED_OFF] Force off for {target_staff_id} on {date} (penalty={penalty})")
                     else:
-                        # Default to preferred_shift behavior (includes 'preferred_shift', 'required_off', or empty string)
+                        # preferred_shift: softly prefer this shift type
                         if is_hard:
-                            # FIX: Convert HARD to HIGH-PENALTY SOFT to prevent INFEASIBLE
-                            # We want this shift to be 1, so add penalty when it's 0
                             rule_name = rule.get('name', 'unnamed')
-                            # Create a NOT variable: penalty when shift_var == 0
                             not_shift = self.model.NewBoolVar(f'not_{target_staff_id}_{date}_{shift_type}')
                             self.model.Add(not_shift == 1 - shift_var)
                             self.violation_vars.append((
                                 not_shift,
-                                500,  # Very high penalty when NOT having this shift
+                                500,
                                 f'hard_priority_required_{rule_name}_{target_staff_id}_{date}'
                             ))
                             logger.debug(f"  [HARD→SOFT] Require {shift_type_name} for {target_staff_id} on {date} (penalty=500)")
                         else:
-                            # Soft constraint: prefer this shift (add to objective with weight)
                             self.preferred_vars.append((shift_var, priority_level))
 
             rules_applied += 1

@@ -522,7 +522,7 @@ export class ShiftsService {
       return {
         id: rule.id,
         name: rule.name,
-        ruleType: rd?.ruleType || rd?.type || 'preferred_shift',
+        ruleType: rd?.ruleType || rd?.rule_type || rd?.type || rule.rule_type || 'preferred_shift',
         staffIds: rd?.staffIds || (rd?.staff_id ? [rd.staff_id] : rd?.staff_ids || []),
         shiftType: rd?.shiftType || rd?.shift_type || 'off',
         daysOfWeek: rd?.daysOfWeek || rd?.days_of_week || [],
