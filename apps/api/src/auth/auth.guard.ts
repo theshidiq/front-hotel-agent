@@ -70,24 +70,26 @@ export class StaffAuthGuard implements CanActivate {
       throw new UnauthorizedException('No email associated with this account');
     }
 
-    // Resolve organization ID: prefer request header, fall back to env var
-    const organizationId =
-      (request.headers['x-organization-id'] as string) ||
-      this.supabaseService.getOrganizationId();
-
-    // Check if this user is a staff member
+    // Check if this user is a staff member — look up by email only (no org filter)
+    // The org is derived from the staff record itself, not from client headers
     const { data: staff, error: staffError } = await supabase
       .from('staff')
-      .select('id, name, email, position, is_admin, role_id')
+      .select('id, name, email, position, is_admin, role_id, organization_id')
       .eq('email', email)
-      .eq('organization_id', organizationId)
       .eq('is_active', true)
+      .limit(1)
       .single();
 
     if (staffError || !staff) {
       this.logger.warn(`Non-staff login attempt: ${email}`);
       throw new UnauthorizedException('You are not registered as staff');
     }
+
+    // Resolve organization ID: derive from staff record (authoritative), fall back to header or env var
+    const organizationId: string =
+      staff.organization_id ||
+      (request.headers['x-organization-id'] as string) ||
+      this.supabaseService.getOrganizationId();
 
     // Load permissions from role
     let permissions: string[] = [];
