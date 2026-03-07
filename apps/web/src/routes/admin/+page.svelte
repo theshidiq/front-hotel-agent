@@ -155,9 +155,9 @@
 		}
 	}
 
-	// Load data when section changes
+	// Load data when section changes (wait for auth to be ready)
 	$effect(() => {
-		if (activeSection === 'roles' && roles.length === 0) {
+		if (activeSection === 'roles' && roles.length === 0 && !authState.loading && authState.isStaff) {
 			loadRolesData();
 		}
 	});
