@@ -1326,6 +1326,39 @@ class ShiftScheduleOptimizer:
         calendar_rules = self.constraints_config.get('calendarRules', {})
         constraint_count = 0
 
+        # Build required_off lookup: {date -> set of staff_ids that must be off}
+        # These staff are excluded from the daily-max count so their mandatory off-day
+        # doesn't trigger an over-max violation when the limit is tight.
+        _day_idx_map = {0:'sunday',1:'monday',2:'tuesday',3:'wednesday',4:'thursday',5:'friday',6:'saturday'}
+        required_off_by_date = {}  # date -> set of staff_ids
+        _pr_list = self.constraints_config.get('priorityRules', [])
+        if isinstance(_pr_list, list):
+            for _pr in _pr_list:
+                if not _pr.get('isActive', True):
+                    continue
+                if _pr.get('ruleType', '') != 'required_off':
+                    continue
+                _sids = _pr.get('staffIds') or _pr.get('staff_ids') or []
+                _single = _pr.get('staffId') or _pr.get('staff_id')
+                if _single and _single not in _sids:
+                    _sids = list(_sids) + [_single]
+                _dow = _pr.get('daysOfWeek', [])
+                _target_days = set()
+                for _d in _dow:
+                    if isinstance(_d, int) and _d in _day_idx_map:
+                        _target_days.add(_day_idx_map[_d])
+                    elif isinstance(_d, str):
+                        _target_days.add(_d.lower())
+                for _date in self.date_range:
+                    if self._get_day_of_week(_date) in _target_days:
+                        if _date not in required_off_by_date:
+                            required_off_by_date[_date] = set()
+                        required_off_by_date[_date].update(_sids)
+
+        if required_off_by_date:
+            total = sum(len(v) for v in required_off_by_date.values())
+            logger.info(f"[OR-TOOLS] Daily limits: excluding {total} required_off staff-days from max constraint")
+
         for date in self.date_range:
             # Skip calendar rule dates - they override daily limits
             if date in calendar_rules:
@@ -1333,8 +1366,19 @@ class ShiftScheduleOptimizer:
                 if rule.get('must_day_off') or rule.get('must_work'):
                     continue
 
+            # Staff covered by required_off rules on this date are excluded from max cap
+            required_off_ids_today = required_off_by_date.get(date, set())
+
             # Count off days (x) on this date across non-backup staff only
             # IMPORTANT: Only include staff who work on this date (before end_period) AND have shift vars
+            # Exclude required_off staff from the max cap (their off is mandatory, not discretionary)
+            off_count_capped = sum([
+                self.shifts[(staff['id'], date, self.SHIFT_OFF)]
+                for staff in non_backup_staff
+                if staff['id'] not in required_off_ids_today
+                and self._staff_works_on_date(staff['id'], date) and self._has_shift_var(staff['id'], date)
+            ])
+            # Full off count (including required_off staff) used for minimum check
             off_count = sum([
                 self.shifts[(staff['id'], date, self.SHIFT_OFF)]
                 for staff in non_backup_staff
@@ -1346,7 +1390,8 @@ class ShiftScheduleOptimizer:
                 if min_off > 0:
                     self.model.Add(off_count >= min_off)
                     constraint_count += 1
-                self.model.Add(off_count <= max_off)
+                # Use capped count (excluding required_off staff) for max constraint
+                self.model.Add(off_count_capped <= max_off)
                 constraint_count += 1
             else:
                 # SOFT CONSTRAINT for min: Penalize if below minimum
@@ -1363,9 +1408,11 @@ class ShiftScheduleOptimizer:
                     constraint_count += 1
 
                 # SOFT CONSTRAINT for max: Penalize if above maximum
-                # over_max = max(0, off_count - max_off)
+                # Use capped count (excluding required_off staff) so their mandatory
+                # off-day doesn't trigger an over-max violation
+                # over_max = max(0, off_count_capped - max_off)
                 over_max_var = self.model.NewIntVar(0, staff_count, f'daily_over_max_{date}')
-                self.model.Add(over_max_var >= off_count - max_off)
+                self.model.Add(over_max_var >= off_count_capped - max_off)
                 self.model.Add(over_max_var >= 0)
                 self.violation_vars.append((
                     over_max_var,
