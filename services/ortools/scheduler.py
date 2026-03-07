@@ -766,7 +766,10 @@ class ShiftScheduleOptimizer:
         """
         priority_rules = self.constraints_config.get('priorityRules', [])
         if not isinstance(priority_rules, list) or not priority_rules:
+            logger.info("[OR-TOOLS] _add_required_off_constraints: no priorityRules in constraints")
             return
+
+        logger.info(f"[OR-TOOLS] _add_required_off_constraints: checking {len(priority_rules)} rules")
 
         day_index_to_name = {
             0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday',
@@ -776,9 +779,12 @@ class ShiftScheduleOptimizer:
         constraint_count = 0
 
         for rule in priority_rules:
+            rule_type = rule.get('ruleType', '') or rule.get('rule_type', '')
+            logger.info(f"  Rule: name={rule.get('name')} ruleType={rule_type} isActive={rule.get('isActive', True)} staffIds={rule.get('staffIds')} daysOfWeek={rule.get('daysOfWeek')}")
+
             if not rule.get('isActive', True):
                 continue
-            if rule.get('ruleType', '') != 'required_off':
+            if rule_type != 'required_off':
                 continue
 
             # Collect target staff IDs
@@ -788,7 +794,7 @@ class ShiftScheduleOptimizer:
                 staff_ids = list(staff_ids) + [single_id]
 
             # Build target day names (JS 0=Sunday convention)
-            days_of_week = rule.get('daysOfWeek', [])
+            days_of_week = rule.get('daysOfWeek', []) or rule.get('days_of_week', [])
             target_days = set()
             for d in days_of_week:
                 if isinstance(d, int) and d in day_index_to_name:
@@ -796,12 +802,16 @@ class ShiftScheduleOptimizer:
                 elif isinstance(d, str):
                     target_days.add(d.lower())
 
+            logger.info(f"  → staff_ids={staff_ids} target_days={target_days}")
+
             if not staff_ids or not target_days:
+                logger.warning(f"  → SKIPPED: empty staff_ids or target_days")
                 continue
 
             rule_name = rule.get('name', 'unnamed')
             for staff_id in staff_ids:
                 if staff_id not in valid_staff_ids:
+                    logger.warning(f"  → staff_id {staff_id} NOT in valid_staff_ids — skipping")
                     continue
                 for date in self.date_range:
                     # Calendar rules take highest precedence — skip if already locked
@@ -816,10 +826,9 @@ class ShiftScheduleOptimizer:
                     self.model.Add(self.shifts[(staff_id, date, self.SHIFT_OFF)] == 1)
                     self.required_off_cells.add((staff_id, date))
                     constraint_count += 1
-                    logger.debug(f"  [REQUIRED_OFF HARD] {staff_id} on {date} ({rule_name})")
+                    logger.info(f"  → HARD OFF: {staff_id} on {date} ({rule_name})")
 
-        if constraint_count > 0:
-            logger.info(f"[OR-TOOLS] ✅ Added {constraint_count} required_off HARD constraints ({len(self.required_off_cells)} unique staff-days)")
+        logger.info(f"[OR-TOOLS] ✅ required_off: {constraint_count} HARD constraints added ({len(self.required_off_cells)} unique staff-days)")
 
     def _add_backup_staff_constraints(self):
         """
