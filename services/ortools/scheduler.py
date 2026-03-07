@@ -290,9 +290,9 @@ class ShiftScheduleOptimizer:
 
             # 2. Add all constraints (order matches original phases)
             self._add_basic_constraints()                    # One shift per staff per day
-            self._add_prefilled_constraints()                # PRE-PHASE: Lock user-edited cells as HARD constraints
             self._add_calendar_rules()                       # PRE-PHASE + Phase 3 Integration
-            self._add_required_off_constraints()             # PRE-PHASE: required_off priority rules as HARD constraints
+            self._add_required_off_constraints()             # PRE-PHASE: required_off priority rules as HARD constraints (MUST be before prefilled)
+            self._add_prefilled_constraints()                # PRE-PHASE: Lock user-edited cells as HARD constraints (skips required_off cells)
             self._add_backup_staff_constraints()             # Backup staff can never have off days
             self._add_staff_status_shift_restrictions()      # 派遣/パート can only have work/off shifts
             self._add_staff_group_constraints()              # PHASE 2
@@ -503,48 +503,9 @@ class ShiftScheduleOptimizer:
             logger.info(f"[OR-TOOLS] 🛡️ {len(backup_staff_ids_early)} backup staff will be EXCLUDED from pre-filled constraints")
             logger.info(f"[OR-TOOLS]    (Backup schedules determined by coverage constraints, not pre-filled values)")
 
-        # ═══════════════════════════════════════════════════════════════════════════
-        # PRIORITY RULE OVERRIDE: Build set of (staff_id, date) pairs covered by
-        # required_off priority rules. Prefilled cells on these dates will be
-        # skipped (not locked as HARD) so the priority rule can take effect.
-        # ═══════════════════════════════════════════════════════════════════════════
-        day_index_to_name_pf = {
-            0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday',
-            4: 'thursday', 5: 'friday', 6: 'saturday'
-        }
-        required_off_cells = set()  # (staff_id, date) pairs that must be off
-        priority_rules = self.constraints_config.get('priorityRules', [])
-        if isinstance(priority_rules, list):
-            for rule in priority_rules:
-                if not rule.get('isActive', True):
-                    continue
-                rule_type = rule.get('ruleType', '')
-                if rule_type != 'required_off':
-                    continue
-                # Collect all staff IDs for this rule
-                rule_staff_ids = []
-                sid = rule.get('staffIds') or rule.get('staff_ids') or []
-                if isinstance(sid, list):
-                    rule_staff_ids.extend(sid)
-                single_sid = rule.get('staffId') or rule.get('staff_id')
-                if single_sid and single_sid not in rule_staff_ids:
-                    rule_staff_ids.append(single_sid)
-                # Get target days
-                days_of_week = rule.get('daysOfWeek', [])
-                target_day_names = set()
-                for d in days_of_week:
-                    if isinstance(d, int) and d in day_index_to_name_pf:
-                        target_day_names.add(day_index_to_name_pf[d])
-                    elif isinstance(d, str):
-                        target_day_names.add(d.lower())
-                # Mark all matching (staff_id, date) pairs
-                for date in self.date_range:
-                    day_name = self._get_day_of_week(date)
-                    if day_name not in target_day_names:
-                        continue
-                    for sid in rule_staff_ids:
-                        required_off_cells.add((sid, date))
-
+        # Use self.required_off_cells populated by _add_required_off_constraints()
+        # which runs BEFORE this method in the constraint pipeline.
+        required_off_cells = self.required_off_cells
         if required_off_cells:
             logger.info(f"[OR-TOOLS] 🚫 {len(required_off_cells)} prefilled cells will be SKIPPED due to required_off priority rules")
 
