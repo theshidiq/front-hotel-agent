@@ -4,7 +4,7 @@ app = 'sinara-ortools'
 primary_region = 'nrt'
 
 [build]
-  dockerfile = 'services/ortools/Dockerfile'
+  dockerfile = 'Dockerfile'
 
 [http_service]
   internal_port = 5000
