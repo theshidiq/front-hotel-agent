@@ -259,7 +259,7 @@
 			}
 			// Save permissions
 			await updateRolePermissions(editingRole.id, [...editingPermissions]);
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 			editingRole = null;
 		} catch (e: any) {
 			error = e.message;
@@ -295,7 +295,7 @@
 			newRoleDescription = '';
 			newRolePermissions = new Set();
 			showNewRole = false;
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		} finally {
@@ -310,7 +310,7 @@
 			} else {
 				await setRoleAsDefault(role.id);
 			}
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		}
@@ -321,7 +321,7 @@
 		try {
 			await deleteRole(id);
 			if (editingRole?.id === id) editingRole = null;
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		}
