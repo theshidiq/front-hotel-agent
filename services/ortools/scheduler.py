@@ -500,6 +500,51 @@ class ShiftScheduleOptimizer:
             logger.info(f"[OR-TOOLS] 🛡️ {len(backup_staff_ids_early)} backup staff will be EXCLUDED from pre-filled constraints")
             logger.info(f"[OR-TOOLS]    (Backup schedules determined by coverage constraints, not pre-filled values)")
 
+        # ═══════════════════════════════════════════════════════════════════════════
+        # PRIORITY RULE OVERRIDE: Build set of (staff_id, date) pairs covered by
+        # required_off priority rules. Prefilled cells on these dates will be
+        # skipped (not locked as HARD) so the priority rule can take effect.
+        # ═══════════════════════════════════════════════════════════════════════════
+        day_index_to_name_pf = {
+            0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday',
+            4: 'thursday', 5: 'friday', 6: 'saturday'
+        }
+        required_off_cells = set()  # (staff_id, date) pairs that must be off
+        priority_rules = self.constraints_config.get('priorityRules', [])
+        if isinstance(priority_rules, list):
+            for rule in priority_rules:
+                if not rule.get('isActive', True):
+                    continue
+                rule_type = rule.get('ruleType', '')
+                if rule_type != 'required_off':
+                    continue
+                # Collect all staff IDs for this rule
+                rule_staff_ids = []
+                sid = rule.get('staffIds') or rule.get('staff_ids') or []
+                if isinstance(sid, list):
+                    rule_staff_ids.extend(sid)
+                single_sid = rule.get('staffId') or rule.get('staff_id')
+                if single_sid and single_sid not in rule_staff_ids:
+                    rule_staff_ids.append(single_sid)
+                # Get target days
+                days_of_week = rule.get('daysOfWeek', [])
+                target_day_names = set()
+                for d in days_of_week:
+                    if isinstance(d, int) and d in day_index_to_name_pf:
+                        target_day_names.add(day_index_to_name_pf[d])
+                    elif isinstance(d, str):
+                        target_day_names.add(d.lower())
+                # Mark all matching (staff_id, date) pairs
+                for date in self.date_range:
+                    day_name = self._get_day_of_week(date)
+                    if day_name not in target_day_names:
+                        continue
+                    for sid in rule_staff_ids:
+                        required_off_cells.add((sid, date))
+
+        if required_off_cells:
+            logger.info(f"[OR-TOOLS] 🚫 {len(required_off_cells)} prefilled cells will be SKIPPED due to required_off priority rules")
+
         # Create lookup for valid staff IDs
         valid_staff_ids = {s['id'] for s in self.staff_members}
         valid_dates = set(self.date_range)
@@ -556,6 +601,13 @@ class ShiftScheduleOptimizer:
                 # Skip if shift variable doesn't exist (staff not working on this date)
                 if not self._has_shift_var(staff_id, date):
                     logger.warning(f"  Skipping pre-filled cell for {staff_id} on {date} - no shift variable (before start_period)")
+                    skipped_count += 1
+                    continue
+
+                # Skip if this cell is covered by a required_off priority rule
+                # (priority rules override pre-filled working cells)
+                if (staff_id, date) in required_off_cells and shift_type != self.SHIFT_OFF:
+                    logger.info(f"  [PRIORITY OVERRIDE] Skipping prefilled '{symbol_stripped}' for {staff_id} on {date} - required_off rule applies")
                     skipped_count += 1
                     continue
 
@@ -2970,13 +3022,13 @@ class ShiftScheduleOptimizer:
                         rule_name = rule.get('name', 'unnamed')
                         not_off = self.model.NewBoolVar(f'not_off_{target_staff_id}_{date}')
                         self.model.Add(not_off == 1 - shift_var)
-                        penalty = 500 if is_hard else max(priority_level * 5, 200)
+                        penalty = 500 if is_hard else max(priority_level * 50, 500)
                         self.violation_vars.append((
                             not_off,
                             penalty,
                             f'required_off_{rule_name}_{target_staff_id}_{date}'
                         ))
-                        logger.debug(f"  [REQUIRED_OFF] Force off for {target_staff_id} on {date} (penalty={penalty})")
+                        logger.info(f"  [REQUIRED_OFF] staff={target_staff_id} date={date} penalty={penalty} is_hard={is_hard}")
                     else:
                         # preferred_shift: softly prefer this shift type
                         if is_hard:
