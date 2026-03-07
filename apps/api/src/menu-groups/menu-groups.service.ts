@@ -57,9 +57,8 @@ export class MenuGroupsService {
     return result;
   }
 
-  async findAll(seasonalMenuId?: string): Promise<MenuGroup[]> {
+  async findAll(organizationId: string, seasonalMenuId?: string): Promise<MenuGroup[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     let query = supabase
       .from('menu_groups')
@@ -88,9 +87,8 @@ export class MenuGroupsService {
     }));
   }
 
-  async create(data: { name: string; seasonal_menu_id?: string; course_ids?: string[] }): Promise<MenuGroup> {
+  async create(organizationId: string, data: { name: string; seasonal_menu_id?: string; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Get max sort_order for auto-increment
     const { data: existing } = await supabase
@@ -133,9 +131,8 @@ export class MenuGroupsService {
     return { ...created, allowed_courses: coursesMap[created.id] || [] };
   }
 
-  async update(id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; kids_group_ids?: string[]; stay_period_nights?: number[] | null; course_ids?: string[] }): Promise<MenuGroup> {
+  async update(organizationId: string, id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; kids_group_ids?: string[]; stay_period_nights?: number[] | null; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const updateData: Record<string, unknown> = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
@@ -186,9 +183,8 @@ export class MenuGroupsService {
     return { ...updated, allowed_courses: coursesMap[id] || [] };
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Clear menu_group_id on menus that reference this group
     await supabase
@@ -211,9 +207,8 @@ export class MenuGroupsService {
     }
   }
 
-  async findByStayPeriod(nights: number, seasonalMenuId?: string): Promise<MenuGroup[]> {
+  async findByStayPeriod(organizationId: string, nights: number, seasonalMenuId?: string): Promise<MenuGroup[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     let query = supabase
       .from('menu_groups')

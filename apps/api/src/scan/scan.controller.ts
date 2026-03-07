@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Body, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ScanService } from './scan.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanExtractResponse, ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
 import { RequirePermission } from '../auth/permission.decorator';
+import { StaffAuthGuard } from '../auth/auth.guard';
 
 @ApiTags('scan')
 @Controller('scan')
@@ -17,8 +18,8 @@ export class ScanController {
     description:
       'Uploads an image URL to Qwen Vision OCR, extracts product data, and automatically saves to database',
   })
-  async createScan(@Body() createScanDto: CreateScanDto): Promise<ScanResultResponse> {
-    return this.scanService.createScan(createScanDto);
+  async createScan(@Req() req: any, @Body() createScanDto: CreateScanDto): Promise<ScanResultResponse> {
+    return this.scanService.createScan(req.user.organization_id, createScanDto);
   }
 
   @Post('extract')
@@ -28,18 +29,22 @@ export class ScanController {
     description:
       'Runs OCR on the image and returns extracted data for user review before saving',
   })
-  async extractOnly(@Body() createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
-    return this.scanService.extractOnly(createScanDto);
+  async extractOnly(@Req() req: any, @Body() createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
+    return this.scanService.extractOnly(req.user.organization_id, createScanDto);
   }
 
   @Get()
+  @UseGuards(StaffAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'List recent scan sessions' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  async findAll(@Query('limit') limit?: number): Promise<ScanSessionResponse[]> {
-    return this.scanService.findAll(limit || 20);
+  async findAll(@Req() req: any, @Query('limit') limit?: number): Promise<ScanSessionResponse[]> {
+    return this.scanService.findAll(req.user.organization_id, limit || 20);
   }
 
   @Get(':id')
+  @UseGuards(StaffAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get scan session by ID with product details' })
   async findOne(@Param('id') id: string): Promise<ScanResultResponse> {
     return this.scanService.findOne(id);

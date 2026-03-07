@@ -9,9 +9,8 @@ import { AllergenInfo } from '../products/dto/product-response.dto';
 export class MenusService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async create(createMenuDto: CreateMenuDto): Promise<MenuResponse> {
+  async create(organizationId: string, createMenuDto: CreateMenuDto): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { product_ids, ...menuData } = createMenuDto;
 
@@ -40,12 +39,11 @@ export class MenusService {
     }
 
     // Return complete menu with products and derived allergens
-    return this.findOne(menu.id);
+    return this.findOne(organizationId, menu.id);
   }
 
-  async findAll(limit = 50): Promise<MenuResponse[]> {
+  async findAll(organizationId: string, limit = 50): Promise<MenuResponse[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: menus, error } = await supabase
       .from('menus')
@@ -149,9 +147,8 @@ export class MenusService {
     });
   }
 
-  async findOne(id: string): Promise<MenuResponse> {
+  async findOne(organizationId: string, id: string): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Parallel fetch: menu + product links
     const [menuResult, linksResult] = await Promise.all([
@@ -213,9 +210,8 @@ export class MenusService {
     };
   }
 
-  async update(id: string, updateMenuDto: UpdateMenuDto): Promise<MenuResponse> {
+  async update(organizationId: string, id: string, updateMenuDto: UpdateMenuDto): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { product_ids, ...menuData } = updateMenuDto;
 
@@ -246,12 +242,11 @@ export class MenusService {
       }
     }
 
-    return this.findOne(id);
+    return this.findOne(organizationId, id);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Delete product links first
     await supabase.from('menu_products').delete().eq('menu_id', id);

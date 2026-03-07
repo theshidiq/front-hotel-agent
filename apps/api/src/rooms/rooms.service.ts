@@ -7,12 +7,12 @@ import { UpdateRoomStatusDto } from './dto/update-room-status.dto';
 export class RoomsService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async findAll(): Promise<RoomResponse[]> {
+  async findAll(organizationId: string): Promise<RoomResponse[]> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('rooms')
       .select('*')
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .order('room_number');
 
     if (error) {
@@ -22,13 +22,13 @@ export class RoomsService {
     return data || [];
   }
 
-  async findOne(id: string): Promise<RoomResponse> {
+  async findOne(organizationId: string, id: string): Promise<RoomResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('rooms')
       .select('*')
       .eq('id', id)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !data) {
@@ -38,13 +38,13 @@ export class RoomsService {
     return data;
   }
 
-  async findByRoomNumber(roomNumber: string): Promise<RoomResponse> {
+  async findByRoomNumber(organizationId: string, roomNumber: string): Promise<RoomResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('rooms')
       .select('*')
       .eq('room_number', roomNumber)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !data) {
@@ -54,7 +54,7 @@ export class RoomsService {
     return data;
   }
 
-  async updateStatus(id: string, dto: UpdateRoomStatusDto): Promise<RoomResponse> {
+  async updateStatus(organizationId: string, id: string, dto: UpdateRoomStatusDto): Promise<RoomResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('rooms')
@@ -63,7 +63,7 @@ export class RoomsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -78,7 +78,7 @@ export class RoomsService {
     return data;
   }
 
-  async setOccupied(roomNumber: string, reservationId: string): Promise<RoomResponse> {
+  async setOccupied(organizationId: string, roomNumber: string, reservationId: string): Promise<RoomResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('rooms')
@@ -88,7 +88,7 @@ export class RoomsService {
         updated_at: new Date().toISOString(),
       })
       .eq('room_number', roomNumber)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -99,7 +99,7 @@ export class RoomsService {
     return data;
   }
 
-  async setAvailable(roomNumber: string): Promise<RoomResponse> {
+  async setAvailable(organizationId: string, roomNumber: string): Promise<RoomResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('rooms')
@@ -109,7 +109,7 @@ export class RoomsService {
         updated_at: new Date().toISOString(),
       })
       .eq('room_number', roomNumber)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .select()
       .single();
 

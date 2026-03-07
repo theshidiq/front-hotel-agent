@@ -1111,7 +1111,9 @@ export interface OrgDepartment {
 }
 
 export async function getDepartments(): Promise<OrgDepartment[]> {
-	const response = await fetch(`${API_URL}/departments`);
+	const response = await fetch(`${API_URL}/departments`, {
+		headers: authHeaders(),
+	});
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.message || 'Failed to fetch departments');

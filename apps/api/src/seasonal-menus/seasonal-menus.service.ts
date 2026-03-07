@@ -18,9 +18,8 @@ export class SeasonalMenusService {
 
   constructor(private supabaseService: SupabaseService) {}
 
-  async findAll(): Promise<SeasonalMenu[]> {
+  async findAll(organizationId: string): Promise<SeasonalMenu[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('seasonal_menus')
@@ -37,9 +36,8 @@ export class SeasonalMenusService {
     return data || [];
   }
 
-  async create(data: { name: string; start_date?: string; end_date?: string }): Promise<SeasonalMenu> {
+  async create(organizationId: string, data: { name: string; start_date?: string; end_date?: string }): Promise<SeasonalMenu> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Get max sort_order for auto-increment
     const { data: existing } = await supabase
@@ -71,9 +69,8 @@ export class SeasonalMenusService {
     return created;
   }
 
-  async update(id: string, data: { name?: string; start_date?: string; end_date?: string; is_active?: boolean }): Promise<SeasonalMenu> {
+  async update(organizationId: string, id: string, data: { name?: string; start_date?: string; end_date?: string; is_active?: boolean }): Promise<SeasonalMenu> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const updateData: Record<string, unknown> = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
@@ -97,9 +94,8 @@ export class SeasonalMenusService {
     return updated;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Nullify references on menu_groups and menus
     await supabase

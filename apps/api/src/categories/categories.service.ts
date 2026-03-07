@@ -24,9 +24,8 @@ export interface UpdateCategoryData {
 export class CategoriesService {
   constructor(private supabaseService: SupabaseService) {}
 
-  async findAll(type?: 'product' | 'menu'): Promise<Category[]> {
+  async findAll(organizationId: string, type?: 'product' | 'menu'): Promise<Category[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     let query = supabase
       .from('categories')
@@ -47,9 +46,8 @@ export class CategoriesService {
     return data || [];
   }
 
-  async create(name: string, type: 'product' | 'menu'): Promise<Category> {
+  async create(organizationId: string, name: string, type: 'product' | 'menu'): Promise<Category> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
     const value = name.trim().toLowerCase().replace(/\s+/g, '-');
 
     const { data, error } = await supabase
@@ -65,9 +63,8 @@ export class CategoriesService {
     return data;
   }
 
-  async update(id: string, updateData: UpdateCategoryData): Promise<Category> {
+  async update(organizationId: string, id: string, updateData: UpdateCategoryData): Promise<Category> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const payload: Record<string, any> = {};
     if (updateData.name !== undefined) {
@@ -93,9 +90,8 @@ export class CategoriesService {
     return data;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('categories')

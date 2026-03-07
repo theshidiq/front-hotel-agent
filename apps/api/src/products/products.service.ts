@@ -8,9 +8,8 @@ import { ProductResponse, AllergenInfo } from './dto/product-response.dto';
 export class ProductsService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async create(createProductDto: CreateProductDto): Promise<ProductResponse> {
+  async create(organizationId: string, createProductDto: CreateProductDto): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { allergen_ids, ...productData } = createProductDto;
 
@@ -63,9 +62,8 @@ export class ProductsService {
     };
   }
 
-  async findAll(limit = 50): Promise<ProductResponse[]> {
+  async findAll(organizationId: string, limit = 50): Promise<ProductResponse[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: products, error } = await supabase
       .from('products')
@@ -110,9 +108,8 @@ export class ProductsService {
     }));
   }
 
-  async findOne(id: string): Promise<ProductResponse> {
+  async findOne(organizationId: string, id: string): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Parallel fetch: product + allergen links
     const [productResult, allergenResult] = await Promise.all([
@@ -143,11 +140,11 @@ export class ProductsService {
   }
 
   async update(
+    organizationId: string,
     id: string,
     updateProductDto: UpdateProductDto,
   ): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { allergen_ids, ...productData } = updateProductDto;
 
@@ -182,12 +179,11 @@ export class ProductsService {
       }
     }
 
-    return this.findOne(id);
+    return this.findOne(organizationId, id);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Delete allergen links + product in parallel (links first, then product)
     await supabase.from('product_allergens').delete().eq('product_id', id);

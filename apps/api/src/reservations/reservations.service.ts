@@ -16,12 +16,12 @@ export class ReservationsService {
     private readonly allergensService: AllergensService,
   ) { }
 
-  async findAll(date?: string, status?: string): Promise<ReservationResponse[]> {
+  async findAll(organizationId: string, date?: string, status?: string): Promise<ReservationResponse[]> {
     let query = this.supabaseService
       .getClient()
       .from('reservations')
       .select('*')
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .order('room_number');
 
     if (date) {
@@ -48,18 +48,18 @@ export class ReservationsService {
     return Promise.all(data.map(reservation => this.enrichWithAllergens(reservation)));
   }
 
-  async findToday(): Promise<ReservationResponse[]> {
+  async findToday(organizationId: string): Promise<ReservationResponse[]> {
     const today = new Date().toISOString().split('T')[0];
-    return this.findAll(today);
+    return this.findAll(organizationId, today);
   }
 
-  async findOne(id: string): Promise<ReservationResponse> {
+  async findOne(organizationId: string, id: string): Promise<ReservationResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !data) {
@@ -93,14 +93,14 @@ export class ReservationsService {
     return this.lookupByToken(qrCode);
   }
 
-  async search(dto: SearchReservationDto): Promise<ReservationResponse[]> {
+  async search(organizationId: string, dto: SearchReservationDto): Promise<ReservationResponse[]> {
     const today = new Date().toISOString().split('T')[0];
     const targetDate = dto.date || today;
     let query = this.supabaseService
       .getClient()
       .from('reservations')
       .select('*')
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .lte('check_in_date', targetDate)
       .gte('check_out_date', targetDate);
 
@@ -126,7 +126,7 @@ export class ReservationsService {
     return Promise.all(data.map(reservation => this.enrichWithAllergens(reservation)));
   }
 
-  async create(dto: CreateReservationDto): Promise<ReservationResponse> {
+  async create(organizationId: string, dto: CreateReservationDto): Promise<ReservationResponse> {
     // Extract allergen_ids for backward compatibility
     const allergenIds = dto.allergen_details?.map(a => a.allergen_id) || [];
 
@@ -134,7 +134,7 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .insert({
-        organization_id: this.supabaseService.getOrganizationId(),
+        organization_id: organizationId,
         ...dto,
         allergen_ids: allergenIds,
         allergen_details: dto.allergen_details || [],
@@ -149,14 +149,14 @@ export class ReservationsService {
     return this.enrichWithAllergens(data);
   }
 
-  async checkIn(id: string, dto: CheckInDto): Promise<ReservationResponse> {
+  async checkIn(organizationId: string, id: string, dto: CheckInDto): Promise<ReservationResponse> {
     // Light-weight status check (no allergen enrichment needed)
     const { data: reservation, error: fetchError } = await this.supabaseService
       .getClient()
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .single();
 
     if (fetchError || !reservation) {
@@ -214,13 +214,13 @@ export class ReservationsService {
 
     // Update room status + create alert in parallel
     const tasks: Promise<any>[] = [
-      this.roomsService.setOccupied(reservation.room_number, id),
+      this.roomsService.setOccupied(organizationId, reservation.room_number, id),
     ];
 
     const hasAllergens = (dto.allergen_details && dto.allergen_details.length > 0) ||
       (dto.allergen_ids && dto.allergen_ids.length > 0);
     if (hasAllergens) {
-      tasks.push(this.createCheckInAlert(data, updateData.allergen_details));
+      tasks.push(this.createCheckInAlert(organizationId, data, updateData.allergen_details));
     }
 
     await Promise.all(tasks);
@@ -228,14 +228,14 @@ export class ReservationsService {
     return this.enrichWithAllergens(data);
   }
 
-  async checkOut(id: string): Promise<ReservationResponse> {
+  async checkOut(organizationId: string, id: string): Promise<ReservationResponse> {
     // Light-weight status check
     const { data: reservation, error: fetchError } = await this.supabaseService
       .getClient()
       .from('reservations')
       .select('id, status, room_number')
       .eq('id', id)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .single();
 
     if (fetchError || !reservation) {
@@ -268,7 +268,7 @@ export class ReservationsService {
           updated_at: new Date().toISOString(),
         })
         .eq('room_number', reservation.room_number)
-        .eq('organization_id', this.supabaseService.getOrganizationId()),
+        .eq('organization_id', organizationId),
     ]);
 
     if (updateResult.error) {
@@ -317,7 +317,7 @@ export class ReservationsService {
         .getClient()
         .from('guest_alerts')
         .insert({
-          organization_id: this.supabaseService.getOrganizationId(),
+          organization_id: reservation.organization_id,
           reservation_id: reservation.id,
           alert_type: 'allergy_update',
           room_number: reservation.room_number,
@@ -335,13 +335,13 @@ export class ReservationsService {
     return this.enrichWithAllergens(data);
   }
 
-  async deleteAllReservations(): Promise<{ deleted: number }> {
+  async deleteAllReservations(organizationId: string): Promise<{ deleted: number }> {
     // First, clear any current_reservation_id references in rooms table
     await this.supabaseService
       .getClient()
       .from('rooms')
       .update({ current_reservation_id: null })
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .not('current_reservation_id', 'is', null);
 
     // Now delete all reservations
@@ -349,7 +349,7 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .delete()
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .select();
 
     if (error) {
@@ -359,12 +359,12 @@ export class ReservationsService {
     return { deleted: data?.length || 0 };
   }
 
-  private async createCheckInAlert(reservation: any, allergenDetails: any[]): Promise<void> {
+  private async createCheckInAlert(organizationId: string, reservation: any, allergenDetails: any[]): Promise<void> {
     await this.supabaseService
       .getClient()
       .from('guest_alerts')
       .insert({
-        organization_id: this.supabaseService.getOrganizationId(),
+        organization_id: organizationId,
         reservation_id: reservation.id,
         alert_type: 'check_in',
         room_number: reservation.room_number,
