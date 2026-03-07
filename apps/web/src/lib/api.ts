@@ -1000,7 +1000,7 @@ export interface CreateStaffData {
 }
 
 export async function getStaffs(): Promise<StaffMember[]> {
-	const response = await fetch(`${API_URL}/staffs`);
+	const response = await fetch(`${API_URL}/staffs`, { headers: authHeaders() });
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.message || 'Failed to fetch staffs');
@@ -1131,7 +1131,7 @@ export interface OrgDepartment {
 }
 
 export async function getDepartments(): Promise<OrgDepartment[]> {
-	const response = await fetch(`${API_URL}/departments`);
+	const response = await fetch(`${API_URL}/departments`, { headers: authHeaders() });
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.message || 'Failed to fetch departments');
