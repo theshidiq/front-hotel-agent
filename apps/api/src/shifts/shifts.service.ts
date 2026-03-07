@@ -562,6 +562,37 @@ export class ShiftsService {
 
     const dateRange = this.generateDateRange(period.start_date, period.end_date);
 
+    // Build prefilledSchedule: start from existing schedule_data, then inject required_off as × (HARD OFF).
+    // This mirrors how React's BusinessRuleValidator directly sets cells — bypasses CP-SAT constraint
+    // ordering issues where prefilled WORK cells would win over required_off HARD constraints.
+    const baseScheduleData: Record<string, Record<string, string>> =
+      (dto.preservePrefilled && schedule?.schedule_data) ? { ...(schedule.schedule_data as any) } : {};
+
+    // Inject required_off rules as × cells (override any existing value)
+    // JS day-of-week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+    let requiredOffInjected = 0;
+    for (const rule of normalizedPriorityRules) {
+      if (rule.ruleType !== 'required_off') continue;
+      if (rule.isActive === false) continue;
+
+      const targetStaffIds: Set<string> = new Set(rule.staffIds || []);
+      const daysOfWeek: Set<number> = new Set((rule.daysOfWeek || []).map(Number));
+      if (targetStaffIds.size === 0 || daysOfWeek.size === 0) continue;
+
+      for (const dateStr of dateRange) {
+        const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun, 6=Sat
+        if (!daysOfWeek.has(dayOfWeek)) continue;
+        for (const staffId of targetStaffIds) {
+          if (!baseScheduleData[staffId]) baseScheduleData[staffId] = {};
+          baseScheduleData[staffId][dateStr] = '×';
+          requiredOffInjected++;
+        }
+      }
+    }
+    if (requiredOffInjected > 0) {
+      this.logger.log(`[optimize] Injected ${requiredOffInjected} required_off cells as × into prefilledSchedule`);
+    }
+
     // Early shift preferences: build dict { staffId: { dateString: boolean, 'default': boolean } }
     // Expected format by scheduler.py _add_calendar_rules()
     const earlyShiftPrefsDict: Record<string, Record<string, boolean>> = {};
@@ -610,8 +641,8 @@ export class ShiftsService {
         ...(normalizedPriorityRules.length && { priorityRules: normalizedPriorityRules }),
         ...(Object.keys(earlyShiftPrefsDict).length && { earlyShiftPreferences: earlyShiftPrefsDict }),
         ...(backupAssignments.length && { backupAssignments }),
-        ...(dto.preservePrefilled && schedule?.schedule_data && {
-          prefilledSchedule: schedule.schedule_data,
+        ...(Object.keys(baseScheduleData).length && {
+          prefilledSchedule: baseScheduleData,
         }),
         // Staff status restrictions toggle (#4)
         ...(ss?.disableStaffStatusShiftRestrictions && {
@@ -1362,6 +1393,9 @@ export class ShiftsService {
   // ==================== SETTINGS: Priority Rules ====================
 
   async getPriorityRules(organizationId: string, departmentId?: string): Promise<any[]> {
+    // Fetch rules that match the department OR have no department (global rules).
+    // Using `or` so that department-scoped rules are always included when a departmentId is provided,
+    // and global rules (department_id IS NULL) are always included regardless.
     let query = this.supabase
       .from('priority_rules')
       .select('*')
@@ -1369,7 +1403,7 @@ export class ShiftsService {
       .eq('is_active', true);
 
     if (departmentId) {
-      query = query.eq('department_id', departmentId);
+      query = query.or(`department_id.eq.${departmentId},department_id.is.null`);
     } else {
       query = query.is('department_id', null);
     }
