@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.env
+*.egg-info/
+dist/
+build/
+test_*.py
+README.md
+fly.toml
