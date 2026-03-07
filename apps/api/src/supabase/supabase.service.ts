@@ -25,8 +25,4 @@ export class SupabaseService {
     return this.configService.get<string>('ORGANIZATION_ID') || '';
   }
 
-  /** @deprecated Use getOrganizationId() instead */
-  getRestaurantId(): string {
-    return this.configService.get<string>('RESTAURANT_ID') || '';
-  }
 }

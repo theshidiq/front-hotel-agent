@@ -112,10 +112,11 @@ export class ProductsService {
 
   async findOne(id: string): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Parallel fetch: product + allergen links
     const [productResult, allergenResult] = await Promise.all([
-      supabase.from('products').select('*').eq('id', id).single(),
+      supabase.from('products').select('*').eq('id', id).eq('organization_id', organizationId).single(),
       supabase
         .from('product_allergens')
         .select('*, allergens(*)')
@@ -146,6 +147,7 @@ export class ProductsService {
     updateProductDto: UpdateProductDto,
   ): Promise<ProductResponse> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { allergen_ids, ...productData } = updateProductDto;
 
@@ -155,6 +157,7 @@ export class ProductsService {
         .from('products')
         .update(productData)
         .eq('id', id)
+        .eq('organization_id', organizationId)
         .select('id');
 
       if (error) {
@@ -184,6 +187,7 @@ export class ProductsService {
 
   async remove(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Delete allergen links + product in parallel (links first, then product)
     await supabase.from('product_allergens').delete().eq('product_id', id);
@@ -192,6 +196,7 @@ export class ProductsService {
       .from('products')
       .delete()
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .select('id');
 
     if (error) {

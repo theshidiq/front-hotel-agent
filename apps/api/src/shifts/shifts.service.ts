@@ -169,6 +169,7 @@ export class ShiftsService {
     const { data, error } = await this.supabase
       .from('periods')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('start_date', { ascending: false });
 
     if (error) {
@@ -184,6 +185,7 @@ export class ShiftsService {
       .from('periods')
       .select('*')
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !data) {
@@ -197,6 +199,7 @@ export class ShiftsService {
     const { data, error } = await this.supabase
       .from('periods')
       .insert({
+        organization_id: organizationId,
         label: dto.label,
         start_date: dto.start_date,
         end_date: dto.end_date,
@@ -216,7 +219,8 @@ export class ShiftsService {
     const { error } = await this.supabase
       .from('periods')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to delete period', error);
@@ -422,6 +426,7 @@ export class ShiftsService {
     const { data: metadata, error: metaError } = await this.supabase
       .from('schedule_metadata')
       .insert({
+        organization_id: organizationId,
         schedule_name: scheduleName,
         schedule_period_start: period.start_date,
         schedule_period_end: period.end_date,
@@ -438,6 +443,7 @@ export class ShiftsService {
     const { data: schedule, error } = await this.supabase
       .from('schedules')
       .insert({
+        organization_id: organizationId,
         schedule_data: {},
         metadata_id: metadata.id,
       })
@@ -1493,6 +1499,7 @@ export class ShiftsService {
         .from('priority_rules')
         .select('rule_definition')
         .eq('id', id)
+        .eq('organization_id', organizationId)
         .single();
 
       updateData.rule_definition = {
@@ -1756,12 +1763,12 @@ export class ShiftsService {
       });
     }
 
-    // Delete existing periods and insert new ones
-    await this.supabase.from('periods').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    // Delete existing periods for this org and insert new ones
+    await this.supabase.from('periods').delete().eq('organization_id', organizationId);
 
     const { data, error } = await this.supabase
       .from('periods')
-      .insert(periods)
+      .insert(periods.map(p => ({ ...p, organization_id: organizationId })))
       .select();
 
     if (error) {

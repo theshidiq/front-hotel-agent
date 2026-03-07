@@ -67,6 +67,7 @@ export class CategoriesService {
 
   async update(id: string, updateData: UpdateCategoryData): Promise<Category> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const payload: Record<string, any> = {};
     if (updateData.name !== undefined) {
@@ -81,6 +82,7 @@ export class CategoriesService {
       .from('categories')
       .update(payload)
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -93,11 +95,13 @@ export class CategoriesService {
 
   async delete(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('categories')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       throw new Error(`Failed to delete category: ${error.message}`);

@@ -153,6 +153,7 @@ export class RolesService {
 
   async update(id: string, name?: string, description?: string): Promise<Role> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const updateData: Record<string, any> = {};
     if (name !== undefined) updateData.name = name.trim();
@@ -165,7 +166,8 @@ export class RolesService {
     const { error } = await supabase
       .from('roles')
       .update(updateData)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       if (error.message.includes('unique') || error.message.includes('duplicate')) {
@@ -255,7 +257,8 @@ export class RolesService {
     const { error } = await supabase
       .from('roles')
       .update({ is_default: true })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       throw new InternalServerErrorException(`Failed to set default role: ${error.message}`);
@@ -299,7 +302,7 @@ export class RolesService {
       );
     }
 
-    const { error } = await supabase.from('roles').delete().eq('id', id);
+    const { error } = await supabase.from('roles').delete().eq('id', id).eq('organization_id', organizationId);
 
     if (error) {
       throw new InternalServerErrorException(`Failed to delete role: ${error.message}`);

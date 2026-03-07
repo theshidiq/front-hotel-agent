@@ -135,6 +135,7 @@ export class MenuGroupsService {
 
   async update(id: string, data: { name?: string; display_title?: string | null; seasonal_menu_id?: string | null; kids_group_ids?: string[]; stay_period_nights?: number[] | null; course_ids?: string[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const updateData: Record<string, unknown> = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
@@ -147,7 +148,8 @@ export class MenuGroupsService {
       const { error } = await supabase
         .from('menu_groups')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', organizationId);
 
       if (error) {
         this.logger.error(`Failed to update menu group: ${error.message}`);
@@ -186,19 +188,22 @@ export class MenuGroupsService {
 
   async delete(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Clear menu_group_id on menus that reference this group
     await supabase
       .from('menus')
       .update({ menu_group_id: null })
-      .eq('menu_group_id', id);
+      .eq('menu_group_id', id)
+      .eq('organization_id', organizationId);
 
     // menu_group_courses cascade-deletes automatically
 
     const { error } = await supabase
       .from('menu_groups')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error(`Failed to delete menu group: ${error.message}`);

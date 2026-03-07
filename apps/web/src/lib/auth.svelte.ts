@@ -474,6 +474,10 @@ export async function signOut(): Promise<void> {
 	clearOrgId();
 	// Reload guest permissions for non-logged-in view
 	loadGuestPermissions();
+	// Redirect to main page
+	if (typeof window !== 'undefined') {
+		window.location.href = '/';
+	}
 }
 
 export function getAuthHeaders(): Record<string, string> {

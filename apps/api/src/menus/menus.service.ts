@@ -151,10 +151,11 @@ export class MenusService {
 
   async findOne(id: string): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Parallel fetch: menu + product links
     const [menuResult, linksResult] = await Promise.all([
-      supabase.from('menus').select('*').eq('id', id).single(),
+      supabase.from('menus').select('*').eq('id', id).eq('organization_id', organizationId).single(),
       supabase.from('menu_products').select('product_id').eq('menu_id', id),
     ]);
 
@@ -214,6 +215,7 @@ export class MenusService {
 
   async update(id: string, updateMenuDto: UpdateMenuDto): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     const { product_ids, ...menuData } = updateMenuDto;
 
@@ -224,7 +226,8 @@ export class MenusService {
         ...menuData,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       throw new Error(`Failed to update menu: ${error.message}`);
@@ -248,6 +251,7 @@ export class MenusService {
 
   async remove(id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
+    const organizationId = this.supabaseService.getOrganizationId();
 
     // Delete product links first
     await supabase.from('menu_products').delete().eq('menu_id', id);
@@ -257,6 +261,7 @@ export class MenusService {
       .from('menus')
       .delete()
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .select('id');
 
     if (error) {

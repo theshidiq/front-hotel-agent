@@ -333,37 +333,6 @@
                 );
             }
 
-            const { data: restaurant, error: restErr } = await supabase
-                .from("restaurants")
-                .insert({
-                    name: name.trim(),
-                    slug: slug.trim(),
-                    organization_id: org.id,
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    settings: {
-                        business_hours: { open: "09:00", close: "22:00" },
-                        shift_duration: 8,
-                        min_staff_per_shift: 2,
-                        max_consecutive_days: 6,
-                    },
-                    contact_info: {
-                        address: addressStr || null,
-                        phone: phoneStr,
-                        email: resolvedEmail,
-                    },
-                })
-                .select("id")
-                .single();
-            if (restErr || !restaurant)
-                throw new Error(
-                    restErr?.message ?? "Failed to create restaurant",
-                );
-
-            await supabase
-                .from("organizations")
-                .update({ restaurant_id: restaurant.id })
-                .eq("id", org.id);
-
             await supabase.from("period_configuration").insert({
                 organization_id: org.id,
                 start_day: 21,
@@ -381,7 +350,6 @@
 
             // Create a staff record for the owner so they can log in to the dashboard
             await supabase.from("staff").insert({
-                restaurant_id: restaurant.id,
                 organization_id: org.id,
                 name: name.trim(),
                 email: resolvedEmail,
