@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { signUpWithEmail } from '$lib/auth.svelte';
 
 	let email = $state('');
@@ -37,8 +38,11 @@
 			} else {
 				formError = result.error || '登録に失敗しました';
 			}
-		} else {
+		} else if (result.needsConfirmation) {
 			sent = true;
+		} else {
+			// Email confirmation disabled — immediately redirect to setup
+			goto('/setup');
 		}
 	}
 </script>

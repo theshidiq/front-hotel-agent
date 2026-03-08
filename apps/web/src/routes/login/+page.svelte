@@ -26,9 +26,14 @@
 	const isStaff = $derived(authState.isStaff);
 
 	$effect(() => {
-		if (isStaff && !authState.loading && !redirected) {
+		if (authState.loading || redirected) return;
+		if (isStaff) {
 			redirected = true;
 			goto('/dashboard');
+		} else if (authState.user && !authState.error) {
+			// Authenticated but no staff record yet → new user, send to setup
+			redirected = true;
+			goto('/setup');
 		}
 	});
 
@@ -93,8 +98,11 @@
 
 		if (!result.success) {
 			formError = result.error || 'ログインに失敗しました';
+		} else if (!redirected) {
+			// $effect handles redirect, but trigger it explicitly in case state doesn't change
+			redirected = true;
+			goto(authState.isStaff ? '/dashboard' : '/setup');
 		}
-		// success → $effect redirects
 	}
 
 	function handleGoogleLogin() {

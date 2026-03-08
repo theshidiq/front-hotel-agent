@@ -431,20 +431,32 @@ export async function signInWithEmail(email: string, password: string): Promise<
 		authState.user = data.session.user;
 		authState.session = data.session;
 		await handleSignedIn(data.session.user.email, data.session.user.id);
-		return { success: authState.isStaff };
+		// Success if authenticated as staff, OR if new user (no staff record yet → goes to setup)
+		if (authState.isStaff || (!authState.error && authState.user)) {
+			return { success: true };
+		}
+		return { success: false, error: authState.error || 'スタッフとして登録されていません' };
 	}
 	return { success: false, error: 'ログインに失敗しました' };
 }
 
-export async function signUpWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-	const { error } = await supabase.auth.signUp({ email, password });
+export async function signUpWithEmail(email: string, password: string): Promise<{ success: boolean; needsConfirmation: boolean; error?: string }> {
+	const { data, error } = await supabase.auth.signUp({ email, password });
 	if (error) {
 		if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
-			return { success: false, error: 'このメールアドレスはすでに登録されています' };
+			return { success: false, needsConfirmation: false, error: 'このメールアドレスはすでに登録されています' };
 		}
-		return { success: false, error: error.message };
+		return { success: false, needsConfirmation: false, error: error.message };
 	}
-	return { success: true };
+	// If session is returned immediately, email confirmation is disabled — sign in right away
+	if (data.session?.user?.email) {
+		authState.user = data.session.user;
+		authState.session = data.session;
+		await handleSignedIn(data.session.user.email, data.session.user.id);
+		return { success: true, needsConfirmation: false };
+	}
+	// Email confirmation required
+	return { success: true, needsConfirmation: true };
 }
 
 export async function resetPasswordForEmail(email: string): Promise<{ success: boolean; error?: string }> {
