@@ -421,6 +421,42 @@ export async function initAuth(): Promise<void> {
 	});
 }
 
+export async function signInWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+	authState.error = null;
+	const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+	if (error) {
+		return { success: false, error: 'メールアドレスまたはパスワードが正しくありません' };
+	}
+	if (data.session?.user?.email) {
+		authState.user = data.session.user;
+		authState.session = data.session;
+		await handleSignedIn(data.session.user.email, data.session.user.id);
+		return { success: authState.isStaff };
+	}
+	return { success: false, error: 'ログインに失敗しました' };
+}
+
+export async function signUpWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+	const { error } = await supabase.auth.signUp({ email, password });
+	if (error) {
+		if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+			return { success: false, error: 'このメールアドレスはすでに登録されています' };
+		}
+		return { success: false, error: error.message };
+	}
+	return { success: true };
+}
+
+export async function resetPasswordForEmail(email: string): Promise<{ success: boolean; error?: string }> {
+	const { error } = await supabase.auth.resetPasswordForEmail(email, {
+		redirectTo: typeof window !== 'undefined' ? window.location.origin + '/login' : '/login',
+	});
+	if (error) {
+		return { success: false, error: error.message };
+	}
+	return { success: true };
+}
+
 export async function signInWithGoogle(redirectTo?: string): Promise<void> {
 	authState.error = null;
 	const { error } = await supabase.auth.signInWithOAuth({
