@@ -30,10 +30,6 @@
 		if (isStaff) {
 			redirected = true;
 			goto('/dashboard');
-		} else if (authState.user && !authState.error) {
-			// Authenticated but no staff record yet → new user, send to setup
-			redirected = true;
-			goto('/setup');
 		}
 	});
 
