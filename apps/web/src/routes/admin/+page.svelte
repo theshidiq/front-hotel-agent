@@ -345,7 +345,7 @@
 	<header class="bg-white border-b border-gray-200 px-4 md:px-6 py-4">
 		<div class="max-w-5xl mx-auto flex items-center justify-between">
 			<div class="flex items-center gap-3">
-				<a href="/" class="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors">
+				<a href="/dashboard" class="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors">
 					<span class="material-symbols-rounded text-xl">arrow_back</span>
 					<span class="text-sm hidden sm:inline">Back to App</span>
 				</a>
