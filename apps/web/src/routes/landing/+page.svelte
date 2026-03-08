@@ -232,7 +232,7 @@
 
         <div class="nav-actions">
             <a href="/login" class="nav-login">Log in</a>
-            <a href="/setup" class="btn-secondary nav-start">Get started free</a
+            <a href="/signup" class="btn-secondary nav-start">Get started free</a
             >
             <a href="#contact" class="btn-primary">Book a Demo</a>
         </div>
@@ -269,7 +269,7 @@
                         fully present.
                     </p>
                     <div class="hero-ctas">
-                        <a href="/setup" class="btn-primary">Get started free</a
+                        <a href="/signup" class="btn-primary">Get started free</a
                         >
                         <a href="#contact" class="btn-secondary">Book a Demo</a>
                     </div>

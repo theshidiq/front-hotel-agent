@@ -3,7 +3,7 @@
     import { cubicOut } from "svelte/easing";
     import ConstellationCanvas from "$lib/components/ConstellationCanvas.svelte";
     function startSetup() {
-        window.location.href = "/login";
+        window.location.href = "/signup";
     }
 
     let emailInput = $state("");
