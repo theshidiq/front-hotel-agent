@@ -663,10 +663,13 @@
 
 				lastSolveTime = result.solve_time;
 				lastIsOptimal = result.is_optimal;
-				if (result.violations && result.violations.length > 0) {
-					optimizeViolations = result.violations;
+				const userViolations = (result.violations ?? []).filter(
+					(v: { description: string }) => !(v.description.startsWith('Backup ') && v.description.includes('has day off (not on holiday)'))
+				);
+				if (userViolations.length > 0) {
+					optimizeViolations = userViolations;
 					showViolations = true;
-					showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒) — ${result.violations.length}件の制約違反`);
+					showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒) — ${userViolations.length}件の制約違反`);
 				} else {
 					optimizeViolations = [];
 					showViolations = false;
@@ -714,10 +717,13 @@
 			await _commitSchedule(partialResult.schedule);
 			lastSolveTime = partialResult.solve_time;
 			lastIsOptimal = false;
-			if (partialResult.violations.length > 0) {
-				optimizeViolations = partialResult.violations;
+			const partialUserViolations = partialResult.violations.filter(
+				(v: { description: string }) => !(v.description.startsWith('Backup ') && v.description.includes('has day off (not on holiday)'))
+			);
+			if (partialUserViolations.length > 0) {
+				optimizeViolations = partialUserViolations;
 				showViolations = true;
-				showSuccess(`部分最適化スケジュールを保存しました — ${partialResult.violations.length}件の制約違反`);
+				showSuccess(`部分最適化スケジュールを保存しました — ${partialUserViolations.length}件の制約違反`);
 			} else {
 				optimizeViolations = [];
 				showViolations = false;
