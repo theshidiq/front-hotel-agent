@@ -2,11 +2,11 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { supabase } from "$lib/supabase";
-    import { authState, initAuth } from "$lib/auth.svelte";
+    import { authState, initAuth, authInitialized } from "$lib/auth.svelte";
 
     // ─── Init auth + already-onboarded guard ─────────────────────────────────
     onMount(async () => {
-        await initAuth();
+        if (!authInitialized) await initAuth();
         const userId = authState.user?.id;
         if (userId) {
             const { data: membership } = await supabase
@@ -366,6 +366,7 @@
                 .eq("id", org.id);
             currentStep = TOTAL_STEPS;
         } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') return;
             submitError =
                 err instanceof Error
                     ? err.message
@@ -375,9 +376,8 @@
         }
     }
 
-    async function goToDashboard() {
-        await initAuth();
-        goto("/dashboard");
+    function goToDashboard() {
+        window.location.href = '/dashboard';
     }
 </script>
 

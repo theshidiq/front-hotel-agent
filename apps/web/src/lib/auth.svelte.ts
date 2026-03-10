@@ -172,7 +172,7 @@ async function checkStaffStatus(email: string): Promise<StaffWithPeriod | null> 
 		.eq('email', email)
 		.eq('is_active', true)
 		.limit(1)
-		.single();
+		.maybeSingle();
 
 	if (error || !data) {
 		return null;
@@ -201,7 +201,7 @@ async function resolveOrganizationId(authUserId: string, staffOrgId: string | nu
 		.eq('auth_user_id', authUserId)
 		.eq('is_active', true)
 		.limit(1)
-		.single();
+		.maybeSingle();
 
 	return data?.organization_id ?? null;
 }
@@ -220,11 +220,14 @@ async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | 
 }
 
 let signingInProgress = false;
-let authInitialized = false;
+export let authInitialized = false;
 
 async function handleSignedIn(email: string, authUserId?: string): Promise<void> {
 	// Guard against concurrent calls (getSession + onAuthStateChange both fire on OAuth redirect)
-	if (signingInProgress) return;
+	if (signingInProgress) {
+		authState.loading = false;
+		return;
+	}
 	signingInProgress = true;
 	// Only show loading spinner on first auth, not on subsequent token refreshes
 	if (!authInitialized) authState.loading = true;
@@ -441,7 +444,8 @@ export async function signInWithEmail(email: string, password: string): Promise<
 }
 
 export async function signUpWithEmail(email: string, password: string): Promise<{ success: boolean; needsConfirmation: boolean; error?: string }> {
-	const { data, error } = await supabase.auth.signUp({ email, password });
+	const redirectTo = typeof window !== 'undefined' ? window.location.origin + '/setup' : '/setup';
+	const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
 	if (error) {
 		if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
 			return { success: false, needsConfirmation: false, error: 'このメールアドレスはすでに登録されています' };
