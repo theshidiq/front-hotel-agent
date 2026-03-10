@@ -95,6 +95,7 @@ class ShiftScheduleOptimizer:
         self.calendar_off_dates = set()  # Track must_day_off dates
         self.calendar_work_dates = set()  # Track must_work dates (for skipping priority rules)
         self.required_off_cells = set()  # Track (staff_id, date) pairs forced off by required_off rules
+        self.post_period_dates = set()  # Track post-period dates (days after long closures)
         self.prefilled_cells = set()  # Track pre-filled cells (staff_id, date) for reference
         self.prefilled_star_equiv_by_staff = {}  # Track ★ symbols per staff for monthly limits (★ is WORK but counts as off-equivalent)
         self.backup_unavailable_slots = {}  # Track (staff_id, date) -> any_member_off bool var for backup unavailability
@@ -1318,6 +1319,12 @@ class ShiftScheduleOptimizer:
         - Daily limits: min/max TOTAL staff off per day (across all types)
         - Staff type limits: max of SPECIFIC TYPE off per day (e.g., max 1 社員)
         """
+        # Pre-compute post-period dates so we can skip them in daily limits.
+        # _add_post_period_constraints() runs after this, so we compute them here early.
+        # self.post_period_dates will be set again (same values) when that method runs.
+        if not self.post_period_dates:
+            self._compute_post_period_dates()
+
         daily_limits = self.constraints_config.get('dailyLimitsRaw', {})
         staff_type_limits = self.constraints_config.get('staffTypeLimits', {})
 
@@ -1388,6 +1395,11 @@ class ShiftScheduleOptimizer:
                 rule = calendar_rules[date]
                 if rule.get('must_day_off') or rule.get('must_work'):
                     continue
+
+            # Skip post-period dates - post-period constraint forces everyone to work,
+            # making it structurally impossible to meet daily minimum off count
+            if date in self.post_period_dates:
+                continue
 
             # Staff covered by required_off rules on this date are excluded from max cap
             required_off_ids_today = required_off_by_date.get(date, set())
@@ -2665,6 +2677,60 @@ class ShiftScheduleOptimizer:
 
         logger.info(f"[OR-TOOLS] Added {constraint_count} 5-day rest {constraint_mode} constraints")
 
+    def _compute_post_period_dates(self):
+        """
+        Pre-compute self.post_period_dates (set of date strings) from calendar rules.
+        Called early (before daily limits) so daily limits can skip these dates.
+        """
+        early_shift_config = self.constraints_config.get('earlyShiftConfig', {})
+        post_period_config = early_shift_config.get('postPeriodConstraint', {})
+        if not post_period_config.get('enabled', False):
+            return
+
+        min_period_length = post_period_config.get('minPeriodLength', 3)
+        post_period_days = post_period_config.get('postPeriodDays', 2)
+        calendar_rules = self.constraints_config.get('calendarRules', {})
+
+        must_day_off_dates = sorted([
+            date for date, rule in calendar_rules.items()
+            if isinstance(rule, dict) and rule.get('must_day_off') and date in self.date_range
+        ])
+        if not must_day_off_dates:
+            must_day_off_dates = sorted([
+                date for date, rule in calendar_rules.items()
+                if rule == 'must_day_off' and date in self.date_range
+            ])
+
+        if not must_day_off_dates:
+            return
+
+        # Group into consecutive periods
+        from datetime import datetime, timedelta
+        periods = []
+        period_start = must_day_off_dates[0]
+        period_end = must_day_off_dates[0]
+        for date in must_day_off_dates[1:]:
+            prev = datetime.strptime(period_end, '%Y-%m-%d')
+            curr = datetime.strptime(date, '%Y-%m-%d')
+            if (curr - prev).days == 1:
+                period_end = date
+            else:
+                periods.append({'start': period_start, 'end': period_end})
+                period_start = date
+                period_end = date
+        periods.append({'start': period_start, 'end': period_end})
+
+        for period in periods:
+            start_dt = datetime.strptime(period['start'], '%Y-%m-%d')
+            end_dt = datetime.strptime(period['end'], '%Y-%m-%d')
+            period_length = (end_dt - start_dt).days + 1
+            if period_length < min_period_length:
+                continue
+            for day_offset in range(1, post_period_days + 1):
+                post_date = (end_dt + timedelta(days=day_offset)).strftime('%Y-%m-%d')
+                if post_date in self.date_range:
+                    self.post_period_dates.add(post_date)
+
     def _add_post_period_constraints(self):
         """
         Post day-off period constraints.
@@ -2814,6 +2880,9 @@ class ShiftScheduleOptimizer:
             logger.info("  No post-period dates within schedule range")
             logger.info("=" * 60)
             return
+
+        # Store on self so daily limits can skip these dates
+        self.post_period_dates = set(post_period_dates)
 
         # DIAGNOSTIC: Confirm what dates will be protected
         logger.info(f"  [DIAGNOSTIC] POST-PERIOD DATES TO PROTECT: {post_period_dates}")

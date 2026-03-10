@@ -235,7 +235,7 @@
 		// #4 — staff status shift restrictions toggle
 		disableStaffStatusShiftRestrictions: false,
 		// #6 & #7 — post-period constraints
-		postPeriodEnabled: false,
+		postPeriodEnabled: true,
 		postPeriodDays: 2,
 		postPeriodIsHard: true,
 		postPeriodMinLength: 3,
@@ -313,7 +313,7 @@
 					penaltyAdjacentConflict: pw?.adjacentConflict ?? 30,
 					penaltyStaffStatusShift: pw?.staffStatusShift ?? 150,
 					disableStaffStatusShiftRestrictions: ss?.disableStaffStatusShiftRestrictions ?? false,
-					postPeriodEnabled: ss?.postPeriodEnabled ?? false,
+					postPeriodEnabled: ss?.postPeriodEnabled ?? true,
 					postPeriodDays: ss?.postPeriodDays ?? 2,
 					postPeriodIsHard: ss?.postPeriodIsHard ?? true,
 					postPeriodMinLength: ss?.postPeriodMinLength ?? 3,
