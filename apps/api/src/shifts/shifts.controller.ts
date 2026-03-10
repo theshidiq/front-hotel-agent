@@ -21,6 +21,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ShiftsService } from './shifts.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
@@ -55,6 +56,7 @@ import {
   UpdatePeriodConfigurationDto,
 } from './dto/settings.dto';
 
+@SkipThrottle()
 @ApiTags('shifts')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
