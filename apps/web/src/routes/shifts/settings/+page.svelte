@@ -49,7 +49,7 @@
 	let activeDepartmentId: string | null = $state(null);
 
 	// Dept-specific tabs
-	const DEPT_TABS: SettingsTab[] = ['limits', 'groups', 'priority', 'early'];
+	const DEPT_TABS: SettingsTab[] = ['limits', 'groups', 'priority', 'early', 'capabilities', 'vacation', 'backup'];
 
 	// ── Data State ──
 	let dailyLimits: DailyLimits | null = $state(null);
@@ -144,6 +144,11 @@
 
 			if (!activeDepartmentId && depts.length > 0) {
 				activeDepartmentId = depts[0].id;
+				// Re-fetch staff scoped to the first department (initial load had no deptId)
+				if (!deptId) {
+					const deptStaff = await getShiftStaff(depts[0].id);
+					allStaff = deptStaff.map(s => ({ ...s, staff_status: s.status }));
+				}
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load settings';
