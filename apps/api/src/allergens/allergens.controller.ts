@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Delete, Query, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Query, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { AllergensService, Allergen } from './allergens.service';
 import { RequirePermission } from '../auth/permission.decorator';
+import { StaffAuthGuard } from '../auth/auth.guard';
 
 @ApiTags('allergens')
 @Controller('allergens')
@@ -9,6 +10,7 @@ export class AllergensController {
   constructor(private readonly allergensService: AllergensService) {}
 
   @Get()
+  @UseGuards(StaffAuthGuard)
   @ApiOperation({ summary: 'Get all allergens' })
   @ApiQuery({
     name: 'category',

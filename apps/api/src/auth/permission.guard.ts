@@ -60,10 +60,12 @@ export class PermissionGuard implements CanActivate {
       throw new UnauthorizedException('You are not registered as staff');
     }
 
-    const organizationId: string =
-      staff.organization_id ||
-      (request.headers['x-organization-id'] as string) ||
-      this.supabaseService.getOrganizationId();
+    // Organization ID must come from the staff record — never from client-supplied headers
+    const organizationId: string | null = staff.organization_id ?? null;
+    if (!organizationId) {
+      this.logger.warn(`Staff ${staff.email} has no organization_id — denying access`);
+      throw new ForbiddenException('Staff account is not associated with an organization');
+    }
 
     // Load permissions from role
     let permissions: string[] = [];

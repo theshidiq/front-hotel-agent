@@ -114,10 +114,4 @@ export class ReservationsController {
     return this.reservationsService.checkOut(req.user.organization_id, id);
   }
 
-  @Delete('test-data')
-  @RequireStaff()
-  @ApiOperation({ summary: 'Delete all test reservations (danger: clears all reservations for this restaurant)' })
-  async deleteTestData(@Req() req: any): Promise<{ deleted: number }> {
-    return this.reservationsService.deleteAllReservations(req.user.organization_id);
-  }
 }

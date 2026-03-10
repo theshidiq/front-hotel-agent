@@ -13,6 +13,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
 import logging
+import os
+import functools
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +22,20 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
+
+# ── Internal shared secret: set ORTOOLS_SECRET env var; NestJS sends same value ──
+_INTERNAL_SECRET = os.environ.get('ORTOOLS_SECRET', '')
+
+def require_internal_secret(f):
+    """Reject requests missing the correct X-Internal-Token header."""
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        if _INTERNAL_SECRET:
+            token = request.headers.get('X-Internal-Token', '')
+            if token != _INTERNAL_SECRET:
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 
 class ShiftScheduleOptimizer:
@@ -4026,6 +4042,7 @@ def health():
 
 
 @app.route('/optimize', methods=['POST'])
+@require_internal_secret
 def optimize():
     """
     Main optimization endpoint.
@@ -4083,6 +4100,7 @@ def optimize():
 
 
 @app.route('/validate', methods=['POST'])
+@require_internal_secret
 def validate():
     """
     Validate a schedule against constraints without optimizing.
@@ -4099,4 +4117,5 @@ if __name__ == '__main__':
     import os
     # Development server - use PORT env var or default to 5001 (5000 is used by AirPlay on macOS)
     port = int(os.environ.get('PORT', 5001))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    app.run(host='127.0.0.1', port=port, debug=debug)
