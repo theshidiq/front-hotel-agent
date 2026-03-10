@@ -2481,6 +2481,10 @@ class ShiftScheduleOptimizer:
             staff_id = staff['id']
             staff_name = staff.get('name', staff_id)
 
+            # Backup staff are schedule-driven by coverage rules, not adjacent conflict penalties
+            if staff_id in self.backup_staff_ids:
+                continue
+
             for i in range(len(self.date_range) - 1):
                 date1 = self.date_range[i]
                 date2 = self.date_range[i + 1]
