@@ -12,7 +12,16 @@ interface Props {
 let { allStaff, onStaffChange, departmentId }: Props = $props();
 
 const today = new Date().toISOString().slice(0, 10);
-let activeStaff = $derived(allStaff.filter(s => isStaffActiveInCurrentPeriod(s, [today])));
+const STATUS_ORDER: Record<string, number> = { '社員': 0, '派遣': 1, 'パート': 2 };
+let activeStaff = $derived(
+  allStaff
+    .filter(s => isStaffActiveInCurrentPeriod(s, [today]))
+    .sort((a, b) => {
+      const sa = a.status || a.staff_status || '社員';
+      const sb = b.status || b.staff_status || '社員';
+      return (STATUS_ORDER[sa] ?? 99) - (STATUS_ORDER[sb] ?? 99);
+    })
+);
 
 // Status types that have default restrictions (派遣, パート)
 const RESTRICTED_STATUSES = new Set(['派遣', 'パート']);
