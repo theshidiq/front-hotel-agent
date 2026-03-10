@@ -521,13 +521,16 @@ export interface OptimizeOptions {
 	timeout?: number;
 	penaltyWeights?: Record<string, number>;
 	preservePrefilled?: boolean;
+	signal?: AbortSignal;
 }
 
 export async function optimizeSchedule(options: OptimizeOptions): Promise<OptimizeResponse> {
+	const { signal, ...body } = options;
 	const response = await apiFetch(`${API_URL}/shifts/optimize`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
-		body: JSON.stringify(options)
+		body: JSON.stringify(body),
+		signal
 	});
 	const result = await handleResponse<OptimizeResponse>(response);
 	// Invalidate schedule cache after optimization

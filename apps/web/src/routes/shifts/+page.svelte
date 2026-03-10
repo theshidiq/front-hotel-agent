@@ -102,6 +102,11 @@
 	let optimizing = $state(false);
 	let clearing = $state(false);
 	let optimizerHealthy = $state(false);
+	let _optimizeAbortController: AbortController | null = null;
+
+	// ── Partial Result Dialog ──
+	let showPartialDialog = $state(false);
+	let partialResult = $state<{ schedule: Record<string, Record<string, string>>; solve_time?: number; violations: Array<{ description: string; count: number; penalty: number }> } | null>(null);
 
 	// ── Violations State ──
 	let optimizeViolations = $state<Array<{ description: string; count: number; penalty: number }>>([]);
@@ -625,6 +630,8 @@
 	async function handleOptimize() {
 		if (!selectedPeriodId || !optimizerHealthy) return;
 
+		_optimizeAbortController = new AbortController();
+
 		try {
 			optimizing = true;
 			error = "";
@@ -635,23 +642,25 @@
 				departmentId: activeDepartmentId ?? undefined,
 				timeout: 30,
 				preservePrefilled: true,
+				signal: _optimizeAbortController.signal,
 			});
 
 			if (result.success && result.schedule) {
-				finishOptimizeProgress();
-
-				scheduleData = result.schedule;
-
-				// Save optimized schedule
-				const updates: CellUpdate[] = [];
-				for (const [staffId, dates] of Object.entries(result.schedule)) {
-					for (const [date, symbol] of Object.entries(dates)) {
-						updates.push({ staffId, date, symbol });
-					}
+				// If not optimal (FEASIBLE / timed out), show partial result dialog instead of auto-saving
+				if (result.is_optimal === false) {
+					stopOptimizeProgress();
+					partialResult = {
+						schedule: result.schedule,
+						solve_time: result.solve_time,
+						violations: result.violations ?? [],
+					};
+					showPartialDialog = true;
+					return;
 				}
-				await bulkUpdateCells(selectedPeriodId, updates, activeDepartmentId ?? undefined);
 
-				// Show violations if any
+				finishOptimizeProgress();
+				await _commitSchedule(result.schedule);
+
 				lastSolveTime = result.solve_time;
 				lastIsOptimal = result.is_optimal;
 				if (result.violations && result.violations.length > 0) {
@@ -669,10 +678,63 @@
 			}
 		} catch (e) {
 			stopOptimizeProgress();
-			error = e instanceof Error ? e.message : "Optimization failed";
+			if (e instanceof Error && e.name === 'AbortError') {
+				showSuccess('最適化をキャンセルしました');
+			} else {
+				error = e instanceof Error ? e.message : "Optimization failed";
+			}
 		} finally {
 			optimizing = false;
+			_optimizeAbortController = null;
 		}
+	}
+
+	function handleCancelOptimize() {
+		_optimizeAbortController?.abort();
+	}
+
+	async function _commitSchedule(schedule: Record<string, Record<string, string>>) {
+		if (!selectedPeriodId) return;
+		scheduleData = schedule;
+		const updates: CellUpdate[] = [];
+		for (const [staffId, dates] of Object.entries(schedule)) {
+			for (const [date, symbol] of Object.entries(dates)) {
+				updates.push({ staffId, date, symbol });
+			}
+		}
+		await bulkUpdateCells(selectedPeriodId, updates, activeDepartmentId ?? undefined);
+	}
+
+	async function handleUsePartialSchedule() {
+		if (!partialResult) return;
+		showPartialDialog = false;
+		try {
+			optimizing = true;
+			finishOptimizeProgress();
+			await _commitSchedule(partialResult.schedule);
+			lastSolveTime = partialResult.solve_time;
+			lastIsOptimal = false;
+			if (partialResult.violations.length > 0) {
+				optimizeViolations = partialResult.violations;
+				showViolations = true;
+				showSuccess(`部分最適化スケジュールを保存しました — ${partialResult.violations.length}件の制約違反`);
+			} else {
+				optimizeViolations = [];
+				showViolations = false;
+				showSuccess('部分最適化スケジュールを保存しました');
+			}
+		} catch (e) {
+			stopOptimizeProgress();
+			error = e instanceof Error ? e.message : 'Save failed';
+		} finally {
+			optimizing = false;
+			partialResult = null;
+		}
+	}
+
+	function handleDiscardPartialSchedule() {
+		showPartialDialog = false;
+		partialResult = null;
 	}
 
 	function handleClear() {
@@ -850,6 +912,45 @@
 				/>
 			{/if}
 
+			<!-- Partial Result Dialog -->
+			{#if showPartialDialog && partialResult}
+				<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+					<div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 flex flex-col gap-4">
+						<div class="flex items-start gap-3">
+							<span class="material-symbols-rounded text-amber-500 text-2xl mt-0.5">timer_off</span>
+							<div>
+								<h2 class="text-base font-semibold text-gray-900">タイムアウト — 部分解が見つかりました</h2>
+								<p class="text-sm text-gray-500 mt-1">
+									ソルバーが時間内に最適解を見つけられませんでした。部分的なスケジュールが得られています。
+									{#if partialResult.solve_time != null}
+										（{partialResult.solve_time.toFixed(2)}秒）
+									{/if}
+								</p>
+							</div>
+						</div>
+						{#if partialResult.violations.length > 0}
+							<div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+								{partialResult.violations.length}件の制約違反が含まれます
+							</div>
+						{/if}
+						<div class="flex gap-2 justify-end mt-1">
+							<button
+								class="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50"
+								onclick={handleDiscardPartialSchedule}
+							>
+								破棄
+							</button>
+							<button
+								class="px-4 py-2 rounded-lg text-sm bg-amber-500 hover:bg-amber-600 text-white font-medium"
+								onclick={handleUsePartialSchedule}
+							>
+								このスケジュールを使用
+							</button>
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			<!-- Main Content -->
 			{#if reconnecting}
 				<!-- Waking up after inactivity - show banner over existing data -->
@@ -1010,7 +1111,7 @@
 									rows={dateRange.length || 20}
 									columns={staff.length || 12}
 								/>
-								<OptimizeOverlay progress={optimizeProgress} elapsed={optimizeElapsed} />
+								<OptimizeOverlay progress={optimizeProgress} elapsed={optimizeElapsed} oncancel={handleCancelOptimize} />
 							{:else if !hasScheduleData && staff.length > 0}
 								<!-- Empty schedule notice -->
 								<div class="p-8 text-center">
