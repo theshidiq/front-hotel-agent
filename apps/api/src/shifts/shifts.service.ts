@@ -676,7 +676,7 @@ export class ShiftsService {
 
     const result = await this.ortoolsClient.optimize(ortoolsRequest);
 
-    if (result.success && result.schedule) {
+    if (result.success && result.schedule && !dto.dryRun) {
       await this.bulkUpdateCells(
         organizationId,
         dto.periodId,
@@ -685,7 +685,7 @@ export class ShiftsService {
       );
     }
 
-    return result;
+    return { ...result, dryRun: dto.dryRun ?? false };
   }
 
   async clearSchedule(organizationId: string, periodId: string, departmentId?: string): Promise<void> {

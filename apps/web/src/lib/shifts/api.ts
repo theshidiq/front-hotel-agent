@@ -524,6 +524,7 @@ export interface OptimizeOptions {
 	timeout?: number;
 	penaltyWeights?: Record<string, number>;
 	preservePrefilled?: boolean;
+	dryRun?: boolean;
 	signal?: AbortSignal;
 }
 
@@ -536,11 +537,13 @@ export async function optimizeSchedule(options: OptimizeOptions): Promise<Optimi
 		signal
 	});
 	const result = await handleResponse<OptimizeResponse>(response);
-	// Invalidate schedule cache after optimization
-	const cacheKey = options.departmentId
-		? `schedule:${options.periodId}:${options.departmentId}`
-		: `schedule:${options.periodId}`;
-	apiCache.invalidate(cacheKey);
+	// Invalidate schedule cache after optimization (not for dry-run)
+	if (!options.dryRun) {
+		const cacheKey = options.departmentId
+			? `schedule:${options.periodId}:${options.departmentId}`
+			: `schedule:${options.periodId}`;
+		apiCache.invalidate(cacheKey);
+	}
 	return result;
 }
 
