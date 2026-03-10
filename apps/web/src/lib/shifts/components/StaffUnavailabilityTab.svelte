@@ -23,6 +23,15 @@ let activeStaff = $derived(allStaff.filter(s => isStaffActiveInCurrentPeriod(s, 
 
 // ── State ──
 let selectedStaffId = $state<string | null>(null);
+
+// Reset selection when department changes and selected staff is no longer in list
+$effect(() => {
+  const ids = new Set(activeStaff.map(s => s.id));
+  if (selectedStaffId && !ids.has(selectedStaffId)) {
+    selectedStaffId = null;
+    unavailability = [];
+  }
+});
 let unavailability = $state<StaffUnavailability[]>([]);
 let loading = $state(false);
 let savingDate = $state<string | null>(null);
