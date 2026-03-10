@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SupabaseModule } from './supabase/supabase.module';
@@ -28,6 +30,10 @@ import { DepartmentsModule } from './departments/departments.module';
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === 'production' ? undefined : '../../.env',
     }),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60000, limit: 100 },
+      { name: 'scan', ttl: 60000, limit: 10 },
+    ]),
     HttpModule,
     SupabaseModule,
     AuthModule,
@@ -49,6 +55,9 @@ import { DepartmentsModule } from './departments/departments.module';
     DepartmentsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

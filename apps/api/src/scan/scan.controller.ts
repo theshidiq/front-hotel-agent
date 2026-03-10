@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ScanService } from './scan.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanExtractResponse, ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
@@ -12,6 +13,7 @@ export class ScanController {
   constructor(private readonly scanService: ScanService) {}
 
   @Post()
+  @Throttle({ scan: { ttl: 60000, limit: 10 } })
   @RequirePermission('products.scan')
   @ApiOperation({
     summary: 'Scan product image and auto-save',
@@ -23,6 +25,7 @@ export class ScanController {
   }
 
   @Post('extract')
+  @Throttle({ scan: { ttl: 60000, limit: 10 } })
   @RequirePermission('products.scan')
   @ApiOperation({
     summary: 'Extract product data from image without saving',
