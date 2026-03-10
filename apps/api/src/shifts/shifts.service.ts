@@ -483,7 +483,7 @@ export class ShiftsService {
       this.getStaffGroups(organizationId, deptId),
       this.getPriorityRules(organizationId, deptId),
       this.getEarlyShiftPreferences(organizationId, deptId),
-      this.getBackupAssignments(organizationId, deptId),
+      this.getBackupAssignments(organizationId, deptId, true), // active-only for solver
     ]);
 
     // Staff groups: members stored in group_config.members JSONB
@@ -1781,7 +1781,7 @@ export class ShiftsService {
 
   // ==================== BACKUP ASSIGNMENTS ====================
 
-  async getBackupAssignments(organizationId: string, departmentId?: string): Promise<Array<{
+  async getBackupAssignments(organizationId: string, departmentId?: string, activeOnly = false): Promise<Array<{
     id: string;
     staffId: string;
     groupId: string;
@@ -1792,8 +1792,11 @@ export class ShiftsService {
     let query = this.supabase
       .from('staff_backup_assignments')
       .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true);
+      .eq('organization_id', organizationId);
+
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
 
     // Filter by department if provided — join via staff table
     // For simplicity, fetch all active assignments and filter by staff in the department
@@ -1830,6 +1833,74 @@ export class ShiftsService {
       assignmentType: a.assignment_type,
       priorityOrder: a.priority_order,
     }));
+  }
+
+  async createBackupAssignment(
+    organizationId: string,
+    dto: { staffId: string; groupId: string; assignmentType?: string; priorityOrder?: number },
+  ) {
+    const versionId = await this.getOrCreateConfigVersion(organizationId);
+    const { data, error } = await this.supabase
+      .from('staff_backup_assignments')
+      .insert({
+        organization_id: organizationId,
+        version_id: versionId,
+        staff_id: dto.staffId,
+        group_id: dto.groupId,
+        is_active: true,
+        assignment_type: dto.assignmentType ?? 'coverage',
+        priority_order: dto.priorityOrder ?? 0,
+      })
+      .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
+      .single();
+
+    if (error) throw new Error(`Failed to create backup assignment: ${error.message}`);
+    return {
+      id: data.id,
+      staffId: data.staff_id,
+      groupId: data.group_id,
+      isActive: data.is_active,
+      assignmentType: data.assignment_type,
+      priorityOrder: data.priority_order,
+    };
+  }
+
+  async updateBackupAssignment(
+    organizationId: string,
+    id: string,
+    dto: { isActive?: boolean; priorityOrder?: number },
+  ) {
+    const updates: Record<string, any> = {};
+    if (dto.isActive !== undefined) updates.is_active = dto.isActive;
+    if (dto.priorityOrder !== undefined) updates.priority_order = dto.priorityOrder;
+
+    const { data, error } = await this.supabase
+      .from('staff_backup_assignments')
+      .update(updates)
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
+      .single();
+
+    if (error) throw new Error(`Failed to update backup assignment: ${error.message}`);
+    return {
+      id: data.id,
+      staffId: data.staff_id,
+      groupId: data.group_id,
+      isActive: data.is_active,
+      assignmentType: data.assignment_type,
+      priorityOrder: data.priority_order,
+    };
+  }
+
+  async deleteBackupAssignment(organizationId: string, id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('staff_backup_assignments')
+      .delete()
+      .eq('id', id)
+      .eq('organization_id', organizationId);
+
+    if (error) throw new Error(`Failed to delete backup assignment: ${error.message}`);
   }
 
   // ==================== HELPERS ====================

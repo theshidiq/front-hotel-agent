@@ -53,6 +53,8 @@ import {
   UpdateEarlyShiftPreferenceDto,
   BulkEarlyShiftPreferenceDto,
   UpdatePeriodConfigurationDto,
+  CreateBackupAssignmentDto,
+  UpdateBackupAssignmentDto,
 } from './dto/settings.dto';
 
 @ApiTags('shifts')
@@ -496,5 +498,49 @@ export class ShiftsController {
   @ApiResponse({ status: 200, description: 'Periods regenerated' })
   async regeneratePeriods(@GetUser() user: any) {
     return this.shiftsService.regeneratePeriods(user.organization_id);
+  }
+
+  // ==================== BACKUP ASSIGNMENTS ====================
+
+  @Get('settings/backup-assignments')
+  @ApiOperation({ summary: 'List backup assignments' })
+  @ApiQuery({ name: 'departmentId', required: false })
+  @ApiResponse({ status: 200, description: 'List of backup assignments' })
+  async getBackupAssignments(
+    @GetUser() user: any,
+    @Query('departmentId') departmentId?: string,
+  ) {
+    return this.shiftsService.getBackupAssignments(user.organization_id, departmentId);
+  }
+
+  @Post('settings/backup-assignments')
+  @ApiOperation({ summary: 'Create a backup assignment' })
+  @ApiResponse({ status: 201, description: 'Backup assignment created' })
+  async createBackupAssignment(
+    @GetUser() user: any,
+    @Body() dto: CreateBackupAssignmentDto,
+  ) {
+    return this.shiftsService.createBackupAssignment(user.organization_id, dto);
+  }
+
+  @Patch('settings/backup-assignments/:id')
+  @ApiOperation({ summary: 'Update a backup assignment (toggle active, change priority)' })
+  @ApiParam({ name: 'id', description: 'Backup assignment ID' })
+  @ApiResponse({ status: 200, description: 'Backup assignment updated' })
+  async updateBackupAssignment(
+    @GetUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateBackupAssignmentDto,
+  ) {
+    return this.shiftsService.updateBackupAssignment(user.organization_id, id, dto);
+  }
+
+  @Delete('settings/backup-assignments/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a backup assignment' })
+  @ApiParam({ name: 'id', description: 'Backup assignment ID' })
+  @ApiResponse({ status: 204, description: 'Backup assignment deleted' })
+  async deleteBackupAssignment(@GetUser() user: any, @Param('id') id: string) {
+    return this.shiftsService.deleteBackupAssignment(user.organization_id, id);
   }
 }

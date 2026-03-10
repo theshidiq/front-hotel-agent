@@ -36,9 +36,10 @@
 	import PriorityRulesTab from '$lib/shifts/components/PriorityRulesTab.svelte';
 	import EarlyShiftTab from '$lib/shifts/components/EarlyShiftTab.svelte';
 	import PeriodsTab from '$lib/shifts/components/PeriodsTab.svelte';
+	import BackupCoverageTab from '$lib/shifts/components/BackupCoverageTab.svelte';
 
 	// ── Tab Navigation ──
-	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods';
+	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup';
 	let activeTab: SettingsTab = $state('groups');
 
 	// ── Department State ──
@@ -213,6 +214,7 @@
 	// Tab definitions
 	const tabs = [
 		{ id: 'groups', label: 'グループ', icon: 'group', description: 'スタッフグループ管理' },
+		{ id: 'backup', label: 'バックアップ', icon: 'backup', description: 'バックアップカバレッジ設定' },
 		{ id: 'limits', label: '制限設定', icon: 'tune', description: '日次・月次の人数制限' },
 		{ id: 'priority', label: '優先ルール', icon: 'priority_high', description: 'シフト優先度ルール' },
 		{ id: 'calendar', label: 'カレンダー', icon: 'event_note', description: '祝日・定休日の設定' },
@@ -368,6 +370,13 @@
 								{staffGroups}
 								{allStaff}
 								onGroupsChange={handleGroupsChange}
+								departmentId={activeDepartmentId ?? undefined}
+							/>
+
+						{:else if activeTab === 'backup'}
+							<BackupCoverageTab
+								{allStaff}
+								{staffGroups}
 								departmentId={activeDepartmentId ?? undefined}
 							/>
 

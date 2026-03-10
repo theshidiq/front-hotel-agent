@@ -469,3 +469,37 @@ export class UpdatePeriodConfigurationDto {
   @IsNumber()
   period_length_days?: number;
 }
+
+// ==================== BACKUP ASSIGNMENTS ====================
+
+export class CreateBackupAssignmentDto {
+  @ApiProperty({ description: 'Staff ID of the backup staff member' })
+  @IsString()
+  staffId: string;
+
+  @ApiProperty({ description: 'Staff group ID the backup staff covers' })
+  @IsString()
+  groupId: string;
+
+  @ApiPropertyOptional({ description: 'Assignment type (e.g. coverage)', example: 'coverage' })
+  @IsOptional()
+  @IsString()
+  assignmentType?: string;
+
+  @ApiPropertyOptional({ description: 'Priority order for multiple backups covering the same group' })
+  @IsOptional()
+  @IsNumber()
+  priorityOrder?: number;
+}
+
+export class UpdateBackupAssignmentDto {
+  @ApiPropertyOptional({ description: 'Whether the assignment is active' })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({ description: 'Priority order' })
+  @IsOptional()
+  @IsNumber()
+  priorityOrder?: number;
+}

@@ -8,7 +8,8 @@ import type {
 	MonthlyLimits,
 	ORToolsSolverConfig,
 	ScheduleResponse,
-	OptimizeResponse
+	OptimizeResponse,
+	BackupAssignment
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
@@ -1063,4 +1064,51 @@ export async function regeneratePeriods(): Promise<SchedulePeriod[]> {
 		headers: authHeaders()
 	});
 	return handleResponse(response);
+}
+
+// ==================== BACKUP ASSIGNMENTS ====================
+
+export async function getBackupAssignments(departmentId?: string): Promise<BackupAssignment[]> {
+	const params = departmentId ? `?departmentId=${departmentId}` : '';
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments${params}`, {
+		headers: authHeaders()
+	});
+	return handleResponse(response);
+}
+
+export async function createBackupAssignment(data: {
+	staffId: string;
+	groupId: string;
+	assignmentType?: string;
+	priorityOrder?: number;
+}): Promise<BackupAssignment> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function updateBackupAssignment(
+	id: string,
+	data: { isActive?: boolean; priorityOrder?: number }
+): Promise<BackupAssignment> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments/${id}`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function deleteBackupAssignment(id: string): Promise<void> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders()
+	});
+	if (!response.ok && response.status !== 204) {
+		const err = await response.json().catch(() => ({ message: 'Delete failed' }));
+		throw new Error(err.message);
+	}
 }

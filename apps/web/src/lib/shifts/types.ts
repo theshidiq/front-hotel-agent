@@ -184,6 +184,16 @@ export interface ScheduleResponse {
 	staff: ScheduleStaff[];
 }
 
+// Backup assignment
+export interface BackupAssignment {
+	id: string;
+	staffId: string;
+	groupId: string;
+	isActive: boolean;
+	assignmentType?: string;
+	priorityOrder?: number;
+}
+
 // Optimization response
 export interface OptimizeResponse {
 	success: boolean;
