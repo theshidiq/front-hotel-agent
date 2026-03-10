@@ -2570,12 +2570,14 @@ class ShiftScheduleOptimizer:
             if staff_id in self.backup_staff_ids:
                 continue
 
+            staff_vacation = self.staff_unavailable_dates.get(staff_id, set())
+
             for i in range(len(self.date_range) - 1):
                 date1 = self.date_range[i]
                 date2 = self.date_range[i + 1]
 
-                date1_is_calendar = date1 in self.calendar_off_dates
-                date2_is_calendar = date2 in self.calendar_off_dates
+                date1_is_calendar = date1 in self.calendar_off_dates or date1 in staff_vacation
+                date2_is_calendar = date2 in self.calendar_off_dates or date2 in staff_vacation
 
                 # Check if dates are pre-filled (and what type)
                 date1_prefilled_symbol = prefilled_symbols.get((staff_id, date1))
