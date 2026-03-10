@@ -636,6 +636,7 @@ export class ShiftsService {
         staff_order: s.staff_order,
         ...(s.start_period && { start_period: s.start_period }),
         ...(s.end_period && { end_period: s.end_period }),
+        ...((s as any).metadata && { metadata: (s as any).metadata }),
       })),
       dateRange,
       constraints: {

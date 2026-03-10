@@ -341,6 +341,7 @@ export interface UpdateShiftStaffData {
 	is_active?: boolean;
 	start_period?: { year: number; month: number; day: number };
 	end_period?: { year: number; month: number; day: number };
+	metadata?: Record<string, unknown>;
 }
 
 export async function updateShiftStaff(id: string, data: UpdateShiftStaffData): Promise<ScheduleStaff> {

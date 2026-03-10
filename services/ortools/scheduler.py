@@ -1125,13 +1125,35 @@ class ShiftScheduleOptimizer:
             staff_name = staff.get('name', staff_id)
             staff_status = staff.get('status', '社員')  # Default to 社員 if not set
 
-            # Skip if no restriction for this status
-            if staff_status not in effective_restrictions:
-                continue
+            # Per-staff capability override via metadata.capabilities
+            meta_caps = (staff.get('metadata') or {}).get('capabilities', {})
+            can_early_override = meta_caps.get('canDoEarlyShifts')  # True/False/None
+            can_late_override = meta_caps.get('canDoLateShifts')    # True/False/None
 
-            restriction = effective_restrictions[staff_status]
-            forbidden_shifts = restriction.get('forbiddenShifts', [])
+            # Build per-staff forbidden shifts, starting from status defaults
+            if staff_status in effective_restrictions:
+                base_forbidden = list(effective_restrictions[staff_status].get('forbiddenShifts', []))
+            else:
+                base_forbidden = []
 
+            # Apply capability overrides
+            if can_early_override is True and 'early' in base_forbidden:
+                base_forbidden.remove('early')
+                logger.info(f"[OR-TOOLS] 🔓 {staff_name}: capability override → canDoEarlyShifts=True (early removed from forbidden)")
+            elif can_early_override is False and 'early' not in base_forbidden:
+                base_forbidden.append('early')
+                logger.info(f"[OR-TOOLS] 🔒 {staff_name}: capability override → canDoEarlyShifts=False (early added to forbidden)")
+
+            if can_late_override is True and 'late' in base_forbidden:
+                base_forbidden.remove('late')
+                logger.info(f"[OR-TOOLS] 🔓 {staff_name}: capability override → canDoLateShifts=True (late removed from forbidden)")
+            elif can_late_override is False and 'late' not in base_forbidden:
+                base_forbidden.append('late')
+                logger.info(f"[OR-TOOLS] 🔒 {staff_name}: capability override → canDoLateShifts=False (late added to forbidden)")
+
+            forbidden_shifts = base_forbidden
+
+            # Skip if no restrictions apply
             if not forbidden_shifts:
                 continue
 

@@ -37,9 +37,10 @@
 	import EarlyShiftTab from '$lib/shifts/components/EarlyShiftTab.svelte';
 	import PeriodsTab from '$lib/shifts/components/PeriodsTab.svelte';
 	import BackupCoverageTab from '$lib/shifts/components/BackupCoverageTab.svelte';
+	import ShiftCapabilitiesTab from '$lib/shifts/components/ShiftCapabilitiesTab.svelte';
 
 	// ── Tab Navigation ──
-	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup';
+	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup' | 'capabilities';
 	let activeTab: SettingsTab = $state('groups');
 
 	// ── Department State ──
@@ -202,6 +203,10 @@
 		earlyShiftPreferences = await getEarlyShiftPreferences(activeDepartmentId ?? undefined);
 	}
 
+	async function handleStaffChange() {
+		allStaff = (await getShiftStaff(activeDepartmentId ?? undefined)).map(s => ({ ...s, staff_status: s.status }));
+	}
+
 	async function handlePeriodsSave() {
 		const [config, list] = await Promise.all([
 			getPeriodConfiguration(),
@@ -215,6 +220,7 @@
 	const tabs = [
 		{ id: 'groups', label: 'グループ', icon: 'group', description: 'スタッフグループ管理' },
 		{ id: 'backup', label: 'バックアップ', icon: 'backup', description: 'バックアップカバレッジ設定' },
+		{ id: 'capabilities', label: 'シフト能力', icon: 'accessibility', description: '早番・遅番の可否設定' },
 		{ id: 'limits', label: '制限設定', icon: 'tune', description: '日次・月次の人数制限' },
 		{ id: 'priority', label: '優先ルール', icon: 'priority_high', description: 'シフト優先度ルール' },
 		{ id: 'calendar', label: 'カレンダー', icon: 'event_note', description: '祝日・定休日の設定' },
@@ -377,6 +383,13 @@
 							<BackupCoverageTab
 								{allStaff}
 								{staffGroups}
+								departmentId={activeDepartmentId ?? undefined}
+							/>
+
+						{:else if activeTab === 'capabilities'}
+							<ShiftCapabilitiesTab
+								{allStaff}
+								onStaffChange={handleStaffChange}
 								departmentId={activeDepartmentId ?? undefined}
 							/>
 
