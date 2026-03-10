@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ScanService } from './scan.service';
 import { CreateScanDto } from './dto/create-scan.dto';
 import { ScanExtractResponse, ScanResultResponse, ScanSessionResponse } from './dto/scan-response.dto';
@@ -13,6 +13,7 @@ export class ScanController {
   constructor(private readonly scanService: ScanService) {}
 
   @Post()
+  @UseGuards(ThrottlerGuard)
   @Throttle({ scan: { ttl: 60000, limit: 10 } })
   @RequirePermission('products.scan')
   @ApiOperation({
@@ -25,6 +26,7 @@ export class ScanController {
   }
 
   @Post('extract')
+  @UseGuards(ThrottlerGuard)
   @Throttle({ scan: { ttl: 60000, limit: 10 } })
   @RequirePermission('products.scan')
   @ApiOperation({
