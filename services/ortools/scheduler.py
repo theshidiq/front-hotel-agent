@@ -1124,12 +1124,15 @@ class ShiftScheduleOptimizer:
                     self.backup_unavailable_slots[(backup_staff_id, date)] = ('holiday', None)
                 else:
                     # ═══════════════════════════════════════════════════════════════════════════
-                    # NON-HOLIDAY: Backup MUST WORK — HARD constraint prevents OFF assignment
-                    # Backup staff work every day unless it's a Japanese holiday.
-                    # On coverage days (any_member_off=1): Constraint A already forces WORK.
-                    # On non-coverage days (any_member_off=0): force OFF=0 so solver assigns WORK.
+                    # NON-HOLIDAY: SOFT penalty for backup taking OFF when not on holiday.
+                    # backup_off_var is already a BoolVar (1=off, 0=work).
+                    # Adding it directly to violation_vars penalizes each OFF day taken.
                     # ═══════════════════════════════════════════════════════════════════════════
-                    self.model.Add(backup_off_var == 0)
+                    self.violation_vars.append((
+                        backup_off_var,
+                        self.PENALTY_WEIGHTS['backup_coverage'],
+                        f'Backup {backup_name} has day off (not on holiday) on {date}'
+                    ))
                     constraint_count += 1
                     # Track for solution extraction (any_member_off determines if coverage needed)
                     self.backup_unavailable_slots[(backup_staff_id, date)] = ('coverage', any_member_off)
