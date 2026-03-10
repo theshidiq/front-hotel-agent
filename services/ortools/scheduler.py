@@ -92,9 +92,10 @@ class ShiftScheduleOptimizer:
         self.staff_members = []
         self.date_range = []
         self.constraints_config = {}
-        self.calendar_off_dates = set()  # Track must_day_off dates
+        self.calendar_off_dates = set()  # Track must_day_off dates (org-wide)
         self.calendar_work_dates = set()  # Track must_work dates (for skipping priority rules)
         self.required_off_cells = set()  # Track (staff_id, date) pairs forced off by required_off rules
+        self.staff_unavailable_dates: dict = {}  # Track per-staff vacation dates: staff_id -> set of date strings
         self.post_period_dates = set()  # Track post-period dates (days after long closures)
         self.prefilled_cells = set()  # Track pre-filled cells (staff_id, date) for reference
         self.prefilled_star_equiv_by_staff = {}  # Track ★ symbols per staff for monthly limits (★ is WORK but counts as off-equivalent)
@@ -204,6 +205,7 @@ class ShiftScheduleOptimizer:
         self.constraints_config = constraints
         self.calendar_off_dates = set()
         self.required_off_cells = set()  # Reset required_off cells tracking
+        self.staff_unavailable_dates = {}  # Reset per-staff vacation dates
         self.prefilled_cells = set()  # Reset pre-filled cells tracking
         self.prefilled_star_equiv_by_staff = {}  # Reset star equivalent tracking
         self.backup_unavailable_slots = {}  # Reset backup unavailable slots tracking
@@ -760,9 +762,12 @@ class ShiftScheduleOptimizer:
                 off_var = self.shifts[(staff_id, date_str, self.SHIFT_OFF)]
                 self.model.Add(off_var == 1)
 
-                # Track so prefilled + monthly limit logic treats it as a required-off day
+                # Track as required-off (excludes from daily max-off limit)
                 self.required_off_cells.add((staff_id, date_str))
-                self.calendar_off_dates.add(date_str)
+                # Track per-staff (NOT in calendar_off_dates — that is org-wide)
+                if staff_id not in self.staff_unavailable_dates:
+                    self.staff_unavailable_dates[staff_id] = set()
+                self.staff_unavailable_dates[staff_id].add(date_str)
 
                 constraint_count += 1
 
@@ -2214,10 +2219,12 @@ class ShiftScheduleOptimizer:
             staff_max_off = int(math.ceil(float(staff_max_off_raw))) if staff_max_off_raw is not None else 999
 
             # Calculate flexible dates based on this staff's calendar exclusion setting
+            # Also exclude per-staff vacation dates (staff_unavailable_dates) from the quota pool
+            staff_vacation_dates = self.staff_unavailable_dates.get(staff_id, set())
             if staff_exclude_calendar:
-                staff_flexible_dates = [d for d in self.date_range if d not in self.calendar_off_dates]
+                staff_flexible_dates = [d for d in self.date_range if d not in self.calendar_off_dates and d not in staff_vacation_dates]
             else:
-                staff_flexible_dates = list(self.date_range)
+                staff_flexible_dates = [d for d in self.date_range if d not in staff_vacation_dates]
 
             # Sanity check: can't require more off days than available dates
             staff_min_off = min(staff_min_off, len(staff_flexible_dates))
@@ -2363,7 +2370,7 @@ class ShiftScheduleOptimizer:
                 # off × 2 + early × 1 + prefilled_star × 2
                 # IMPORTANT: Only include dates where staff is employed (before end_period) AND shift var exists
                 # Use staff-specific flexible_dates based on their exclude_calendar setting
-                staff_flex_dates = [d for d in self.date_range if d not in self.calendar_off_dates and d not in work_locked_dates and self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
+                staff_flex_dates = [d for d in self.date_range if d not in self.calendar_off_dates and d not in work_locked_dates and d not in staff_vacation_dates and self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
                 off_vars = [self.shifts[(staff_id, date, self.SHIFT_OFF)] for date in staff_flex_dates]
                 early_vars = [self.shifts[(staff_id, date, self.SHIFT_EARLY)] for date in staff_flex_dates]
 
@@ -2411,7 +2418,7 @@ class ShiftScheduleOptimizer:
                 # Count combined off-equivalent for all dates (including calendar off dates)
                 # off × 2 + early × 1 + prefilled_star × 2
                 # IMPORTANT: Only include dates where staff is employed (before end_period) AND shift var exists
-                staff_all_dates = [d for d in self.date_range if d not in work_locked_dates and self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
+                staff_all_dates = [d for d in self.date_range if d not in work_locked_dates and d not in staff_vacation_dates and self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
                 off_vars = [self.shifts[(staff_id, date, self.SHIFT_OFF)] for date in staff_all_dates]
                 early_vars = [self.shifts[(staff_id, date, self.SHIFT_EARLY)] for date in staff_all_dates]
 
