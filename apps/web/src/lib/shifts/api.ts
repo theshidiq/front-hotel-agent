@@ -116,9 +116,10 @@ class PrefetchManager {
 
 		try {
 			// Sort periods by start_date descending (most recent first)
-			const sortedPeriods = [...periods].sort((a, b) =>
-				b.start_date.localeCompare(a.start_date)
-			);
+			// Only prefetch the 3 most recent periods — users rarely navigate to old ones
+			const sortedPeriods = [...periods]
+				.sort((a, b) => b.start_date.localeCompare(a.start_date))
+				.slice(0, 3);
 
 			// Prefetch in batches of 3 for network efficiency
 			const batchSize = 3;
