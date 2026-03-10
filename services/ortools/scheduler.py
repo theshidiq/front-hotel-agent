@@ -1775,9 +1775,9 @@ class ShiftScheduleOptimizer:
                     continue  # Skip SOFT rules - they don't guarantee shifts
 
             # Count preferred_shift and required_off rules that force shifts
-            # avoided_shift and blocked rules force shift=0, not counted toward off-equivalent
-            # If no ruleType specified but has shiftType, assume it's a preferred shift rule
-            if rule_type in ['avoided_shift', 'blocked']:
+            # avoided_shift / avoid_shift / blocked rules prevent shifts, not counted toward off-equivalent
+            # avoid_shift with shiftType=off means "must work" — but does NOT consume off budget
+            if rule_type in ['avoided_shift', 'blocked', 'avoid_shift', 'avoid_shift_with_exceptions']:
                 continue  # These don't force off/early, they prevent shifts
 
             # Extract staff IDs using helper methods
@@ -2147,12 +2147,10 @@ class ShiftScheduleOptimizer:
             is_backup = staff_id in self.backup_staff_ids
 
             if is_backup:
-                # Apply relaxed limits for backup staff (1.5x normal max)
-                backup_max_off = int(staff_max_off * 1.5)
-                backup_min_off = 0
-                staff_max_scaled = backup_max_off * 2
-                staff_min_scaled = backup_min_off * 2
-                logger.info(f"  🛡️ Backup staff {staff_name}: relaxed limits min={backup_min_off}, max={backup_max_off} (1.5x normal)")
+                # Backup staff are fully exempt from monthly limits.
+                # Their schedule is driven by coverage constraints, not off-day quotas.
+                logger.info(f"  🛡️ Backup staff {staff_name}: SKIPPING monthly limits (fully exempt)")
+                continue
 
             # ═══════════════════════════════════════════════════════════════════════════
             # PRORATE MONTHLY LIMITS FOR STAFF WITH start_period OR end_period
@@ -2224,12 +2222,58 @@ class ShiftScheduleOptimizer:
                 logger.info(f"  📋 {staff_name}: priority rules force {priority_consumed/2:.1f} off-equiv (will count in combined total)")
                 logger.info(f"      → Monthly limit: max={staff_max_scaled/2:.1f}, min={staff_min_scaled/2:.1f} (includes priority shifts)")
 
+            # ───────────────────────────────────────────────────────────────────────
+            # Build work-locked set: dates where HARD avoid_shift+off rules force
+            # the staff to work (e.g. haken rule: no off on Sundays).
+            # These dates are excluded from the monthly off-count so that any
+            # 5-day-rest-forced off on a locked day doesn't count against the quota.
+            # ───────────────────────────────────────────────────────────────────────
+            work_locked_dates = set()
+            _pr_list = self.constraints_config.get('priorityRules', [])
+            if isinstance(_pr_list, list):
+                _day_idx2 = {0:'sunday',1:'monday',2:'tuesday',3:'wednesday',
+                             4:'thursday',5:'friday',6:'saturday'}
+                for _rule in _pr_list:
+                    if not _rule.get('isActive', True):
+                        continue
+                    _rt = _rule.get('ruleType', '')
+                    # Only plain avoid_shift (no exceptions) truly locks the day to work.
+                    # avoid_shift_with_exceptions allows alternatives (e.g. early △) so
+                    # those days are NOT fully locked — don't exclude them from the count.
+                    if _rt != 'avoid_shift':
+                        continue
+                    _ih = (_rule.get('isHardConstraint', False) or
+                           _rule.get('constraints', {}).get('isHardConstraint', False))
+                    if not _ih:
+                        continue
+                    _st = (_rule.get('shiftType', '') or
+                           _rule.get('preferences', {}).get('shiftType', '') or '').lower()
+                    if _st != 'off':
+                        continue  # only "avoid off" rules lock days to work
+                    _rsid = self._extract_staff_id_from_rule(_rule)
+                    _rsids = self._extract_staff_ids_from_rule(_rule)
+                    if _rsid != staff_id and staff_id not in _rsids:
+                        continue
+                    _rdays = (_rule.get('daysOfWeek', []) or
+                              _rule.get('preferences', {}).get('daysOfWeek', []))
+                    _tdays = set()
+                    for _d in _rdays:
+                        if isinstance(_d, int) and _d in _day_idx2:
+                            _tdays.add(_day_idx2[_d])
+                        elif isinstance(_d, str):
+                            _tdays.add(_d.lower())
+                    for _date in self.date_range:
+                        if self._get_day_of_week(_date) in _tdays:
+                            work_locked_dates.add(_date)
+            if work_locked_dates:
+                logger.info(f"  🔒 {staff_name}: excluding {len(work_locked_dates)} work-locked date(s) from monthly off count")
+
             if staff_exclude_calendar:
                 # Count combined off-equivalent for flexible dates (excluding calendar)
                 # off × 2 + early × 1 + prefilled_star × 2
                 # IMPORTANT: Only include dates where staff is employed (before end_period) AND shift var exists
                 # Use staff-specific flexible_dates based on their exclude_calendar setting
-                staff_flex_dates = [d for d in self.date_range if d not in self.calendar_off_dates and self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
+                staff_flex_dates = [d for d in self.date_range if d not in self.calendar_off_dates and d not in work_locked_dates and self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
                 off_vars = [self.shifts[(staff_id, date, self.SHIFT_OFF)] for date in staff_flex_dates]
                 early_vars = [self.shifts[(staff_id, date, self.SHIFT_EARLY)] for date in staff_flex_dates]
 
@@ -2277,7 +2321,7 @@ class ShiftScheduleOptimizer:
                 # Count combined off-equivalent for all dates (including calendar off dates)
                 # off × 2 + early × 1 + prefilled_star × 2
                 # IMPORTANT: Only include dates where staff is employed (before end_period) AND shift var exists
-                staff_all_dates = [d for d in self.date_range if self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
+                staff_all_dates = [d for d in self.date_range if d not in work_locked_dates and self._staff_works_on_date(staff_id, d) and self._has_shift_var(staff_id, d)]
                 off_vars = [self.shifts[(staff_id, date, self.SHIFT_OFF)] for date in staff_all_dates]
                 early_vars = [self.shifts[(staff_id, date, self.SHIFT_EARLY)] for date in staff_all_dates]
 
@@ -3075,7 +3119,7 @@ class ShiftScheduleOptimizer:
                                 with open('/tmp/priority_rule_debug.log', 'a') as f:
                                     f.write(f"[DEBUG] Added exception preference: staff={target_staff_id}, date={date}, shift={allowed_shift_name}({allowed_shift_type}), weight={exception_weight}\n")
 
-                    elif rule_type in ['avoided_shift', 'blocked']:
+                    elif rule_type in ['avoided_shift', 'blocked', 'avoid_shift']:
                         if is_hard:
                             # FIX: Convert HARD to HIGH-PENALTY SOFT to prevent INFEASIBLE
                             rule_name = rule.get('name', 'unnamed')
@@ -3259,8 +3303,10 @@ class ShiftScheduleOptimizer:
                 monthly_min = self.constraints_config.get('monthly_limits', {}).get('min_days_off_per_month', 4)
                 monthly_max = self.constraints_config.get('monthly_limits', {}).get('max_days_off_per_month', 10)
 
-                # Target: push toward maximum day-offs (staff should get as much rest as possible)
-                target_dayoffs = monthly_max  # e.g., 10 if max=10
+                # Target: only ensure MINIMUM day-offs are reachable on free days.
+                # Using monthly_max caused false violations when other constraints prevented reaching it.
+                # monthly_min is the actual labor requirement; max is aspirational and creates noise.
+                target_dayoffs = min(monthly_min, len(non_applicable_dates))  # can't exceed available free days
 
                 # Use SOFT constraint to encourage minimum day-offs on free days
                 # Rather than preferring ALL days, just ensure minimum is met

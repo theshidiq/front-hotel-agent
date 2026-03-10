@@ -25,6 +25,7 @@
 	import ScheduleSkeleton from "$lib/shifts/components/ScheduleSkeleton.svelte";
 	import TableSkeleton from "$lib/shifts/components/TableSkeleton.svelte";
 	import OptimizeOverlay from "$lib/shifts/components/OptimizeOverlay.svelte";
+	import ViolationsPanel from "$lib/shifts/components/ViolationsPanel.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import { printSchedule } from "$lib/shifts/printSchedule";
 
@@ -101,6 +102,12 @@
 	let optimizing = $state(false);
 	let clearing = $state(false);
 	let optimizerHealthy = $state(false);
+
+	// ── Violations State ──
+	let optimizeViolations = $state<Array<{ description: string; count: number; penalty: number }>>([]);
+	let showViolations = $state(false);
+	let lastSolveTime = $state<number | undefined>(undefined);
+	let lastIsOptimal = $state<boolean | undefined>(undefined);
 
 
 	// ── Optimize Progress Overlay ──
@@ -643,7 +650,19 @@
 					}
 				}
 				await bulkUpdateCells(selectedPeriodId, updates, activeDepartmentId ?? undefined);
-				showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒)`);
+
+				// Show violations if any
+				lastSolveTime = result.solve_time;
+				lastIsOptimal = result.is_optimal;
+				if (result.violations && result.violations.length > 0) {
+					optimizeViolations = result.violations;
+					showViolations = true;
+					showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒) — ${result.violations.length}件の制約違反`);
+				} else {
+					optimizeViolations = [];
+					showViolations = false;
+					showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒)`);
+				}
 			} else {
 				stopOptimizeProgress();
 				error = result.error || "Optimization failed";
@@ -819,6 +838,16 @@
 						<span class="text-green-700">{successMessage}</span>
 					</div>
 				</div>
+			{/if}
+
+			<!-- Violations Panel -->
+			{#if showViolations && optimizeViolations.length > 0}
+				<ViolationsPanel
+					violations={optimizeViolations}
+					solveTime={lastSolveTime}
+					isOptimal={lastIsOptimal}
+					onClose={() => (showViolations = false)}
+				/>
 			{/if}
 
 			<!-- Main Content -->

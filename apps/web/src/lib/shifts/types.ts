@@ -191,8 +191,8 @@ export interface OptimizeResponse {
 	solve_time?: number;
 	is_optimal?: boolean;
 	violations?: Array<{
-		type: string;
 		description: string;
+		count: number;
 		penalty: number;
 	}>;
 	error?: string;
