@@ -65,10 +65,6 @@ export class OptimizeRequestDto {
   @IsBoolean()
   preservePrefilled?: boolean;
 
-  @ApiPropertyOptional({ description: 'Dry-run mode: run solver but do not save results to DB' })
-  @IsOptional()
-  @IsBoolean()
-  dryRun?: boolean;
 }
 
 export class ScheduleResponseDto {

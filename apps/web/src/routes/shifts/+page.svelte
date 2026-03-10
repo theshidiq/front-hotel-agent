@@ -26,8 +26,7 @@
 	import TableSkeleton from "$lib/shifts/components/TableSkeleton.svelte";
 	import OptimizeOverlay from "$lib/shifts/components/OptimizeOverlay.svelte";
 	import ViolationsPanel from "$lib/shifts/components/ViolationsPanel.svelte";
-	import SchedulePreviewModal from "$lib/shifts/components/SchedulePreviewModal.svelte";
-	import Sidebar from "$lib/components/Sidebar.svelte";
+import Sidebar from "$lib/components/Sidebar.svelte";
 	import { printSchedule } from "$lib/shifts/printSchedule";
 
 	// ── Sidebar State ──
@@ -109,11 +108,7 @@
 	let showPartialDialog = $state(false);
 	let partialResult = $state<{ schedule: Record<string, Record<string, string>>; solve_time?: number; violations: Array<{ description: string; count: number; penalty: number }> } | null>(null);
 
-	// ── Dry-Run Preview Modal ──
-	let showPreviewModal = $state(false);
-	let previewResult = $state<{ schedule: Record<string, Record<string, string>>; solve_time?: number; violations: Array<{ description: string; count: number; penalty: number }> } | null>(null);
-
-	// ── Violations State ──
+// ── Violations State ──
 	let optimizeViolations = $state<Array<{ description: string; count: number; penalty: number }>>([]);
 	let showViolations = $state(false);
 	let lastSolveTime = $state<number | undefined>(undefined);
@@ -701,86 +696,7 @@
 		_optimizeAbortController?.abort();
 	}
 
-	async function handlePreview() {
-		if (!selectedPeriodId || !optimizerHealthy) return;
-
-		_optimizeAbortController = new AbortController();
-
-		try {
-			optimizing = true;
-			error = '';
-			startOptimizeProgress();
-
-			const result = await optimizeSchedule({
-				periodId: selectedPeriodId,
-				departmentId: activeDepartmentId ?? undefined,
-				timeout: 30,
-				preservePrefilled: true,
-				dryRun: true,
-				signal: _optimizeAbortController.signal,
-			});
-
-			stopOptimizeProgress();
-
-			if (result.success && result.schedule) {
-				const userViolations = (result.violations ?? []).filter(
-					(v: { description: string }) => !(v.description.startsWith('Backup ') && v.description.includes('has day off (not on holiday)'))
-				);
-				previewResult = {
-					schedule: result.schedule,
-					solve_time: result.solve_time,
-					violations: userViolations,
-				};
-				showPreviewModal = true;
-			} else {
-				error = result.error || 'Preview failed';
-			}
-		} catch (e) {
-			stopOptimizeProgress();
-			if (e instanceof Error && e.name === 'AbortError') {
-				showSuccess('プレビューをキャンセルしました');
-			} else {
-				error = e instanceof Error ? e.message : 'Preview failed';
-			}
-		} finally {
-			optimizing = false;
-			_optimizeAbortController = null;
-		}
-	}
-
-	async function handleCommitPreview() {
-		if (!previewResult) return;
-		showPreviewModal = false;
-		try {
-			optimizing = true;
-			finishOptimizeProgress();
-			await _commitSchedule(previewResult.schedule);
-			lastSolveTime = previewResult.solve_time;
-			lastIsOptimal = true;
-			if (previewResult.violations.length > 0) {
-				optimizeViolations = previewResult.violations;
-				showViolations = true;
-				showSuccess(`最適化完了 (${previewResult.solve_time?.toFixed(2)}秒) — ${previewResult.violations.length}件の制約違反`);
-			} else {
-				optimizeViolations = [];
-				showViolations = false;
-				showSuccess(`最適化完了 (${previewResult.solve_time?.toFixed(2)}秒)`);
-			}
-		} catch (e) {
-			stopOptimizeProgress();
-			error = e instanceof Error ? e.message : 'Save failed';
-		} finally {
-			optimizing = false;
-			previewResult = null;
-		}
-	}
-
-	function handleDiscardPreview() {
-		showPreviewModal = false;
-		previewResult = null;
-	}
-
-	async function _commitSchedule(schedule: Record<string, Record<string, string>>) {
+async function _commitSchedule(schedule: Record<string, Record<string, string>>) {
 		if (!selectedPeriodId) return;
 		scheduleData = schedule;
 		const updates: CellUpdate[] = [];
@@ -1002,20 +918,7 @@
 				/>
 			{/if}
 
-			<!-- Dry-Run Preview Modal -->
-			{#if showPreviewModal && previewResult}
-				<SchedulePreviewModal
-					schedule={previewResult.schedule}
-					violations={previewResult.violations}
-					{staff}
-					{dateRange}
-					solveTime={previewResult.solve_time}
-					onCommit={handleCommitPreview}
-					onDiscard={handleDiscardPreview}
-				/>
-			{/if}
-
-			<!-- Partial Result Dialog -->
+<!-- Partial Result Dialog -->
 			{#if showPartialDialog && partialResult}
 				<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
 					<div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 flex flex-col gap-4">
@@ -1154,18 +1057,7 @@
 							自動最適化
 						</button>
 
-						<!-- Preview Button -->
-						<button
-							class="px-4 py-2 text-blue-700 border border-blue-300 bg-blue-50 rounded-lg hover:bg-blue-100 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
-							onclick={handlePreview}
-							disabled={optimizing || clearing || !optimizerHealthy}
-							title="保存前にプレビュー"
-						>
-							<span class="material-symbols-rounded text-sm shrink-0">preview</span>
-							プレビュー
-						</button>
-
-						<!-- Clear Button -->
+<!-- Clear Button -->
 						<button
 							class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-300 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
 							onclick={handleClear}
