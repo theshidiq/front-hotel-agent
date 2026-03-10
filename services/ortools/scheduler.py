@@ -292,6 +292,7 @@ class ShiftScheduleOptimizer:
             # 2. Add all constraints (order matches original phases)
             self._add_basic_constraints()                    # One shift per staff per day
             self._add_calendar_rules()                       # PRE-PHASE + Phase 3 Integration
+            self._add_staff_unavailability_constraints()     # PRE-PHASE: Per-staff date-specific OFF (vacation/PTO)
             self._add_required_off_constraints()             # PRE-PHASE: required_off priority rules as HARD constraints (MUST be before prefilled)
             self._add_prefilled_constraints()                # PRE-PHASE: Lock user-edited cells as HARD constraints (skips required_off cells)
             self._add_backup_staff_constraints()             # Backup staff can never have off days
@@ -711,6 +712,61 @@ class ShiftScheduleOptimizer:
         self._japanese_holidays_cache = set()
         self._japanese_holidays_names = {}
         return self._japanese_holidays_cache
+
+    def _add_staff_unavailability_constraints(self):
+        """
+        PRE-PHASE: Apply per-staff date-specific unavailability as HARD OFF constraints.
+
+        Data format from constraints_config:
+          staffUnavailability: [
+            { staffId, date, reason? },
+            ...
+          ]
+
+        Each entry forces the specific staff member to be OFF on that date.
+        Also tracks these dates in self.required_off_cells so prefilled constraints
+        and monthly limit counts exclude them correctly.
+        """
+        unavailability = self.constraints_config.get('staffUnavailability', [])
+        if not unavailability:
+            return
+
+        logger.info(f"[OR-TOOLS] 🏖️ Processing {len(unavailability)} staff unavailability entries...")
+
+        # Build lookup: staff_id → set of dates
+        unavail_map: dict = {}
+        for entry in unavailability:
+            staff_id = entry.get('staffId') or entry.get('staff_id')
+            date_str = entry.get('date')
+            if not staff_id or not date_str:
+                continue
+            if staff_id not in unavail_map:
+                unavail_map[staff_id] = set()
+            unavail_map[staff_id].add(date_str)
+
+        constraint_count = 0
+        skipped_count = 0
+
+        for staff_id, dates in unavail_map.items():
+            for date_str in dates:
+                if date_str not in self.date_range:
+                    skipped_count += 1
+                    continue
+                if not self._has_shift_var(staff_id, date_str):
+                    skipped_count += 1
+                    continue
+
+                # HARD constraint: force OFF
+                off_var = self.shifts[(staff_id, date_str, self.SHIFT_OFF)]
+                self.model.Add(off_var == 1)
+
+                # Track so prefilled + monthly limit logic treats it as a required-off day
+                self.required_off_cells.add((staff_id, date_str))
+                self.calendar_off_dates.add(date_str)
+
+                constraint_count += 1
+
+        logger.info(f"[OR-TOOLS] 🏖️ Staff unavailability: {constraint_count} HARD OFF constraints added, {skipped_count} skipped (out of range)")
 
     def _add_required_off_constraints(self):
         """

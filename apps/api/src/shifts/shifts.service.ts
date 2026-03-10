@@ -475,6 +475,7 @@ export class ShiftsService {
       priorityRules,
       earlyShiftPreferences,
       backupAssignments,
+      staffUnavailability,
     ] = await Promise.all([
       this.getCalendarRules(organizationId),
       this.getDailyLimits(organizationId, deptId),
@@ -484,6 +485,7 @@ export class ShiftsService {
       this.getPriorityRules(organizationId, deptId),
       this.getEarlyShiftPreferences(organizationId, deptId),
       this.getBackupAssignments(organizationId, deptId, true), // active-only for solver
+      this.getStaffUnavailability(organizationId),
     ]);
 
     // Staff groups: members stored in group_config.members JSONB
@@ -648,6 +650,7 @@ export class ShiftsService {
         ...(normalizedPriorityRules.length && { priorityRules: normalizedPriorityRules }),
         ...(Object.keys(earlyShiftPrefsDict).length && { earlyShiftPreferences: earlyShiftPrefsDict }),
         ...(backupAssignments.length && { backupAssignments }),
+        ...(staffUnavailability.length && { staffUnavailability }),
         ...(Object.keys(baseScheduleData).length && {
           prefilledSchedule: baseScheduleData,
         }),
@@ -1902,6 +1905,95 @@ export class ShiftsService {
       .eq('organization_id', organizationId);
 
     if (error) throw new Error(`Failed to delete backup assignment: ${error.message}`);
+  }
+
+  // ==================== STAFF UNAVAILABILITY ====================
+
+  async getStaffUnavailability(
+    organizationId: string,
+    staffId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<Array<{ id: string; staffId: string; date: string; reason?: string; createdAt: string }>> {
+    let query = this.supabase
+      .from('staff_unavailability')
+      .select('id, staff_id, date, reason, created_at')
+      .eq('organization_id', organizationId)
+      .order('date', { ascending: true });
+
+    if (staffId) query = query.eq('staff_id', staffId);
+    if (startDate) query = query.gte('date', startDate);
+    if (endDate) query = query.lte('date', endDate);
+
+    const { data, error } = await query;
+    if (error) {
+      this.logger.warn('Failed to fetch staff unavailability', error);
+      return [];
+    }
+    return (data ?? []).map((r: any) => ({
+      id: r.id,
+      staffId: r.staff_id,
+      date: r.date,
+      reason: r.reason,
+      createdAt: r.created_at,
+    }));
+  }
+
+  async createStaffUnavailability(
+    organizationId: string,
+    dto: { staffId: string; date: string; reason?: string },
+  ) {
+    const { data, error } = await this.supabase
+      .from('staff_unavailability')
+      .upsert(
+        {
+          organization_id: organizationId,
+          staff_id: dto.staffId,
+          date: dto.date,
+          reason: dto.reason ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'organization_id,staff_id,date' },
+      )
+      .select('id, staff_id, date, reason, created_at')
+      .single();
+
+    if (error) throw new Error(`Failed to create unavailability: ${error.message}`);
+    return { id: data.id, staffId: data.staff_id, date: data.date, reason: data.reason, createdAt: data.created_at };
+  }
+
+  async bulkCreateStaffUnavailability(
+    organizationId: string,
+    dto: { staffId: string; dates: string[]; reason?: string },
+  ) {
+    if (!dto.dates.length) return [];
+    const rows = dto.dates.map((date) => ({
+      organization_id: organizationId,
+      staff_id: dto.staffId,
+      date,
+      reason: dto.reason ?? null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { data, error } = await this.supabase
+      .from('staff_unavailability')
+      .upsert(rows, { onConflict: 'organization_id,staff_id,date' })
+      .select('id, staff_id, date, reason, created_at');
+
+    if (error) throw new Error(`Failed to bulk create unavailability: ${error.message}`);
+    return (data ?? []).map((r: any) => ({
+      id: r.id, staffId: r.staff_id, date: r.date, reason: r.reason, createdAt: r.created_at,
+    }));
+  }
+
+  async deleteStaffUnavailability(organizationId: string, id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('staff_unavailability')
+      .delete()
+      .eq('id', id)
+      .eq('organization_id', organizationId);
+
+    if (error) throw new Error(`Failed to delete unavailability: ${error.message}`);
   }
 
   // ==================== HELPERS ====================

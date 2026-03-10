@@ -38,9 +38,10 @@
 	import PeriodsTab from '$lib/shifts/components/PeriodsTab.svelte';
 	import BackupCoverageTab from '$lib/shifts/components/BackupCoverageTab.svelte';
 	import ShiftCapabilitiesTab from '$lib/shifts/components/ShiftCapabilitiesTab.svelte';
+	import StaffUnavailabilityTab from '$lib/shifts/components/StaffUnavailabilityTab.svelte';
 
 	// ── Tab Navigation ──
-	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup' | 'capabilities';
+	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup' | 'capabilities' | 'vacation';
 	let activeTab: SettingsTab = $state('groups');
 
 	// ── Department State ──
@@ -221,6 +222,7 @@
 		{ id: 'groups', label: 'グループ', icon: 'group', description: 'スタッフグループ管理' },
 		{ id: 'backup', label: 'バックアップ', icon: 'backup', description: 'バックアップカバレッジ設定' },
 		{ id: 'capabilities', label: 'シフト能力', icon: 'accessibility', description: '早番・遅番の可否設定' },
+		{ id: 'vacation', label: '休暇設定', icon: 'event_busy', description: 'スタッフ休暇・不在日管理' },
 		{ id: 'limits', label: '制限設定', icon: 'tune', description: '日次・月次の人数制限' },
 		{ id: 'priority', label: '優先ルール', icon: 'priority_high', description: 'シフト優先度ルール' },
 		{ id: 'calendar', label: 'カレンダー', icon: 'event_note', description: '祝日・定休日の設定' },
@@ -414,6 +416,12 @@
 								{periodConfig}
 								{periods}
 								onSave={handlePeriodsSave}
+							/>
+
+						{:else if activeTab === 'vacation'}
+							<StaffUnavailabilityTab
+								{allStaff}
+								departmentId={activeDepartmentId ?? undefined}
 							/>
 						{/if}
 					</div>

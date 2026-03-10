@@ -9,7 +9,8 @@ import type {
 	ORToolsSolverConfig,
 	ScheduleResponse,
 	OptimizeResponse,
-	BackupAssignment
+	BackupAssignment,
+	StaffUnavailability
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
@@ -1105,6 +1106,59 @@ export async function updateBackupAssignment(
 
 export async function deleteBackupAssignment(id: string): Promise<void> {
 	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders()
+	});
+	if (!response.ok && response.status !== 204) {
+		const err = await response.json().catch(() => ({ message: 'Delete failed' }));
+		throw new Error(err.message);
+	}
+}
+
+// ==================== STAFF UNAVAILABILITY ====================
+
+export async function getStaffUnavailability(params?: {
+	staffId?: string;
+	startDate?: string;
+	endDate?: string;
+}): Promise<StaffUnavailability[]> {
+	const q = new URLSearchParams();
+	if (params?.staffId) q.set('staffId', params.staffId);
+	if (params?.startDate) q.set('startDate', params.startDate);
+	if (params?.endDate) q.set('endDate', params.endDate);
+	const url = `${API_URL}/shifts/settings/staff-unavailability${q.toString() ? `?${q}` : ''}`;
+	const response = await apiFetch(url, { headers: authHeaders() });
+	return handleResponse(response);
+}
+
+export async function createStaffUnavailability(data: {
+	staffId: string;
+	date: string;
+	reason?: string;
+}): Promise<StaffUnavailability> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-unavailability`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function bulkCreateStaffUnavailability(data: {
+	staffId: string;
+	dates: string[];
+	reason?: string;
+}): Promise<StaffUnavailability[]> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-unavailability/bulk`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function deleteStaffUnavailability(id: string): Promise<void> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-unavailability/${id}`, {
 		method: 'DELETE',
 		headers: authHeaders()
 	});

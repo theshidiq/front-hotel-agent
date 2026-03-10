@@ -55,6 +55,8 @@ import {
   UpdatePeriodConfigurationDto,
   CreateBackupAssignmentDto,
   UpdateBackupAssignmentDto,
+  CreateStaffUnavailabilityDto,
+  BulkCreateStaffUnavailabilityDto,
 } from './dto/settings.dto';
 
 @ApiTags('shifts')
@@ -542,5 +544,51 @@ export class ShiftsController {
   @ApiResponse({ status: 204, description: 'Backup assignment deleted' })
   async deleteBackupAssignment(@GetUser() user: any, @Param('id') id: string) {
     return this.shiftsService.deleteBackupAssignment(user.organization_id, id);
+  }
+
+  // ==================== STAFF UNAVAILABILITY ====================
+
+  @Get('settings/staff-unavailability')
+  @ApiOperation({ summary: 'List staff unavailability records' })
+  @ApiQuery({ name: 'staffId', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiResponse({ status: 200, description: 'List of staff unavailability entries' })
+  async getStaffUnavailability(
+    @GetUser() user: any,
+    @Query('staffId') staffId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.shiftsService.getStaffUnavailability(user.organization_id, staffId, startDate, endDate);
+  }
+
+  @Post('settings/staff-unavailability')
+  @ApiOperation({ summary: 'Create a staff unavailability entry' })
+  @ApiResponse({ status: 201, description: 'Unavailability entry created' })
+  async createStaffUnavailability(
+    @GetUser() user: any,
+    @Body() dto: CreateStaffUnavailabilityDto,
+  ) {
+    return this.shiftsService.createStaffUnavailability(user.organization_id, dto);
+  }
+
+  @Post('settings/staff-unavailability/bulk')
+  @ApiOperation({ summary: 'Bulk create staff unavailability entries' })
+  @ApiResponse({ status: 201, description: 'Unavailability entries created' })
+  async bulkCreateStaffUnavailability(
+    @GetUser() user: any,
+    @Body() dto: BulkCreateStaffUnavailabilityDto,
+  ) {
+    return this.shiftsService.bulkCreateStaffUnavailability(user.organization_id, dto);
+  }
+
+  @Delete('settings/staff-unavailability/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a staff unavailability entry' })
+  @ApiParam({ name: 'id', description: 'Unavailability entry ID' })
+  @ApiResponse({ status: 204, description: 'Entry deleted' })
+  async deleteStaffUnavailability(@GetUser() user: any, @Param('id') id: string) {
+    return this.shiftsService.deleteStaffUnavailability(user.organization_id, id);
   }
 }

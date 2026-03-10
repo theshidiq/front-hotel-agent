@@ -503,3 +503,34 @@ export class UpdateBackupAssignmentDto {
   @IsNumber()
   priorityOrder?: number;
 }
+
+// ==================== STAFF UNAVAILABILITY ====================
+
+export class CreateStaffUnavailabilityDto {
+  @ApiProperty({ description: 'Staff ID' })
+  @IsString()
+  staffId: string;
+
+  @ApiProperty({ description: 'Date (YYYY-MM-DD)' })
+  @IsString()
+  date: string;
+
+  @ApiPropertyOptional({ description: 'Reason (vacation, PTO, personal leave, etc.)' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class BulkCreateStaffUnavailabilityDto {
+  @ApiProperty({ description: 'Staff ID' })
+  @IsString()
+  staffId: string;
+
+  @ApiProperty({ description: 'Array of dates (YYYY-MM-DD)' })
+  dates: string[];
+
+  @ApiPropertyOptional({ description: 'Reason applied to all dates' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}

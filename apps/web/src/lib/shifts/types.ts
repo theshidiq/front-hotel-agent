@@ -184,6 +184,15 @@ export interface ScheduleResponse {
 	staff: ScheduleStaff[];
 }
 
+// Staff unavailability (vacation / PTO)
+export interface StaffUnavailability {
+	id: string;
+	staffId: string;
+	date: string; // YYYY-MM-DD
+	reason?: string;
+	createdAt: string;
+}
+
 // Backup assignment
 export interface BackupAssignment {
 	id: string;
