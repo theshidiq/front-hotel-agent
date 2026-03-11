@@ -21,9 +21,8 @@
 	} from "$lib/api";
 	import { onMount, onDestroy } from "svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
-	import { authState, can, loadGuestPermissions } from "$lib/auth.svelte";
+	import { authState, can } from "$lib/auth.svelte";
 	import { supabase } from "$lib/supabase";
-	import { page } from "$app/stores";
 
 	const isStaff = $derived(authState.isStaff);
 
@@ -1249,10 +1248,6 @@
 	}
 
 	onMount(() => {
-		// If ?org=<orgId> is in the URL, use it to load guest permissions for this hotel
-		const orgFromUrl = $page.url.searchParams.get('org');
-		if (orgFromUrl) loadGuestPermissions(orgFromUrl);
-
 		loadData();
 		setupRealtimeSubscriptions();
 	});
