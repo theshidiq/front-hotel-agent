@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Req, UseGuards, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { RolesService, Role, ALL_PERMISSIONS } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto, UpdateRolePermissionsDto } from './dto/update-role-permissions.dto';
-import { RequirePermission } from '../auth/permission.decorator';
+import { RequirePermission, SkipAuth } from '../auth/permission.decorator';
 import { StaffAuthGuard } from '../auth/auth.guard';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -15,11 +15,14 @@ export class RolesController {
     private readonly supabaseService: SupabaseService,
   ) {}
 
-  // Public endpoint — no auth required; uses env-configured organization
+  // Public endpoint — no auth required; caller must supply organizationId
   @Get('default')
+  @SkipAuth()
   @ApiOperation({ summary: 'Get the default guest role with permissions (public)' })
-  async getDefault(): Promise<Role | null> {
-    return this.rolesService.findDefault(this.supabaseService.getOrganizationId());
+  @ApiQuery({ name: 'organizationId', required: true, description: 'Organization ID' })
+  async getDefault(@Query('organizationId') organizationId: string): Promise<Role | null> {
+    if (!organizationId) throw new BadRequestException('organizationId is required');
+    return this.rolesService.findDefault(organizationId);
   }
 
   @Get()

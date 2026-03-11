@@ -1218,19 +1218,24 @@
 
 	// Supabase realtime subscription (single channel, optimized for free tier)
 	let realtimeChannel: any = null;
+	let realtimeStatus = $state<"connecting" | "connected" | "error" | "closed">("connecting");
 
 	function setupRealtimeSubscriptions() {
-		// Get organization ID from environment
-		const organizationId = import.meta.env.VITE_ORGANIZATION_ID;
+		// Use the authenticated user's org ID — never a hardcoded env var
+		const organizationId = authState.organizationId;
 
-		console.log(
-			"🔌 Setting up real-time subscriptions for organization:",
-			organizationId,
-		);
+		// Clean up any existing channel first to avoid CLOSED status from duplicate channel names
+		if (realtimeChannel) {
+			supabase.removeChannel(realtimeChannel);
+			realtimeChannel = null;
+		}
+
+		// Use a unique channel name per session to avoid conflicts on hot reload
+		const channelName = `front-desk-realtime-${Date.now()}`;
 
 		// Use a single channel with multiple event listeners to minimize connections
 		realtimeChannel = supabase
-			.channel("front-desk-realtime")
+			.channel(channelName)
 			// Listen to reservations changes
 			.on(
 				"postgres_changes",
@@ -1291,11 +1296,23 @@
 				},
 			)
 			.subscribe((status, err) => {
-				console.log("📡 Front-desk realtime status:", status, err);
-				if (status === "CHANNEL_ERROR") {
+				if (status === "SUBSCRIBED") {
+					realtimeStatus = "connected";
+					console.log("✅ Front-desk realtime: connected");
+				} else if (status === "CHANNEL_ERROR") {
+					realtimeStatus = "error";
 					console.error(
-						"❌ Channel error - you may have too many connections open. Supabase free tier allows only 2 concurrent real-time connections. Close other tabs or upgrade plan.",
+						"❌ Realtime channel error — too many connections or realtime not enabled for tables. Free tier: max 2 concurrent channels.",
+						err,
 					);
+				} else if (status === "TIMED_OUT") {
+					realtimeStatus = "error";
+					console.warn("⏱️ Realtime channel timed out — retrying automatically.");
+				} else if (status === "CLOSED") {
+					realtimeStatus = "closed";
+					console.log("📡 Front-desk realtime: closed");
+				} else {
+					console.log("📡 Front-desk realtime:", status, err ?? "");
 				}
 			});
 	}
@@ -1532,12 +1549,13 @@
 					{/if}
 					<!-- Real-time indicator -->
 					<div
-						class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-md bg-gray-50"
+						class="flex items-center gap-2 px-3 py-2 border rounded-md {realtimeStatus === 'connected' ? 'border-green-200 bg-green-50' : realtimeStatus === 'error' ? 'border-red-200 bg-red-50' : realtimeStatus === 'closed' ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}"
+						title={realtimeStatus === 'connected' ? 'リアルタイム接続中' : realtimeStatus === 'error' ? 'リアルタイム接続エラー' : realtimeStatus === 'closed' ? 'リアルタイム切断中' : '接続中...'}
 					>
 						<span
-							class="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+							class="w-2 h-2 rounded-full {realtimeStatus === 'connected' ? 'bg-green-500 animate-pulse' : realtimeStatus === 'error' ? 'bg-red-500' : realtimeStatus === 'closed' ? 'bg-amber-400' : 'bg-gray-400 animate-pulse'}"
 						></span>
-						<span class="text-xs text-gray-600">リアルタイム</span>
+						<span class="text-xs {realtimeStatus === 'connected' ? 'text-green-700' : realtimeStatus === 'error' ? 'text-red-700' : realtimeStatus === 'closed' ? 'text-amber-700' : 'text-gray-600'}">リアルタイム</span>
 					</div>
 					<button
 						onclick={() => loadData()}
