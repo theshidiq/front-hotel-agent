@@ -99,7 +99,7 @@ export async function scanExtract(imageUrl: string): Promise<ScanExtractResult> 
 }
 
 export async function getProducts(): Promise<Product[]> {
-	const response = await fetch(`${API_URL}/products`);
+	const response = await fetch(`${API_URL}/products`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch products');
@@ -180,7 +180,7 @@ export async function createProduct(data: CreateProductData): Promise<Product> {
 }
 
 export async function getAllergens(): Promise<Allergen[]> {
-	const response = await fetch(`${API_URL}/allergens`);
+	const response = await fetch(`${API_URL}/allergens`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch allergens');
@@ -237,7 +237,7 @@ export interface UpdateCategoryData {
 }
 
 export async function getCategories(type: 'product' | 'menu'): Promise<Category[]> {
-	const response = await fetch(`${API_URL}/categories?type=${type}`);
+	const response = await fetch(`${API_URL}/categories?type=${type}`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch categories');
@@ -314,7 +314,7 @@ export interface UpdateSeasonalMenuData {
 }
 
 export async function getSeasonalMenus(): Promise<SeasonalMenu[]> {
-	const response = await fetch(`${API_URL}/seasonal-menus`);
+	const response = await fetch(`${API_URL}/seasonal-menus`, { headers: authHeaders() });
 	if (!response.ok) {
 		throw new Error('Failed to fetch seasonal menus');
 	}
@@ -404,7 +404,7 @@ export async function getMenuGroups(seasonalMenuId?: string, stayPeriodNights?: 
 
 	const queryString = params.toString();
 	const url = queryString ? `${API_URL}/menu-groups?${queryString}` : `${API_URL}/menu-groups`;
-	const response = await fetch(url);
+	const response = await fetch(url, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch menu groups');
@@ -497,7 +497,7 @@ export interface UpdateMenuData extends Partial<CreateMenuData> {}
 
 // Menu API Functions
 export async function getMenus(): Promise<Menu[]> {
-	const response = await fetch(`${API_URL}/menus`);
+	const response = await fetch(`${API_URL}/menus`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch menus');
@@ -507,7 +507,7 @@ export async function getMenus(): Promise<Menu[]> {
 }
 
 export async function getMenu(id: string): Promise<Menu> {
-	const response = await fetch(`${API_URL}/menus/${id}`);
+	const response = await fetch(`${API_URL}/menus/${id}`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch menu');
@@ -578,7 +578,7 @@ export interface Room {
 }
 
 export async function getRooms(): Promise<Room[]> {
-	const response = await fetch(`${API_URL}/rooms`);
+	const response = await fetch(`${API_URL}/rooms`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch rooms');
@@ -588,7 +588,7 @@ export async function getRooms(): Promise<Room[]> {
 }
 
 export async function getRoom(id: string): Promise<Room> {
-	const response = await fetch(`${API_URL}/rooms/${id}`);
+	const response = await fetch(`${API_URL}/rooms/${id}`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch room');
@@ -702,7 +702,7 @@ export async function getReservations(date?: string, status?: string): Promise<R
 	if (status) params.append('status', status);
 
 	const url = params.toString() ? `${API_URL}/reservations?${params}` : `${API_URL}/reservations`;
-	const response = await fetch(url);
+	const response = await fetch(url, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch reservations');
@@ -712,7 +712,7 @@ export async function getReservations(date?: string, status?: string): Promise<R
 }
 
 export async function getTodayReservations(): Promise<Reservation[]> {
-	const response = await fetch(`${API_URL}/reservations/today`);
+	const response = await fetch(`${API_URL}/reservations/today`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch today reservations');
@@ -722,7 +722,7 @@ export async function getTodayReservations(): Promise<Reservation[]> {
 }
 
 export async function getReservation(id: string): Promise<Reservation> {
-	const response = await fetch(`${API_URL}/reservations/${id}`);
+	const response = await fetch(`${API_URL}/reservations/${id}`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch reservation');
@@ -874,7 +874,7 @@ export interface CreateGuestAlertData {
 
 export async function getGuestAlerts(status?: string): Promise<GuestAlert[]> {
 	const url = status ? `${API_URL}/guest-alerts?status=${status}` : `${API_URL}/guest-alerts`;
-	const response = await fetch(url);
+	const response = await fetch(url, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch guest alerts');
@@ -884,7 +884,7 @@ export async function getGuestAlerts(status?: string): Promise<GuestAlert[]> {
 }
 
 export async function getNewGuestAlerts(): Promise<GuestAlert[]> {
-	const response = await fetch(`${API_URL}/guest-alerts/new`);
+	const response = await fetch(`${API_URL}/guest-alerts/new`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch new guest alerts');
@@ -894,7 +894,7 @@ export async function getNewGuestAlerts(): Promise<GuestAlert[]> {
 }
 
 export async function getGuestAlert(id: string): Promise<GuestAlert> {
-	const response = await fetch(`${API_URL}/guest-alerts/${id}`);
+	const response = await fetch(`${API_URL}/guest-alerts/${id}`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch guest alert');
@@ -980,7 +980,7 @@ export interface CreateStaffData {
 }
 
 export async function getStaffs(): Promise<StaffMember[]> {
-	const response = await fetch(`${API_URL}/staffs`);
+	const response = await fetch(`${API_URL}/staffs`, { headers: authHeaders() });
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.message || 'Failed to fetch staffs');
