@@ -211,13 +211,20 @@
 		}
 	}
 
+	let dataLoaded = $state(false);
+
 	onMount(() => {
-		if (!authState.isStaff && !authState.loading) {
+		const tab = $page.url.searchParams.get('tab');
+		if (tab === 'menus' || tab === 'menu') activeTab = 'menus';
+	});
+
+	$effect(() => {
+		if (authState.loading || dataLoaded) return;
+		if (!authState.isStaff) {
 			window.location.href = '/login';
 			return;
 		}
-		const tab = $page.url.searchParams.get('tab');
-		if (tab === 'menus' || tab === 'menu') activeTab = 'menus';
+		dataLoaded = true;
 		loadAll();
 	});
 
