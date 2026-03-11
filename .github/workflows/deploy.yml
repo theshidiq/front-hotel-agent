@@ -29,7 +29,6 @@ jobs:
           VITE_API_URL: https://front-hotel-agent-api.fly.dev
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_ORGANIZATION_ID: ${{ secrets.VITE_ORGANIZATION_ID }}
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy apps/web/.svelte-kit/cloudflare --project-name front-hotel-agent --branch main --commit-dirty=true

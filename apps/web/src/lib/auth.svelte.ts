@@ -344,10 +344,14 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 		signingInProgress = false;
 	}
 }
-async function loadGuestPermissions(): Promise<void> {
+export async function loadGuestPermissions(explicitOrgId?: string): Promise<void> {
 	try {
 		const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
-		const response = await fetch(`${API_URL}/roles/default`);
+		const orgId = explicitOrgId ?? getStoredOrgId();
+		if (!orgId) return;
+		// Persist so future page loads without ?org= still work (e.g. staff returning to same hotel)
+		if (explicitOrgId) saveOrgId(explicitOrgId);
+		const response = await fetch(`${API_URL}/roles/default?organizationId=${orgId}`);
 		if (response.ok) {
 			const role = await response.json();
 			if (role && role.permissions) {
