@@ -6,7 +6,9 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { SupabaseService } from '../supabase/supabase.service';
+import { IS_PUBLIC_KEY } from './permission.decorator';
 
 interface CachedUser {
   user: any;
@@ -20,7 +22,10 @@ export class StaffAuthGuard implements CanActivate {
   private readonly logger = new Logger(StaffAuthGuard.name);
   private readonly cache = new Map<string, CachedUser>();
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly reflector: Reflector,
+  ) {}
 
   private getCached(token: string): any | null {
     const entry = this.cache.get(token);
@@ -37,6 +42,12 @@ export class StaffAuthGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers['authorization'];
 

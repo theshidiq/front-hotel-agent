@@ -24,6 +24,7 @@ import {
 import { ShiftsService } from './shifts.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
+import { SkipAuth } from '../auth/permission.decorator';
 
 // Staff DTOs
 import { CreateStaffDto, UpdateStaffDto, ReorderStaffDto } from './dto/staff.dto';
@@ -201,6 +202,7 @@ export class ShiftsController {
   }
 
   @Get('optimize/health')
+  @SkipAuth()
   @ApiOperation({ summary: 'Check OR-Tools service health' })
   @ApiResponse({ status: 200, description: 'Health status' })
   async checkOptimizerHealth() {
