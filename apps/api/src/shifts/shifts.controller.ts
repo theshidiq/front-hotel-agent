@@ -25,6 +25,7 @@ import { ShiftsService } from './shifts.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { SkipAuth } from '../auth/permission.decorator';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 // Staff DTOs
 import { CreateStaffDto, UpdateStaffDto, ReorderStaffDto } from './dto/staff.dto';
@@ -195,6 +196,8 @@ export class ShiftsController {
   // ==================== OPTIMIZATION ENDPOINTS ====================
 
   @Post('optimize')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Optimize schedule using OR-Tools' })
   @ApiResponse({ status: 200, description: 'Optimization result', type: OptimizeResponseDto })
   async optimizeSchedule(@GetUser() user: any, @Body() optimizeDto: OptimizeRequestDto) {
