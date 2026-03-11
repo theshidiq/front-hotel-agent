@@ -16,6 +16,7 @@ interface CachedUser {
 }
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
+const CACHE_MAX_SIZE = 500;  // evict oldest entry when exceeded
 
 @Injectable()
 export class StaffAuthGuard implements CanActivate {
@@ -38,6 +39,10 @@ export class StaffAuthGuard implements CanActivate {
   }
 
   private setCached(token: string, user: any): void {
+    if (this.cache.size >= CACHE_MAX_SIZE) {
+      // Evict the oldest entry (Map insertion order is FIFO)
+      this.cache.delete(this.cache.keys().next().value);
+    }
     this.cache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
   }
 
