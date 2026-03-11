@@ -580,6 +580,9 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 	) {
 		if (!selectedPeriodId) return;
 
+		// Save previous value for revert on failure
+		const prevSymbol = scheduleData[staffId]?.[date] ?? '';
+
 		// Update local state immediately (optimistic)
 		if (!scheduleData[staffId]) {
 			scheduleData[staffId] = {};
@@ -591,7 +594,9 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 			saving = true;
 			await bulkUpdateCells(selectedPeriodId, [{ staffId, date, symbol }], activeDepartmentId ?? undefined);
 		} catch (e) {
-			// Revert on failure
+			// Revert optimistic update on failure
+			scheduleData[staffId][date] = prevSymbol;
+			scheduleData = { ...scheduleData };
 			error = e instanceof Error ? e.message : "Failed to save";
 		} finally {
 			saving = false;
@@ -1047,7 +1052,8 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 						<button
 							class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
 							onclick={handleOptimize}
-							disabled={optimizing || clearing || !optimizerHealthy}
+							disabled={optimizing || clearing || !optimizerHealthy || !selectedPeriodId}
+							title={!selectedPeriodId ? '期間を先に選択してください' : !optimizerHealthy ? 'OR-Toolsオフライン — 最適化サービスを起動してください' : '自動最適化を実行'}
 						>
 							{#if optimizing}
 								<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-white shrink-0"></span>
@@ -1118,7 +1124,25 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 									columns={staff.length || 12}
 								/>
 								<OptimizeOverlay progress={optimizeProgress} elapsed={optimizeElapsed} oncancel={handleCancelOptimize} />
-							{:else if !hasScheduleData && staff.length > 0}
+							{:else if staff.length === 0}
+							<!-- No staff in this department -->
+							<div class="p-8 text-center">
+								<span class="material-symbols-rounded text-5xl text-gray-300 mb-4">group_off</span>
+								<h3 class="text-lg font-medium text-gray-700 mb-2">
+									このデパートメントにスタッフがいません
+								</h3>
+								<p class="text-sm text-gray-500 mb-4">
+									スタッフ設定からこのデパートメントにスタッフを追加してください。
+								</p>
+								<a
+									href="/shifts/settings"
+									class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+								>
+									<span class="material-symbols-rounded text-sm">settings</span>
+									設定を開く
+								</a>
+							</div>
+						{:else if !hasScheduleData}
 								<!-- Empty schedule notice -->
 								<div class="p-8 text-center">
 									<span
@@ -1145,8 +1169,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 										<button
 											class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
 											onclick={handleOptimize}
-											disabled={optimizing ||
-												!optimizerHealthy}
+											disabled={optimizing || !optimizerHealthy || !selectedPeriodId}
 										>
 											<span
 												class="material-symbols-rounded text-sm"

@@ -11,10 +11,14 @@ from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
 import json
 import logging
 import os
 import functools
+
+# Load .env from repo root (two levels up from services/ortools/)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
