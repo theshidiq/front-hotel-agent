@@ -51,7 +51,30 @@ export class QwenVisionService {
     this.logger.log(`Qwen API URL: ${this.apiUrl}`);
   }
 
+  async extractProductDataFromBuffer(
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<{
+    extractedData: OcrExtractedData;
+    rawResponse: QwenApiResponse;
+  }> {
+    const base64 = buffer.toString('base64');
+    const base64Image = `data:${mimeType};base64,${base64}`;
+    this.logger.log(`Image buffer to base64 (length: ${base64Image.length})`);
+    return this.callQwenApi(base64Image);
+  }
+
   async extractProductData(imageUrl: string): Promise<{
+    extractedData: OcrExtractedData;
+    rawResponse: QwenApiResponse;
+  }> {
+    // Download image and convert to base64 (Qwen international can't access external URLs)
+    const base64Image = await this.downloadImageAsBase64(imageUrl);
+    this.logger.log(`Image converted to base64 (length: ${base64Image.length})`);
+    return this.callQwenApi(base64Image);
+  }
+
+  private async callQwenApi(base64Image: string): Promise<{
     extractedData: OcrExtractedData;
     rawResponse: QwenApiResponse;
   }> {
@@ -63,10 +86,6 @@ export class QwenVisionService {
     }
 
     this.logger.log(`Calling Qwen Vision API with model: ${model}`);
-
-    // Download image and convert to base64 (Qwen international can't access external URLs)
-    const base64Image = await this.downloadImageAsBase64(imageUrl);
-    this.logger.log(`Image converted to base64 (length: ${base64Image.length})`);
 
     const requestBody = {
       model,
@@ -104,14 +123,11 @@ export class QwenVisionService {
         throw new Error('Empty response from Qwen API');
       }
 
-      // Parse JSON from response (handle markdown code blocks)
       const extractedData = this.parseJsonResponse(content);
-
       this.logger.log('Successfully extracted product data');
 
       return { extractedData, rawResponse };
     } catch (error) {
-      // Log detailed error information
       if (error.response) {
         this.logger.error(
           `Qwen API error: ${error.response.status} - ${JSON.stringify(error.response.data)}`,

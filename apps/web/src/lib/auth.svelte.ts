@@ -165,7 +165,21 @@ function isStoredPeriodExpired(): boolean {
 	return !isWithinActivePeriod(null, endPeriod);
 }
 
-async function checkStaffStatus(email: string): Promise<StaffWithPeriod | null> {
+async function checkStaffStatus(email: string, preferOrgId?: string | null): Promise<StaffWithPeriod | null> {
+	// If we have a cached org ID, query that org directly to avoid returning the wrong org's record
+	if (preferOrgId) {
+		const { data } = await supabase
+			.from('staff')
+			.select('id, name, email, position, start_period, end_period, is_admin, role_id, organization_id')
+			.eq('email', email)
+			.eq('organization_id', preferOrgId)
+			.eq('is_active', true)
+			.limit(1)
+			.maybeSingle();
+		if (data) return data as StaffWithPeriod;
+	}
+
+	// Fallback: find any active staff record for this email
 	const { data, error } = await supabase
 		.from('staff')
 		.select('id, name, email, position, start_period, end_period, is_admin, role_id, organization_id')
@@ -233,7 +247,8 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 	if (!authInitialized) authState.loading = true;
 
 	try {
-		const staff = await checkStaffStatus(email);
+		const cachedOrgId = getStoredOrgId();
+		const staff = await checkStaffStatus(email, cachedOrgId);
 
 		const pendingEmail = getPendingStaffEmail();
 		if (pendingEmail) {
@@ -340,6 +355,10 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 
 		authState.loading = false;
 		authInitialized = true;
+	} catch (err) {
+		authState.loading = false;
+		authInitialized = true;
+		throw err;
 	} finally {
 		signingInProgress = false;
 	}

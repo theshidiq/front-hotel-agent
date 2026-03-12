@@ -155,12 +155,7 @@
 		}
 	}
 
-	// Load data when section changes
-	$effect(() => {
-		if (activeSection === 'roles' && roles.length === 0) {
-			loadRolesData();
-		}
-	});
+	// Roles data is loaded explicitly when the user navigates to the roles section
 
 	let initialized = $state(false);
 
@@ -259,7 +254,7 @@
 			}
 			// Save permissions
 			await updateRolePermissions(editingRole.id, [...editingPermissions]);
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 			editingRole = null;
 		} catch (e: any) {
 			error = e.message;
@@ -295,7 +290,7 @@
 			newRoleDescription = '';
 			newRolePermissions = new Set();
 			showNewRole = false;
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		} finally {
@@ -310,7 +305,7 @@
 			} else {
 				await setRoleAsDefault(role.id);
 			}
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		}
@@ -321,7 +316,7 @@
 		try {
 			await deleteRole(id);
 			if (editingRole?.id === id) editingRole = null;
-			await loadStaffData(); await loadRolesData();
+			await loadRolesData();
 		} catch (e: any) {
 			error = e.message;
 		}
@@ -393,7 +388,7 @@
 				</button>
 
 				<button
-					onclick={() => activeSection = 'roles'}
+					onclick={() => { activeSection = 'roles'; loadRolesData(); }}
 					class="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-purple-300 transition-all text-left"
 				>
 					<div class="flex items-center gap-4">
