@@ -4,8 +4,17 @@
 	import { uploadImage, compressImage, compressImageForOCR } from '$lib/supabase';
 	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
-	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import MenuStructurePanel from '$lib/components/MenuStructurePanel.svelte';
+	import type MenuTreeConfigType from '$lib/components/MenuTreeConfig.svelte';
+
+	// Lazy-loaded — @xyflow/svelte + @dagrejs/dagre are ~600KB, only needed when tree view opens
+	let MenuTreeConfig: typeof MenuTreeConfigType | null = $state(null);
+	async function loadTreeConfig() {
+		if (!MenuTreeConfig) {
+			const mod = await import('$lib/components/MenuTreeConfig.svelte');
+			MenuTreeConfig = mod.default;
+		}
+	}
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { authState, can } from '$lib/auth.svelte';
 
@@ -1199,7 +1208,7 @@ ${coursesHtml}
 					{/if}
 					{#if mainTab === 'menu' && can('menus.structure')}
 						<button
-							onclick={() => showMenuTreeConfig = true}
+							onclick={() => { showMenuTreeConfig = true; loadTreeConfig(); }}
 							class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
 						>
 							<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2609,34 +2618,47 @@ ${coursesHtml}
 			onCreateMenu={treeCreateMenu}
 			onUpdateMenu={treeUpdateMenu}
 			onDeleteMenu={treeDeleteMenu}
-			onSwitchToTree={() => { menuStructureView = 'tree'; }}
+			onSwitchToTree={() => { menuStructureView = 'tree'; loadTreeConfig(); }}
 			onClose={() => showMenuTreeConfig = false}
 		/>
 	{:else if showMenuTreeConfig && menuStructureView === 'tree'}
-		<MenuTreeConfig
-			{seasonalMenus}
-			{menuGroups}
-			{menuCategories}
-			{menus}
-			{products}
-			{productAlternates}
-			onAddAlternate={handleAddAlternate}
-			onRemoveAlternate={handleRemoveAlternate}
-			onCreateSeason={treeCreateSeason}
-			onUpdateSeason={treeUpdateSeason}
-			onDeleteSeason={treeDeleteSeason}
-			onCreateGroup={treeCreateGroup}
-			onUpdateGroup={treeUpdateGroup}
-			onDeleteGroup={treeDeleteGroup}
-			onCreateCourse={treeCreateCourse}
-			onUpdateCourse={treeUpdateCourse}
-			onUpdateCourseDetails={treeUpdateCourseDetails}
-			onDeleteCourse={treeDeleteCourse}
-			onCreateMenu={treeCreateMenu}
-			onUpdateMenu={treeUpdateMenu}
-			onDeleteMenu={treeDeleteMenu}
-			onSwitchToPanel={() => { menuStructureView = 'panel'; }}
-			onClose={() => showMenuTreeConfig = false}
-		/>
+		{#if MenuTreeConfig}
+			<svelte:component
+				this={MenuTreeConfig}
+				{seasonalMenus}
+				{menuGroups}
+				{menuCategories}
+				{menus}
+				{products}
+				{productAlternates}
+				onAddAlternate={handleAddAlternate}
+				onRemoveAlternate={handleRemoveAlternate}
+				onCreateSeason={treeCreateSeason}
+				onUpdateSeason={treeUpdateSeason}
+				onDeleteSeason={treeDeleteSeason}
+				onCreateGroup={treeCreateGroup}
+				onUpdateGroup={treeUpdateGroup}
+				onDeleteGroup={treeDeleteGroup}
+				onCreateCourse={treeCreateCourse}
+				onUpdateCourse={treeUpdateCourse}
+				onUpdateCourseDetails={treeUpdateCourseDetails}
+				onDeleteCourse={treeDeleteCourse}
+				onCreateMenu={treeCreateMenu}
+				onUpdateMenu={treeUpdateMenu}
+				onDeleteMenu={treeDeleteMenu}
+				onSwitchToPanel={() => { menuStructureView = 'panel'; }}
+				onClose={() => showMenuTreeConfig = false}
+			/>
+		{:else}
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+				<div class="bg-white rounded-xl p-8 flex items-center gap-3 text-gray-600 shadow-xl">
+					<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+					</svg>
+					Loading tree view...
+				</div>
+			</div>
+		{/if}
 	{/if}
 </div>
