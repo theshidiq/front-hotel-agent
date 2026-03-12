@@ -469,3 +469,68 @@ export class UpdatePeriodConfigurationDto {
   @IsNumber()
   period_length_days?: number;
 }
+
+// ==================== BACKUP ASSIGNMENTS ====================
+
+export class CreateBackupAssignmentDto {
+  @ApiProperty({ description: 'Staff ID of the backup staff member' })
+  @IsString()
+  staffId: string;
+
+  @ApiProperty({ description: 'Staff group ID the backup staff covers' })
+  @IsString()
+  groupId: string;
+
+  @ApiPropertyOptional({ description: 'Assignment type (e.g. coverage)', example: 'coverage' })
+  @IsOptional()
+  @IsString()
+  assignmentType?: string;
+
+  @ApiPropertyOptional({ description: 'Priority order for multiple backups covering the same group' })
+  @IsOptional()
+  @IsNumber()
+  priorityOrder?: number;
+}
+
+export class UpdateBackupAssignmentDto {
+  @ApiPropertyOptional({ description: 'Whether the assignment is active' })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({ description: 'Priority order' })
+  @IsOptional()
+  @IsNumber()
+  priorityOrder?: number;
+}
+
+// ==================== STAFF UNAVAILABILITY ====================
+
+export class CreateStaffUnavailabilityDto {
+  @ApiProperty({ description: 'Staff ID' })
+  @IsString()
+  staffId: string;
+
+  @ApiProperty({ description: 'Date (YYYY-MM-DD)' })
+  @IsString()
+  date: string;
+
+  @ApiPropertyOptional({ description: 'Reason (vacation, PTO, personal leave, etc.)' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class BulkCreateStaffUnavailabilityDto {
+  @ApiProperty({ description: 'Staff ID' })
+  @IsString()
+  staffId: string;
+
+  @ApiProperty({ description: 'Array of dates (YYYY-MM-DD)' })
+  dates: string[];
+
+  @ApiPropertyOptional({ description: 'Reason applied to all dates' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}

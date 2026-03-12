@@ -9,9 +9,8 @@ import { AllergenInfo } from '../products/dto/product-response.dto';
 export class MenusService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async create(createMenuDto: CreateMenuDto): Promise<MenuResponse> {
+  async create(organizationId: string, createMenuDto: CreateMenuDto): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { product_ids, ...menuData } = createMenuDto;
 
@@ -40,12 +39,11 @@ export class MenusService {
     }
 
     // Return complete menu with products and derived allergens
-    return this.findOne(menu.id);
+    return this.findOne(organizationId, menu.id);
   }
 
-  async findAll(limit = 50): Promise<MenuResponse[]> {
+  async findAll(organizationId: string, limit = 50): Promise<MenuResponse[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: menus, error } = await supabase
       .from('menus')
@@ -149,12 +147,12 @@ export class MenusService {
     });
   }
 
-  async findOne(id: string): Promise<MenuResponse> {
+  async findOne(organizationId: string, id: string): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
 
     // Parallel fetch: menu + product links
     const [menuResult, linksResult] = await Promise.all([
-      supabase.from('menus').select('*').eq('id', id).single(),
+      supabase.from('menus').select('*').eq('id', id).eq('organization_id', organizationId).single(),
       supabase.from('menu_products').select('product_id').eq('menu_id', id),
     ]);
 
@@ -212,7 +210,7 @@ export class MenusService {
     };
   }
 
-  async update(id: string, updateMenuDto: UpdateMenuDto): Promise<MenuResponse> {
+  async update(organizationId: string, id: string, updateMenuDto: UpdateMenuDto): Promise<MenuResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { product_ids, ...menuData } = updateMenuDto;
@@ -224,7 +222,8 @@ export class MenusService {
         ...menuData,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       throw new Error(`Failed to update menu: ${error.message}`);
@@ -243,10 +242,10 @@ export class MenusService {
       }
     }
 
-    return this.findOne(id);
+    return this.findOne(organizationId, id);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
     // Delete product links first
@@ -257,6 +256,7 @@ export class MenusService {
       .from('menus')
       .delete()
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .select('id');
 
     if (error) {

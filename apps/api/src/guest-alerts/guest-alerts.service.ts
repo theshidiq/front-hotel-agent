@@ -12,12 +12,12 @@ export class GuestAlertsService {
     private readonly allergensService: AllergensService,
   ) {}
 
-  async findAll(status?: string): Promise<GuestAlertResponse[]> {
+  async findAll(organizationId: string, status?: string): Promise<GuestAlertResponse[]> {
     let query = this.supabaseService
       .getClient()
       .from('guest_alerts')
       .select('*')
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -33,17 +33,17 @@ export class GuestAlertsService {
     return data || [];
   }
 
-  async findNew(): Promise<GuestAlertResponse[]> {
-    return this.findAll('new');
+  async findNew(organizationId: string): Promise<GuestAlertResponse[]> {
+    return this.findAll(organizationId, 'new');
   }
 
-  async findOne(id: string): Promise<GuestAlertResponse> {
+  async findOne(organizationId: string, id: string): Promise<GuestAlertResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('guest_alerts')
       .select('*')
       .eq('id', id)
-      .eq('organization_id', this.supabaseService.getOrganizationId())
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !data) {
@@ -53,12 +53,12 @@ export class GuestAlertsService {
     return this.enrichWithAllergens(data);
   }
 
-  async create(dto: CreateGuestAlertDto): Promise<GuestAlertResponse> {
+  async create(organizationId: string, dto: CreateGuestAlertDto): Promise<GuestAlertResponse> {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('guest_alerts')
       .insert({
-        organization_id: this.supabaseService.getOrganizationId(),
+        organization_id: organizationId,
         ...dto,
         status: 'new',
       })
@@ -72,8 +72,8 @@ export class GuestAlertsService {
     return data;
   }
 
-  async acknowledge(id: string, dto: AcknowledgeAlertDto): Promise<GuestAlertResponse> {
-    const alert = await this.findOne(id);
+  async acknowledge(organizationId: string, id: string, dto: AcknowledgeAlertDto): Promise<GuestAlertResponse> {
+    const alert = await this.findOne(organizationId, id);
 
     if (alert.status !== 'new') {
       throw new BadRequestException('Alert is already acknowledged or resolved');
@@ -99,8 +99,8 @@ export class GuestAlertsService {
     return this.enrichWithAllergens(data);
   }
 
-  async resolve(id: string): Promise<GuestAlertResponse> {
-    const alert = await this.findOne(id);
+  async resolve(organizationId: string, id: string): Promise<GuestAlertResponse> {
+    const alert = await this.findOne(organizationId, id);
 
     if (alert.status === 'resolved') {
       throw new BadRequestException('Alert is already resolved');

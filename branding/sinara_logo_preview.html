@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sinara — Logo Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Gloock&display=swap" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Instrument Sans', sans-serif;
+      background: #F5F1EC;
+      padding: 48px 32px;
+      color: #1A2744;
+    }
+    h1 { font-family: 'Gloock', serif; font-size: 1.6rem; margin-bottom: 6px; }
+    .sub { color: #6B7280; font-size: 0.85rem; margin-bottom: 48px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 900px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px;
+      border: 1.5px solid #E5E1DA;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card.dark {
+      background: #1A2744;
+      border-color: #243561;
+    }
+
+    .card.cream {
+      background: #F5F1EC;
+      border-color: #D4CFC8;
+    }
+
+    .label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #9CA3AF;
+    }
+
+    .card.dark .label { color: #4B6A9A; }
+
+    /* LOGO VARIATIONS */
+
+    /* Variation 1: Full wordmark */
+    .logo-wordmark {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      line-height: 1;
+    }
+
+    .logo-text {
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 48px;
+      font-weight: 500;
+      color: #1A2744;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text.on-dark { color: #F5F1EC; }
+
+    .logo-i-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    .logo-i-stem {
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 48px;
+      font-weight: 500;
+      color: #B8956A;
+      /* hide the actual dot of i */
+      display: inline-block;
+      position: relative;
+    }
+
+    /* Hide default dot using a white overlay */
+    .logo-i-stem::before {
+      content: '';
+      position: absolute;
+      top: 0px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 14px;
+      background: var(--dot-cover, white);
+      z-index: 1;
+    }
+
+    /* 4-pointed star as the dot */
+    .star-dot {
+      position: absolute;
+      top: 1px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    /* Small mark standalone */
+    .mark-only {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tagline {
+      font-size: 0.78rem;
+      color: #9CA3AF;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .card.dark .tagline { color: #4B6A9A; }
+
+  </style>
+</head>
+<body>
+
+  <h1>Sinara — Logo Variations</h1>
+  <p class="sub">The "i" as the brand mark · Navy #1A2744 · Gold #B8956A</p>
+
+  <div class="grid">
+
+    <!-- Variation 1: White bg wordmark -->
+    <div class="card">
+      <div class="label">Wordmark · Light</div>
+      <div class="logo-wordmark">
+        <svg width="220" height="64" viewBox="0 0 220 64" xmlns="http://www.w3.org/2000/svg">
+          <text y="52" font-family="'Instrument Sans', 'Helvetica Neue', sans-serif"
+            font-size="52" font-weight="500" fill="#1A2744">S</text>
+          <!-- i stem gold -->
+          <text x="36" y="52" font-family="'Instrument Sans', 'Helvetica Neue', sans-serif"
+            font-size="52" font-weight="500" fill="#B8956A">i</text>
+          <!-- cover default dot -->
+          <rect x="33" y="0" width="16" height="16" fill="white"/>
+          <!-- 4-point star dot -->
+          <path d="M41,2 L43,8 L49,10 L43,12 L41,18 L39,12 L33,10 L39,8 Z" fill="#B8956A"/>
+          <!-- nara -->
+          <text x="49" y="52" font-family="'Instrument Sans', 'Helvetica Neue', sans-serif"
+            font-size="52" font-weight="500" fill="#1A2744">nara</text>
+        </svg>
+      </div>
+      <div class="tagline">presence, by design</div>
+    </div>
+
+    <!-- Variation 2: Dark bg wordmark -->
+    <div class="card dark">
+      <div class="label">Wordmark · Dark</div>
+      <div class="logo-wordmark">
+        <svg width="220" height="64" viewBox="0 0 220 64" xmlns="http://www.w3.org/2000/svg">
+          <text y="52" font-family="'Instrument Sans', 'Helvetica Neue', sans-serif"
+            font-size="52" font-weight="500" fill="#F5F1EC">S</text>
+          <text x="36" y="52" font-family="'Instrument Sans', 'Helvetica Neue', sans-serif"
+            font-size="52" font-weight="500" fill="#B8956A">i</text>
+          <rect x="33" y="0" width="16" height="16" fill="#1A2744"/>
+          <path d="M41,2 L43,8 L49,10 L43,12 L41,18 L39,12 L33,10 L39,8 Z" fill="#B8956A"/>
+          <text x="49" y="52" font-family="'Instrument Sans', 'Helvetica Neue', sans-serif"
+            font-size="52" font-weight="500" fill="#F5F1EC">nara</text>
+        </svg>
+      </div>
+      <div class="tagline">presence, by design</div>
+    </div>
+
+    <!-- Variation 3: Mark + wordmark stacked -->
+    <div class="card cream">
+      <div class="label">Mark · Standalone</div>
+      <div style="display:flex; align-items:center; gap:20px;">
+        <!-- Standalone i mark -->
+        <svg width="48" height="64" viewBox="0 0 48 64" xmlns="http://www.w3.org/2000/svg">
+          <!-- i stem -->
+          <rect x="20" y="22" width="8" height="36" rx="4" fill="#1A2744"/>
+          <!-- 4-point star -->
+          <path d="M24,2 L26.5,9.5 L34,12 L26.5,14.5 L24,22 L21.5,14.5 L14,12 L21.5,9.5 Z" fill="#B8956A"/>
+        </svg>
+        <div>
+          <div style="font-family:'Instrument Sans',sans-serif; font-size:36px; font-weight:500; color:#1A2744; letter-spacing:-0.5px;">Sinara</div>
+          <div class="tagline" style="color:#9CA3AF;">presence, by design</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Variation 4: Small / compact mark -->
+    <div class="card">
+      <div class="label">Compact · App icon style</div>
+      <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+
+        <!-- Large version -->
+        <svg width="56" height="56" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+          <rect width="56" height="56" rx="14" fill="#1A2744"/>
+          <!-- i stem -->
+          <rect x="24" y="26" width="8" height="20" rx="4" fill="#F5F1EC"/>
+          <!-- star -->
+          <path d="M28,10 L30,17 L37,19 L30,21 L28,28 L26,21 L19,19 L26,17 Z" fill="#B8956A"/>
+        </svg>
+
+        <!-- Medium version -->
+        <svg width="40" height="40" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+          <rect width="56" height="56" rx="14" fill="#1A2744"/>
+          <rect x="24" y="26" width="8" height="20" rx="4" fill="#F5F1EC"/>
+          <path d="M28,10 L30,17 L37,19 L30,21 L28,28 L26,21 L19,19 L26,17 Z" fill="#B8956A"/>
+        </svg>
+
+        <!-- Small favicon size -->
+        <svg width="24" height="24" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+          <rect width="56" height="56" rx="14" fill="#1A2744"/>
+          <rect x="24" y="26" width="8" height="20" rx="4" fill="#F5F1EC"/>
+          <path d="M28,10 L30,17 L37,19 L30,21 L28,28 L26,21 L19,19 L26,17 Z" fill="#B8956A"/>
+        </svg>
+
+        <div style="font-size:0.78rem; color:#9CA3AF; line-height:1.6;">
+          App icon · Favicon<br/>56px · 40px · 24px
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

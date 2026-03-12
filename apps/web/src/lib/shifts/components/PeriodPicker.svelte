@@ -143,6 +143,15 @@
 
 <svelte:window onclick={handleClickOutside} onkeydown={handleKeyDown} />
 
+{#if periods.length === 0}
+	<a
+		href="/shifts/settings?tab=periods"
+		class="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors text-sm font-medium"
+	>
+		<span class="material-symbols-rounded text-base">add_circle</span>
+		期間を設定してください →
+	</a>
+{:else}
 <div class="period-picker relative inline-flex items-center gap-1">
 	<!-- Previous Period Button -->
 	<button
@@ -246,3 +255,4 @@
 		</div>
 	{/if}
 </div>
+{/if}

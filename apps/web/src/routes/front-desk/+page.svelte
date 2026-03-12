@@ -11,21 +11,16 @@
 		searchReservations,
 		createReservation,
 		deleteAllReservations,
-		getMenuGroups,
-		getMenus,
-		getSeasonalMenus,
+
 		type Reservation,
 		type Room,
 		type GuestAlert,
 		type Allergen,
 		type CheckInData,
-		type MenuGroup,
-		type Menu,
-		type SeasonalMenu,
+
 	} from "$lib/api";
 	import { onMount, onDestroy } from "svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
-	import MenuPreviewPanel from "$lib/components/flow/MenuPreviewPanel.svelte";
 	import { authState, can } from "$lib/auth.svelte";
 	import { supabase } from "$lib/supabase";
 
@@ -39,70 +34,6 @@
 	const canViewReservations = $derived(can("reservations.view"));
 	const canViewRooms = $derived(can("rooms.view"));
 	const canViewNotifications = $derived(can("notifications.view"));
-
-	// Menu preview state
-	let showMenuPreview = $state(false);
-	let selectedMenuGroupId = $state<string | null>(null);
-	let menuGroups = $state<MenuGroup[]>([]);
-	let menus = $state<Menu[]>([]);
-	let seasonalMenus = $state<SeasonalMenu[]>([]);
-
-	// Derived data for menu preview
-	const activeMenuGroup = $derived(
-		menuGroups.find((g) => g.id === selectedMenuGroupId) ?? null,
-	);
-	const activeGroupCourses = $derived.by(() => {
-		if (!activeMenuGroup) return [];
-		return (activeMenuGroup.allowed_courses || []).map((ac) => ({
-			courseId: ac.id,
-			courseName: ac.category_name,
-			courseValue: ac.category_value,
-			menus: menus
-				.filter(
-					(m) =>
-						m.menu_group_id === activeMenuGroup.id &&
-						m.category === ac.category_value,
-				)
-				.map((m) => ({
-					id: m.id,
-					name: m.name,
-					price: m.price,
-					description: m.description,
-				})),
-		}));
-	});
-	const activeGroupSeasonName = $derived(
-		activeMenuGroup?.seasonal_menu_id
-			? (seasonalMenus.find(
-					(s) => s.id === activeMenuGroup.seasonal_menu_id,
-				)?.name ?? null)
-			: null,
-	);
-	const activeKidsGroup = $derived.by(() => {
-		if (!activeMenuGroup?.kids_group_id) return null;
-		const kg = menuGroups.find(
-			(g) => g.id === activeMenuGroup.kids_group_id,
-		);
-		if (!kg) return null;
-		const mainCourseIds = new Set(
-			(activeMenuGroup.allowed_courses || []).map((c) => c.category_id),
-		);
-		const kidsCourses = (kg.allowed_courses || []).filter((c) =>
-			mainCourseIds.has(c.category_id),
-		);
-		return {
-			id: kg.id,
-			name: kg.name,
-			courseNames: kidsCourses.map((c) => c.category_name),
-		};
-	});
-
-	// Filter out groups that are linked as kids groups
-	const previewableMenuGroups = $derived.by(() => {
-		return menuGroups.filter(
-			(g) => !menuGroups.some((mg) => mg.kids_group_id === g.id),
-		);
-	});
 
 	// Sidebar
 	let sidebarCollapsed = $state(false);
@@ -169,43 +100,17 @@
 		if (frontDeskItems.length > 0) {
 			sections.push({ label: "フロント", items: frontDeskItems });
 		}
-		const foodItems: {
-			icon: string;
-			label: string;
-			href?: string;
-			onclick?: () => void;
-			active: boolean;
-		}[] = [];
-		// Menu preview requires menus.preview permission
-		if (can("menus.preview")) {
-			foodItems.push({
-				icon: "menu_book",
-				label: "お品書きプレビュー",
-				active: showMenuPreview,
-				onclick: () => {
-					showMenuPreview = true;
+		sections.push({
+			label: "食材管理",
+			items: [
+				{
+					icon: "menu_book",
+					label: "メニュー・商品管理",
+					href: "/menu",
+					active: false,
 				},
-			});
-		}
-		if (can("products.view")) {
-			foodItems.push({
-				icon: "inventory_2",
-				label: "商品管理",
-				href: "/",
-				active: false,
-			});
-		}
-		if (can("menus.view")) {
-			foodItems.push({
-				icon: "restaurant_menu",
-				label: "メニュー管理",
-				href: "/",
-				active: false,
-			});
-		}
-		if (foodItems.length > 0) {
-			sections.push({ label: "食材管理", items: foodItems });
-		}
+			],
+		});
 		sections.push({
 			label: "スタッフ",
 			items: [
@@ -630,17 +535,11 @@
 				roomsData,
 				alertsData,
 				allergensData,
-				menuGroupsData,
-				menusData,
-				seasonalMenusData,
 			] = await Promise.all([
 				getReservations(dateParam),
 				getRooms(),
 				getNewGuestAlerts(),
 				getAllergens(),
-				getMenuGroups(),
-				getMenus(),
-				getSeasonalMenus(),
 			]);
 
 			// Filter by date range on client side for multi-day ranges
@@ -660,9 +559,6 @@
 			rooms = roomsData;
 			alerts = alertsData;
 			allergens = allergensData;
-			menuGroups = menuGroupsData;
-			menus = menusData;
-			seasonalMenus = seasonalMenusData;
 		} catch (e) {
 			error =
 				e instanceof Error
@@ -1218,19 +1114,24 @@
 
 	// Supabase realtime subscription (single channel, optimized for free tier)
 	let realtimeChannel: any = null;
+	let realtimeStatus = $state<"connecting" | "connected" | "error" | "closed">("connecting");
 
 	function setupRealtimeSubscriptions() {
-		// Get organization ID from environment
-		const organizationId = import.meta.env.VITE_ORGANIZATION_ID;
+		// Use the authenticated user's org ID — never a hardcoded env var
+		const organizationId = authState.organizationId;
 
-		console.log(
-			"🔌 Setting up real-time subscriptions for organization:",
-			organizationId,
-		);
+		// Clean up any existing channel first to avoid CLOSED status from duplicate channel names
+		if (realtimeChannel) {
+			supabase.removeChannel(realtimeChannel);
+			realtimeChannel = null;
+		}
+
+		// Use a unique channel name per session to avoid conflicts on hot reload
+		const channelName = `front-desk-realtime-${Date.now()}`;
 
 		// Use a single channel with multiple event listeners to minimize connections
 		realtimeChannel = supabase
-			.channel("front-desk-realtime")
+			.channel(channelName)
 			// Listen to reservations changes
 			.on(
 				"postgres_changes",
@@ -1291,11 +1192,23 @@
 				},
 			)
 			.subscribe((status, err) => {
-				console.log("📡 Front-desk realtime status:", status, err);
-				if (status === "CHANNEL_ERROR") {
+				if (status === "SUBSCRIBED") {
+					realtimeStatus = "connected";
+					console.log("✅ Front-desk realtime: connected");
+				} else if (status === "CHANNEL_ERROR") {
+					realtimeStatus = "error";
 					console.error(
-						"❌ Channel error - you may have too many connections open. Supabase free tier allows only 2 concurrent real-time connections. Close other tabs or upgrade plan.",
+						"❌ Realtime channel error — too many connections or realtime not enabled for tables. Free tier: max 2 concurrent channels.",
+						err,
 					);
+				} else if (status === "TIMED_OUT") {
+					realtimeStatus = "error";
+					console.warn("⏱️ Realtime channel timed out — retrying automatically.");
+				} else if (status === "CLOSED") {
+					realtimeStatus = "closed";
+					console.log("📡 Front-desk realtime: closed");
+				} else {
+					console.log("📡 Front-desk realtime:", status, err ?? "");
 				}
 			});
 	}
@@ -1532,12 +1445,13 @@
 					{/if}
 					<!-- Real-time indicator -->
 					<div
-						class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-md bg-gray-50"
+						class="flex items-center gap-2 px-3 py-2 border rounded-md {realtimeStatus === 'connected' ? 'border-green-200 bg-green-50' : realtimeStatus === 'error' ? 'border-red-200 bg-red-50' : realtimeStatus === 'closed' ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}"
+						title={realtimeStatus === 'connected' ? 'リアルタイム接続中' : realtimeStatus === 'error' ? 'リアルタイム接続エラー' : realtimeStatus === 'closed' ? 'リアルタイム切断中' : '接続中...'}
 					>
 						<span
-							class="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+							class="w-2 h-2 rounded-full {realtimeStatus === 'connected' ? 'bg-green-500 animate-pulse' : realtimeStatus === 'error' ? 'bg-red-500' : realtimeStatus === 'closed' ? 'bg-amber-400' : 'bg-gray-400 animate-pulse'}"
 						></span>
-						<span class="text-xs text-gray-600">リアルタイム</span>
+						<span class="text-xs {realtimeStatus === 'connected' ? 'text-green-700' : realtimeStatus === 'error' ? 'text-red-700' : realtimeStatus === 'closed' ? 'text-amber-700' : 'text-gray-600'}">リアルタイム</span>
 					</div>
 					<button
 						onclick={() => loadData()}
@@ -3253,93 +3167,6 @@
 	</div>
 {/if}
 
-<!-- Menu Preview Group Selector Modal -->
-{#if showMenuPreview && !selectedMenuGroupId}
-	<div
-		class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
-	>
-		<div
-			class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
-		>
-			<div
-				class="border-b border-gray-200 px-6 py-4 flex justify-between items-center"
-			>
-				<h2 class="text-lg font-semibold text-gray-900">
-					お品書きを選択
-				</h2>
-				<button
-					onclick={() => {
-						showMenuPreview = false;
-					}}
-					class="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-				>
-					<span class="material-symbols-rounded text-xl">close</span>
-				</button>
-			</div>
-			<div class="flex-1 overflow-y-auto p-6">
-				{#if previewableMenuGroups.length === 0}
-					<div
-						class="flex flex-col items-center justify-center py-12 text-gray-400"
-					>
-						<span class="material-symbols-rounded text-5xl mb-3"
-							>menu_book</span
-						>
-						<p class="text-sm">メニューグループがありません</p>
-					</div>
-				{:else}
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-						{#each previewableMenuGroups as group}
-							<button
-								onclick={() => {
-									selectedMenuGroupId = group.id;
-								}}
-								class="flex flex-col items-start p-4 border-2 border-gray-200 rounded-lg hover:border-orange-400 hover:bg-orange-50/30 transition-all text-left group"
-							>
-								<div class="flex items-center gap-2 mb-2">
-									<span
-										class="material-symbols-rounded text-orange-600 text-xl"
-										>restaurant_menu</span
-									>
-									<span
-										class="font-semibold text-gray-900 group-hover:text-orange-700 transition-colors"
-										>{group.name}</span
-									>
-								</div>
-								{#if group.display_title}
-									<p class="text-xs text-gray-500">
-										{group.display_title}
-									</p>
-								{/if}
-								<div class="mt-2 text-xs text-gray-400">
-									{(group.allowed_courses || []).length} コース
-								</div>
-							</button>
-						{/each}
-					</div>
-				{/if}
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Menu Preview Panel -->
-{#if showMenuPreview && selectedMenuGroupId && activeMenuGroup}
-	<MenuPreviewPanel
-		groupId={activeMenuGroup.id}
-		groupName={activeMenuGroup.name}
-		seasonName={activeGroupSeasonName}
-		displayTitle={activeMenuGroup.display_title ?? null}
-		courses={activeGroupCourses}
-		availableCourses={[]}
-		kidsGroup={activeKidsGroup}
-		linkableGroups={[]}
-		readonly={true}
-		onClose={() => {
-			showMenuPreview = false;
-			selectedMenuGroupId = null;
-		}}
-	/>
-{/if}
 
 <!-- Toast Notification -->
 {#if showToast}

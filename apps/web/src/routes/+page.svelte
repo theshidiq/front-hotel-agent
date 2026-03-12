@@ -2,10 +2,8 @@
     import { onMount } from "svelte";
     import { cubicOut } from "svelte/easing";
     import ConstellationCanvas from "$lib/components/ConstellationCanvas.svelte";
-    import { signInWithGoogle } from "$lib/auth.svelte";
-
     function startSetup() {
-        signInWithGoogle(window.location.origin + "/setup");
+        window.location.href = "/signup";
     }
 
     let emailInput = $state("");

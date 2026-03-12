@@ -8,7 +8,9 @@ import type {
 	MonthlyLimits,
 	ORToolsSolverConfig,
 	ScheduleResponse,
-	OptimizeResponse
+	OptimizeResponse,
+	BackupAssignment,
+	StaffUnavailability
 } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
@@ -116,9 +118,10 @@ class PrefetchManager {
 
 		try {
 			// Sort periods by start_date descending (most recent first)
-			const sortedPeriods = [...periods].sort((a, b) =>
-				b.start_date.localeCompare(a.start_date)
-			);
+			// Only prefetch the 3 most recent periods — users rarely navigate to old ones
+			const sortedPeriods = [...periods]
+				.sort((a, b) => b.start_date.localeCompare(a.start_date))
+				.slice(0, 3);
 
 			// Prefetch in batches of 3 for network efficiency
 			const batchSize = 3;
@@ -339,6 +342,7 @@ export interface UpdateShiftStaffData {
 	is_active?: boolean;
 	start_period?: { year: number; month: number; day: number };
 	end_period?: { year: number; month: number; day: number };
+	metadata?: Record<string, unknown>;
 }
 
 export async function updateShiftStaff(id: string, data: UpdateShiftStaffData): Promise<ScheduleStaff> {
@@ -520,13 +524,16 @@ export interface OptimizeOptions {
 	timeout?: number;
 	penaltyWeights?: Record<string, number>;
 	preservePrefilled?: boolean;
+	signal?: AbortSignal;
 }
 
 export async function optimizeSchedule(options: OptimizeOptions): Promise<OptimizeResponse> {
+	const { signal, ...body } = options;
 	const response = await apiFetch(`${API_URL}/shifts/optimize`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),
-		body: JSON.stringify(options)
+		body: JSON.stringify(body),
+		signal
 	});
 	const result = await handleResponse<OptimizeResponse>(response);
 	// Invalidate schedule cache after optimization
@@ -1059,4 +1066,104 @@ export async function regeneratePeriods(): Promise<SchedulePeriod[]> {
 		headers: authHeaders()
 	});
 	return handleResponse(response);
+}
+
+// ==================== BACKUP ASSIGNMENTS ====================
+
+export async function getBackupAssignments(departmentId?: string): Promise<BackupAssignment[]> {
+	const params = departmentId ? `?departmentId=${departmentId}` : '';
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments${params}`, {
+		headers: authHeaders()
+	});
+	return handleResponse(response);
+}
+
+export async function createBackupAssignment(data: {
+	staffId: string;
+	groupId: string;
+	assignmentType?: string;
+	priorityOrder?: number;
+}): Promise<BackupAssignment> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function updateBackupAssignment(
+	id: string,
+	data: { isActive?: boolean; priorityOrder?: number }
+): Promise<BackupAssignment> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments/${id}`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function deleteBackupAssignment(id: string): Promise<void> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/backup-assignments/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders()
+	});
+	if (!response.ok && response.status !== 204) {
+		const err = await response.json().catch(() => ({ message: 'Delete failed' }));
+		throw new Error(err.message);
+	}
+}
+
+// ==================== STAFF UNAVAILABILITY ====================
+
+export async function getStaffUnavailability(params?: {
+	staffId?: string;
+	startDate?: string;
+	endDate?: string;
+}): Promise<StaffUnavailability[]> {
+	const q = new URLSearchParams();
+	if (params?.staffId) q.set('staffId', params.staffId);
+	if (params?.startDate) q.set('startDate', params.startDate);
+	if (params?.endDate) q.set('endDate', params.endDate);
+	const url = `${API_URL}/shifts/settings/staff-unavailability${q.toString() ? `?${q}` : ''}`;
+	const response = await apiFetch(url, { headers: authHeaders() });
+	return handleResponse(response);
+}
+
+export async function createStaffUnavailability(data: {
+	staffId: string;
+	date: string;
+	reason?: string;
+}): Promise<StaffUnavailability> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-unavailability`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function bulkCreateStaffUnavailability(data: {
+	staffId: string;
+	dates: string[];
+	reason?: string;
+}): Promise<StaffUnavailability[]> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-unavailability/bulk`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data)
+	});
+	return handleResponse(response);
+}
+
+export async function deleteStaffUnavailability(id: string): Promise<void> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/staff-unavailability/${id}`, {
+		method: 'DELETE',
+		headers: authHeaders()
+	});
+	if (!response.ok && response.status !== 204) {
+		const err = await response.json().catch(() => ({ message: 'Delete failed' }));
+		throw new Error(err.message);
+	}
 }

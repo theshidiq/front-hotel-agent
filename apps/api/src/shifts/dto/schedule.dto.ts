@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject, IsNumber, IsArray, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsNumber, IsArray, IsBoolean, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ShiftSymbol } from '../interfaces/shift.interface';
 
@@ -50,9 +50,11 @@ export class OptimizeRequestDto {
   @IsString()
   departmentId?: string;
 
-  @ApiPropertyOptional({ description: 'Solver timeout in seconds (default: 30)' })
+  @ApiPropertyOptional({ description: 'Solver timeout in seconds (default: 30, max: 300)' })
   @IsOptional()
   @IsNumber()
+  @Min(1)
+  @Max(300)
   timeout?: number;
 
   @ApiPropertyOptional({ description: 'Custom penalty weights override' })
@@ -64,6 +66,7 @@ export class OptimizeRequestDto {
   @IsOptional()
   @IsBoolean()
   preservePrefilled?: boolean;
+
 }
 
 export class ScheduleResponseDto {

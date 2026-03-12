@@ -169,6 +169,7 @@ export class ShiftsService {
     const { data, error } = await this.supabase
       .from('periods')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('start_date', { ascending: false });
 
     if (error) {
@@ -184,6 +185,7 @@ export class ShiftsService {
       .from('periods')
       .select('*')
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !data) {
@@ -197,6 +199,7 @@ export class ShiftsService {
     const { data, error } = await this.supabase
       .from('periods')
       .insert({
+        organization_id: organizationId,
         label: dto.label,
         start_date: dto.start_date,
         end_date: dto.end_date,
@@ -216,7 +219,8 @@ export class ShiftsService {
     const { error } = await this.supabase
       .from('periods')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to delete period', error);
@@ -422,6 +426,7 @@ export class ShiftsService {
     const { data: metadata, error: metaError } = await this.supabase
       .from('schedule_metadata')
       .insert({
+        organization_id: organizationId,
         schedule_name: scheduleName,
         schedule_period_start: period.start_date,
         schedule_period_end: period.end_date,
@@ -438,6 +443,7 @@ export class ShiftsService {
     const { data: schedule, error } = await this.supabase
       .from('schedules')
       .insert({
+        organization_id: organizationId,
         schedule_data: {},
         metadata_id: metadata.id,
       })
@@ -469,6 +475,7 @@ export class ShiftsService {
       priorityRules,
       earlyShiftPreferences,
       backupAssignments,
+      staffUnavailability,
     ] = await Promise.all([
       this.getCalendarRules(organizationId),
       this.getDailyLimits(organizationId, deptId),
@@ -477,7 +484,8 @@ export class ShiftsService {
       this.getStaffGroups(organizationId, deptId),
       this.getPriorityRules(organizationId, deptId),
       this.getEarlyShiftPreferences(organizationId, deptId),
-      this.getBackupAssignments(organizationId, deptId),
+      this.getBackupAssignments(organizationId, deptId, true), // active-only for solver
+      this.getStaffUnavailability(organizationId),
     ]);
 
     // Staff groups: members stored in group_config.members JSONB
@@ -522,7 +530,7 @@ export class ShiftsService {
       return {
         id: rule.id,
         name: rule.name,
-        ruleType: rd?.ruleType || rd?.type || 'preferred_shift',
+        ruleType: rd?.ruleType || rd?.rule_type || rd?.type || rule.rule_type || 'preferred_shift',
         staffIds: rd?.staffIds || (rd?.staff_id ? [rd.staff_id] : rd?.staff_ids || []),
         shiftType: rd?.shiftType || rd?.shift_type || 'off',
         daysOfWeek: rd?.daysOfWeek || rd?.days_of_week || [],
@@ -562,6 +570,37 @@ export class ShiftsService {
 
     const dateRange = this.generateDateRange(period.start_date, period.end_date);
 
+    // Build prefilledSchedule: start from existing schedule_data, then inject required_off as × (HARD OFF).
+    // This mirrors how React's BusinessRuleValidator directly sets cells — bypasses CP-SAT constraint
+    // ordering issues where prefilled WORK cells would win over required_off HARD constraints.
+    const baseScheduleData: Record<string, Record<string, string>> =
+      (dto.preservePrefilled && schedule?.schedule_data) ? { ...(schedule.schedule_data as any) } : {};
+
+    // Inject required_off rules as × cells (override any existing value)
+    // JS day-of-week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+    let requiredOffInjected = 0;
+    for (const rule of normalizedPriorityRules) {
+      if (rule.ruleType !== 'required_off') continue;
+      if (rule.isActive === false) continue;
+
+      const targetStaffIds: Set<string> = new Set(rule.staffIds || []);
+      const daysOfWeek: Set<number> = new Set((rule.daysOfWeek || []).map(Number));
+      if (targetStaffIds.size === 0 || daysOfWeek.size === 0) continue;
+
+      for (const dateStr of dateRange) {
+        const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay(); // 0=Sun, 6=Sat
+        if (!daysOfWeek.has(dayOfWeek)) continue;
+        for (const staffId of targetStaffIds) {
+          if (!baseScheduleData[staffId]) baseScheduleData[staffId] = {};
+          baseScheduleData[staffId][dateStr] = '×';
+          requiredOffInjected++;
+        }
+      }
+    }
+    if (requiredOffInjected > 0) {
+      this.logger.log(`[optimize] Injected ${requiredOffInjected} required_off cells as × into prefilledSchedule`);
+    }
+
     // Early shift preferences: build dict { staffId: { dateString: boolean, 'default': boolean } }
     // Expected format by scheduler.py _add_calendar_rules()
     const earlyShiftPrefsDict: Record<string, Record<string, boolean>> = {};
@@ -599,6 +638,7 @@ export class ShiftsService {
         staff_order: s.staff_order,
         ...(s.start_period && { start_period: s.start_period }),
         ...(s.end_period && { end_period: s.end_period }),
+        ...((s as any).metadata && { metadata: (s as any).metadata }),
       })),
       dateRange,
       constraints: {
@@ -610,8 +650,9 @@ export class ShiftsService {
         ...(normalizedPriorityRules.length && { priorityRules: normalizedPriorityRules }),
         ...(Object.keys(earlyShiftPrefsDict).length && { earlyShiftPreferences: earlyShiftPrefsDict }),
         ...(backupAssignments.length && { backupAssignments }),
-        ...(dto.preservePrefilled && schedule?.schedule_data && {
-          prefilledSchedule: schedule.schedule_data,
+        ...(staffUnavailability.length && { staffUnavailability }),
+        ...(Object.keys(baseScheduleData).length && {
+          prefilledSchedule: baseScheduleData,
         }),
         // Staff status restrictions toggle (#4)
         ...(ss?.disableStaffStatusShiftRestrictions && {
@@ -1362,6 +1403,9 @@ export class ShiftsService {
   // ==================== SETTINGS: Priority Rules ====================
 
   async getPriorityRules(organizationId: string, departmentId?: string): Promise<any[]> {
+    // Fetch rules that match the department OR have no department (global rules).
+    // Using `or` so that department-scoped rules are always included when a departmentId is provided,
+    // and global rules (department_id IS NULL) are always included regardless.
     let query = this.supabase
       .from('priority_rules')
       .select('*')
@@ -1369,7 +1413,7 @@ export class ShiftsService {
       .eq('is_active', true);
 
     if (departmentId) {
-      query = query.eq('department_id', departmentId);
+      query = query.or(`department_id.eq.${departmentId},department_id.is.null`);
     } else {
       query = query.is('department_id', null);
     }
@@ -1459,6 +1503,7 @@ export class ShiftsService {
         .from('priority_rules')
         .select('rule_definition')
         .eq('id', id)
+        .eq('organization_id', organizationId)
         .single();
 
       updateData.rule_definition = {
@@ -1722,12 +1767,12 @@ export class ShiftsService {
       });
     }
 
-    // Delete existing periods and insert new ones
-    await this.supabase.from('periods').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    // Delete existing periods for this org and insert new ones
+    await this.supabase.from('periods').delete().eq('organization_id', organizationId);
 
     const { data, error } = await this.supabase
       .from('periods')
-      .insert(periods)
+      .insert(periods.map(p => ({ ...p, organization_id: organizationId })))
       .select();
 
     if (error) {
@@ -1740,7 +1785,7 @@ export class ShiftsService {
 
   // ==================== BACKUP ASSIGNMENTS ====================
 
-  async getBackupAssignments(organizationId: string, departmentId?: string): Promise<Array<{
+  async getBackupAssignments(organizationId: string, departmentId?: string, activeOnly = false): Promise<Array<{
     id: string;
     staffId: string;
     groupId: string;
@@ -1751,8 +1796,11 @@ export class ShiftsService {
     let query = this.supabase
       .from('staff_backup_assignments')
       .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true);
+      .eq('organization_id', organizationId);
+
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
 
     // Filter by department if provided — join via staff table
     // For simplicity, fetch all active assignments and filter by staff in the department
@@ -1789,6 +1837,163 @@ export class ShiftsService {
       assignmentType: a.assignment_type,
       priorityOrder: a.priority_order,
     }));
+  }
+
+  async createBackupAssignment(
+    organizationId: string,
+    dto: { staffId: string; groupId: string; assignmentType?: string; priorityOrder?: number },
+  ) {
+    const versionId = await this.getOrCreateConfigVersion(organizationId);
+    const { data, error } = await this.supabase
+      .from('staff_backup_assignments')
+      .insert({
+        organization_id: organizationId,
+        version_id: versionId,
+        staff_id: dto.staffId,
+        group_id: dto.groupId,
+        is_active: true,
+        assignment_type: dto.assignmentType ?? 'coverage',
+        priority_order: dto.priorityOrder ?? 0,
+      })
+      .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
+      .single();
+
+    if (error) throw new Error(`Failed to create backup assignment: ${error.message}`);
+    return {
+      id: data.id,
+      staffId: data.staff_id,
+      groupId: data.group_id,
+      isActive: data.is_active,
+      assignmentType: data.assignment_type,
+      priorityOrder: data.priority_order,
+    };
+  }
+
+  async updateBackupAssignment(
+    organizationId: string,
+    id: string,
+    dto: { isActive?: boolean; priorityOrder?: number },
+  ) {
+    const updates: Record<string, any> = {};
+    if (dto.isActive !== undefined) updates.is_active = dto.isActive;
+    if (dto.priorityOrder !== undefined) updates.priority_order = dto.priorityOrder;
+
+    const { data, error } = await this.supabase
+      .from('staff_backup_assignments')
+      .update(updates)
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .select('id, staff_id, group_id, is_active, assignment_type, priority_order')
+      .single();
+
+    if (error) throw new Error(`Failed to update backup assignment: ${error.message}`);
+    return {
+      id: data.id,
+      staffId: data.staff_id,
+      groupId: data.group_id,
+      isActive: data.is_active,
+      assignmentType: data.assignment_type,
+      priorityOrder: data.priority_order,
+    };
+  }
+
+  async deleteBackupAssignment(organizationId: string, id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('staff_backup_assignments')
+      .delete()
+      .eq('id', id)
+      .eq('organization_id', organizationId);
+
+    if (error) throw new Error(`Failed to delete backup assignment: ${error.message}`);
+  }
+
+  // ==================== STAFF UNAVAILABILITY ====================
+
+  async getStaffUnavailability(
+    organizationId: string,
+    staffId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<Array<{ id: string; staffId: string; date: string; reason?: string; createdAt: string }>> {
+    let query = this.supabase
+      .from('staff_unavailability')
+      .select('id, staff_id, date, reason, created_at')
+      .eq('organization_id', organizationId)
+      .order('date', { ascending: true });
+
+    if (staffId) query = query.eq('staff_id', staffId);
+    if (startDate) query = query.gte('date', startDate);
+    if (endDate) query = query.lte('date', endDate);
+
+    const { data, error } = await query;
+    if (error) {
+      this.logger.warn('Failed to fetch staff unavailability', error);
+      return [];
+    }
+    return (data ?? []).map((r: any) => ({
+      id: r.id,
+      staffId: r.staff_id,
+      date: r.date,
+      reason: r.reason,
+      createdAt: r.created_at,
+    }));
+  }
+
+  async createStaffUnavailability(
+    organizationId: string,
+    dto: { staffId: string; date: string; reason?: string },
+  ) {
+    const { data, error } = await this.supabase
+      .from('staff_unavailability')
+      .upsert(
+        {
+          organization_id: organizationId,
+          staff_id: dto.staffId,
+          date: dto.date,
+          reason: dto.reason ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'organization_id,staff_id,date' },
+      )
+      .select('id, staff_id, date, reason, created_at')
+      .single();
+
+    if (error) throw new Error(`Failed to create unavailability: ${error.message}`);
+    return { id: data.id, staffId: data.staff_id, date: data.date, reason: data.reason, createdAt: data.created_at };
+  }
+
+  async bulkCreateStaffUnavailability(
+    organizationId: string,
+    dto: { staffId: string; dates: string[]; reason?: string },
+  ) {
+    if (!dto.dates.length) return [];
+    const rows = dto.dates.map((date) => ({
+      organization_id: organizationId,
+      staff_id: dto.staffId,
+      date,
+      reason: dto.reason ?? null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { data, error } = await this.supabase
+      .from('staff_unavailability')
+      .upsert(rows, { onConflict: 'organization_id,staff_id,date' })
+      .select('id, staff_id, date, reason, created_at');
+
+    if (error) throw new Error(`Failed to bulk create unavailability: ${error.message}`);
+    return (data ?? []).map((r: any) => ({
+      id: r.id, staffId: r.staff_id, date: r.date, reason: r.reason, createdAt: r.created_at,
+    }));
+  }
+
+  async deleteStaffUnavailability(organizationId: string, id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('staff_unavailability')
+      .delete()
+      .eq('id', id)
+      .eq('organization_id', organizationId);
+
+    if (error) throw new Error(`Failed to delete unavailability: ${error.message}`);
   }
 
   // ==================== HELPERS ====================

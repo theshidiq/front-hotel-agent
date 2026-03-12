@@ -25,7 +25,8 @@
 	import ScheduleSkeleton from "$lib/shifts/components/ScheduleSkeleton.svelte";
 	import TableSkeleton from "$lib/shifts/components/TableSkeleton.svelte";
 	import OptimizeOverlay from "$lib/shifts/components/OptimizeOverlay.svelte";
-	import Sidebar from "$lib/components/Sidebar.svelte";
+	import ViolationsPanel from "$lib/shifts/components/ViolationsPanel.svelte";
+import Sidebar from "$lib/components/Sidebar.svelte";
 	import { printSchedule } from "$lib/shifts/printSchedule";
 
 	// ── Sidebar State ──
@@ -101,6 +102,17 @@
 	let optimizing = $state(false);
 	let clearing = $state(false);
 	let optimizerHealthy = $state(false);
+	let _optimizeAbortController: AbortController | null = null;
+
+	// ── Partial Result Dialog ──
+	let showPartialDialog = $state(false);
+	let partialResult = $state<{ schedule: Record<string, Record<string, string>>; solve_time?: number; violations: Array<{ description: string; count: number; penalty: number }> } | null>(null);
+
+// ── Violations State ──
+	let optimizeViolations = $state<Array<{ description: string; count: number; penalty: number }>>([]);
+	let showViolations = $state(false);
+	let lastSolveTime = $state<number | undefined>(undefined);
+	let lastIsOptimal = $state<boolean | undefined>(undefined);
 
 
 	// ── Optimize Progress Overlay ──
@@ -568,6 +580,9 @@
 	) {
 		if (!selectedPeriodId) return;
 
+		// Save previous value for revert on failure
+		const prevSymbol = scheduleData[staffId]?.[date] ?? '';
+
 		// Update local state immediately (optimistic)
 		if (!scheduleData[staffId]) {
 			scheduleData[staffId] = {};
@@ -579,7 +594,9 @@
 			saving = true;
 			await bulkUpdateCells(selectedPeriodId, [{ staffId, date, symbol }], activeDepartmentId ?? undefined);
 		} catch (e) {
-			// Revert on failure
+			// Revert optimistic update on failure
+			scheduleData[staffId][date] = prevSymbol;
+			scheduleData = { ...scheduleData };
 			error = e instanceof Error ? e.message : "Failed to save";
 		} finally {
 			saving = false;
@@ -618,6 +635,8 @@
 	async function handleOptimize() {
 		if (!selectedPeriodId || !optimizerHealthy) return;
 
+		_optimizeAbortController = new AbortController();
+
 		try {
 			optimizing = true;
 			error = "";
@@ -628,32 +647,105 @@
 				departmentId: activeDepartmentId ?? undefined,
 				timeout: 30,
 				preservePrefilled: true,
+				signal: _optimizeAbortController.signal,
 			});
 
 			if (result.success && result.schedule) {
-				finishOptimizeProgress();
-
-				scheduleData = result.schedule;
-
-				// Save optimized schedule
-				const updates: CellUpdate[] = [];
-				for (const [staffId, dates] of Object.entries(result.schedule)) {
-					for (const [date, symbol] of Object.entries(dates)) {
-						updates.push({ staffId, date, symbol });
-					}
+				// If not optimal (FEASIBLE / timed out), show partial result dialog instead of auto-saving
+				if (result.is_optimal === false) {
+					stopOptimizeProgress();
+					partialResult = {
+						schedule: result.schedule,
+						solve_time: result.solve_time,
+						violations: result.violations ?? [],
+					};
+					showPartialDialog = true;
+					return;
 				}
-				await bulkUpdateCells(selectedPeriodId, updates, activeDepartmentId ?? undefined);
-				showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒)`);
+
+				finishOptimizeProgress();
+				await _commitSchedule(result.schedule);
+
+				lastSolveTime = result.solve_time;
+				lastIsOptimal = result.is_optimal;
+				const userViolations = (result.violations ?? []).filter(
+					(v: { description: string }) => !(v.description.startsWith('Backup ') && v.description.includes('has day off (not on holiday)'))
+				);
+				if (userViolations.length > 0) {
+					optimizeViolations = userViolations;
+					showViolations = true;
+					showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒) — ${userViolations.length}件の制約違反`);
+				} else {
+					optimizeViolations = [];
+					showViolations = false;
+					showSuccess(`最適化完了 (${result.solve_time?.toFixed(2)}秒)`);
+				}
 			} else {
 				stopOptimizeProgress();
 				error = result.error || "Optimization failed";
 			}
 		} catch (e) {
 			stopOptimizeProgress();
-			error = e instanceof Error ? e.message : "Optimization failed";
+			if (e instanceof Error && e.name === 'AbortError') {
+				showSuccess('最適化をキャンセルしました');
+			} else {
+				error = e instanceof Error ? e.message : "Optimization failed";
+			}
 		} finally {
 			optimizing = false;
+			_optimizeAbortController = null;
 		}
+	}
+
+	function handleCancelOptimize() {
+		_optimizeAbortController?.abort();
+	}
+
+async function _commitSchedule(schedule: Record<string, Record<string, string>>) {
+		if (!selectedPeriodId) return;
+		scheduleData = schedule;
+		const updates: CellUpdate[] = [];
+		for (const [staffId, dates] of Object.entries(schedule)) {
+			for (const [date, symbol] of Object.entries(dates)) {
+				updates.push({ staffId, date, symbol });
+			}
+		}
+		await bulkUpdateCells(selectedPeriodId, updates, activeDepartmentId ?? undefined);
+	}
+
+	async function handleUsePartialSchedule() {
+		if (!partialResult) return;
+		showPartialDialog = false;
+		try {
+			optimizing = true;
+			finishOptimizeProgress();
+			await _commitSchedule(partialResult.schedule);
+			lastSolveTime = partialResult.solve_time;
+			lastIsOptimal = false;
+			const partialUserViolations = partialResult.violations.filter(
+				(v: { description: string }) => !(v.description.startsWith('Backup ') && v.description.includes('has day off (not on holiday)'))
+			);
+			if (partialUserViolations.length > 0) {
+				optimizeViolations = partialUserViolations;
+				showViolations = true;
+				showSuccess(`部分最適化スケジュールを保存しました — ${partialUserViolations.length}件の制約違反`);
+			} else {
+				optimizeViolations = [];
+				showViolations = false;
+				showSuccess('部分最適化スケジュールを保存しました');
+			}
+		} catch (e) {
+			stopOptimizeProgress();
+			error = e instanceof Error ? e.message : 'Save failed';
+		} finally {
+			optimizing = false;
+			partialResult = null;
+		}
+	}
+
+	function handleDiscardPartialSchedule() {
+		showPartialDialog = false;
+		partialResult = null;
 	}
 
 	function handleClear() {
@@ -821,6 +913,55 @@
 				</div>
 			{/if}
 
+			<!-- Violations Panel -->
+			{#if showViolations && optimizeViolations.length > 0}
+				<ViolationsPanel
+					violations={optimizeViolations}
+					solveTime={lastSolveTime}
+					isOptimal={lastIsOptimal}
+					onClose={() => (showViolations = false)}
+				/>
+			{/if}
+
+<!-- Partial Result Dialog -->
+			{#if showPartialDialog && partialResult}
+				<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+					<div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 flex flex-col gap-4">
+						<div class="flex items-start gap-3">
+							<span class="material-symbols-rounded text-amber-500 text-2xl mt-0.5">timer_off</span>
+							<div>
+								<h2 class="text-base font-semibold text-gray-900">タイムアウト — 部分解が見つかりました</h2>
+								<p class="text-sm text-gray-500 mt-1">
+									ソルバーが時間内に最適解を見つけられませんでした。部分的なスケジュールが得られています。
+									{#if partialResult.solve_time != null}
+										（{partialResult.solve_time.toFixed(2)}秒）
+									{/if}
+								</p>
+							</div>
+						</div>
+						{#if partialResult.violations.length > 0}
+							<div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+								{partialResult.violations.length}件の制約違反が含まれます
+							</div>
+						{/if}
+						<div class="flex gap-2 justify-end mt-1">
+							<button
+								class="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50"
+								onclick={handleDiscardPartialSchedule}
+							>
+								破棄
+							</button>
+							<button
+								class="px-4 py-2 rounded-lg text-sm bg-amber-500 hover:bg-amber-600 text-white font-medium"
+								onclick={handleUsePartialSchedule}
+							>
+								このスケジュールを使用
+							</button>
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			<!-- Main Content -->
 			{#if reconnecting}
 				<!-- Waking up after inactivity - show banner over existing data -->
@@ -911,7 +1052,8 @@
 						<button
 							class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
 							onclick={handleOptimize}
-							disabled={optimizing || clearing || !optimizerHealthy}
+							disabled={optimizing || clearing || !optimizerHealthy || !selectedPeriodId}
+							title={!selectedPeriodId ? '期間を先に選択してください' : !optimizerHealthy ? 'OR-Toolsオフライン — 最適化サービスを起動してください' : '自動最適化を実行'}
 						>
 							{#if optimizing}
 								<span class="animate-spin rounded-full h-4 w-4 border-b-2 border-white shrink-0"></span>
@@ -921,7 +1063,7 @@
 							自動最適化
 						</button>
 
-						<!-- Clear Button -->
+<!-- Clear Button -->
 						<button
 							class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-300 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
 							onclick={handleClear}
@@ -981,8 +1123,26 @@
 									rows={dateRange.length || 20}
 									columns={staff.length || 12}
 								/>
-								<OptimizeOverlay progress={optimizeProgress} elapsed={optimizeElapsed} />
-							{:else if !hasScheduleData && staff.length > 0}
+								<OptimizeOverlay progress={optimizeProgress} elapsed={optimizeElapsed} oncancel={handleCancelOptimize} />
+							{:else if staff.length === 0}
+							<!-- No staff in this department -->
+							<div class="p-8 text-center">
+								<span class="material-symbols-rounded text-5xl text-gray-300 mb-4">group_off</span>
+								<h3 class="text-lg font-medium text-gray-700 mb-2">
+									このデパートメントにスタッフがいません
+								</h3>
+								<p class="text-sm text-gray-500 mb-4">
+									スタッフ設定からこのデパートメントにスタッフを追加してください。
+								</p>
+								<a
+									href="/shifts/settings"
+									class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+								>
+									<span class="material-symbols-rounded text-sm">settings</span>
+									設定を開く
+								</a>
+							</div>
+						{:else if !hasScheduleData}
 								<!-- Empty schedule notice -->
 								<div class="p-8 text-center">
 									<span
@@ -1009,8 +1169,7 @@
 										<button
 											class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
 											onclick={handleOptimize}
-											disabled={optimizing ||
-												!optimizerHealthy}
+											disabled={optimizing || !optimizerHealthy || !selectedPeriodId}
 										>
 											<span
 												class="material-symbols-rounded text-sm"

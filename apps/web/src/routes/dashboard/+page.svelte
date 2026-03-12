@@ -54,12 +54,12 @@
             titleEn: "Kitchen & Menu",
             description: "メニュー設計、食材管理、アレルギー情報、厨房生産管理",
             color: "orange",
-            primaryHref: "/?tab=menu",
+            primaryHref: "/menu",
             links: [
                 {
                     icon: "restaurant_menu",
                     label: "メニュー管理",
-                    href: "/?tab=menu",
+                    href: "/menu",
                     description: "メニュー・商品の登録・編集",
                 },
                 {

@@ -184,6 +184,25 @@ export interface ScheduleResponse {
 	staff: ScheduleStaff[];
 }
 
+// Staff unavailability (vacation / PTO)
+export interface StaffUnavailability {
+	id: string;
+	staffId: string;
+	date: string; // YYYY-MM-DD
+	reason?: string;
+	createdAt: string;
+}
+
+// Backup assignment
+export interface BackupAssignment {
+	id: string;
+	staffId: string;
+	groupId: string;
+	isActive: boolean;
+	assignmentType?: string;
+	priorityOrder?: number;
+}
+
 // Optimization response
 export interface OptimizeResponse {
 	success: boolean;
@@ -191,8 +210,8 @@ export interface OptimizeResponse {
 	solve_time?: number;
 	is_optimal?: boolean;
 	violations?: Array<{
-		type: string;
 		description: string;
+		count: number;
 		penalty: number;
 	}>;
 	error?: string;

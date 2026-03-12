@@ -38,4 +38,5 @@ export class SupabaseService {
     const fromHeader = this.request?.headers?.['x-restaurant-id'] as string;
     return fromHeader || this.configService.get<string>('RESTAURANT_ID') || '';
   }
+
 }

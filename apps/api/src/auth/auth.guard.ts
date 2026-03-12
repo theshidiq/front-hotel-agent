@@ -1,11 +1,14 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { SupabaseService } from '../supabase/supabase.service';
+import { IS_PUBLIC_KEY } from './permission.decorator';
 
 interface CachedUser {
   user: any;
@@ -13,13 +16,17 @@ interface CachedUser {
 }
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
+const CACHE_MAX_SIZE = 500;  // evict oldest entry when exceeded
 
 @Injectable()
 export class StaffAuthGuard implements CanActivate {
   private readonly logger = new Logger(StaffAuthGuard.name);
   private readonly cache = new Map<string, CachedUser>();
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly reflector: Reflector,
+  ) {}
 
   private getCached(token: string): any | null {
     const entry = this.cache.get(token);
@@ -32,10 +39,20 @@ export class StaffAuthGuard implements CanActivate {
   }
 
   private setCached(token: string, user: any): void {
+    if (this.cache.size >= CACHE_MAX_SIZE) {
+      // Evict the oldest entry (Map insertion order is FIFO)
+      this.cache.delete(this.cache.keys().next().value);
+    }
     this.cache.set(token, { user, expiresAt: Date.now() + CACHE_TTL_MS });
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers['authorization'];
 
@@ -70,23 +87,26 @@ export class StaffAuthGuard implements CanActivate {
       throw new UnauthorizedException('No email associated with this account');
     }
 
-    // Resolve organization ID: prefer request header, fall back to env var
-    const organizationId =
-      (request.headers['x-organization-id'] as string) ||
-      this.supabaseService.getOrganizationId();
-
-    // Check if this user is a staff member
+    // Check if this user is a staff member — look up by email only (no org filter)
+    // The org is derived from the staff record itself, not from client headers
     const { data: staff, error: staffError } = await supabase
       .from('staff')
-      .select('id, name, email, position, is_admin, role_id')
+      .select('id, name, email, position, is_admin, role_id, organization_id')
       .eq('email', email)
-      .eq('organization_id', organizationId)
       .eq('is_active', true)
+      .limit(1)
       .single();
 
     if (staffError || !staff) {
       this.logger.warn(`Non-staff login attempt: ${email}`);
       throw new UnauthorizedException('You are not registered as staff');
+    }
+
+    // Organization ID must come from the staff record — never from client-supplied headers
+    const organizationId: string | null = staff.organization_id ?? null;
+    if (!organizationId) {
+      this.logger.warn(`Staff ${email} has no organization_id — denying access`);
+      throw new ForbiddenException('Staff account is not associated with an organization');
     }
 
     // Load permissions from role

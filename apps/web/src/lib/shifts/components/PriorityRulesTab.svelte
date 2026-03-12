@@ -133,7 +133,19 @@
 	}
 
 	function startEdit(rule: PriorityRule) {
-		formData = { ...rule };
+		formData = {
+			name: rule.name,
+			description: rule.description,
+			staff_ids: rule.staff_ids,
+			rule_type: rule.rule_type,
+			shift_type: rule.shift_type,
+			days_of_week: rule.days_of_week,
+			allowed_shifts: rule.allowed_shifts,
+			priority_level: rule.priority_level,
+			is_hard_constraint: rule.is_hard_constraint,
+			penalty_weight: rule.penalty_weight,
+			is_active: rule.is_active,
+		};
 		editingRuleId = rule.id;
 		isCreating = false;
 	}

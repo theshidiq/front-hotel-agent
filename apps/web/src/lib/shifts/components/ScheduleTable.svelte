@@ -497,6 +497,8 @@
 		let count = 0;
 
 		for (const date of dateRange) {
+			// Skip dates outside the staff's work period (greyed-out END cells)
+			if (staffMember && !isDateWithinStaffWorkPeriod(staffMember, date)) continue;
 			const value = staffSchedule[date] || "";
 
 			if (staffMember?.status === "パート") {

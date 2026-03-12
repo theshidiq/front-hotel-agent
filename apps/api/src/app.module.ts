@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SupabaseModule } from './supabase/supabase.module';
@@ -28,6 +29,10 @@ import { DepartmentsModule } from './departments/departments.module';
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === 'production' ? undefined : '../../.env',
     }),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60000, limit: 300 },
+      { name: 'scan', ttl: 60000, limit: 10 },
+    ]),
     HttpModule,
     SupabaseModule,
     AuthModule,

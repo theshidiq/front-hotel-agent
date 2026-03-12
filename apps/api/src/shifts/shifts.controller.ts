@@ -24,6 +24,8 @@ import {
 import { ShiftsService } from './shifts.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
+import { SkipAuth } from '../auth/permission.decorator';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 // Staff DTOs
 import { CreateStaffDto, UpdateStaffDto, ReorderStaffDto } from './dto/staff.dto';
@@ -53,6 +55,10 @@ import {
   UpdateEarlyShiftPreferenceDto,
   BulkEarlyShiftPreferenceDto,
   UpdatePeriodConfigurationDto,
+  CreateBackupAssignmentDto,
+  UpdateBackupAssignmentDto,
+  CreateStaffUnavailabilityDto,
+  BulkCreateStaffUnavailabilityDto,
 } from './dto/settings.dto';
 
 @ApiTags('shifts')
@@ -190,6 +196,8 @@ export class ShiftsController {
   // ==================== OPTIMIZATION ENDPOINTS ====================
 
   @Post('optimize')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Optimize schedule using OR-Tools' })
   @ApiResponse({ status: 200, description: 'Optimization result', type: OptimizeResponseDto })
   async optimizeSchedule(@GetUser() user: any, @Body() optimizeDto: OptimizeRequestDto) {
@@ -197,6 +205,7 @@ export class ShiftsController {
   }
 
   @Get('optimize/health')
+  @SkipAuth()
   @ApiOperation({ summary: 'Check OR-Tools service health' })
   @ApiResponse({ status: 200, description: 'Health status' })
   async checkOptimizerHealth() {
@@ -496,5 +505,95 @@ export class ShiftsController {
   @ApiResponse({ status: 200, description: 'Periods regenerated' })
   async regeneratePeriods(@GetUser() user: any) {
     return this.shiftsService.regeneratePeriods(user.organization_id);
+  }
+
+  // ==================== BACKUP ASSIGNMENTS ====================
+
+  @Get('settings/backup-assignments')
+  @ApiOperation({ summary: 'List backup assignments' })
+  @ApiQuery({ name: 'departmentId', required: false })
+  @ApiResponse({ status: 200, description: 'List of backup assignments' })
+  async getBackupAssignments(
+    @GetUser() user: any,
+    @Query('departmentId') departmentId?: string,
+  ) {
+    return this.shiftsService.getBackupAssignments(user.organization_id, departmentId);
+  }
+
+  @Post('settings/backup-assignments')
+  @ApiOperation({ summary: 'Create a backup assignment' })
+  @ApiResponse({ status: 201, description: 'Backup assignment created' })
+  async createBackupAssignment(
+    @GetUser() user: any,
+    @Body() dto: CreateBackupAssignmentDto,
+  ) {
+    return this.shiftsService.createBackupAssignment(user.organization_id, dto);
+  }
+
+  @Patch('settings/backup-assignments/:id')
+  @ApiOperation({ summary: 'Update a backup assignment (toggle active, change priority)' })
+  @ApiParam({ name: 'id', description: 'Backup assignment ID' })
+  @ApiResponse({ status: 200, description: 'Backup assignment updated' })
+  async updateBackupAssignment(
+    @GetUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateBackupAssignmentDto,
+  ) {
+    return this.shiftsService.updateBackupAssignment(user.organization_id, id, dto);
+  }
+
+  @Delete('settings/backup-assignments/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a backup assignment' })
+  @ApiParam({ name: 'id', description: 'Backup assignment ID' })
+  @ApiResponse({ status: 204, description: 'Backup assignment deleted' })
+  async deleteBackupAssignment(@GetUser() user: any, @Param('id') id: string) {
+    return this.shiftsService.deleteBackupAssignment(user.organization_id, id);
+  }
+
+  // ==================== STAFF UNAVAILABILITY ====================
+
+  @Get('settings/staff-unavailability')
+  @ApiOperation({ summary: 'List staff unavailability records' })
+  @ApiQuery({ name: 'staffId', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiResponse({ status: 200, description: 'List of staff unavailability entries' })
+  async getStaffUnavailability(
+    @GetUser() user: any,
+    @Query('staffId') staffId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.shiftsService.getStaffUnavailability(user.organization_id, staffId, startDate, endDate);
+  }
+
+  @Post('settings/staff-unavailability')
+  @ApiOperation({ summary: 'Create a staff unavailability entry' })
+  @ApiResponse({ status: 201, description: 'Unavailability entry created' })
+  async createStaffUnavailability(
+    @GetUser() user: any,
+    @Body() dto: CreateStaffUnavailabilityDto,
+  ) {
+    return this.shiftsService.createStaffUnavailability(user.organization_id, dto);
+  }
+
+  @Post('settings/staff-unavailability/bulk')
+  @ApiOperation({ summary: 'Bulk create staff unavailability entries' })
+  @ApiResponse({ status: 201, description: 'Unavailability entries created' })
+  async bulkCreateStaffUnavailability(
+    @GetUser() user: any,
+    @Body() dto: BulkCreateStaffUnavailabilityDto,
+  ) {
+    return this.shiftsService.bulkCreateStaffUnavailability(user.organization_id, dto);
+  }
+
+  @Delete('settings/staff-unavailability/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a staff unavailability entry' })
+  @ApiParam({ name: 'id', description: 'Unavailability entry ID' })
+  @ApiResponse({ status: 204, description: 'Entry deleted' })
+  async deleteStaffUnavailability(@GetUser() user: any, @Param('id') id: string) {
+    return this.shiftsService.deleteStaffUnavailability(user.organization_id, id);
   }
 }
