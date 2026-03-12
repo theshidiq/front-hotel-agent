@@ -1,213 +1,917 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { authState } from '$lib/auth.svelte';
-	import { uploadImage, compressImageForOCR } from '$lib/supabase';
+	import { uploadImage, compressImage, compressImageForOCR } from '$lib/supabase';
+	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
+	import CustomSelect from '$lib/components/CustomSelect.svelte';
+	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
+	import MenuStructurePanel from '$lib/components/MenuStructurePanel.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import {
-		getProducts,
-		createProduct,
-		updateProduct,
-		deleteProduct,
-		getAllergens,
-		createAllergen,
-		deleteAllergen,
-		scanExtract,
-		getMenus,
-		createMenu,
-		updateMenu,
-		deleteMenu,
-		getCategories,
-		createCategoryApi,
-		deleteCategoryApi,
-		type Product,
-		type Allergen,
-		type Menu,
-		type Category,
-		type CreateProductData,
-		type UpdateProductData,
-		type CreateMenuData,
-	} from '$lib/api';
+	import { authState, can } from '$lib/auth.svelte';
 
-	// ── Sidebar ─────────────────────────────────────────────
+	const isStaff = $derived(authState.isStaff);
+
+	// Main Tab (Products vs Menu)
+	let mainTab: 'products' | 'menu' = $state('products');
+
+	// Redirect to an accessible tab when permissions load (both staff and guests)
+	$effect(() => {
+		if (!authState.loading) {
+			if (mainTab === 'products' && !canViewProducts) {
+				if (canViewMenus) mainTab = 'menu';
+			} else if (mainTab === 'menu' && !canViewMenus) {
+				if (canViewProducts) mainTab = 'products';
+			}
+		}
+	});
+
+	// Sidebar
 	let sidebarCollapsed = $state(false);
 	let sidebarMobileOpen = $state(false);
 
-	type Tab = 'products' | 'menus';
-	let activeTab = $state<Tab>('products');
-
-	const sidebarSections = $derived.by(() => [
-		{
-			label: 'ホーム',
-			items: [{ icon: 'dashboard', label: 'ダッシュボード', href: '/dashboard', active: false }],
-		},
-		{
-			label: '厨房・メニュー',
-			items: [
-				{
-					icon: 'inventory_2',
-					label: '商品管理',
-					active: activeTab === 'products',
-					onclick: () => (activeTab = 'products'),
-				},
-				{
-					icon: 'restaurant_menu',
-					label: 'メニュー管理',
-					active: activeTab === 'menus',
-					onclick: () => (activeTab = 'menus'),
-				},
-				{ icon: 'cooking', label: '厨房生産管理', href: '/kitchen-production', active: false },
-			],
-		},
-	]);
-
-	// ── Data ────────────────────────────────────────────────
-	let products = $state<Product[]>([]);
-	let allergens = $state<Allergen[]>([]);
-	let menus = $state<Menu[]>([]);
-	let productCategories = $state<Category[]>([]);
-	let menuCategories = $state<Category[]>([]);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-
-	// ── Product form ─────────────────────────────────────────
+	// Add Product Mode
 	let showAddProduct = $state(false);
-	let addMode = $state<'scan' | 'manual'>('scan');
-	let editingProduct = $state<Product | null>(null);
-	let expandedProductId = $state<string | null>(null);
+	let addMode: 'scan' | 'manual' = $state('scan');
 
-	// Scan state
-	let scanFile = $state<File | null>(null);
-	let scanPreviewUrl = $state<string | null>(null);
-	let scanning = $state(false);
-	let scanDone = $state(false);
+	// Scanner State
+	let dragOver = $state(false);
+	let selectedFile: File | null = $state(null);
+	let previewUrl: string | null = $state(null);
+	let isScanning = $state(false);
+	let scanResult: { product: Product; existing_product?: { id: string; name: string; brand: string | null; image_url: string | null } } | null = $state(null);
+	let scanError: string | null = $state(null);
 
-	// Webcam state
-	let webcamActive = $state(false);
-	let webcamError = $state<string | null>(null);
-	let videoEl = $state<HTMLVideoElement | null>(null);
-	let stream: MediaStream | null = null;
+	// Scan review form state
+	let scanExtractData: ScanExtractResult | null = $state(null);
+	let scanReviewProduct: CreateProductData = $state({
+		name: '',
+		brand: '',
+		category: '',
+		ingredients_raw: '',
+		storage_instructions: '',
+		preparation_instructions: '',
+		is_vegetarian: false,
+		is_vegan: false,
+		is_halal: false,
+		is_gluten_free: false,
+		allergen_ids: [],
+		image_url: null,
+	});
+	let isSavingScan = $state(false);
+	let scanSaveError: string | null = $state(null);
+	let scanSaveSuccess = $state(false);
 
-	async function startWebcam() {
-		webcamError = null;
+	// Camera State
+	let showCamera = $state(false);
+	let videoEl: HTMLVideoElement | null = $state(null);
+	let cameraStream: MediaStream | null = $state(null);
+	let cameraError: string | null = $state(null);
+
+	// Image Lightbox
+	let expandedImageUrl: string | null = $state(null);
+
+	// Manual Add State
+	let allergens: Allergen[] = $state([]);
+	let isCreating = $state(false);
+
+	// Allergen Search
+	let allergenSearch = $state('');
+	let editAllergenSearch = $state('');
+	const searchedAllergens = $derived(
+		allergenSearch ? allergens.filter(a => a.name.toLowerCase().includes(allergenSearch.toLowerCase())) : allergens
+	);
+	const searchedEditAllergens = $derived(
+		editAllergenSearch ? allergens.filter(a => a.name.toLowerCase().includes(editAllergenSearch.toLowerCase())) : allergens
+	);
+
+	// Product Categories (managed like menu categories)
+	let productCategories: { value: string; label: string; id: string }[] = $state([]);
+
+	// Manage Product Categories Modal
+	let showManageProductCategories = $state(false);
+	let newProductCategoryName = $state('');
+	let addProductCategoryError: string | null = $state(null);
+	let isAddingProductCategory = $state(false);
+
+	function openManageProductCategories() {
+		newProductCategoryName = '';
+		addProductCategoryError = null;
+		showManageProductCategories = true;
+	}
+
+	function closeManageProductCategories() {
+		showManageProductCategories = false;
+		newProductCategoryName = '';
+		addProductCategoryError = null;
+	}
+
+	async function addProductCategory() {
+		const trimmedName = newProductCategoryName.trim();
+		if (!trimmedName) {
+			addProductCategoryError = 'Category name is required';
+			return;
+		}
+		const value = trimmedName.toLowerCase().replace(/\s+/g, '-');
+		if (productCategories.some(c => c.value === value || c.label.toLowerCase() === trimmedName.toLowerCase())) {
+			addProductCategoryError = 'Category already exists';
+			return;
+		}
 		try {
-			stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-			webcamActive = true;
-			// bind stream after videoEl is in DOM
-			setTimeout(() => {
-				if (videoEl && stream) {
-					videoEl.srcObject = stream;
-					videoEl.play();
-				}
-			}, 50);
-		} catch {
-			webcamError = 'カメラへのアクセスが拒否されました。ブラウザの設定を確認してください。';
+			isAddingProductCategory = true;
+			const created = await createCategoryApi(trimmedName, 'product');
+			productCategories = [...productCategories, { value: created.value, label: created.name, id: created.id }];
+			newProductCategoryName = '';
+			addProductCategoryError = null;
+		} catch (e: any) {
+			addProductCategoryError = e.message || 'Failed to add category';
+		} finally {
+			isAddingProductCategory = false;
 		}
 	}
 
-	function stopWebcam() {
-		stream?.getTracks().forEach((t) => t.stop());
-		stream = null;
-		webcamActive = false;
-		if (videoEl) videoEl.srcObject = null;
-	}
-
-	function captureFrame() {
-		if (!videoEl) return;
-		const canvas = document.createElement('canvas');
-		canvas.width = videoEl.videoWidth;
-		canvas.height = videoEl.videoHeight;
-		canvas.getContext('2d')!.drawImage(videoEl, 0, 0);
-		canvas.toBlob((blob) => {
-			if (!blob) return;
-			const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-			scanFile = file;
-			scanPreviewUrl = URL.createObjectURL(blob);
-			scanDone = false;
-			stopWebcam();
-		}, 'image/jpeg', 0.95);
-	}
-
-	// Product form fields
-	let pName = $state('');
-	let pBrand = $state('');
-	let pCategory = $state('');
-	let pIngredients = $state('');
-	let pIsVeg = $state(false);
-	let pIsVegan = $state(false);
-	let pIsHalal = $state(false);
-	let pIsGF = $state(false);
-	let pAllergenIds = $state<string[]>([]);
-	let pAllergenSearch = $state('');
-	let pImageUrl = $state<string | null>(null);
-	let pImageFile = $state<File | null>(null);
-	let savingProduct = $state(false);
-
-	// ── Menu form ────────────────────────────────────────────
-	let showAddMenu = $state(false);
-	let editingMenu = $state<Menu | null>(null);
-	let expandedMenuId = $state<string | null>(null);
-
-	let mName = $state('');
-	let mDescription = $state('');
-	let mPrice = $state('');
-	let mCategory = $state('');
-	let mProductIds = $state<string[]>([]);
-	let mIsAvailable = $state(true);
-	let mProductSearch = $state('');
-	let savingMenu = $state(false);
-
-	// ── Settings modals ──────────────────────────────────────
-	let showManageAllergens = $state(false);
-	let showManageCategories = $state(false);
-	let newAllergenName = $state('');
-	let newAllergenCategory = $state('grain');
-	let newCategoryName = $state('');
-	let newCategoryType = $state<'product' | 'menu'>('product');
-	let savingSettings = $state(false);
-
-	// ── Derived ──────────────────────────────────────────────
-	const filteredAllergens = $derived(
-		pAllergenSearch.trim()
-			? allergens.filter(
-					(a) =>
-						a.name.toLowerCase().includes(pAllergenSearch.toLowerCase()) ||
-						a.category.toLowerCase().includes(pAllergenSearch.toLowerCase()),
-				)
-			: allergens,
-	);
-
-	const filteredMenuProducts = $derived(
-		mProductSearch.trim()
-			? products.filter(
-					(p) =>
-						p.name.toLowerCase().includes(mProductSearch.toLowerCase()) ||
-						(p.brand ?? '').toLowerCase().includes(mProductSearch.toLowerCase()),
-				)
-			: products,
-	);
-
-	// ── Load data ────────────────────────────────────────────
-	async function loadAll() {
-		loading = true;
-		error = null;
+	async function deleteProductCategory(id: string) {
 		try {
-			const [p, a, m, pc, mc] = await Promise.all([
-				getProducts(),
-				getAllergens(),
-				getMenus(),
-				getCategories('product'),
-				getCategories('menu'),
-			]);
-			products = p;
-			allergens = a;
-			menus = m;
-			productCategories = pc;
-			menuCategories = mc;
-		} catch (e) {
-			error = e instanceof Error ? e.message : '読み込みに失敗しました';
+			await deleteCategoryApi(id);
+			productCategories = productCategories.filter(c => c.id !== id);
+		} catch (e: any) {
+			console.error('Failed to delete product category:', e);
+		}
+	}
+
+	// Manage Allergens Modal
+	let showManageAllergens = $state(false);
+	let newAllergenName = $state('');
+	let newAllergenCategory = $state('other');
+	let addAllergenError: string | null = $state(null);
+	let isAddingAllergen = $state(false);
+
+	function openManageAllergens() {
+		newAllergenName = '';
+		newAllergenCategory = 'other';
+		addAllergenError = null;
+		showManageAllergens = true;
+	}
+
+	function closeManageAllergens() {
+		showManageAllergens = false;
+		newAllergenName = '';
+		addAllergenError = null;
+	}
+
+	async function addAllergenItem() {
+		const trimmedName = newAllergenName.trim();
+		if (!trimmedName) {
+			addAllergenError = 'Allergen name is required';
+			return;
+		}
+		if (allergens.some(a => a.name.toLowerCase() === trimmedName.toLowerCase())) {
+			addAllergenError = 'Allergen already exists';
+			return;
+		}
+		isAddingAllergen = true;
+		addAllergenError = null;
+		try {
+			const newAllergen = await createAllergen(trimmedName, newAllergenCategory);
+			allergens = [...allergens, newAllergen];
+			newAllergenName = '';
+			newAllergenCategory = 'other';
+		} catch (e: any) {
+			addAllergenError = e.message || 'Failed to create allergen';
 		} finally {
-			loading = false;
+			isAddingAllergen = false;
+		}
+	}
+
+	async function deleteAllergenItem(id: string) {
+		try {
+			await deleteAllergen(id);
+			allergens = allergens.filter(a => a.id !== id);
+		} catch (e: any) {
+			console.error('Failed to delete allergen:', e);
+		}
+	}
+
+	let createError: string | null = $state(null);
+	let createSuccess = $state(false);
+	let manualImageFile: File | null = $state(null);
+	let manualImagePreview: string | null = $state(null);
+	let isUploadingImage = $state(false);
+	let newProduct: CreateProductData = $state({
+		name: '',
+		brand: '',
+		category: '',
+		ingredients_raw: '',
+		storage_instructions: '',
+		preparation_instructions: '',
+		is_vegetarian: false,
+		is_vegan: false,
+		is_halal: false,
+		is_gluten_free: false,
+		allergen_ids: [],
+		image_url: null,
+	});
+
+	function resetNewProduct() {
+		newProduct = {
+			name: '',
+			brand: '',
+			category: '',
+			ingredients_raw: '',
+			storage_instructions: '',
+			preparation_instructions: '',
+			is_vegetarian: false,
+			is_vegan: false,
+			is_halal: false,
+			is_gluten_free: false,
+			allergen_ids: [],
+			image_url: null,
+		};
+		if (manualImagePreview) URL.revokeObjectURL(manualImagePreview);
+		manualImageFile = null;
+		manualImagePreview = null;
+		createError = null;
+		createSuccess = false;
+	}
+
+	async function handleManualImageInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		if (input.files && input.files.length > 0) {
+			const file = input.files[0];
+			if (!file.type.startsWith('image/')) {
+				createError = 'Please select an image file';
+				return;
+			}
+			const compressed = await compressImage(file);
+			manualImageFile = compressed;
+			if (manualImagePreview) URL.revokeObjectURL(manualImagePreview);
+			manualImagePreview = URL.createObjectURL(compressed);
+			createError = null;
+		}
+	}
+
+	function clearManualImage() {
+		if (manualImagePreview) URL.revokeObjectURL(manualImagePreview);
+		manualImageFile = null;
+		manualImagePreview = null;
+		newProduct.image_url = null;
+	}
+
+	async function handleCreateProduct() {
+		if (!newProduct.name.trim()) {
+			createError = 'Product name is required';
+			return;
+		}
+		isCreating = true;
+		createError = null;
+		try {
+			// Upload image first if selected
+			if (manualImageFile) {
+				isUploadingImage = true;
+				const imageUrl = await uploadImage(manualImageFile);
+				newProduct.image_url = imageUrl;
+				isUploadingImage = false;
+			}
+
+			await createProduct(newProduct);
+			await loadProducts();
+			createSuccess = true;
+			setTimeout(() => {
+				resetNewProduct();
+			}, 2000);
+		} catch (e: any) {
+			createError = e.message || 'Failed to create product';
+		} finally {
+			isCreating = false;
+			isUploadingImage = false;
+		}
+	}
+
+	function toggleAllergen(allergenId: string) {
+		const ids = newProduct.allergen_ids || [];
+		if (ids.includes(allergenId)) {
+			newProduct.allergen_ids = ids.filter(id => id !== allergenId);
+		} else {
+			newProduct.allergen_ids = [...ids, allergenId];
+		}
+	}
+
+	let scanAllergenSearch = $state('');
+	const scanSearchedAllergens = $derived(
+		scanAllergenSearch ? allergens.filter(a => a.name.toLowerCase().includes(scanAllergenSearch.toLowerCase())) : allergens
+	);
+
+	function toggleScanAllergen(allergenId: string) {
+		const ids = scanReviewProduct.allergen_ids || [];
+		if (ids.includes(allergenId)) {
+			scanReviewProduct.allergen_ids = ids.filter(id => id !== allergenId);
+		} else {
+			scanReviewProduct.allergen_ids = [...ids, allergenId];
+		}
+	}
+
+	function toggleEditAllergen(allergenId: string) {
+		const ids = editForm.allergen_ids || [];
+		if (ids.includes(allergenId)) {
+			editForm.allergen_ids = ids.filter(id => id !== allergenId);
+		} else {
+			editForm.allergen_ids = [...ids, allergenId];
+		}
+	}
+
+	// Products State
+	let searchQuery = $state('');
+	let products: Product[] = $state([]);
+	let isLoading = $state(true);
+	let expandedProductId: string | null = $state(null);
+	let editingProductId: string | null = $state(null);
+	let editForm: UpdateProductData = $state({});
+	let isSaving = $state(false);
+	let saveError: string | null = $state(null);
+
+	function toggleProduct(id: string) {
+		expandedProductId = expandedProductId === id ? null : id;
+		// Close edit mode when collapsing
+		if (expandedProductId !== id) {
+			editingProductId = null;
+		}
+	}
+
+	function startEditing(product: Product) {
+		editingProductId = product.id;
+		editForm = {
+			name: product.name,
+			brand: product.brand,
+			category: product.category,
+			ingredients_raw: product.ingredients_raw,
+			storage_instructions: product.storage_instructions,
+			preparation_instructions: product.preparation_instructions,
+			is_vegetarian: product.is_vegetarian,
+			is_vegan: product.is_vegan,
+			is_halal: product.is_halal,
+			is_gluten_free: product.is_gluten_free,
+			allergen_ids: product.allergens?.map(a => a.id) || [],
+		};
+		saveError = null;
+	}
+
+	function cancelEditing() {
+		editingProductId = null;
+		editForm = {};
+		saveError = null;
+	}
+
+	async function saveProduct(id: string) {
+		isSaving = true;
+		saveError = null;
+		try {
+			await updateProduct(id, editForm);
+			await loadProducts();
+			editingProductId = null;
+			editForm = {};
+		} catch (e: any) {
+			saveError = e.message || 'Failed to save';
+		} finally {
+			isSaving = false;
+		}
+	}
+
+	async function handleDeleteProduct(id: string) {
+		if (!confirm('Are you sure you want to delete this product?')) return;
+		try {
+			await deleteProduct(id);
+			await loadProducts();
+			expandedProductId = null;
+			editingProductId = null;
+		} catch (e: any) {
+			alert(e.message || 'Failed to delete');
+		}
+	}
+
+	// Menu State (declared early so derived blocks below can reference it)
+	let menus: Menu[] = $state([]);
+
+	// Sidebar sections (must be after products & menus declarations)
+	// Permission-aware for both staff and guests (can() handles both)
+	const canViewProducts = $derived(can('products.view'));
+	const canViewMenus = $derived(can('menus.view'));
+	const canAccessFrontDesk = $derived(
+		can('reservations.view') || can('rooms.view') || can('notifications.view')
+	);
+
+	const sidebarSections = $derived.by(() => {
+		const foodItems: { icon: string; label: string; badge?: number; active: boolean; onclick?: () => void; href?: string }[] = [];
+		if (canViewProducts) {
+			foodItems.push({ icon: 'inventory_2', label: '商品管理', badge: products.length, active: mainTab === 'products', onclick: () => mainTab = 'products' });
+		}
+		if (canViewMenus) {
+			foodItems.push({ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' });
+		}
+		const sections: { label: string; items: any[] }[] = [];
+		if (canAccessFrontDesk) {
+			sections.push({
+				label: 'フロント',
+				items: [
+					{ icon: 'calendar_today', label: '予約管理', href: '/front-desk', active: false },
+				]
+			});
+		}
+		if (foodItems.length > 0) {
+			sections.push({ label: '食材管理', items: foodItems });
+		}
+		return sections;
+	});
+
+	// Menu Group filter for products
+	let selectedProductMenuGroup: string = $state('all');
+
+	// Derive which products belong to which menu groups (via menus)
+	const productMenuGroupMap = $derived.by(() => {
+		const map = new Map<string, Set<string>>();
+		for (const menu of menus) {
+			if (menu.menu_group_id) {
+				for (const product of menu.products) {
+					if (!map.has(product.id)) {
+						map.set(product.id, new Set());
+					}
+					map.get(product.id)!.add(menu.menu_group_id);
+				}
+			}
+		}
+		return map;
+	});
+
+	const linkedProductIds = $derived(new Set(productMenuGroupMap.keys()));
+
+	const filteredProducts = $derived(
+		products.filter(p => {
+			const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				(p.brand?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+			if (!matchesSearch) return false;
+			if (selectedProductMenuGroup === 'all') return true;
+			if (selectedProductMenuGroup === 'unlinked') return !linkedProductIds.has(p.id);
+			const groups = productMenuGroupMap.get(p.id);
+			return groups ? groups.has(selectedProductMenuGroup) : false;
+		})
+	);
+
+	let isLoadingMenus = $state(true);
+
+	// Menu Categories
+	let menuCategories: { value: string; label: string; id: string; image_url?: string | null; description?: string | null; price?: number | null }[] = $state([]);
+
+	// Menu Tree Config overlay
+	let showMenuTreeConfig = $state(false);
+	let menuStructureView: 'panel' | 'tree' = $state('panel');
+
+	// Seasonal Menus
+	let seasonalMenus: SeasonalMenu[] = $state([]);
+
+	// Menu Groups
+	let menuGroups: MenuGroup[] = $state([]);
+
+	// Tree config callbacks (wrappers that reload data after mutations)
+	async function treeCreateSeason(data: import('$lib/api').CreateSeasonalMenuData) {
+		const created = await createSeasonalMenu(data);
+		seasonalMenus = [...seasonalMenus, created];
+	}
+
+	async function treeUpdateSeason(id: string, data: import('$lib/api').UpdateSeasonalMenuData) {
+		const prev = seasonalMenus;
+		seasonalMenus = seasonalMenus.map(s => s.id === id ? { ...s, ...data } : s);
+		try {
+			const updated = await updateSeasonalMenu(id, data);
+			seasonalMenus = seasonalMenus.map(s => s.id === id ? updated : s);
+		} catch {
+			seasonalMenus = prev;
+		}
+	}
+
+	async function treeDeleteSeason(id: string) {
+		await deleteSeasonalMenu(id);
+		seasonalMenus = seasonalMenus.filter(s => s.id !== id);
+		menuGroups = menuGroups.map(g => g.seasonal_menu_id === id ? { ...g, seasonal_menu_id: null } : g);
+	}
+
+	async function treeCreateGroup(data: import('$lib/api').CreateMenuGroupData) {
+		const created = await createMenuGroup(data);
+		menuGroups = [...menuGroups, created];
+	}
+
+	async function treeUpdateGroup(id: string, data: import('$lib/api').UpdateMenuGroupData) {
+		const prev = menuGroups;
+		menuGroups = menuGroups.map(g => g.id === id ? { ...g, ...data } : g);
+		try {
+			const updated = await updateMenuGroup(id, data);
+			menuGroups = menuGroups.map(g => g.id === id ? updated : g);
+		} catch {
+			menuGroups = prev;
+		}
+	}
+
+	async function treeDeleteGroup(id: string) {
+		await deleteMenuGroup(id);
+		menuGroups = menuGroups.filter(g => g.id !== id);
+	}
+
+	async function treeCreateCourse(name: string) {
+		const created = await createCategoryApi(name, 'menu');
+		menuCategories = [...menuCategories, { value: created.value, label: created.name, id: created.id }];
+	}
+
+	async function treeUpdateCourse(id: string, name: string) {
+		const prev = menuCategories;
+		menuCategories = menuCategories.map(c => c.id === id ? { ...c, label: name } : c);
+		try {
+			const updated = await updateCategoryApi(id, { name });
+			menuCategories = menuCategories.map(c => c.id === id ? { value: updated.value, label: updated.name, id: updated.id } : c);
+		} catch {
+			menuCategories = prev;
+		}
+	}
+
+	async function treeUpdateCourseDetails(id: string, data: UpdateCategoryData) {
+		await updateCategoryApi(id, data);
+	}
+
+	async function treeDeleteCourse(id: string) {
+		await deleteCategoryApi(id);
+		menuCategories = menuCategories.filter(c => c.id !== id);
+	}
+
+	async function treeCreateMenu(data: import('$lib/api').CreateMenuData) {
+		await createMenu(data);
+		menus = await getMenus();
+	}
+
+	async function treeUpdateMenu(id: string, data: import('$lib/api').UpdateMenuData) {
+		await updateMenu(id, data);
+		menus = await getMenus();
+	}
+
+	async function treeDeleteMenu(id: string) {
+		await deleteMenu(id);
+		menus = menus.filter(m => m.id !== id);
+	}
+
+	// Alternate Ingredients State (maps product_id -> array of alternate product_ids)
+	let productAlternates: Record<string, string[]> = $state({});
+	let showAlternatesModal = $state(false);
+	let alternatesForProductId: string | null = $state(null);
+	let alternateSearchTerm = $state('');
+	let alternateSearchFocused = $state(false);
+
+	// Get the product being configured for alternates
+	const alternatesProduct = $derived(
+		alternatesForProductId ? products.find(p => p.id === alternatesForProductId) : null
+	);
+
+	// Get available products for alternates (exclude the main product and already selected alternates)
+	const availableAlternates = $derived(() => {
+		if (!alternatesForProductId) return [];
+		const currentAlternates = productAlternates[alternatesForProductId] || [];
+		return products.filter(p =>
+			p.id !== alternatesForProductId &&
+			!currentAlternates.includes(p.id) &&
+			(alternateSearchTerm === '' || p.name.toLowerCase().includes(alternateSearchTerm.toLowerCase()))
+		);
+	});
+
+	// Get selected alternates for current product
+	const selectedAlternates = $derived(() => {
+		if (!alternatesForProductId) return [];
+		const alternateIds = productAlternates[alternatesForProductId] || [];
+		return products.filter(p => alternateIds.includes(p.id));
+	});
+
+	function openAlternatesModal(productId: string) {
+		alternatesForProductId = productId;
+		alternateSearchTerm = '';
+		alternateSearchFocused = false;
+		showAlternatesModal = true;
+	}
+
+	function closeAlternatesModal() {
+		showAlternatesModal = false;
+		alternatesForProductId = null;
+		alternateSearchTerm = '';
+	}
+
+	async function addAlternate(productId: string) {
+		if (!alternatesForProductId) return;
+		const current = productAlternates[alternatesForProductId] || [];
+		if (!current.includes(productId)) {
+			productAlternates[alternatesForProductId] = [...current, productId];
+			try {
+				await addProductAlternate(alternatesForProductId, productId);
+			} catch (e) {
+				console.error('Failed to save alternate:', e);
+				productAlternates[alternatesForProductId] = current;
+			}
+		}
+		alternateSearchTerm = '';
+	}
+
+	async function removeAlternate(productId: string) {
+		if (!alternatesForProductId) return;
+		const prev = productAlternates[alternatesForProductId] || [];
+		productAlternates[alternatesForProductId] = prev.filter(id => id !== productId);
+		try {
+			await removeProductAlternate(alternatesForProductId, productId);
+		} catch (e) {
+			console.error('Failed to remove alternate:', e);
+			productAlternates[alternatesForProductId] = prev;
+		}
+	}
+
+	function getAlternatesCount(productId: string): number {
+		return (productAlternates[productId] || []).length;
+	}
+
+	function getAlternatesForProduct(productId: string): typeof products {
+		const alternateIds = productAlternates[productId] || [];
+		return products.filter(p => alternateIds.includes(p.id));
+	}
+
+	async function loadAlternates() {
+		try {
+			const rows = await getProductAlternates();
+			const map: Record<string, string[]> = {};
+			for (const row of rows) {
+				if (!map[row.product_id]) map[row.product_id] = [];
+				map[row.product_id].push(row.alternate_product_id);
+			}
+			productAlternates = map;
+		} catch (e) {
+			console.error('Failed to load alternates:', e);
+		}
+	}
+
+	// Callback for CourseDetailSidebar to add/remove alternates via API
+	async function handleAddAlternate(productId: string, alternateProductId: string) {
+		const current = productAlternates[productId] || [];
+		if (!current.includes(alternateProductId)) {
+			productAlternates[productId] = [...current, alternateProductId];
+			try {
+				await addProductAlternate(productId, alternateProductId);
+			} catch (e) {
+				console.error('Failed to save alternate:', e);
+				productAlternates[productId] = current;
+			}
+		}
+	}
+
+	async function handleRemoveAlternate(productId: string, alternateProductId: string) {
+		const prev = productAlternates[productId] || [];
+		productAlternates[productId] = prev.filter(id => id !== alternateProductId);
+		try {
+			await removeProductAlternate(productId, alternateProductId);
+		} catch (e) {
+			console.error('Failed to remove alternate:', e);
+			productAlternates[productId] = prev;
+		}
+	}
+
+	// Allergen Report Table - compute rows grouped by menu
+	const allergenColors: Record<string, string> = {
+		'牛肉': 'bg-red-500', '豚肉': 'bg-red-400', '鶏肉': 'bg-red-300',
+		'小麦': 'bg-amber-500', '大麦': 'bg-amber-400', 'ライ麦': 'bg-amber-400', 'オーツ麦': 'bg-amber-400',
+		'卵': 'bg-orange-500',
+		'乳': 'bg-blue-500', 'チーズ': 'bg-blue-400',
+		'えび': 'bg-pink-500', 'かに': 'bg-cyan-500',
+		'大豆': 'bg-violet-500',
+		'ごま': 'bg-yellow-600',
+		'落花生': 'bg-amber-700', 'くるみ': 'bg-amber-600', 'カシューナッツ': 'bg-amber-600', 'アーモンド': 'bg-amber-600',
+		'そば': 'bg-stone-500',
+		'さば': 'bg-teal-500', 'さけ': 'bg-teal-400', 'いくら': 'bg-teal-400', 'あわび': 'bg-teal-400', 'いか': 'bg-teal-400',
+	};
+
+	function getAllergenColor(name: string): string {
+		return allergenColors[name] || 'bg-gray-500';
+	}
+
+	// Allergen table grouped by course then by menu
+	type AllergenTableMenuGroup = {
+		menu: Menu;
+		products: { id: string; name: string; image_url: string | null; allergens: { id: string; name: string }[] }[];
+	};
+
+	type AllergenTableCourseGroup = {
+		courseName: string;
+		courseImage: string | null;
+		menus: AllergenTableMenuGroup[];
+	};
+
+	const allergenTableGrouped = $derived.by(() => {
+		const productMap = new Map(products.map(p => [p.id, p]));
+		const groups: AllergenTableMenuGroup[] = [];
+		for (const menu of menus) {
+			const prods = (menu.products || [])
+				.filter(p => (p.allergens || []).length > 0)
+				.map(p => ({ id: p.id, name: p.name, image_url: productMap.get(p.id)?.image_url || null, allergens: p.allergens || [] }));
+			if (prods.length > 0) {
+				groups.push({ menu, products: prods });
+			}
+		}
+		return groups;
+	});
+
+	const allergenTableByCourse = $derived.by(() => {
+		const courseMap = new Map<string, AllergenTableCourseGroup>();
+		for (const group of allergenTableGrouped) {
+			const courseValue = group.menu.category || 'uncategorized';
+			const cat = menuCategories.find(c => c.value === courseValue);
+			const courseName = cat?.label || courseValue;
+			const courseImage = cat?.image_url || null;
+			if (!courseMap.has(courseValue)) {
+				courseMap.set(courseValue, { courseName, courseImage, menus: [] });
+			}
+			courseMap.get(courseValue)!.menus.push(group);
+		}
+		return Array.from(courseMap.values());
+	});
+
+	let showAllergenReport = $state(false);
+	let isExporting = $state(false);
+	let isPrinting = $state(false);
+	let allergenReportSearch = $state('');
+
+	const filteredAllergenTableByCourse = $derived.by(() => {
+		const q = allergenReportSearch.trim().toLowerCase();
+		if (!q) return allergenTableByCourse;
+		return allergenTableByCourse.filter(course => {
+			if (course.courseName.toLowerCase().includes(q)) return true;
+			return course.menus.some(group =>
+				group.products.some(product =>
+					product.name.toLowerCase().includes(q) ||
+					product.allergens.some(a => a.name.toLowerCase().includes(q))
+				)
+			);
+		});
+	});
+
+	async function exportAllergenXlsx() {
+		isExporting = true;
+		try {
+			const { utils, writeFile } = await import('xlsx');
+			const wsData: string[][] = [['コース', '商品/食材', 'アレルギー']];
+			for (const course of allergenTableByCourse) {
+				let isCourseFirst = true;
+				for (const group of course.menus) {
+					for (const product of group.products) {
+						wsData.push([
+							isCourseFirst ? course.courseName : '',
+							product.name,
+							product.allergens.map(a => a.name).join('、'),
+						]);
+						isCourseFirst = false;
+					}
+				}
+			}
+			const ws = utils.aoa_to_sheet(wsData);
+			ws['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 40 }];
+			const wb = utils.book_new();
+			utils.book_append_sheet(wb, ws, 'Allergen Report');
+			const today = new Date().toISOString().split('T')[0];
+			writeFile(wb, `allergen-report-${today}.xlsx`);
+		} catch (e) {
+			console.error('Export failed:', e);
+		} finally {
+			isExporting = false;
+		}
+	}
+
+	const allergenHexColors: Record<string, string> = {
+		'牛肉': '#ef4444', '豚肉': '#f87171', '鶏肉': '#fca5a5',
+		'小麦': '#f59e0b', '大麦': '#fbbf24', 'ライ麦': '#fbbf24', 'オーツ麦': '#fbbf24',
+		'卵': '#f97316',
+		'乳': '#3b82f6', 'チーズ': '#60a5fa',
+		'えび': '#ec4899', 'かに': '#06b6d4',
+		'大豆': '#8b5cf6',
+		'ごま': '#ca8a04',
+		'落花生': '#92400e', 'くるみ': '#d97706', 'カシューナッツ': '#d97706', 'アーモンド': '#d97706',
+		'そば': '#78716c',
+		'さば': '#14b8a6', 'さけ': '#2dd4bf', 'いくら': '#2dd4bf', 'あわび': '#2dd4bf', 'いか': '#2dd4bf',
+	};
+
+	function getAllergenHexColor(name: string): string {
+		return allergenHexColors[name] || '#6b7280';
+	}
+
+	function printAllergenReport() {
+		isPrinting = true;
+		try {
+			const today = new Date().toISOString().split('T')[0];
+			let coursesHtml = '';
+			for (const course of allergenTableByCourse) {
+				const courseImgHtml = course.courseImage
+					? `<img src="${course.courseImage}" style="width:100%;height:100%;object-fit:cover;" />`
+					: `<div style="width:100%;height:100%;background:#334155;display:flex;align-items:center;justify-content:center;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>`;
+
+				let productsHtml = '';
+				let idx = 0;
+				for (let gi = 0; gi < course.menus.length; gi++) {
+					const group = course.menus[gi];
+					for (let pi = 0; pi < group.products.length; pi++) {
+						const product = group.products[pi];
+						const bgColor = pi % 2 === 0 ? '#ffffff' : '#f9fafb';
+						const groupBorder = pi === 0 && gi > 0 ? 'border-top:2px solid #e2e8f0;' : 'border-top:1px solid #f3f4f6;';
+						const productImgHtml = product.image_url
+							? `<img src="${product.image_url}" style="width:36px;height:36px;border-radius:4px;object-fit:cover;flex-shrink:0;" />`
+							: `<div style="width:36px;height:36px;border-radius:4px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></div>`;
+
+						const allergensHtml = product.allergens.map(a =>
+							`<span style="display:inline-block;padding:2px 8px;background:${getAllergenHexColor(a.name)};color:white;font-size:10px;font-weight:500;border-radius:4px;margin:1px;">${a.name}</span>`
+						).join('');
+
+						productsHtml += `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${bgColor};${groupBorder}">
+							${productImgHtml}
+							<span style="font-size:13px;font-weight:500;color:#1f2937;width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${product.name}</span>
+							<div style="display:flex;flex-wrap:wrap;gap:3px;flex:1;">${allergensHtml}</div>
+						</div>`;
+
+						// Alternate products
+						const alts = getAlternatesForProduct(product.id);
+						for (const alt of alts) {
+							const altImgHtml = alt.image_url
+								? `<img src="${alt.image_url}" style="width:28px;height:28px;border-radius:4px;object-fit:cover;flex-shrink:0;" />`
+								: `<div style="width:28px;height:28px;border-radius:4px;background:#fff7ed;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fdba74" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></div>`;
+							const altAllergensHtml = (alt.allergens || []).map(a =>
+								`<span style="display:inline-block;padding:1px 6px;background:${getAllergenHexColor(a.name)};color:white;font-size:9px;font-weight:500;border-radius:4px;margin:1px;">${a.name}</span>`
+							).join('');
+
+							productsHtml += `<div style="display:flex;align-items:center;gap:8px;padding:4px 12px 4px 32px;background:#fff7ed40;border-top:1px solid #f3f4f6;">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+								${altImgHtml}
+								<span style="font-size:11px;font-weight:500;color:#c2410c;width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${alt.name}</span>
+								<div style="display:flex;flex-wrap:wrap;gap:2px;flex:1;">${altAllergensHtml}</div>
+							</div>`;
+						}
+
+						idx++;
+					}
+				}
+
+				const totalProducts = course.menus.reduce((sum: number, g: AllergenTableMenuGroup) => sum + g.products.length, 0);
+				coursesHtml += `<div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:16px;display:flex;break-inside:avoid;">
+					<div style="width:140px;flex-shrink:0;background:#1e293b;overflow:hidden;">${courseImgHtml}</div>
+					<div style="flex:1;min-width:0;">
+						<div style="background:white;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb;">
+							<span style="color:#111827;font-size:16px;font-weight:700;letter-spacing:0.5px;">${course.courseName}</span>
+							<span style="color:#9ca3af;font-size:11px;">${totalProducts} products</span>
+						</div>
+						${productsHtml}
+					</div>
+				</div>`;
+			}
+
+			const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>アレルゲン一覧表 - ${today}</title>
+<style>
+	@page { size: A4 portrait; margin: 15mm 12mm; }
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+	.header { text-align: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb; }
+	.header h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
+	.header p { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+	.footer { text-align: center; font-size: 9px; color: #9ca3af; margin-top: 16px; padding-top: 8px; border-top: 1px solid #e5e7eb; }
+</style>
+</head>
+<body>
+<div class="header">
+	<h1>アレルゲン一覧表</h1>
+	<p>Allergen Report | ${today} | ${allergenTableByCourse.length} courses</p>
+</div>
+${coursesHtml}
+<div class="footer">Generated: ${today} | ${allergenTableByCourse.length} courses, ${allergenTableGrouped.length} menu entries</div>
+</body>
+</html>`;
+
+			const printWindow = window.open('', '_blank');
+			if (printWindow) {
+				printWindow.document.write(html);
+				printWindow.document.close();
+				printWindow.onload = () => {
+					printWindow.print();
+				};
+			}
+		} catch (e) {
+			console.error('Print failed:', e);
+		} finally {
+			isPrinting = false;
+		}
+	}
+
+	async function loadMenus() {
+		try {
+			isLoadingMenus = true;
+			menus = await getMenus();
+		} catch (e) {
+			console.error('Failed to load menus:', e);
+		} finally {
+			isLoadingMenus = false;
 		}
 	}
 
@@ -215,7 +919,7 @@
 
 	onMount(() => {
 		const tab = $page.url.searchParams.get('tab');
-		if (tab === 'menus' || tab === 'menu') activeTab = 'menus';
+		if (tab === 'menu' || tab === 'menus') mainTab = 'menu';
 	});
 
 	$effect(() => {
@@ -225,951 +929,1714 @@
 			return;
 		}
 		dataLoaded = true;
-		loadAll();
+		Promise.all([loadProducts(), loadAllergens(), loadMenus(), loadCategories(), loadAlternates()]);
 	});
 
-	// ── Scan ─────────────────────────────────────────────────
-	function onScanFileChange(e: Event) {
+	async function loadCategories() {
+		try {
+			const [productCats, menuCats, groups, seasons] = await Promise.all([
+				getCategories('product'),
+				getCategories('menu'),
+				getMenuGroups(),
+				getSeasonalMenus(),
+			]);
+			productCategories = productCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
+			menuCategories = menuCats.map(c => ({ value: c.value, label: c.name, id: c.id, image_url: c.image_url, description: c.description, price: c.price }));
+			menuGroups = groups;
+			seasonalMenus = seasons;
+		} catch (e) {
+			console.error('Failed to load categories:', e);
+		}
+	}
+
+	async function loadAllergens() {
+		try {
+			allergens = await getAllergens();
+		} catch (e) {
+			console.error('Failed to load allergens:', e);
+		}
+	}
+
+	async function loadProducts() {
+		try {
+			isLoading = true;
+			products = await getProducts();
+		} catch (e) {
+			console.error('Failed to load products:', e);
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Scanner Functions
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+		dragOver = true;
+	}
+
+	function handleDragLeave() {
+		dragOver = false;
+	}
+
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		dragOver = false;
+		const files = e.dataTransfer?.files;
+		if (files && files.length > 0) handleFile(files[0]);
+	}
+
+	function handleFileInput(e: Event) {
 		const input = e.target as HTMLInputElement;
-		const file = input.files?.[0] ?? null;
-		scanFile = file;
-		scanPreviewUrl = file ? URL.createObjectURL(file) : null;
-		scanDone = false;
+		if (input.files && input.files.length > 0) handleFile(input.files[0]);
 	}
 
-	async function handleScan() {
-		if (!scanFile) return;
-		scanning = true;
-		error = null;
+	async function handleFile(file: File) {
+		if (!file.type.startsWith('image/')) {
+			scanError = 'Please select an image file';
+			return;
+		}
+		const compressed = await compressImageForOCR(file);
+		selectedFile = compressed;
+		previewUrl = URL.createObjectURL(compressed);
+		scanError = null;
+		scanResult = null;
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
+	}
+
+	function clearSelection() {
+		selectedFile = null;
+		if (previewUrl) URL.revokeObjectURL(previewUrl);
+		previewUrl = null;
+		scanResult = null;
+		scanError = null;
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
+	}
+
+	async function openCamera() {
+		cameraError = null;
+		showCamera = true;
 		try {
-			const compressed = await compressImageForOCR(scanFile);
-			const url = await uploadImage(compressed);
-			const result = await scanExtract(url);
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: {
+					facingMode: 'environment',
+					width: { ideal: 2560 },
+					height: { ideal: 1920 }
+				}
+			});
+			cameraStream = stream;
+			if (videoEl) {
+				videoEl.srcObject = stream;
+			}
+		} catch (err: any) {
+			cameraError = err.name === 'NotAllowedError'
+				? 'Camera permission denied. Please allow camera access.'
+				: 'Could not access camera: ' + (err.message || 'Unknown error');
+			showCamera = false;
+		}
+	}
+
+	function capturePhoto() {
+		if (!videoEl) return;
+		const canvas = document.createElement('canvas');
+		canvas.width = videoEl.videoWidth;
+		canvas.height = videoEl.videoHeight;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		ctx.drawImage(videoEl, 0, 0);
+		canvas.toBlob((blob) => {
+			if (blob) {
+				const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+				handleFile(file);
+			}
+			closeCamera();
+		}, 'image/jpeg', 1.0);
+	}
+
+	function closeCamera() {
+		if (cameraStream) {
+			cameraStream.getTracks().forEach(track => track.stop());
+			cameraStream = null;
+		}
+		showCamera = false;
+		cameraError = null;
+	}
+
+	// Wire up camera stream to video element when both are ready
+	$effect(() => {
+		if (videoEl && cameraStream) {
+			videoEl.srcObject = cameraStream;
+		}
+		return () => {
+			if (cameraStream) {
+				cameraStream.getTracks().forEach(track => track.stop());
+			}
+		};
+	});
+
+	async function startScan() {
+		if (!selectedFile) return;
+		isScanning = true;
+		scanError = null;
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
+
+		try {
+			// 1. Upload image to Supabase storage
+			const imageUrl = await uploadImage(selectedFile);
+
+			// 2. Call extract-only API (no auto-save)
+			const result = await scanExtract(imageUrl);
+			scanExtractData = result;
+
+			// 3. Populate review form with extracted data
 			const d = result.extracted_data;
-			pName = d.product_name ?? '';
-			pBrand = d.brand ?? '';
-			pCategory = d.category ?? '';
-			pIngredients = d.ingredients_raw ?? '';
-			pIsVeg = d.is_vegetarian;
-			pIsVegan = d.is_vegan;
-			pIsHalal = d.is_halal;
-			pIsGF = d.is_gluten_free;
-			pAllergenIds = result.matched_allergens.map((a) => a.id);
-			pImageUrl = result.image_url;
-			scanDone = true;
-			addMode = 'manual';
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'スキャンに失敗しました';
-		} finally {
-			scanning = false;
-		}
-	}
-
-	// ── Product CRUD ─────────────────────────────────────────
-	function openAddProduct() {
-		editingProduct = null;
-		pName = ''; pBrand = ''; pCategory = ''; pIngredients = '';
-		pIsVeg = false; pIsVegan = false; pIsHalal = false; pIsGF = false;
-		pAllergenIds = []; pAllergenSearch = ''; pImageUrl = null; pImageFile = null;
-		scanFile = null; scanPreviewUrl = null; scanDone = false;
-		webcamActive = false; webcamError = null; stopWebcam();
-		addMode = 'scan';
-		showAddProduct = true;
-	}
-
-	function closeAddProduct() {
-		stopWebcam();
-		showAddProduct = false;
-	}
-
-	function openEditProduct(p: Product) {
-		editingProduct = p;
-		pName = p.name; pBrand = p.brand ?? ''; pCategory = p.category ?? '';
-		pIngredients = p.ingredients_raw ?? '';
-		pIsVeg = p.is_vegetarian; pIsVegan = p.is_vegan; pIsHalal = p.is_halal; pIsGF = p.is_gluten_free;
-		pAllergenIds = p.allergens.map((a) => a.id);
-		pAllergenSearch = ''; pImageUrl = p.image_url; pImageFile = null;
-		addMode = 'manual';
-		showAddProduct = true;
-	}
-
-	function toggleAllergen(id: string) {
-		pAllergenIds = pAllergenIds.includes(id)
-			? pAllergenIds.filter((a) => a !== id)
-			: [...pAllergenIds, id];
-	}
-
-	async function saveProduct() {
-		if (!pName.trim()) return;
-		savingProduct = true;
-		error = null;
-		try {
-			let imageUrl = pImageUrl;
-			if (pImageFile) imageUrl = await uploadImage(pImageFile);
-
-			if (editingProduct) {
-				const data: UpdateProductData = {
-					name: pName.trim(), brand: pBrand.trim() || null, category: pCategory || null,
-					ingredients_raw: pIngredients.trim() || null,
-					is_vegetarian: pIsVeg, is_vegan: pIsVegan, is_halal: pIsHalal, is_gluten_free: pIsGF,
-					allergen_ids: pAllergenIds,
-				};
-				const updated = await updateProduct(editingProduct.id, data);
-				products = products.map((p) => (p.id === updated.id ? updated : p));
-			} else {
-				const data: CreateProductData = {
-					name: pName.trim(), brand: pBrand.trim() || null, category: pCategory || null,
-					ingredients_raw: pIngredients.trim() || null,
-					is_vegetarian: pIsVeg, is_vegan: pIsVegan, is_halal: pIsHalal, is_gluten_free: pIsGF,
-					allergen_ids: pAllergenIds, image_url: imageUrl,
-				};
-				const created = await createProduct(data);
-				products = [created, ...products];
-			}
-			showAddProduct = false;
-		} catch (e) {
-			error = e instanceof Error ? e.message : '保存に失敗しました';
-		} finally {
-			savingProduct = false;
-		}
-	}
-
-	async function handleDeleteProduct(id: string) {
-		if (!confirm('この商品を削除しますか？')) return;
-		try {
-			await deleteProduct(id);
-			products = products.filter((p) => p.id !== id);
-			if (expandedProductId === id) expandedProductId = null;
-		} catch (e) {
-			error = e instanceof Error ? e.message : '削除に失敗しました';
-		}
-	}
-
-	// ── Menu CRUD ────────────────────────────────────────────
-	function openAddMenu() {
-		editingMenu = null;
-		mName = ''; mDescription = ''; mPrice = ''; mCategory = '';
-		mProductIds = []; mProductSearch = ''; mIsAvailable = true;
-		showAddMenu = true;
-	}
-
-	function openEditMenu(m: Menu) {
-		editingMenu = m;
-		mName = m.name; mDescription = m.description ?? ''; mPrice = m.price != null ? String(m.price) : '';
-		mCategory = m.category ?? ''; mProductIds = m.products.map((p) => p.id);
-		mProductSearch = ''; mIsAvailable = m.is_available;
-		showAddMenu = true;
-	}
-
-	function toggleMenuProduct(id: string) {
-		mProductIds = mProductIds.includes(id)
-			? mProductIds.filter((p) => p !== id)
-			: [...mProductIds, id];
-	}
-
-	async function saveMenu() {
-		if (!mName.trim()) return;
-		savingMenu = true;
-		error = null;
-		try {
-			const data: CreateMenuData = {
-				name: mName.trim(), description: mDescription.trim() || null,
-				price: mPrice ? Number(mPrice) : null, category: mCategory || null,
-				is_available: mIsAvailable, product_ids: mProductIds,
+			scanReviewProduct = {
+				name: d.product_name || '',
+				brand: d.brand || '',
+				category: d.category || '',
+				ingredients_raw: d.ingredients_raw || '',
+				storage_instructions: d.storage_instructions || '',
+				preparation_instructions: d.preparation_instructions || '',
+				is_vegetarian: d.is_vegetarian,
+				is_vegan: d.is_vegan,
+				is_halal: d.is_halal,
+				is_gluten_free: d.is_gluten_free,
+				allergen_ids: result.matched_allergens.map(a => a.id),
+				image_url: result.image_url,
 			};
-			if (editingMenu) {
-				const updated = await updateMenu(editingMenu.id, data);
-				menus = menus.map((m) => (m.id === updated.id ? updated : m));
-			} else {
-				const created = await createMenu(data);
-				menus = [created, ...menus];
-			}
-			showAddMenu = false;
-		} catch (e) {
-			error = e instanceof Error ? e.message : '保存に失敗しました';
+		} catch (e: any) {
+			scanError = e.message || 'Scan failed';
 		} finally {
-			savingMenu = false;
+			isScanning = false;
 		}
 	}
 
-	async function handleDeleteMenu(id: string) {
-		if (!confirm('このメニューを削除しますか？')) return;
-		try {
-			await deleteMenu(id);
-			menus = menus.filter((m) => m.id !== id);
-			if (expandedMenuId === id) expandedMenuId = null;
-		} catch (e) {
-			error = e instanceof Error ? e.message : '削除に失敗しました';
+	async function confirmScanSave() {
+		if (!scanReviewProduct.name.trim()) {
+			scanSaveError = 'Product name is required';
+			return;
 		}
-	}
+		isSavingScan = true;
+		scanSaveError = null;
 
-	// ── Settings ─────────────────────────────────────────────
-	async function handleAddAllergen() {
-		if (!newAllergenName.trim()) return;
-		savingSettings = true;
 		try {
-			const a = await createAllergen(newAllergenName.trim(), newAllergenCategory);
-			allergens = [...allergens, a];
-			newAllergenName = '';
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'アレルゲン追加に失敗しました';
+			await createProduct(scanReviewProduct);
+			await loadProducts();
+			scanSaveSuccess = true;
+		} catch (e: any) {
+			scanSaveError = e.message || 'Failed to save product';
 		} finally {
-			savingSettings = false;
+			isSavingScan = false;
 		}
 	}
 
-	async function handleDeleteAllergen(id: string) {
-		if (!confirm('このアレルゲンを削除しますか？')) return;
-		try {
-			await deleteAllergen(id);
-			allergens = allergens.filter((a) => a.id !== id);
-		} catch (e) {
-			error = e instanceof Error ? e.message : '削除に失敗しました';
-		}
+	function scanAnother() {
+		clearSelection();
+		scanExtractData = null;
+		scanSaveSuccess = false;
+		scanSaveError = null;
+		scanReviewProduct = {
+			name: '',
+			brand: '',
+			category: '',
+			ingredients_raw: '',
+			storage_instructions: '',
+			preparation_instructions: '',
+			is_vegetarian: false,
+			is_vegan: false,
+			is_halal: false,
+			is_gluten_free: false,
+			allergen_ids: [],
+			image_url: null,
+		};
 	}
-
-	async function handleAddCategory() {
-		if (!newCategoryName.trim()) return;
-		savingSettings = true;
-		try {
-			const c = await createCategoryApi(newCategoryName.trim(), newCategoryType);
-			if (newCategoryType === 'product') productCategories = [...productCategories, c];
-			else menuCategories = [...menuCategories, c];
-			newCategoryName = '';
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'カテゴリー追加に失敗しました';
-		} finally {
-			savingSettings = false;
-		}
-	}
-
-	async function handleDeleteCategory(id: string, type: 'product' | 'menu') {
-		if (!confirm('このカテゴリーを削除しますか？')) return;
-		try {
-			await deleteCategoryApi(id);
-			if (type === 'product') productCategories = productCategories.filter((c) => c.id !== id);
-			else menuCategories = menuCategories.filter((c) => c.id !== id);
-		} catch (e) {
-			error = e instanceof Error ? e.message : '削除に失敗しました';
-		}
-	}
-
-	// ── Helpers ──────────────────────────────────────────────
-	function dietaryBadges(p: Product) {
-		return [
-			p.is_vegetarian && { label: 'V', title: 'ベジタリアン', color: 'bg-green-100 text-green-700' },
-			p.is_vegan && { label: 'VG', title: 'ビーガン', color: 'bg-emerald-100 text-emerald-700' },
-			p.is_halal && { label: 'H', title: 'ハラール', color: 'bg-blue-100 text-blue-700' },
-			p.is_gluten_free && { label: 'GF', title: 'グルテンフリー', color: 'bg-amber-100 text-amber-700' },
-		].filter(Boolean) as { label: string; title: string; color: string }[];
-	}
-
-	const allergenCategoryLabels: Record<string, string> = {
-		grain: '穀物', egg: '卵', dairy: '乳製品', meat: '肉類',
-		fish: '魚類', shellfish: '甲殻類', nut: 'ナッツ', legume: '豆類', other: 'その他',
-	};
 </script>
 
 <svelte:head>
 	<title>メニュー管理 — {authState.organization?.name ?? 'Sinara'}</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+		rel="stylesheet"
+	/>
 </svelte:head>
 
-<div class="flex h-screen bg-gray-100">
-	<Sidebar
-		sections={sidebarSections}
-		bind:collapsed={sidebarCollapsed}
-		bind:mobileOpen={sidebarMobileOpen}
-	/>
+<div class="flex h-screen bg-gray-100 font-['Noto_Sans_JP',sans-serif]">
+	<Sidebar sections={sidebarSections} bind:collapsed={sidebarCollapsed} bind:mobileOpen={sidebarMobileOpen} />
 
+	<!-- Main Content -->
 	<div class="flex-1 flex flex-col overflow-hidden">
-		<!-- Header -->
-		<header class="bg-white border-b border-gray-200">
+		<header class="bg-white border-b border-gray-200 shrink-0">
 			<div class="h-16 flex items-center justify-between px-4 md:px-6">
 				<div class="flex items-center gap-3">
 					<button
-						onclick={() => (sidebarMobileOpen = true)}
+						onclick={() => sidebarMobileOpen = true}
 						class="md:hidden p-1.5 -ml-1 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
 						aria-label="メニューを開く"
 					>
 						<span class="material-symbols-rounded text-xl">menu</span>
 					</button>
-					<h2 class="text-lg font-bold text-gray-900">
-						{activeTab === 'products' ? '商品管理' : 'メニュー管理'}
-					</h2>
+					<h2 class="text-lg font-bold text-gray-900">{mainTab === 'products' ? '商品管理' : 'メニュー管理'}</h2>
+					<span class="text-sm text-gray-500 hidden sm:inline">Allergen Management System</span>
 				</div>
-				<div class="flex items-center gap-2">
-					<button
-						onclick={() => (showManageAllergens = true)}
-						class="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
-					>
-						<span class="material-symbols-rounded text-sm">warning</span>
-						アレルゲン
-					</button>
-					<button
-						onclick={() => (showManageCategories = true)}
-						class="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
-					>
-						<span class="material-symbols-rounded text-sm">category</span>
-						カテゴリー
-					</button>
-					{#if activeTab === 'products'}
+				<div class="flex items-center gap-3">
+					{#if mainTab === 'products' && (can('products.create') || can('products.scan'))}
 						<button
-							onclick={openAddProduct}
-							class="flex items-center gap-1 px-4 py-1.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
+							onclick={() => showAddProduct = !showAddProduct}
+							class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
 						>
-							<span class="material-symbols-rounded text-sm">add</span>
-							商品を追加
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+							</svg>
+							Add Product
 						</button>
-					{:else}
+					{/if}
+					{#if mainTab === 'menu' && can('menus.structure')}
 						<button
-							onclick={openAddMenu}
-							class="flex items-center gap-1 px-4 py-1.5 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
+							onclick={() => showMenuTreeConfig = true}
+							class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
 						>
-							<span class="material-symbols-rounded text-sm">add</span>
-							メニューを追加
+							<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+							</svg>
+							Configure Menu Structure
 						</button>
+					{/if}
+					{#if !authState.isStaff && !authState.loading}
+						<a
+							href="/login"
+							class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+						>
+							<span class="material-symbols-rounded text-lg">login</span>
+							ログイン
+						</a>
 					{/if}
 				</div>
 			</div>
+			{#if !isStaff && !authState.loading}
+				<div class="bg-amber-50 border-t border-amber-200 px-4 md:px-6 py-2 flex items-center gap-2">
+					<span class="material-symbols-rounded text-amber-600 text-lg">visibility</span>
+					<span class="text-sm text-amber-700">閲覧モード — スタッフとしてログインすると編集できます</span>
+				</div>
+			{/if}
 		</header>
 
-		<!-- Error banner -->
-		{#if error}
-			<div class="mx-4 mt-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
-				<span>{error}</span>
-				<button onclick={() => (error = null)} class="ml-4 text-red-400 hover:text-red-600">
-					<span class="material-symbols-rounded text-base">close</span>
-				</button>
-			</div>
-		{/if}
+		<main class="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6">
+			<div class="max-w-5xl lg:max-w-7xl mx-auto space-y-4 md:space-y-6">
 
-		<!-- Scrollable body -->
-		<main class="flex-1 overflow-auto p-4 md:p-6">
-			{#if authState.loading || loading}
-				<div class="space-y-3">
-					{#each [1, 2, 3] as _}
-						<div class="bg-white rounded-xl border border-gray-200 p-4 animate-pulse">
-							<div class="flex items-center gap-3">
-								<div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
-								<div class="flex-1 space-y-2">
-									<div class="h-4 bg-gray-200 rounded w-1/3"></div>
-									<div class="h-3 bg-gray-100 rounded w-1/4"></div>
-								</div>
-							</div>
-						</div>
-					{/each}
+		{#if mainTab === 'products'}
+		<!-- Add Product Section (always visible on mobile, toggle on desktop) -->
+		{#if can('products.create') || can('products.scan')}
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 {showAddProduct ? '' : 'md:hidden'}">
+			<!-- Tab Header -->
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-lg font-semibold text-gray-900">Add Product</h2>
+				<div class="flex bg-gray-100 rounded-lg p-1">
+					<button
+						onclick={() => { addMode = 'scan'; resetNewProduct(); }}
+						class="px-3 py-1.5 text-sm rounded-md transition-colors {addMode === 'scan' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-900'}"
+					>
+						Scan Image
+					</button>
+					<button
+						onclick={() => { addMode = 'manual'; clearSelection(); }}
+						class="px-3 py-1.5 text-sm rounded-md transition-colors {addMode === 'manual' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-900'}"
+					>
+						Add Manually
+					</button>
 				</div>
-
-			{:else if !authState.isStaff}
-				<div class="flex items-center justify-center h-64">
-					<p class="text-gray-500">ログインが必要です。<a href="/login" class="text-blue-600 underline">ログイン</a></p>
-				</div>
-
-			{:else if activeTab === 'products'}
-				<!-- Products list -->
-				{#if products.length === 0}
-					<div class="text-center py-16">
-						<span class="material-symbols-rounded text-5xl text-gray-300 mb-4 block">inventory_2</span>
-						<h3 class="text-lg font-medium text-gray-700 mb-2">商品がまだありません</h3>
-						<p class="text-sm text-gray-400 mb-4">スキャンまたは手動で商品を追加してください</p>
-						<button onclick={openAddProduct} class="px-5 py-2.5 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors">
-							最初の商品を追加
-						</button>
-					</div>
-				{:else}
-					<div class="space-y-2">
-						{#each products as product (product.id)}
-							<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<!-- svelte-ignore a11y_click_events_have_key_events -->
-								<div
-									class="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-									onclick={() => (expandedProductId = expandedProductId === product.id ? null : product.id)}
-								>
-									{#if product.image_url}
-										<img src={product.image_url} alt={product.name} class="w-12 h-12 rounded-lg object-cover shrink-0" />
-									{:else}
-										<div class="w-12 h-12 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
-											<span class="material-symbols-rounded text-orange-400">inventory_2</span>
-										</div>
-									{/if}
-									<div class="flex-1 min-w-0">
-										<div class="flex items-center gap-2 flex-wrap">
-											<span class="font-semibold text-gray-900 truncate">{product.name}</span>
-											{#if product.brand}
-												<span class="text-xs text-gray-400">{product.brand}</span>
-											{/if}
-											{#each dietaryBadges(product) as badge}
-												<span class="text-xs font-bold px-1.5 py-0.5 rounded {badge.color}" title={badge.title}>{badge.label}</span>
-											{/each}
-										</div>
-										<div class="flex items-center gap-2 mt-0.5 flex-wrap">
-											{#if product.category}
-												<span class="text-xs text-gray-400">{product.category}</span>
-											{/if}
-											{#if product.allergens.length > 0}
-												<span class="text-xs text-red-500">{product.allergens.length}種アレルゲン</span>
-											{/if}
-										</div>
-									</div>
-									<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<!-- svelte-ignore a11y_click_events_have_key_events -->
-									<div class="flex items-center gap-1 shrink-0" onclick={(e) => e.stopPropagation()}>
-										<button onclick={() => openEditProduct(product)} class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="編集">
-											<span class="material-symbols-rounded text-base">edit</span>
-										</button>
-										<button onclick={() => handleDeleteProduct(product.id)} class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="削除">
-											<span class="material-symbols-rounded text-base">delete</span>
-										</button>
-										<span class="material-symbols-rounded text-gray-300 text-base">{expandedProductId === product.id ? 'expand_less' : 'expand_more'}</span>
-									</div>
-								</div>
-								{#if expandedProductId === product.id}
-									<div class="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-3">
-										{#if product.ingredients_raw}
-											<div>
-												<p class="text-xs font-medium text-gray-500 mb-1">原材料</p>
-												<p class="text-sm text-gray-700">{product.ingredients_raw}</p>
-											</div>
-										{/if}
-										{#if product.allergens.length > 0}
-											<div>
-												<p class="text-xs font-medium text-gray-500 mb-1">アレルゲン</p>
-												<div class="flex flex-wrap gap-1">
-													{#each product.allergens as a}
-														<span class="px-2 py-0.5 bg-red-50 text-red-700 rounded text-xs">{a.name}</span>
-													{/each}
-												</div>
-											</div>
-										{/if}
-									</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{/if}
-
-			{:else}
-				<!-- Menus list -->
-				{#if menus.length === 0}
-					<div class="text-center py-16">
-						<span class="material-symbols-rounded text-5xl text-gray-300 mb-4 block">restaurant_menu</span>
-						<h3 class="text-lg font-medium text-gray-700 mb-2">メニューがまだありません</h3>
-						<p class="text-sm text-gray-400 mb-4">商品を組み合わせてメニューを作成してください</p>
-						<button onclick={openAddMenu} class="px-5 py-2.5 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors">
-							最初のメニューを作成
-						</button>
-					</div>
-				{:else}
-					<div class="space-y-2">
-						{#each menus as menu (menu.id)}
-							<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<!-- svelte-ignore a11y_click_events_have_key_events -->
-								<div
-									class="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-									onclick={() => (expandedMenuId = expandedMenuId === menu.id ? null : menu.id)}
-								>
-									<div class="w-12 h-12 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
-										<span class="material-symbols-rounded text-orange-400">restaurant_menu</span>
-									</div>
-									<div class="flex-1 min-w-0">
-										<div class="flex items-center gap-2 flex-wrap">
-											<span class="font-semibold text-gray-900 truncate">{menu.name}</span>
-											{#if menu.price != null}
-												<span class="text-xs font-medium text-gray-500">¥{menu.price.toLocaleString()}</span>
-											{/if}
-											{#if !menu.is_available}
-												<span class="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">非公開</span>
-											{/if}
-										</div>
-										<div class="flex items-center gap-2 mt-0.5">
-											{#if menu.category}
-												<span class="text-xs text-gray-400">{menu.category}</span>
-											{/if}
-											<span class="text-xs text-gray-400">{menu.products.length}品</span>
-											{#if menu.allergens.length > 0}
-												<span class="text-xs text-red-500">{menu.allergens.length}種アレルゲン</span>
-											{/if}
-										</div>
-									</div>
-									<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<!-- svelte-ignore a11y_click_events_have_key_events -->
-									<div class="flex items-center gap-1 shrink-0" onclick={(e) => e.stopPropagation()}>
-										<button onclick={() => openEditMenu(menu)} class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="編集">
-											<span class="material-symbols-rounded text-base">edit</span>
-										</button>
-										<button onclick={() => handleDeleteMenu(menu.id)} class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="削除">
-											<span class="material-symbols-rounded text-base">delete</span>
-										</button>
-										<span class="material-symbols-rounded text-gray-300 text-base">{expandedMenuId === menu.id ? 'expand_less' : 'expand_more'}</span>
-									</div>
-								</div>
-								{#if expandedMenuId === menu.id}
-									<div class="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-3">
-										{#if menu.description}
-											<p class="text-sm text-gray-600">{menu.description}</p>
-										{/if}
-										{#if menu.products.length > 0}
-											<div>
-												<p class="text-xs font-medium text-gray-500 mb-1">使用商品</p>
-												<div class="flex flex-wrap gap-1">
-													{#each menu.products as p}
-														<span class="px-2 py-0.5 bg-white border border-gray-200 text-gray-700 rounded text-xs">{p.name}</span>
-													{/each}
-												</div>
-											</div>
-										{/if}
-										{#if menu.allergens.length > 0}
-											<div>
-												<p class="text-xs font-medium text-gray-500 mb-1">含まれるアレルゲン（自動算出）</p>
-												<div class="flex flex-wrap gap-1">
-													{#each menu.allergens as a}
-														<span class="px-2 py-0.5 bg-red-50 text-red-700 rounded text-xs">{a.name}</span>
-													{/each}
-												</div>
-											</div>
-										{/if}
-									</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{/if}
-			{/if}
-		</main>
-	</div>
-</div>
-
-<!-- ── Add/Edit Product Modal ────────────────────────────────────────── -->
-{#if showAddProduct}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto"
-		onclick={(e) => { if (e.target === e.currentTarget) closeAddProduct(); }}
-	>
-		<div class="bg-white rounded-2xl shadow-xl w-full max-w-xl my-8">
-			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-				<h2 class="text-lg font-bold text-gray-900">{editingProduct ? '商品を編集' : '商品を追加'}</h2>
-				<button onclick={closeAddProduct} class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
-					<span class="material-symbols-rounded">close</span>
-				</button>
 			</div>
 
-			<div class="px-6 py-4 space-y-4">
-				{#if !editingProduct}
-					<div class="flex rounded-lg border border-gray-200 overflow-hidden">
-						<button
-							onclick={() => (addMode = 'scan')}
-							class="flex-1 py-2.5 text-sm font-medium transition-colors {addMode === 'scan' ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-50'}"
-						>
-							<span class="material-symbols-rounded text-sm align-middle mr-1">qr_code_scanner</span>
-							画像スキャン
-						</button>
-						<button
-							onclick={() => (addMode = 'manual')}
-							class="flex-1 py-2.5 text-sm font-medium transition-colors {addMode === 'manual' ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-50'}"
-						>
-							<span class="material-symbols-rounded text-sm align-middle mr-1">edit_note</span>
-							手動入力
-						</button>
-					</div>
-				{/if}
-
-				{#if addMode === 'scan' && !editingProduct}
-					<!-- Scan tab -->
-					<div class="space-y-3">
-						<!-- Hidden file input for gallery/file picker -->
-						<input id="scan-file" type="file" accept="image/*" onchange={onScanFileChange} class="hidden" />
-
-						{#if webcamActive}
-							<!-- Live webcam view -->
-							<div class="relative rounded-xl overflow-hidden bg-black">
-								<!-- svelte-ignore a11y_media_has_caption -->
-								<video
-									bind:this={videoEl}
-									autoplay
-									playsinline
-									class="w-full h-56 object-cover"
-								></video>
-								<button
-									onclick={stopWebcam}
-									class="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-									title="キャンセル"
-								>
-									<span class="material-symbols-rounded text-base">close</span>
-								</button>
+			{#if addMode === 'scan'}
+				<!-- Scan Mode -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<!-- Upload Area -->
+					<div>
+						{#if showCamera}
+							<!-- Mobile: fullscreen camera overlay -->
+							<div class="fixed inset-0 z-50 bg-black flex flex-col md:relative md:inset-auto md:z-auto md:bg-transparent md:rounded-lg md:overflow-hidden">
+								<video bind:this={videoEl} autoplay playsinline muted class="flex-1 object-cover w-full md:rounded-lg md:object-contain"></video>
+								{#if cameraError}
+									<div class="absolute top-12 left-4 right-4 md:static md:mt-2 md:mx-0">
+										<p class="text-red-400 text-sm bg-black/70 rounded-lg px-3 py-2 md:bg-transparent md:text-red-600 md:p-0">{cameraError}</p>
+									</div>
+								{/if}
+								<!-- Mobile: bottom controls -->
+								<div class="absolute bottom-0 left-0 right-0 p-6 pb-10 flex items-center justify-center gap-6 bg-gradient-to-t from-black/80 to-transparent md:hidden">
+									<button
+										onclick={closeCamera}
+										class="w-12 h-12 rounded-full bg-white/20 text-white flex items-center justify-center backdrop-blur-sm"
+									>
+										<span class="material-symbols-rounded text-2xl">close</span>
+									</button>
+									<button
+										onclick={capturePhoto}
+										class="rounded-full bg-white flex items-center justify-center shadow-lg"
+										style="width: 72px; height: 72px;"
+									>
+										<div class="rounded-full border-4 border-gray-300" style="width: 62px; height: 62px;"></div>
+									</button>
+									<div class="w-12 h-12"></div>
+								</div>
+								<!-- Desktop: inline controls -->
+								<div class="hidden md:flex mt-3 gap-2">
+									<button
+										onclick={capturePhoto}
+										class="flex-1 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+									>
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
+										Capture
+									</button>
+									<button onclick={closeCamera} class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+										Cancel
+									</button>
+								</div>
 							</div>
-							<button
-								onclick={captureFrame}
-								class="w-full py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 text-base"
+						{:else if !previewUrl}
+							<div
+								class="border-2 border-dashed rounded-lg p-6 text-center transition-colors {dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300'}"
+								ondragover={handleDragOver}
+								ondragleave={handleDragLeave}
+								ondrop={handleDrop}
 							>
-								<span class="material-symbols-rounded text-xl">camera</span>
-								撮影する
-							</button>
-						{:else if scanPreviewUrl}
-							<!-- Captured / selected preview -->
-							<div class="relative">
-								<img src={scanPreviewUrl} alt="プレビュー" class="w-full h-52 object-contain rounded-xl border border-gray-200 bg-gray-50" />
-								<button
-									onclick={() => { scanFile = null; scanPreviewUrl = null; scanDone = false; }}
-									class="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-									title="やり直す"
-								>
-									<span class="material-symbols-rounded text-base">close</span>
-								</button>
+								<svg class="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+								</svg>
+								<p class="text-gray-600 text-sm mb-3">Drag & drop or browse</p>
+								<div class="flex gap-2 justify-center">
+									<label class="cursor-pointer px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+										Choose File
+										<input type="file" accept="image/*" class="hidden" onchange={handleFileInput} />
+									</label>
+									<button onclick={openCamera} class="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1.5">
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
+										Camera
+									</button>
+								</div>
 							</div>
 						{:else}
-							<!-- Initial state: camera or file picker -->
-							{#if webcamError}
-								<div class="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
-									{webcamError}
-								</div>
-							{/if}
-							<div class="grid grid-cols-2 gap-2">
-								<button
-									onclick={startWebcam}
-									class="flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors"
-								>
-									<span class="material-symbols-rounded text-3xl">photo_camera</span>
-									<span class="text-xs font-medium">カメラで撮影</span>
-								</button>
-								<label
-									for="scan-file"
-									class="flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 text-gray-600 cursor-pointer hover:bg-gray-100 transition-colors"
-								>
-									<span class="material-symbols-rounded text-3xl">photo_library</span>
-									<span class="text-xs font-medium">ファイルを選択</span>
-								</label>
-							</div>
-						{/if}
-
-						{#if scanPreviewUrl && !webcamActive}
+							<div class="relative">
+								<img src={previewUrl} alt="Preview" class="w-full rounded-lg object-contain max-h-48" />
+								<button onclick={clearSelection} class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+								</svg>
+							</button>
+						</div>
+						<div class="mt-3 flex gap-2">
 							<button
-								onclick={handleScan}
-								disabled={!scanFile || scanning}
-								class="w-full py-2.5 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+								onclick={startScan}
+								disabled={isScanning}
+								class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
 							>
-								{#if scanning}
-									<span class="material-symbols-rounded text-base animate-spin">refresh</span>
-									スキャン中...
+								{#if isScanning}
+									<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+									Scanning...
 								{:else}
-									<span class="material-symbols-rounded text-base">qr_code_scanner</span>
-									OCRスキャン実行
+									Scan
 								{/if}
 							</button>
-						{/if}
+							<button onclick={clearSelection} class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+								Clear
+							</button>
+						</div>
+					{/if}
+					{#if scanError}
+						<p class="mt-2 text-red-600 text-sm">{scanError}</p>
+					{/if}
+				</div>
 
-						{#if scanDone}
-							<div class="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
-								<span class="material-symbols-rounded text-base">check_circle</span>
-								スキャン完了 — 「手動入力」タブで内容を確認・編集してください。
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<!-- Manual / review tab -->
-					<div class="space-y-3">
-						{#if scanDone}
-							<div class="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700 flex items-center gap-1.5">
-								<span class="material-symbols-rounded text-sm">check_circle</span>
-								OCRから自動入力しました。内容を確認してください。
-							</div>
-						{/if}
-						<div>
-							<label class="text-sm font-medium text-gray-700 block mb-1">商品名 <span class="text-red-500">*</span></label>
-							<input type="text" bind:value={pName} placeholder="商品名を入力" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+				<!-- Results / Review Form -->
+				<div>
+					{#if isScanning}
+						<div class="flex flex-col items-center justify-center h-full py-8 text-center">
+							<svg class="w-8 h-8 text-blue-600 animate-pulse mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+							</svg>
+							<p class="text-gray-600 text-sm">Analyzing image...</p>
+							<p class="text-gray-400 text-xs mt-1">This may take a few seconds</p>
 						</div>
-						<div class="grid grid-cols-2 gap-3">
-							<div>
-								<label class="text-sm font-medium text-gray-700 block mb-1">ブランド</label>
-								<input type="text" bind:value={pBrand} placeholder="ブランド名" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+					{:else if scanSaveSuccess}
+						<div class="space-y-4 py-4">
+							<div class="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+								<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+								</svg>
+								<span class="text-green-700 text-sm font-medium">Product saved successfully!</span>
 							</div>
-							<div>
-								<label class="text-sm font-medium text-gray-700 block mb-1">カテゴリー</label>
-								<select bind:value={pCategory} class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
-									<option value="">未選択</option>
-									{#each productCategories as c}
-										<option value={c.value}>{c.name}</option>
-									{/each}
-								</select>
+							<button onclick={scanAnother} class="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+								Scan Another
+							</button>
+						</div>
+					{:else if scanExtractData}
+						<!-- Editable review form pre-filled with OCR data -->
+						<div class="space-y-4">
+							<div class="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+								<svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+								</svg>
+								<span class="text-blue-700 text-xs">Review extracted data and confirm to save</span>
+							</div>
+
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<!-- Left Column -->
+								<div class="space-y-3">
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+										<input
+											type="text"
+											bind:value={scanReviewProduct.name}
+											placeholder="Product name"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+
+									<div class="grid grid-cols-2 gap-3">
+										<div>
+											<label class="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+											<input
+												type="text"
+												bind:value={scanReviewProduct.brand}
+												placeholder="Brand"
+												class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+											/>
+										</div>
+										<div>
+											<label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+											<CustomSelect
+												bind:value={scanReviewProduct.category}
+												options={productCategories.map(c => ({ value: c.value, label: c.label }))}
+												placeholder="Select..."
+											/>
+										</div>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-2">Dietary Information</label>
+										<div class="grid grid-cols-2 gap-2">
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_vegetarian ? 'bg-green-100 ring-2 ring-green-300' : 'bg-gray-50 hover:bg-gray-100'}">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_vegetarian} class="w-4 h-4 text-green-600 rounded" />
+												<span class="text-sm {scanReviewProduct.is_vegetarian ? 'text-green-700 font-medium' : ''}">Vegetarian</span>
+											</label>
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_vegan ? 'bg-green-100 ring-2 ring-green-300' : 'bg-gray-50 hover:bg-gray-100'}">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_vegan} class="w-4 h-4 text-green-600 rounded" />
+												<span class="text-sm {scanReviewProduct.is_vegan ? 'text-green-700 font-medium' : ''}">Vegan</span>
+											</label>
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_halal ? 'bg-emerald-100 ring-2 ring-emerald-300' : 'bg-gray-50 hover:bg-gray-100'}">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_halal} class="w-4 h-4 text-emerald-600 rounded" />
+												<span class="text-sm {scanReviewProduct.is_halal ? 'text-emerald-700 font-medium' : ''}">Halal</span>
+											</label>
+											<label class="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors {scanReviewProduct.is_gluten_free ? 'bg-amber-100 ring-2 ring-amber-300' : 'bg-gray-50 hover:bg-gray-100'}">
+												<input type="checkbox" bind:checked={scanReviewProduct.is_gluten_free} class="w-4 h-4 text-amber-600 rounded" />
+												<span class="text-sm {scanReviewProduct.is_gluten_free ? 'text-amber-700 font-medium' : ''}">Gluten-Free</span>
+											</label>
+										</div>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-2">Allergens</label>
+										<!-- Selected allergens shown at top -->
+										{#if (scanReviewProduct.allergen_ids || []).length > 0}
+											<div class="mb-2">
+												<p class="text-xs text-gray-500 mb-1">Selected ({(scanReviewProduct.allergen_ids || []).length})</p>
+												<div class="flex flex-wrap gap-1.5">
+													{#each allergens.filter(a => (scanReviewProduct.allergen_ids || []).includes(a.id)) as allergen}
+														<button
+															type="button"
+															onclick={() => toggleScanAllergen(allergen.id)}
+															class="px-2.5 py-1 rounded-md text-sm bg-red-100 text-red-700 ring-2 ring-red-300 flex items-center gap-1"
+														>
+															{allergen.name}
+															<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+														</button>
+													{/each}
+												</div>
+											</div>
+										{/if}
+										<!-- Search and all allergens -->
+										<div class="mb-2">
+											<input type="text" bind:value={scanAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+										</div>
+										<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
+											{#each scanSearchedAllergens.filter(a => !(scanReviewProduct.allergen_ids || []).includes(a.id)) as allergen}
+												<button
+													type="button"
+													onclick={() => toggleScanAllergen(allergen.id)}
+													class="px-2.5 py-1 rounded-md text-sm transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+												>
+													{allergen.name}
+												</button>
+											{/each}
+											{#if scanSearchedAllergens.filter(a => !(scanReviewProduct.allergen_ids || []).includes(a.id)).length === 0}
+												<span class="text-gray-400 text-xs">All allergens selected or no results</span>
+											{/if}
+										</div>
+									</div>
+								</div>
+
+								<!-- Right Column -->
+								<div class="space-y-3">
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Ingredients</label>
+										<textarea
+											bind:value={scanReviewProduct.ingredients_raw}
+											rows="3"
+											placeholder="Ingredients list..."
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										></textarea>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Storage Instructions</label>
+										<textarea
+											bind:value={scanReviewProduct.storage_instructions}
+											rows="2"
+											placeholder="Storage instructions..."
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										></textarea>
+									</div>
+
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Preparation Instructions</label>
+										<textarea
+											bind:value={scanReviewProduct.preparation_instructions}
+											rows="2"
+											placeholder="Preparation instructions..."
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										></textarea>
+									</div>
+								</div>
+							</div>
+
+							{#if scanSaveError}
+								<p class="text-red-600 text-sm">{scanSaveError}</p>
+							{/if}
+
+							<div class="flex gap-2 pt-2">
+								<button
+									onclick={confirmScanSave}
+									disabled={isSavingScan}
+									class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+								>
+									{#if isSavingScan}
+										<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+										Saving...
+									{:else}
+										Confirm & Save
+									{/if}
+								</button>
+								<button onclick={scanAnother} class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+									Discard
+								</button>
 							</div>
 						</div>
-						<div>
-							<label class="text-sm font-medium text-gray-700 block mb-1">原材料</label>
-							<textarea bind:value={pIngredients} rows="3" placeholder="原材料を入力" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"></textarea>
+					{:else}
+						<div class="flex flex-col items-center justify-center h-full py-8 text-center text-gray-400">
+							<svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+							</svg>
+							<p class="text-sm">Upload an image to scan</p>
 						</div>
-						<div>
-							<label class="text-sm font-medium text-gray-700 block mb-2">食事制限</label>
-							<div class="flex flex-wrap gap-4">
-								<label class="flex items-center gap-1.5 cursor-pointer">
-									<input type="checkbox" bind:checked={pIsVeg} class="rounded" />
-									<span class="text-sm text-gray-700">ベジタリアン</span>
-								</label>
-								<label class="flex items-center gap-1.5 cursor-pointer">
-									<input type="checkbox" bind:checked={pIsVegan} class="rounded" />
-									<span class="text-sm text-gray-700">ビーガン</span>
-								</label>
-								<label class="flex items-center gap-1.5 cursor-pointer">
-									<input type="checkbox" bind:checked={pIsHalal} class="rounded" />
-									<span class="text-sm text-gray-700">ハラール</span>
-								</label>
-								<label class="flex items-center gap-1.5 cursor-pointer">
-									<input type="checkbox" bind:checked={pIsGF} class="rounded" />
-									<span class="text-sm text-gray-700">グルテンフリー</span>
-								</label>
-							</div>
+					{/if}
+				</div>
+			</div>
+			{:else}
+				<!-- Manual Add Mode -->
+				<div class="space-y-4">
+					{#if createSuccess}
+						<div class="flex items-center gap-2 p-4 bg-green-50 rounded-lg">
+							<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+							</svg>
+							<span class="text-green-700 text-sm font-medium">Product created successfully!</span>
 						</div>
-						<div>
-							<label class="text-sm font-medium text-gray-700 block mb-1">アレルゲン</label>
-							<input type="text" bind:value={pAllergenSearch} placeholder="アレルゲンを検索..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 mb-2" />
-							<div class="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 grid grid-cols-2 gap-0.5">
-								{#each filteredAllergens as a}
-									<label class="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded hover:bg-gray-50">
-										<input type="checkbox" checked={pAllergenIds.includes(a.id)} onchange={() => toggleAllergen(a.id)} class="rounded shrink-0" />
-										<span class="text-xs text-gray-700">{a.name}</span>
+					{:else}
+						<!-- Image Upload -->
+						<div class="mb-4">
+							<label class="block text-sm font-medium text-gray-700 mb-2">Product Image (Optional)</label>
+							{#if !manualImagePreview}
+								<div class="flex items-center gap-3">
+									<label class="cursor-pointer px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 flex items-center gap-2">
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+										</svg>
+										Choose Image
+										<input type="file" accept="image/*" class="hidden" onchange={handleManualImageInput} />
 									</label>
-								{/each}
-								{#if filteredAllergens.length === 0}
-									<p class="text-xs text-gray-400 col-span-2 py-2 text-center">見つかりません</p>
-								{/if}
-							</div>
-							{#if pAllergenIds.length > 0}
-								<p class="text-xs text-orange-600 mt-1">{pAllergenIds.length}件選択中</p>
+									<label class="cursor-pointer px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 flex items-center gap-2">
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
+										Camera
+										<input type="file" accept="image/*" capture="environment" class="hidden" onchange={handleManualImageInput} />
+									</label>
+									<span class="text-gray-400 text-xs">PNG, JPG up to 5MB</span>
+								</div>
+							{:else}
+								<div class="flex items-start gap-3">
+									<div class="relative">
+										<img src={manualImagePreview} alt="Preview" class="w-24 h-24 object-cover rounded-lg" />
+										<button
+											onclick={clearManualImage}
+											class="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+										>
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+									<div class="text-sm text-gray-500">
+										<p class="font-medium text-gray-700">{manualImageFile?.name}</p>
+										<p>{manualImageFile ? (manualImageFile.size / 1024).toFixed(1) + ' KB' : ''}</p>
+									</div>
+								</div>
 							{/if}
 						</div>
-						{#if !editingProduct}
-							<div>
-								<label class="text-sm font-medium text-gray-700 block mb-1">商品画像</label>
-								<input
-									type="file"
-									accept="image/*"
-									onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) pImageFile = f; }}
-									class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-50 file:text-gray-700 file:font-medium hover:file:bg-gray-100"
-								/>
-								{#if pImageUrl && !pImageFile}
-									<img src={pImageUrl} alt="スキャン画像" class="mt-2 h-24 rounded-lg object-contain border border-gray-200 bg-gray-50" />
-								{/if}
-							</div>
-						{/if}
-					</div>
-				{/if}
-			</div>
 
-			<div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
-				<button onclick={closeAddProduct} class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-					キャンセル
-				</button>
-				{#if addMode === 'manual' || editingProduct}
-					<button
-						onclick={saveProduct}
-						disabled={savingProduct || !pName.trim()}
-						class="px-5 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-					>
-						{#if savingProduct}
-							<span class="material-symbols-rounded text-sm animate-spin">refresh</span>
-						{/if}
-						{editingProduct ? '更新' : '保存'}
-					</button>
-				{/if}
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- ── Add/Edit Menu Modal ───────────────────────────────────────────── -->
-{#if showAddMenu}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto"
-		onclick={(e) => { if (e.target === e.currentTarget) showAddMenu = false; }}
-	>
-		<div class="bg-white rounded-2xl shadow-xl w-full max-w-xl my-8">
-			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-				<h2 class="text-lg font-bold text-gray-900">{editingMenu ? 'メニューを編集' : 'メニューを追加'}</h2>
-				<button onclick={() => (showAddMenu = false)} class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
-					<span class="material-symbols-rounded">close</span>
-				</button>
-			</div>
-			<div class="px-6 py-4 space-y-4">
-				<div>
-					<label class="text-sm font-medium text-gray-700 block mb-1">メニュー名 <span class="text-red-500">*</span></label>
-					<input type="text" bind:value={mName} placeholder="メニュー名を入力" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-				</div>
-				<div>
-					<label class="text-sm font-medium text-gray-700 block mb-1">説明</label>
-					<textarea bind:value={mDescription} rows="2" placeholder="説明（任意）" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"></textarea>
-				</div>
-				<div class="grid grid-cols-2 gap-3">
-					<div>
-						<label class="text-sm font-medium text-gray-700 block mb-1">価格（円）</label>
-						<input type="number" bind:value={mPrice} placeholder="0" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-					</div>
-					<div>
-						<label class="text-sm font-medium text-gray-700 block mb-1">カテゴリー</label>
-						<select bind:value={mCategory} class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
-							<option value="">未選択</option>
-							{#each menuCategories as c}
-								<option value={c.value}>{c.name}</option>
-							{/each}
-						</select>
-					</div>
-				</div>
-				<label class="flex items-center gap-2 cursor-pointer">
-					<input type="checkbox" bind:checked={mIsAvailable} class="rounded" />
-					<span class="text-sm text-gray-700">公開する</span>
-				</label>
-				<div>
-					<label class="text-sm font-medium text-gray-700 block mb-1">使用する商品</label>
-					<input type="text" bind:value={mProductSearch} placeholder="商品を検索..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 mb-2" />
-					<div class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-						{#each filteredMenuProducts as p}
-							<label class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50">
-								<input type="checkbox" checked={mProductIds.includes(p.id)} onchange={() => toggleMenuProduct(p.id)} class="rounded shrink-0" />
-								<div class="flex-1 min-w-0">
-									<p class="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-									{#if p.allergens.length > 0}
-										<p class="text-xs text-red-500">{p.allergens.length}種アレルゲン</p>
-									{/if}
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<!-- Left Column -->
+							<div class="space-y-4">
+								<div>
+									<label class="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+									<input
+										type="text"
+										bind:value={newProduct.name}
+										placeholder="e.g., House Special Curry"
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									/>
 								</div>
-							</label>
-						{/each}
-						{#if filteredMenuProducts.length === 0}
-							<p class="text-xs text-gray-400 py-4 text-center">商品が見つかりません</p>
+								<div class="grid grid-cols-2 gap-3">
+									<div>
+										<label class="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+										<input
+											type="text"
+											bind:value={newProduct.brand}
+											placeholder="e.g., In-house"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+									<div>
+										<div class="flex items-center justify-between mb-1">
+											<label class="text-sm font-medium text-gray-700">Category</label>
+											<button type="button" onclick={openManageProductCategories} class="p-0.5 text-gray-400 hover:text-blue-600 transition-colors" title="Manage categories">
+												<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+											</button>
+										</div>
+										<CustomSelect
+											bind:value={newProduct.category}
+											options={productCategories.map(c => ({ value: c.value, label: c.label }))}
+											placeholder="Select..."
+										/>
+									</div>
+								</div>
+
+								<!-- Dietary Info -->
+								<div>
+									<label class="block text-sm font-medium text-gray-700 mb-2">Dietary Information</label>
+									<div class="grid grid-cols-2 gap-2">
+										<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<input type="checkbox" bind:checked={newProduct.is_vegetarian} class="w-4 h-4 text-green-600 rounded" />
+											<span class="text-sm">Vegetarian</span>
+										</label>
+										<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<input type="checkbox" bind:checked={newProduct.is_vegan} class="w-4 h-4 text-green-600 rounded" />
+											<span class="text-sm">Vegan</span>
+										</label>
+										<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<input type="checkbox" bind:checked={newProduct.is_halal} class="w-4 h-4 text-emerald-600 rounded" />
+											<span class="text-sm">Halal</span>
+										</label>
+										<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+											<input type="checkbox" bind:checked={newProduct.is_gluten_free} class="w-4 h-4 text-amber-600 rounded" />
+											<span class="text-sm">Gluten-Free</span>
+										</label>
+									</div>
+								</div>
+
+								<!-- Allergens Selection -->
+								<div>
+									<div class="flex items-center justify-between mb-2">
+										<label class="text-sm font-medium text-gray-700">Allergens ({allergens.length})</label>
+										<button type="button" onclick={openManageAllergens} class="p-0.5 text-gray-400 hover:text-red-600 transition-colors" title="Manage allergens">
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+										</button>
+									</div>
+									<div class="mb-2">
+										<input type="text" bind:value={allergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+									</div>
+									<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg">
+										{#each searchedAllergens as allergen}
+											<button
+												type="button"
+												onclick={() => toggleAllergen(allergen.id)}
+												class="px-2.5 py-1 rounded-md text-sm transition-colors {(newProduct.allergen_ids || []).includes(allergen.id) ? 'bg-red-100 text-red-700 ring-2 ring-red-300' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}"
+											>
+												{allergen.name}
+											</button>
+										{/each}
+										{#if allergens.length === 0}
+											<p class="text-gray-400 text-sm">Loading allergens...</p>
+										{/if}
+									</div>
+								</div>
+							</div>
+
+							<!-- Right Column -->
+							<div class="space-y-4">
+								<div>
+									<label class="block text-sm font-medium text-gray-700 mb-1">Ingredients</label>
+									<textarea
+										bind:value={newProduct.ingredients_raw}
+										rows="3"
+										placeholder="List all ingredients..."
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									></textarea>
+								</div>
+								<div>
+									<label class="block text-sm font-medium text-gray-700 mb-1">Storage Instructions</label>
+									<textarea
+										bind:value={newProduct.storage_instructions}
+										rows="2"
+										placeholder="How to store this product..."
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									></textarea>
+								</div>
+								<div>
+									<label class="block text-sm font-medium text-gray-700 mb-1">Preparation Instructions</label>
+									<textarea
+										bind:value={newProduct.preparation_instructions}
+										rows="2"
+										placeholder="How to prepare/serve..."
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									></textarea>
+								</div>
+							</div>
+						</div>
+
+						{#if createError}
+							<p class="text-red-600 text-sm">{createError}</p>
 						{/if}
-					</div>
-					{#if mProductIds.length > 0}
-						<p class="text-xs text-orange-600 mt-1">{mProductIds.length}品選択中</p>
+
+						<div class="flex gap-2 pt-2">
+							<button
+								onclick={handleCreateProduct}
+								disabled={isCreating}
+								class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+							>
+								{#if isCreating}
+									<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+									{isUploadingImage ? 'Uploading image...' : 'Creating...'}
+								{:else}
+									Create Product
+								{/if}
+							</button>
+							<button
+								onclick={resetNewProduct}
+								class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50"
+							>
+								Clear
+							</button>
+						</div>
 					{/if}
 				</div>
-			</div>
-			<div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
-				<button onclick={() => (showAddMenu = false)} class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-					キャンセル
-				</button>
-				<button
-					onclick={saveMenu}
-					disabled={savingMenu || !mName.trim()}
-					class="px-5 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-				>
-					{#if savingMenu}
-						<span class="material-symbols-rounded text-sm animate-spin">refresh</span>
-					{/if}
-					{editingMenu ? '更新' : '保存'}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
+			{/if}
+		</section>
+		{/if}
 
-<!-- ── Manage Allergens Modal ──────────────────────────────────────────── -->
-{#if showManageAllergens}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto"
-		onclick={(e) => { if (e.target === e.currentTarget) showManageAllergens = false; }}
-	>
-		<div class="bg-white rounded-2xl shadow-xl w-full max-w-lg my-8">
-			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-				<h2 class="text-lg font-bold text-gray-900">アレルゲン管理</h2>
-				<button onclick={() => (showManageAllergens = false)} class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
-					<span class="material-symbols-rounded">close</span>
-				</button>
+		<!-- Products Section -->
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 overflow-visible">
+			<div class="flex items-center justify-between mb-3">
+				<h2 class="text-lg font-semibold text-gray-900">Products ({filteredProducts.length}{selectedProductMenuGroup !== 'all' ? ` / ${products.length}` : ''})</h2>
+				<input
+					type="text"
+					placeholder="Search..."
+					bind:value={searchQuery}
+					class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+				/>
 			</div>
-			<div class="px-6 py-4 space-y-4">
-				<div class="flex gap-2">
-					<input type="text" bind:value={newAllergenName} placeholder="アレルゲン名（日本語）" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-					<select bind:value={newAllergenCategory} class="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
-						{#each Object.entries(allergenCategoryLabels) as [val, label]}
-							<option value={val}>{label}</option>
-						{/each}
-					</select>
-					<button onclick={handleAddAllergen} disabled={savingSettings || !newAllergenName.trim()} class="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">
-						追加
+
+			{#if menuGroups.length > 0}
+				<div class="flex flex-wrap gap-1.5 mb-4">
+					<button
+						onclick={() => selectedProductMenuGroup = 'all'}
+						class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+					>
+						All
+					</button>
+					{#each menuGroups as group}
+						<button
+							onclick={() => selectedProductMenuGroup = group.id}
+							class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === group.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+						>
+							{group.name}
+						</button>
+					{/each}
+					<button
+						onclick={() => selectedProductMenuGroup = 'unlinked'}
+						class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === 'unlinked' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+					>
+						Unlinked
 					</button>
 				</div>
-				<div class="max-h-72 overflow-y-auto space-y-1">
-					{#each allergens as a}
-						<div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50">
-							<div>
-								<span class="text-sm font-medium text-gray-800">{a.name}</span>
-								<span class="ml-2 text-xs text-gray-400">{allergenCategoryLabels[a.category] ?? a.category}</span>
-							</div>
-							<button onclick={() => handleDeleteAllergen(a.id)} class="p-1 text-gray-300 hover:text-red-500 transition-colors">
-								<span class="material-symbols-rounded text-base">delete</span>
+			{/if}
+
+			{#if isLoading}
+				<div class="flex justify-center py-8">
+					<svg class="w-6 h-6 text-gray-400 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+				</div>
+			{:else if filteredProducts.length > 0}
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3 {expandedProductId ? 'pb-[70vh]' : ''}">
+					{#each filteredProducts as product}
+						<div class="relative bg-gray-50 rounded-lg overflow-visible border border-gray-200">
+							<!-- Product Header (clickable) -->
+							<button
+								onclick={() => toggleProduct(product.id)}
+								class="w-full p-3 flex items-center gap-3 hover:bg-gray-100 transition-colors text-left"
+							>
+								{#if product.image_url}
+									<button onclick={(e) => { e.stopPropagation(); expandedImageUrl = product.image_url; }} class="flex-shrink-0">
+										<img src={product.image_url} alt={product.name} class="w-10 h-10 object-cover rounded-lg cursor-zoom-in" />
+									</button>
+								{:else}
+									<div class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+										<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+										</svg>
+									</div>
+								{/if}
+								<div class="flex-1 min-w-0">
+									<p class="font-medium text-gray-900 text-sm truncate">{product.name}</p>
+									<div class="flex items-center gap-1 mt-0.5 flex-wrap">
+										{#each product.allergens || [] as allergen}
+											<span class="px-1.5 py-0 bg-red-100 text-red-700 rounded text-[10px] leading-4">{allergen.name}</span>
+										{/each}
+										{#if product.is_vegetarian}
+											<span class="w-4 h-4 bg-green-100 text-green-700 rounded text-[10px] flex items-center justify-center" title="Vegetarian">V</span>
+										{/if}
+										{#if product.is_vegan}
+											<span class="w-4 h-4 bg-green-100 text-green-700 rounded text-[10px] flex items-center justify-center" title="Vegan">VG</span>
+										{/if}
+										{#if product.is_halal}
+											<span class="w-4 h-4 bg-emerald-100 text-emerald-700 rounded text-[10px] flex items-center justify-center" title="Halal">H</span>
+										{/if}
+										{#if product.is_gluten_free}
+											<span class="w-4 h-4 bg-amber-100 text-amber-700 rounded text-[10px] flex items-center justify-center" title="Gluten-Free">GF</span>
+										{/if}
+									</div>
+								</div>
+								<svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform {expandedProductId === product.id ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+								</svg>
 							</button>
+
+							<!-- Expanded Details (floating overlay) -->
+							{#if expandedProductId === product.id}
+							<div class="absolute left-0 right-0 top-full z-20 px-4 pb-4 border border-gray-200 rounded-b-lg bg-white max-h-[70vh] overflow-y-auto">
+									<!-- Edit/View Toggle Buttons -->
+									<div class="flex justify-end gap-2 pt-3 mb-3">
+										{#if editingProductId === product.id}
+											<button
+												onclick={() => cancelEditing()}
+												class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+											>
+												Cancel
+											</button>
+											<button
+												onclick={() => saveProduct(product.id)}
+												disabled={isSaving}
+												class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+											>
+												{#if isSaving}
+													<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+												{/if}
+												Save
+											</button>
+										{:else}
+											{#if can('products.edit')}
+											<button
+												onclick={() => startEditing(product)}
+												class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 flex items-center gap-1"
+											>
+												<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+												</svg>
+												Edit
+											</button>
+											{/if}
+											{#if can('products.delete')}
+											<button
+												onclick={() => handleDeleteProduct(product.id)}
+												class="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 flex items-center gap-1"
+											>
+												<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+												</svg>
+												Delete
+											</button>
+											{/if}
+										{/if}
+									</div>
+
+									{#if saveError}
+										<p class="text-red-600 text-sm mb-3">{saveError}</p>
+									{/if}
+
+									{#if editingProductId === product.id}
+										<!-- Edit Mode -->
+										<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+											<!-- Left Column -->
+											<div class="space-y-4">
+												<!-- Basic Info -->
+												<div>
+													<label class="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+													<input
+														type="text"
+														bind:value={editForm.name}
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+													/>
+												</div>
+												<div class="grid grid-cols-2 gap-3">
+													<div>
+														<label class="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+														<input
+															type="text"
+															bind:value={editForm.brand}
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+														/>
+													</div>
+													<div>
+														<div class="flex items-center justify-between mb-1">
+															<label class="text-sm font-medium text-gray-700">Category</label>
+															<button type="button" onclick={openManageProductCategories} class="p-0.5 text-gray-400 hover:text-blue-600 transition-colors" title="Manage categories">
+																<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+															</button>
+														</div>
+														<CustomSelect
+															bind:value={editForm.category}
+															options={productCategories.map(c => ({ value: c.value, label: c.label }))}
+															placeholder="Select..."
+														/>
+													</div>
+												</div>
+
+												<!-- Dietary Info -->
+												<div>
+													<label class="block text-sm font-medium text-gray-700 mb-2">Dietary Information</label>
+													<div class="grid grid-cols-2 gap-2">
+														<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+															<input type="checkbox" bind:checked={editForm.is_vegetarian} class="w-4 h-4 text-green-600 rounded" />
+															<span class="text-sm">Vegetarian</span>
+														</label>
+														<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+															<input type="checkbox" bind:checked={editForm.is_vegan} class="w-4 h-4 text-green-600 rounded" />
+															<span class="text-sm">Vegan</span>
+														</label>
+														<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+															<input type="checkbox" bind:checked={editForm.is_halal} class="w-4 h-4 text-emerald-600 rounded" />
+															<span class="text-sm">Halal</span>
+														</label>
+														<label class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+															<input type="checkbox" bind:checked={editForm.is_gluten_free} class="w-4 h-4 text-amber-600 rounded" />
+															<span class="text-sm">Gluten-Free</span>
+														</label>
+													</div>
+												</div>
+
+												<!-- Allergens (editable) -->
+												<div>
+													<div class="flex items-center justify-between mb-2">
+														<label class="text-sm font-medium text-gray-700">Allergens ({allergens.length})</label>
+														<button type="button" onclick={openManageAllergens} class="p-0.5 text-gray-400 hover:text-red-600 transition-colors" title="Manage allergens">
+															<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+														</button>
+													</div>
+													<div class="mb-2">
+														<input type="text" bind:value={editAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+													</div>
+													<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
+														{#each searchedEditAllergens as allergen}
+															<button
+																type="button"
+																onclick={() => toggleEditAllergen(allergen.id)}
+																class="px-2.5 py-1 rounded-md text-sm transition-colors {(editForm.allergen_ids || []).includes(allergen.id) ? 'bg-red-100 text-red-700 ring-2 ring-red-300' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}"
+															>
+																{allergen.name}
+															</button>
+														{/each}
+														{#if allergens.length === 0}
+															<p class="text-gray-400 text-sm">Loading allergens...</p>
+														{/if}
+													</div>
+												</div>
+											</div>
+
+											<!-- Right Column -->
+											<div class="space-y-4">
+												<!-- Ingredients -->
+												<div>
+													<label class="block text-sm font-medium text-gray-700 mb-1">Ingredients</label>
+													<textarea
+														bind:value={editForm.ingredients_raw}
+														rows="4"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+													></textarea>
+												</div>
+
+												<!-- Storage Instructions -->
+												<div>
+													<label class="block text-sm font-medium text-gray-700 mb-1">Storage Instructions</label>
+													<textarea
+														bind:value={editForm.storage_instructions}
+														rows="2"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+													></textarea>
+												</div>
+
+												<!-- Preparation Instructions -->
+												<div>
+													<label class="block text-sm font-medium text-gray-700 mb-1">Preparation Instructions</label>
+													<textarea
+														bind:value={editForm.preparation_instructions}
+														rows="2"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+													></textarea>
+												</div>
+											</div>
+										</div>
+									{:else}
+										<!-- View Mode -->
+										<div class="space-y-4">
+												<!-- Allergens -->
+												<div>
+													<h4 class="text-sm font-medium text-gray-700 mb-2">Allergens</h4>
+													{#if product.allergens && product.allergens.length > 0}
+														<div class="flex flex-wrap gap-1.5">
+															{#each product.allergens as allergen}
+																<span class="px-2.5 py-1 bg-red-100 text-red-700 rounded-md text-sm">{allergen.name}</span>
+															{/each}
+														</div>
+													{:else}
+														<p class="text-gray-400 text-sm">No allergens detected</p>
+													{/if}
+												</div>
+
+												<!-- Dietary Info -->
+												<div>
+													<h4 class="text-sm font-medium text-gray-700 mb-2">Dietary Information</h4>
+													<div class="flex flex-wrap gap-2">
+														<span class="px-2.5 py-1 rounded-md text-sm {product.is_vegetarian ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}">
+															{product.is_vegetarian ? '✓' : '✗'} Vegetarian
+														</span>
+														<span class="px-2.5 py-1 rounded-md text-sm {product.is_vegan ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}">
+															{product.is_vegan ? '✓' : '✗'} Vegan
+														</span>
+														<span class="px-2.5 py-1 rounded-md text-sm {product.is_halal ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}">
+															{product.is_halal ? '✓' : '✗'} Halal
+														</span>
+														<span class="px-2.5 py-1 rounded-md text-sm {product.is_gluten_free ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}">
+															{product.is_gluten_free ? '✓' : '✗'} Gluten-Free
+														</span>
+													</div>
+												</div>
+
+												<!-- Nutrition -->
+												{#if product.nutrition_per_100g}
+													<div>
+														<h4 class="text-sm font-medium text-gray-700 mb-2">Nutrition (per 100g)</h4>
+														<div class="grid grid-cols-5 gap-2 text-center">
+															<div class="bg-gray-50 rounded-lg p-2">
+																<p class="font-semibold text-gray-900">{product.nutrition_per_100g.calories || '-'}</p>
+																<p class="text-xs text-gray-500">kcal</p>
+															</div>
+															<div class="bg-gray-50 rounded-lg p-2">
+																<p class="font-semibold text-gray-900">{product.nutrition_per_100g.protein || '-'}g</p>
+																<p class="text-xs text-gray-500">Protein</p>
+															</div>
+															<div class="bg-gray-50 rounded-lg p-2">
+																<p class="font-semibold text-gray-900">{product.nutrition_per_100g.fat || '-'}g</p>
+																<p class="text-xs text-gray-500">Fat</p>
+															</div>
+															<div class="bg-gray-50 rounded-lg p-2">
+																<p class="font-semibold text-gray-900">{product.nutrition_per_100g.carbs || '-'}g</p>
+																<p class="text-xs text-gray-500">Carbs</p>
+															</div>
+															<div class="bg-gray-50 rounded-lg p-2">
+																<p class="font-semibold text-gray-900">{product.nutrition_per_100g.sodium || '-'}</p>
+																<p class="text-xs text-gray-500">Sodium</p>
+															</div>
+														</div>
+													</div>
+												{/if}
+
+												<!-- Ingredients -->
+												{#if product.ingredients_raw}
+													<div>
+														<h4 class="text-sm font-medium text-gray-700 mb-2">Ingredients</h4>
+														<p class="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 leading-relaxed">{product.ingredients_raw}</p>
+													</div>
+												{/if}
+
+												<!-- Storage Instructions -->
+												{#if product.storage_instructions}
+													<div>
+														<h4 class="text-sm font-medium text-gray-700 mb-2">Storage Instructions</h4>
+														<p class="text-sm text-gray-600 bg-blue-50 rounded-lg p-3">{product.storage_instructions}</p>
+													</div>
+												{/if}
+
+												<!-- Preparation Instructions -->
+												{#if product.preparation_instructions}
+													<div>
+														<h4 class="text-sm font-medium text-gray-700 mb-2">Preparation</h4>
+														<p class="text-sm text-gray-600 bg-amber-50 rounded-lg p-3">{product.preparation_instructions}</p>
+													</div>
+												{/if}
+										</div>
+									{/if}
+							</div>
+							{/if}
 						</div>
 					{/each}
 				</div>
+			{:else}
+				<p class="text-center text-gray-400 py-8 text-sm">No products found</p>
+			{/if}
+		</section>
+		{:else}
+		<!-- Menu Tab Content -->
+		<!-- Allergen Report Table -->
+		{#if menus.length > 0}
+		<section class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+			<div class="flex items-center justify-between mb-3">
+				<div class="flex items-center gap-3">
+					<h2 class="text-lg font-semibold text-gray-900">アレルゲン一覧表</h2>
+					<span class="text-sm text-gray-500">Allergen Report</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<input
+						type="text"
+						bind:value={allergenReportSearch}
+						placeholder="Search course, product, allergen..."
+						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+					/>
+					{#if can('reports.print')}
+					<button
+						onclick={printAllergenReport}
+						disabled={isPrinting}
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+					>
+						<span class="material-symbols-rounded text-base">print</span>
+						{isPrinting ? 'Preparing...' : 'Print PDF'}
+					</button>
+					{/if}
+					{#if can('reports.export')}
+					<button
+						onclick={exportAllergenXlsx}
+						disabled={isExporting}
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+					>
+						<span class="material-symbols-rounded text-base">download</span>
+						{isExporting ? 'Exporting...' : 'Export .xlsx'}
+					</button>
+					{/if}
+				</div>
 			</div>
-		</div>
-	</div>
-{/if}
 
-<!-- ── Manage Categories Modal ─────────────────────────────────────────── -->
-{#if showManageCategories}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center p-4 overflow-y-auto"
-		onclick={(e) => { if (e.target === e.currentTarget) showManageCategories = false; }}
-	>
-		<div class="bg-white rounded-2xl shadow-xl w-full max-w-lg my-8">
-			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-				<h2 class="text-lg font-bold text-gray-900">カテゴリー管理</h2>
-				<button onclick={() => (showManageCategories = false)} class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
-					<span class="material-symbols-rounded">close</span>
-				</button>
-			</div>
-			<div class="px-6 py-4 space-y-4">
-				<div class="flex gap-2">
-					<input type="text" bind:value={newCategoryName} placeholder="カテゴリー名" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
-					<select bind:value={newCategoryType} class="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
-						<option value="product">商品</option>
-						<option value="menu">メニュー</option>
-					</select>
-					<button onclick={handleAddCategory} disabled={savingSettings || !newCategoryName.trim()} class="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">
-						追加
+			{#if allergenTableByCourse.length === 0}
+				<p class="text-center text-gray-400 py-6 text-sm">No allergens found in any menu. Link products with allergens to see the report.</p>
+			{:else if filteredAllergenTableByCourse.length === 0}
+				<p class="text-center text-gray-400 py-6 text-sm">No results for "{allergenReportSearch}"</p>
+			{:else}
+				<div class="space-y-4">
+					{#each filteredAllergenTableByCourse as course}
+						<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm flex">
+							<!-- Large course image on the left -->
+							<div class="w-40 flex-shrink-0 bg-slate-800 relative">
+								{#if course.courseImage}
+									<img src={course.courseImage} alt={course.courseName} class="w-full h-full object-cover" />
+								{:else}
+									<div class="w-full h-full flex items-center justify-center bg-slate-700">
+										<svg class="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+									</div>
+								{/if}
+							</div>
+							<!-- Right side: course name + product rows -->
+							<div class="flex-1 min-w-0">
+								<!-- Course name header -->
+								<div class="bg-white px-4 py-2.5 flex items-center justify-between border-b border-gray-200">
+									<h3 class="text-gray-900 text-lg font-bold tracking-wide">{course.courseName}</h3>
+									<span class="text-gray-400 text-xs">{course.menus.reduce((sum, g) => sum + g.products.length, 0)} products</span>
+								</div>
+								<!-- Product rows -->
+								<div class="divide-y divide-gray-100">
+									{#each course.menus as group, gi}
+										{#each group.products as product, pi}
+											<!-- Main product row -->
+											<div class="flex items-center gap-3 px-3 py-2 {pi % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} {pi === 0 && gi > 0 ? 'border-t-2 border-slate-200' : ''}">
+												{#if product.image_url}
+													<img src={product.image_url} alt={product.name} class="w-9 h-9 rounded object-cover flex-shrink-0" />
+												{:else}
+													<div class="w-9 h-9 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+														<svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+													</div>
+												{/if}
+												<span class="text-sm text-gray-800 font-medium w-36 truncate flex-shrink-0" title={product.name}>{product.name}</span>
+												<div class="flex flex-wrap gap-1 flex-1 min-w-0">
+													{#each product.allergens as allergen}
+														<span class="inline-block px-2 py-0.5 text-white text-[10px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
+													{/each}
+												</div>
+											</div>
+											<!-- Alternate product rows -->
+											{#each getAlternatesForProduct(product.id) as alt}
+												<div class="flex items-center gap-3 px-3 py-1.5 bg-orange-50/40 pl-8">
+													<svg class="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+													</svg>
+													{#if alt.image_url}
+														<img src={alt.image_url} alt={alt.name} class="w-7 h-7 rounded object-cover flex-shrink-0" />
+													{:else}
+														<div class="w-7 h-7 rounded bg-orange-100 flex items-center justify-center flex-shrink-0">
+															<svg class="w-3 h-3 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+														</div>
+													{/if}
+													<span class="text-xs text-orange-700 font-medium w-36 truncate flex-shrink-0" title={alt.name}>{alt.name}</span>
+													<div class="flex flex-wrap gap-1 flex-1 min-w-0">
+														{#each alt.allergens || [] as allergen}
+															<span class="inline-block px-1.5 py-0.5 text-white text-[9px] font-medium rounded {getAllergenColor(allergen.name)}">{allergen.name}</span>
+														{/each}
+													</div>
+												</div>
+											{/each}
+										{/each}
+									{/each}
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+
+				<p class="text-[10px] text-gray-400 mt-3">
+					Generated: {new Date().toISOString().split('T')[0]} | {filteredAllergenTableByCourse.length} courses, {allergenTableGrouped.length} menu entries
+				</p>
+			{/if}
+		</section>
+		{/if}
+
+		<!-- Menu Items list removed - managed via Menu Structure (MenuTreeConfig) -->
+		{/if}
+		</div>
+	</main>
+	</div>
+
+	<!-- Manage Product Categories Modal -->
+	{#if showManageProductCategories}
+		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={closeManageProductCategories}>
+			<div
+				class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<div class="px-6 py-4 border-b border-gray-200 bg-blue-50">
+					<div class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+							<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+							</svg>
+						</div>
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900">Manage Product Categories</h3>
+							<p class="text-sm text-gray-500">Add or remove product categories</p>
+						</div>
+					</div>
+				</div>
+				<div class="px-6 py-4 space-y-4">
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Add New Category</label>
+						<div class="flex gap-2">
+							<input
+								type="text"
+								bind:value={newProductCategoryName}
+								placeholder="e.g., Dairy, Sauce"
+								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addProductCategory()}
+							/>
+							<button
+								onclick={addProductCategory}
+								disabled={!newProductCategoryName.trim() || isAddingProductCategory}
+								class="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							>
+								{isAddingProductCategory ? '...' : 'Add'}
+							</button>
+						</div>
+						{#if addProductCategoryError}
+							<p class="mt-2 text-sm text-red-600">{addProductCategoryError}</p>
+						{/if}
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Categories ({productCategories.length})</label>
+						{#if productCategories.length > 0}
+							<div class="space-y-2 max-h-48 overflow-y-auto">
+								{#each productCategories as category}
+									<div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+										<span class="text-sm text-gray-700">{category.label}</span>
+										<button
+											onclick={() => deleteProductCategory(category.id)}
+											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+											title="Delete category"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-sm text-gray-500 py-2">No categories. Add one above.</p>
+						{/if}
+					</div>
+				</div>
+				<div class="px-6 py-4 bg-gray-50 flex justify-end">
+					<button
+						onclick={closeManageProductCategories}
+						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+					>
+						Done
 					</button>
 				</div>
-				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">商品カテゴリー</p>
-						<div class="space-y-1">
-							{#each productCategories as c}
-								<div class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50">
-									<span class="text-sm text-gray-700">{c.name}</span>
-									<button onclick={() => handleDeleteCategory(c.id, 'product')} class="p-1 text-gray-300 hover:text-red-500">
-										<span class="material-symbols-rounded text-sm">delete</span>
-									</button>
-								</div>
-							{/each}
-							{#if productCategories.length === 0}
-								<p class="text-xs text-gray-400 py-2">なし</p>
-							{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Manage Allergens Modal -->
+	{#if showManageAllergens}
+		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={closeManageAllergens}>
+			<div
+				class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<div class="px-6 py-4 border-b border-gray-200 bg-red-50">
+					<div class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+							<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+							</svg>
 						</div>
-					</div>
-					<div>
-						<p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">メニューカテゴリー</p>
-						<div class="space-y-1">
-							{#each menuCategories as c}
-								<div class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50">
-									<span class="text-sm text-gray-700">{c.name}</span>
-									<button onclick={() => handleDeleteCategory(c.id, 'menu')} class="p-1 text-gray-300 hover:text-red-500">
-										<span class="material-symbols-rounded text-sm">delete</span>
-									</button>
-								</div>
-							{/each}
-							{#if menuCategories.length === 0}
-								<p class="text-xs text-gray-400 py-2">なし</p>
-							{/if}
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900">Manage Allergens</h3>
+							<p class="text-sm text-gray-500">Add or remove allergen items</p>
 						</div>
 					</div>
 				</div>
+				<div class="px-6 py-4 space-y-4">
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Add New Allergen</label>
+						<div class="flex gap-2">
+							<input
+								type="text"
+								bind:value={newAllergenName}
+								placeholder="e.g., Sesame, Celery"
+								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addAllergenItem()}
+							/>
+							<CustomSelect
+								bind:value={newAllergenCategory}
+								options={[
+									{ value: 'grain', label: 'Grain' },
+									{ value: 'egg', label: 'Egg' },
+									{ value: 'dairy', label: 'Dairy' },
+									{ value: 'meat', label: 'Meat' },
+									{ value: 'fish', label: 'Fish' },
+									{ value: 'shellfish', label: 'Shellfish' },
+									{ value: 'nut', label: 'Nut' },
+									{ value: 'legume', label: 'Legume' },
+									{ value: 'other', label: 'Other' },
+								]}
+							/>
+							<button
+								onclick={addAllergenItem}
+								disabled={!newAllergenName.trim() || isAddingAllergen}
+								class="px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							>
+								{isAddingAllergen ? '...' : 'Add'}
+							</button>
+						</div>
+						{#if addAllergenError}
+							<p class="mt-2 text-sm text-red-600">{addAllergenError}</p>
+						{/if}
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Allergens ({allergens.length})</label>
+						{#if allergens.length > 0}
+							<div class="space-y-2 max-h-48 overflow-y-auto">
+								{#each allergens as allergen}
+									<div class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+										<div>
+											<span class="text-sm text-gray-700">{allergen.name}</span>
+											<span class="text-xs text-gray-400 ml-1">({allergen.category})</span>
+										</div>
+										<button
+											onclick={() => deleteAllergenItem(allergen.id)}
+											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+											title="Delete allergen"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-sm text-gray-500 py-2">No allergens. Add one above.</p>
+						{/if}
+					</div>
+				</div>
+				<div class="px-6 py-4 bg-gray-50 flex justify-end">
+					<button
+						onclick={closeManageAllergens}
+						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+					>
+						Done
+					</button>
+				</div>
 			</div>
 		</div>
-	</div>
-{/if}
+	{/if}
+
+
+	<!-- Alternate Ingredients Modal -->
+	{#if showAlternatesModal && alternatesProduct}
+		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={closeAlternatesModal}>
+			<div
+				class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<!-- Modal Header -->
+				<div class="px-6 py-4 border-b border-gray-200 bg-orange-50">
+					<div class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+							<svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+							</svg>
+						</div>
+						<div>
+							<h3 class="text-lg font-semibold text-gray-900">Alternate Ingredients</h3>
+							<p class="text-sm text-gray-500">for <span class="font-medium text-orange-700">{alternatesProduct.name}</span></p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Modal Body -->
+				<div class="px-6 py-4 space-y-4">
+					<!-- Info Banner -->
+					<div class="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+						<svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						<p>Add products that can substitute <strong>{alternatesProduct.name}</strong> when a guest has allergies or dietary restrictions.</p>
+					</div>
+
+					<!-- Main Product Allergens -->
+					{#if alternatesProduct.allergens && alternatesProduct.allergens.length > 0}
+						<div class="p-3 bg-red-50 rounded-lg">
+							<p class="text-xs font-medium text-red-700 mb-1.5">Current Allergens:</p>
+							<div class="flex flex-wrap gap-1">
+								{#each alternatesProduct.allergens as allergen}
+									<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">{allergen.name}</span>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Search Alternates -->
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Add Alternate Product</label>
+						<div class="relative">
+							<input
+								type="text"
+								bind:value={alternateSearchTerm}
+								onfocus={() => alternateSearchFocused = true}
+								onblur={() => setTimeout(() => alternateSearchFocused = false, 200)}
+								placeholder="Search for alternate products..."
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+							/>
+							{#if alternateSearchFocused && availableAlternates().length > 0}
+								<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+									{#each availableAlternates().slice(0, 8) as product}
+										<button
+											onclick={() => addAlternate(product.id)}
+											class="w-full px-3 py-2 text-left hover:bg-orange-50 transition-colors flex items-center justify-between gap-2"
+										>
+											<div class="flex items-center gap-2 min-w-0">
+												{#if product.image_url}
+													<img src={product.image_url} alt="" class="w-8 h-8 object-cover rounded" />
+												{:else}
+													<div class="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-gray-400">
+														<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+														</svg>
+													</div>
+												{/if}
+												<span class="truncate text-sm">{product.name}</span>
+											</div>
+											{#if product.allergens && product.allergens.length > 0}
+												<div class="flex gap-1 flex-shrink-0">
+													{#each product.allergens.slice(0, 2) as allergen}
+														<span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs">{allergen.name}</span>
+													{/each}
+													{#if product.allergens.length > 2}
+														<span class="text-xs text-gray-400">+{product.allergens.length - 2}</span>
+													{/if}
+												</div>
+											{:else}
+												<span class="px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs">No allergens</span>
+											{/if}
+										</button>
+									{/each}
+								</div>
+							{:else if alternateSearchFocused && availableAlternates().length === 0}
+								<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500 text-center">
+									No more products available
+								</div>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Selected Alternates -->
+					<div>
+						<label class="block text-sm font-medium text-gray-700 mb-2">Selected Alternates ({selectedAlternates().length})</label>
+						{#if selectedAlternates().length > 0}
+							<div class="space-y-2 max-h-40 overflow-y-auto">
+								{#each selectedAlternates() as product}
+									<div class="flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+										<div class="flex items-center gap-2 min-w-0">
+											<span class="text-sm text-gray-700 truncate">{product.name}</span>
+											{#if product.allergens && product.allergens.length > 0}
+												<div class="flex gap-1 flex-shrink-0">
+													{#each product.allergens.slice(0, 2) as allergen}
+														<span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs">{allergen.name}</span>
+													{/each}
+													{#if product.allergens.length > 2}
+														<span class="text-xs text-gray-400">+{product.allergens.length - 2}</span>
+													{/if}
+												</div>
+											{:else}
+												<span class="px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs">No allergens</span>
+											{/if}
+										</div>
+										<button
+											onclick={() => removeAlternate(product.id)}
+											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+											title="Remove alternate"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+											</svg>
+										</button>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<div class="p-3 bg-gray-50 rounded-lg text-center text-gray-400 text-sm">
+								No alternates configured. Add products above that can substitute this ingredient.
+							</div>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Modal Footer -->
+				<div class="px-6 py-4 bg-gray-50 flex justify-end">
+					<button
+						onclick={closeAlternatesModal}
+						class="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+					>
+						Done
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if expandedImageUrl}
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+			onclick={() => expandedImageUrl = null}
+			role="dialog"
+		>
+			<button onclick={() => expandedImageUrl = null} class="absolute top-4 right-4 p-2 bg-white/20 text-white rounded-full hover:bg-white/40">
+				<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+			<img src={expandedImageUrl} alt="Expanded" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" onclick={(e) => e.stopPropagation()} />
+		</div>
+	{/if}
+
+	{#if showMenuTreeConfig && menuStructureView === 'panel'}
+		<MenuStructurePanel
+			{seasonalMenus}
+			{menuGroups}
+			{menuCategories}
+			{menus}
+			{products}
+			{productAlternates}
+			onAddAlternate={handleAddAlternate}
+			onRemoveAlternate={handleRemoveAlternate}
+			onCreateSeason={treeCreateSeason}
+			onUpdateSeason={treeUpdateSeason}
+			onDeleteSeason={treeDeleteSeason}
+			onCreateGroup={treeCreateGroup}
+			onUpdateGroup={treeUpdateGroup}
+			onDeleteGroup={treeDeleteGroup}
+			onCreateCourse={treeCreateCourse}
+			onUpdateCourse={treeUpdateCourse}
+			onUpdateCourseDetails={treeUpdateCourseDetails}
+			onDeleteCourse={treeDeleteCourse}
+			onCreateMenu={treeCreateMenu}
+			onUpdateMenu={treeUpdateMenu}
+			onDeleteMenu={treeDeleteMenu}
+			onSwitchToTree={() => { menuStructureView = 'tree'; }}
+			onClose={() => showMenuTreeConfig = false}
+		/>
+	{:else if showMenuTreeConfig && menuStructureView === 'tree'}
+		<MenuTreeConfig
+			{seasonalMenus}
+			{menuGroups}
+			{menuCategories}
+			{menus}
+			{products}
+			{productAlternates}
+			onAddAlternate={handleAddAlternate}
+			onRemoveAlternate={handleRemoveAlternate}
+			onCreateSeason={treeCreateSeason}
+			onUpdateSeason={treeUpdateSeason}
+			onDeleteSeason={treeDeleteSeason}
+			onCreateGroup={treeCreateGroup}
+			onUpdateGroup={treeUpdateGroup}
+			onDeleteGroup={treeDeleteGroup}
+			onCreateCourse={treeCreateCourse}
+			onUpdateCourse={treeUpdateCourse}
+			onUpdateCourseDetails={treeUpdateCourseDetails}
+			onDeleteCourse={treeDeleteCourse}
+			onCreateMenu={treeCreateMenu}
+			onUpdateMenu={treeUpdateMenu}
+			onDeleteMenu={treeDeleteMenu}
+			onSwitchToPanel={() => { menuStructureView = 'panel'; }}
+			onClose={() => showMenuTreeConfig = false}
+		/>
+	{/if}
+</div>
