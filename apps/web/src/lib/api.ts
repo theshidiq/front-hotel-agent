@@ -142,8 +142,12 @@ export async function scanExtractUpload(file: File, signal?: AbortSignal): Promi
 	return response.json();
 }
 
-export async function getProducts(): Promise<Product[]> {
-	const response = await apiFetch(`${API_URL}/products`, { headers: authHeaders() });
+export async function getProducts(opts?: { search?: string; category?: string }): Promise<Product[]> {
+	const params = new URLSearchParams();
+	if (opts?.search) params.set('search', opts.search);
+	if (opts?.category) params.set('category', opts.category);
+	const qs = params.size > 0 ? `?${params}` : '';
+	const response = await apiFetch(`${API_URL}/products${qs}`, { headers: authHeaders() });
 
 	if (!response.ok) {
 		throw new Error('Failed to fetch products');

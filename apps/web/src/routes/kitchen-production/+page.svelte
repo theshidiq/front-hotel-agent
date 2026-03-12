@@ -589,13 +589,29 @@
 			.on(
 				"postgres_changes",
 				{
-					event: "*", // Listen to all events: INSERT, UPDATE, DELETE
+					event: "*",
 					schema: "public",
 					table: "reservations",
 				},
 				(payload) => {
-					console.log("🔔 Reservation changed:", payload);
-					loadData(); // Reload data when reservations change
+					console.log("🔔 Reservation changed:", payload.eventType);
+					if (payload.eventType === "UPDATE") {
+						// Patch in-place for status/field changes — avoids full refetch
+						const updated = payload.new as Reservation;
+						const idx = reservations.findIndex((r) => r.id === updated.id);
+						if (idx !== -1) {
+							reservations = [
+								...reservations.slice(0, idx),
+								updated,
+								...reservations.slice(idx + 1),
+							];
+						} else {
+							loadData();
+						}
+					} else {
+						// INSERT/DELETE may affect date-filtered set — reload
+						loadData();
+					}
 				},
 			)
 			.on(
@@ -606,8 +622,8 @@
 					table: "menu_groups",
 				},
 				(payload) => {
-					console.log("🔔 Menu group changed:", payload);
-					loadData(); // Reload data when menu groups change
+					console.log("🔔 Menu group changed:", payload.eventType);
+					loadData(); // Structure change — always reload
 				},
 			)
 			.subscribe((status, err) => {
