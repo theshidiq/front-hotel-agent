@@ -282,10 +282,14 @@
     // ─── Submit ───────────────────────────────────────────────────────────────
     async function handleSubmit() {
         if (!validateStep(3)) return;
+        if (!authState.user) {
+            submitError = "You must be logged in to create a workspace. Please log in first.";
+            return;
+        }
         submitting = true;
         submitError = null;
         try {
-            const authUserId = authState.user?.id ?? null;
+            const authUserId = authState.user.id;
             const resolvedEmail = ownerEmail || null;
 
             const addressStr = [
@@ -340,16 +344,17 @@
                 period_length_days: 30,
             });
 
-            await supabase.from("organization_members").insert({
+            const { error: memberErr } = await supabase.from("organization_members").insert({
                 organization_id: org.id,
                 auth_user_id: authUserId,
                 role: "owner",
                 email: resolvedEmail,
                 is_active: true,
             });
+            if (memberErr) throw new Error(memberErr.message);
 
             // Create a staff record for the owner so they can log in to the dashboard
-            await supabase.from("staff").insert({
+            const { error: staffErr } = await supabase.from("staff").insert({
                 organization_id: org.id,
                 name: name.trim(),
                 email: resolvedEmail,
@@ -357,6 +362,7 @@
                 is_admin: true,
                 hire_date: new Date().toISOString().split("T")[0],
             });
+            if (staffErr) throw new Error(staffErr.message);
 
             createdOrgId = org.id;
 
