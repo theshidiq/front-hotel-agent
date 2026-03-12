@@ -46,19 +46,25 @@ export class PermissionGuard implements CanActivate {
       throw new UnauthorizedException('No email associated with this account');
     }
 
-    // Check if this user is a staff member
-    const organizationId = this.supabaseService.getOrganizationId();
+    // Check if this user is a staff member — look up by email only (no org filter)
     const { data: staff, error: staffError } = await supabase
       .from('staff')
-      .select('id, name, email, position, is_admin, role_id')
+      .select('id, name, email, position, is_admin, role_id, organization_id')
       .eq('email', email)
-      .eq('organization_id', organizationId)
       .eq('is_active', true)
+      .limit(1)
       .single();
 
     if (staffError || !staff) {
       this.logger.warn(`Non-staff login attempt: ${email}`);
       throw new UnauthorizedException('You are not registered as staff');
+    }
+
+    // Organization ID must come from the staff record — never from client-supplied headers
+    const organizationId: string | null = staff.organization_id ?? null;
+    if (!organizationId) {
+      this.logger.warn(`Staff ${staff.email} has no organization_id — denying access`);
+      throw new ForbiddenException('Staff account is not associated with an organization');
     }
 
     // Load permissions from role
@@ -90,6 +96,7 @@ export class PermissionGuard implements CanActivate {
       roleId: staff.role_id,
       roleName,
       permissions,
+      organization_id: organizationId,
     };
 
     // Check required permissions

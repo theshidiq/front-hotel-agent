@@ -52,9 +52,8 @@ export class RolesService {
 
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async findAll(): Promise<Role[]> {
+  async findAll(organizationId: string): Promise<Role[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: roles, error } = await supabase
       .from('roles')
@@ -110,12 +109,12 @@ export class RolesService {
   }
 
   async create(
+    organizationId: string,
     name: string,
     description?: string,
     permissions?: string[],
   ): Promise<Role> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: role, error } = await supabase
       .from('roles')
@@ -151,7 +150,7 @@ export class RolesService {
     };
   }
 
-  async update(id: string, name?: string, description?: string): Promise<Role> {
+  async update(organizationId: string, id: string, name?: string, description?: string): Promise<Role> {
     const supabase = this.supabaseService.getClient();
 
     const updateData: Record<string, any> = {};
@@ -165,7 +164,8 @@ export class RolesService {
     const { error } = await supabase
       .from('roles')
       .update(updateData)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       if (error.message.includes('unique') || error.message.includes('duplicate')) {
@@ -213,9 +213,8 @@ export class RolesService {
     };
   }
 
-  async findDefault(): Promise<Role | null> {
+  async findDefault(organizationId: string): Promise<Role | null> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data: role } = await supabase
       .from('roles')
@@ -237,9 +236,8 @@ export class RolesService {
     };
   }
 
-  async setDefault(id: string): Promise<Role> {
+  async setDefault(organizationId: string, id: string): Promise<Role> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Clear existing default + validate role exists in parallel
     const [, roleResult] = await Promise.all([
@@ -255,7 +253,8 @@ export class RolesService {
     const { error } = await supabase
       .from('roles')
       .update({ is_default: true })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       throw new InternalServerErrorException(`Failed to set default role: ${error.message}`);
@@ -269,9 +268,8 @@ export class RolesService {
     };
   }
 
-  async clearDefault(): Promise<void> {
+  async clearDefault(organizationId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     await supabase
       .from('roles')
@@ -280,9 +278,8 @@ export class RolesService {
       .eq('is_default', true);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Check if any staff are assigned to this role
     const { data: assignedStaff } = await supabase
@@ -299,7 +296,7 @@ export class RolesService {
       );
     }
 
-    const { error } = await supabase.from('roles').delete().eq('id', id);
+    const { error } = await supabase.from('roles').delete().eq('id', id).eq('organization_id', organizationId);
 
     if (error) {
       throw new InternalServerErrorException(`Failed to delete role: ${error.message}`);

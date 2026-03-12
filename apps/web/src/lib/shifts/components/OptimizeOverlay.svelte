@@ -2,14 +2,15 @@
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
 	import { fade } from 'svelte/transition';
-	import { Sparkles, Check, Loader2, Timer } from 'lucide-svelte';
+	import { Sparkles, Check, Loader2, Timer, X } from 'lucide-svelte';
 
 	interface Props {
 		progress: number;
 		elapsed: number;
+		oncancel?: () => void;
 	}
 
-	let { progress, elapsed }: Props = $props();
+	let { progress, elapsed, oncancel }: Props = $props();
 
 	const display = tweened(0, { duration: 600, easing: cubicOut });
 	$effect(() => { display.set(progress); });
@@ -79,6 +80,12 @@
 		<div class="footer">
 			<Timer size={13} />
 			<span>経過時間: {elapsed}秒</span>
+			{#if oncancel}
+				<button class="cancel-btn" onclick={oncancel}>
+					<X size={12} strokeWidth={2.5} />
+					キャンセル
+				</button>
+			{/if}
 		</div>
 
 	</div>
@@ -236,6 +243,26 @@
 		border-top: 1px solid rgba(0, 0, 0, 0.06);
 		font-size: 11.5px;
 		color: #9ca3af;
+	}
+
+	.cancel-btn {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 11.5px;
+		color: #6b7280;
+		background: transparent;
+		border: 1px solid #e5e7eb;
+		border-radius: 6px;
+		padding: 3px 8px;
+		cursor: pointer;
+		transition: background 0.15s, color 0.15s;
+	}
+	.cancel-btn:hover {
+		background: #fef2f2;
+		color: #ef4444;
+		border-color: #fca5a5;
 	}
 
 	@keyframes pulse {

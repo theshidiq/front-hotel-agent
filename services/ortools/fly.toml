@@ -1,5 +1,5 @@
-# fly.toml for sinara-ortools (Python OR-Tools optimizer service)
 
+# fly.toml for sinara-ortools (OR-Tools Flask optimizer service)
 app = 'sinara-ortools'
 primary_region = 'nrt'
 

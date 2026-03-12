@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="640" height="160">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500&amp;display=swap');
+    </style>
+  </defs>
+
+  <!-- Background (transparent) -->
+
+  <!-- Wordmark: "S" -->
+  <text x="20" y="56"
+    font-family="'Instrument Sans', 'Helvetica Neue', Arial, sans-serif"
+    font-size="52" font-weight="500" letter-spacing="0.5"
+    fill="#1A2744">S</text>
+
+  <!-- "i" stem in gold — no dot (dot replaced by star) -->
+  <!-- Covering the dot area with background color first -->
+  <text x="55" y="56"
+    font-family="'Instrument Sans', 'Helvetica Neue', Arial, sans-serif"
+    font-size="52" font-weight="500"
+    fill="#B8956A">i</text>
+
+  <!-- White rect to cover default "i" dot -->
+  <rect x="52" y="4" width="18" height="16" fill="white"/>
+
+  <!-- 4-pointed star replacing the "i" dot -->
+  <!-- Star center at (61, 12) -->
+  <path d="
+    M 61,4
+    L 63.2,9.8
+    L 69,12
+    L 63.2,14.2
+    L 61,20
+    L 58.8,14.2
+    L 53,12
+    L 58.8,9.8
+    Z"
+    fill="#B8956A"/>
+
+  <!-- "nara" -->
+  <text x="70" y="56"
+    font-family="'Instrument Sans', 'Helvetica Neue', Arial, sans-serif"
+    font-size="52" font-weight="500" letter-spacing="0.5"
+    fill="#1A2744">nara</text>
+
+</svg>

@@ -28,17 +28,13 @@ export class DepartmentsService {
     return this.supabaseService.getClient();
   }
 
-  private get organizationId() {
-    return this.supabaseService.getOrganizationId();
-  }
-
   // ── Departments ────────────────────────────────────────────
 
-  async findAllDepartments(): Promise<Department[]> {
+  async findAllDepartments(organizationId: string): Promise<Department[]> {
     const { data, error } = await this.db
       .from('departments')
       .select('*, positions(*)')
-      .eq('organization_id', this.organizationId)
+      .eq('organization_id', organizationId)
       .order('sort_order')
       .order('name');
 
@@ -51,10 +47,10 @@ export class DepartmentsService {
     }));
   }
 
-  async createDepartment(name: string, color: string, sortOrder: number): Promise<Department> {
+  async createDepartment(name: string, color: string, sortOrder: number, organizationId: string): Promise<Department> {
     const { data, error } = await this.db
       .from('departments')
-      .insert({ organization_id: this.organizationId, name: name.trim(), color, sort_order: sortOrder })
+      .insert({ organization_id: organizationId, name: name.trim(), color, sort_order: sortOrder })
       .select()
       .single();
 
@@ -65,12 +61,12 @@ export class DepartmentsService {
     return data;
   }
 
-  async updateDepartment(id: string, updates: Partial<{ name: string; color: string; sort_order: number }>): Promise<Department> {
+  async updateDepartment(id: string, updates: Partial<{ name: string; color: string; sort_order: number }>, organizationId: string): Promise<Department> {
     const { data, error } = await this.db
       .from('departments')
       .update(updates)
       .eq('id', id)
-      .eq('organization_id', this.organizationId)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -82,24 +78,24 @@ export class DepartmentsService {
     return data;
   }
 
-  async deleteDepartment(id: string): Promise<void> {
+  async deleteDepartment(id: string, organizationId: string): Promise<void> {
     const { error } = await this.db
       .from('departments')
       .delete()
       .eq('id', id)
-      .eq('organization_id', this.organizationId);
+      .eq('organization_id', organizationId);
 
     if (error) throw new InternalServerErrorException(error.message);
   }
 
   // ── Positions ──────────────────────────────────────────────
 
-  async findPositionsByDepartment(departmentId: string): Promise<Position[]> {
+  async findPositionsByDepartment(departmentId: string, organizationId: string): Promise<Position[]> {
     const { data, error } = await this.db
       .from('positions')
       .select('*')
       .eq('department_id', departmentId)
-      .eq('organization_id', this.organizationId)
+      .eq('organization_id', organizationId)
       .order('sort_order')
       .order('name');
 
@@ -107,10 +103,10 @@ export class DepartmentsService {
     return data || [];
   }
 
-  async createPosition(departmentId: string, name: string, sortOrder: number): Promise<Position> {
+  async createPosition(departmentId: string, name: string, sortOrder: number, organizationId: string): Promise<Position> {
     const { data, error } = await this.db
       .from('positions')
-      .insert({ organization_id: this.organizationId, department_id: departmentId, name: name.trim(), sort_order: sortOrder })
+      .insert({ organization_id: organizationId, department_id: departmentId, name: name.trim(), sort_order: sortOrder })
       .select()
       .single();
 
@@ -121,12 +117,12 @@ export class DepartmentsService {
     return data;
   }
 
-  async updatePosition(id: string, updates: Partial<{ name: string; sort_order: number }>): Promise<Position> {
+  async updatePosition(id: string, updates: Partial<{ name: string; sort_order: number }>, organizationId: string): Promise<Position> {
     const { data, error } = await this.db
       .from('positions')
       .update(updates)
       .eq('id', id)
-      .eq('organization_id', this.organizationId)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -138,12 +134,12 @@ export class DepartmentsService {
     return data;
   }
 
-  async deletePosition(id: string): Promise<void> {
+  async deletePosition(id: string, organizationId: string): Promise<void> {
     const { error } = await this.db
       .from('positions')
       .delete()
       .eq('id', id)
-      .eq('organization_id', this.organizationId);
+      .eq('organization_id', organizationId);
 
     if (error) throw new InternalServerErrorException(error.message);
   }

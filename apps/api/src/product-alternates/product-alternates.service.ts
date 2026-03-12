@@ -13,9 +13,8 @@ export interface ProductAlternate {
 export class ProductAlternatesService {
   constructor(private supabaseService: SupabaseService) {}
 
-  async findAll(): Promise<ProductAlternate[]> {
+  async findAll(organizationId: string): Promise<ProductAlternate[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('product_alternates')
@@ -30,9 +29,8 @@ export class ProductAlternatesService {
     return data || [];
   }
 
-  async findByProduct(productId: string): Promise<ProductAlternate[]> {
+  async findByProduct(organizationId: string, productId: string): Promise<ProductAlternate[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('product_alternates')
@@ -47,9 +45,8 @@ export class ProductAlternatesService {
     return data || [];
   }
 
-  async create(productId: string, alternateProductId: string): Promise<ProductAlternate> {
+  async create(organizationId: string, productId: string, alternateProductId: string): Promise<ProductAlternate> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('product_alternates')
@@ -68,9 +65,8 @@ export class ProductAlternatesService {
     return data;
   }
 
-  async delete(productId: string, alternateProductId: string): Promise<void> {
+  async delete(organizationId: string, productId: string, alternateProductId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('product_alternates')

@@ -18,9 +18,8 @@ export class SeasonalMenusService {
 
   constructor(private supabaseService: SupabaseService) {}
 
-  async findAll(): Promise<SeasonalMenu[]> {
+  async findAll(organizationId: string): Promise<SeasonalMenu[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('seasonal_menus')
@@ -37,9 +36,8 @@ export class SeasonalMenusService {
     return data || [];
   }
 
-  async create(data: { name: string; start_date?: string; end_date?: string }): Promise<SeasonalMenu> {
+  async create(organizationId: string, data: { name: string; start_date?: string; end_date?: string }): Promise<SeasonalMenu> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // Get max sort_order for auto-increment
     const { data: existing } = await supabase
@@ -71,7 +69,7 @@ export class SeasonalMenusService {
     return created;
   }
 
-  async update(id: string, data: { name?: string; start_date?: string; end_date?: string; is_active?: boolean }): Promise<SeasonalMenu> {
+  async update(organizationId: string, id: string, data: { name?: string; start_date?: string; end_date?: string; is_active?: boolean }): Promise<SeasonalMenu> {
     const supabase = this.supabaseService.getClient();
 
     const updateData: Record<string, unknown> = {};
@@ -84,6 +82,7 @@ export class SeasonalMenusService {
       .from('seasonal_menus')
       .update(updateData)
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -95,24 +94,27 @@ export class SeasonalMenusService {
     return updated;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
     // Nullify references on menu_groups and menus
     await supabase
       .from('menu_groups')
       .update({ seasonal_menu_id: null })
-      .eq('seasonal_menu_id', id);
+      .eq('seasonal_menu_id', id)
+      .eq('organization_id', organizationId);
 
     await supabase
       .from('menus')
       .update({ seasonal_menu_id: null })
-      .eq('seasonal_menu_id', id);
+      .eq('seasonal_menu_id', id)
+      .eq('organization_id', organizationId);
 
     const { error } = await supabase
       .from('seasonal_menus')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error(`Failed to delete seasonal menu: ${error.message}`);

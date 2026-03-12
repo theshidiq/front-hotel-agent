@@ -215,7 +215,7 @@ async function resolveOrganizationId(authUserId: string, staffOrgId: string | nu
 		.eq('auth_user_id', authUserId)
 		.eq('is_active', true)
 		.limit(1)
-		.single();
+		.maybeSingle();
 
 	return data?.organization_id ?? null;
 }
@@ -234,11 +234,14 @@ async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | 
 }
 
 let signingInProgress = false;
-let authInitialized = false;
+export let authInitialized = false;
 
 async function handleSignedIn(email: string, authUserId?: string): Promise<void> {
 	// Guard against concurrent calls (getSession + onAuthStateChange both fire on OAuth redirect)
-	if (signingInProgress) return;
+	if (signingInProgress) {
+		authState.loading = false;
+		return;
+	}
 	signingInProgress = true;
 	// Only show loading spinner on first auth, not on subsequent token refreshes
 	if (!authInitialized) authState.loading = true;
@@ -360,10 +363,14 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 		signingInProgress = false;
 	}
 }
-async function loadGuestPermissions(): Promise<void> {
+export async function loadGuestPermissions(explicitOrgId?: string): Promise<void> {
 	try {
 		const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
-		const response = await fetch(`${API_URL}/roles/default`);
+		const orgId = explicitOrgId ?? getStoredOrgId();
+		if (!orgId) return;
+		// Persist so future page loads without ?org= still work (e.g. staff returning to same hotel)
+		if (explicitOrgId) saveOrgId(explicitOrgId);
+		const response = await fetch(`${API_URL}/roles/default?organizationId=${orgId}`);
 		if (response.ok) {
 			const role = await response.json();
 			if (role && role.permissions) {
@@ -440,6 +447,55 @@ export async function initAuth(): Promise<void> {
 	});
 }
 
+export async function signInWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+	authState.error = null;
+	const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+	if (error) {
+		return { success: false, error: 'メールアドレスまたはパスワードが正しくありません' };
+	}
+	if (data.session?.user?.email) {
+		authState.user = data.session.user;
+		authState.session = data.session;
+		await handleSignedIn(data.session.user.email, data.session.user.id);
+		// Success if authenticated as staff, OR if new user (no staff record yet → goes to setup)
+		if (authState.isStaff || (!authState.error && authState.user)) {
+			return { success: true };
+		}
+		return { success: false, error: authState.error || 'スタッフとして登録されていません' };
+	}
+	return { success: false, error: 'ログインに失敗しました' };
+}
+
+export async function signUpWithEmail(email: string, password: string): Promise<{ success: boolean; needsConfirmation: boolean; error?: string }> {
+	const redirectTo = typeof window !== 'undefined' ? window.location.origin + '/setup' : '/setup';
+	const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
+	if (error) {
+		if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+			return { success: false, needsConfirmation: false, error: 'このメールアドレスはすでに登録されています' };
+		}
+		return { success: false, needsConfirmation: false, error: error.message };
+	}
+	// If session is returned immediately, email confirmation is disabled — sign in right away
+	if (data.session?.user?.email) {
+		authState.user = data.session.user;
+		authState.session = data.session;
+		await handleSignedIn(data.session.user.email, data.session.user.id);
+		return { success: true, needsConfirmation: false };
+	}
+	// Email confirmation required
+	return { success: true, needsConfirmation: true };
+}
+
+export async function resetPasswordForEmail(email: string): Promise<{ success: boolean; error?: string }> {
+	const { error } = await supabase.auth.resetPasswordForEmail(email, {
+		redirectTo: typeof window !== 'undefined' ? window.location.origin + '/login' : '/login',
+	});
+	if (error) {
+		return { success: false, error: error.message };
+	}
+	return { success: true };
+}
+
 export async function signInWithGoogle(redirectTo?: string): Promise<void> {
 	authState.error = null;
 	const { error } = await supabase.auth.signInWithOAuth({
@@ -493,6 +549,10 @@ export async function signOut(): Promise<void> {
 	clearOrgId();
 	// Reload guest permissions for non-logged-in view
 	loadGuestPermissions();
+	// Redirect to main page
+	if (typeof window !== 'undefined') {
+		window.location.href = '/';
+	}
 }
 
 export function getAuthHeaders(): Record<string, string> {

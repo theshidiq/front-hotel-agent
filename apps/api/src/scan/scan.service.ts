@@ -15,9 +15,8 @@ export class ScanService {
     private readonly allergensService: AllergensService,
   ) {}
 
-  async createScan(createScanDto: CreateScanDto): Promise<ScanResultResponse> {
+  async createScan(organizationId: string, createScanDto: CreateScanDto): Promise<ScanResultResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // 1. Create scan session (pending)
     const { data: scanSession, error: scanError } = await supabase
@@ -198,9 +197,8 @@ export class ScanService {
     return links;
   }
 
-  async extractOnly(createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
+  async extractOnly(organizationId: string, createScanDto: CreateScanDto): Promise<ScanExtractResponse> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     // 1. Create scan session
     const { data: scanSession, error: scanError } = await supabase
@@ -466,9 +464,8 @@ export class ScanService {
     };
   }
 
-  async findAll(limit = 20): Promise<ScanSessionResponse[]> {
+  async findAll(organizationId: string, limit = 20): Promise<ScanSessionResponse[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('scan_sessions')

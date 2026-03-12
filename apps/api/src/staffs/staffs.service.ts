@@ -53,16 +53,14 @@ export class StaffsService {
     return true;
   }
 
-  private async autoDeactivateExpired(): Promise<void> {
+  private async autoDeactivateExpired(organizationId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const today = new Date();
     const y = today.getFullYear();
     const m = today.getMonth() + 1;
     const d = today.getDate();
 
-    // Use DB-side JSONB comparison to find expired staff
     const { data, error } = await supabase
       .from('staff')
       .select('id, name')
@@ -88,9 +86,8 @@ export class StaffsService {
     this.logger.log(`Auto-deactivated ${ids.length} expired staff: ${data.map((s) => s.name).join(', ')}`);
   }
 
-  async findAll(): Promise<Staff[]> {
+  async findAll(organizationId: string): Promise<Staff[]> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
@@ -104,13 +101,11 @@ export class StaffsService {
       throw new InternalServerErrorException(`Failed to fetch staff: ${error.message}`);
     }
 
-    // Filter by active period
     return (data || []).filter((s) => this.isWithinActivePeriod(s));
   }
 
-  async updateEmail(id: string, email: string): Promise<Staff> {
+  async updateEmail(id: string, email: string, organizationId: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
@@ -128,9 +123,8 @@ export class StaffsService {
     return data;
   }
 
-  async create(name: string, email: string, position: string, departmentId?: string | null, positionId?: string | null): Promise<Staff> {
+  async create(name: string, email: string, position: string, organizationId: string, departmentId?: string | null, positionId?: string | null): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
@@ -153,9 +147,8 @@ export class StaffsService {
     return data;
   }
 
-  async updateOrg(id: string, updates: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: PeriodJson | null; end_period?: PeriodJson | null }): Promise<Staff> {
+  async updateOrg(id: string, updates: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: PeriodJson | null; end_period?: PeriodJson | null }, organizationId: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
@@ -173,12 +166,10 @@ export class StaffsService {
     return data;
   }
 
-  async findAllIncludingInactive(): Promise<Staff[]> {
-    // Auto-deactivate any staff whose end_period has passed before returning
-    await this.autoDeactivateExpired();
+  async findAllIncludingInactive(organizationId: string): Promise<Staff[]> {
+    await this.autoDeactivateExpired(organizationId);
 
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
@@ -194,9 +185,8 @@ export class StaffsService {
     return data || [];
   }
 
-  async deleteStaff(id: string): Promise<void> {
+  async deleteStaff(id: string, organizationId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('staff')
@@ -210,16 +200,15 @@ export class StaffsService {
     }
   }
 
-  async hardDeleteStaff(id: string): Promise<void> {
+  async hardDeleteStaff(id: string, organizationId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { error } = await supabase
       .from('staff')
       .delete()
       .eq('id', id)
       .eq('organization_id', organizationId)
-      .eq('is_active', false); // Safety: only allow deleting inactive staff
+      .eq('is_active', false);
 
     if (error) {
       this.logger.error(`Failed to hard delete staff: ${error.message}`);
@@ -227,9 +216,8 @@ export class StaffsService {
     }
   }
 
-  async updateRole(id: string, roleId: string | null): Promise<Staff> {
+  async updateRole(id: string, roleId: string | null, organizationId: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
     const { data, error } = await supabase
       .from('staff')
@@ -247,16 +235,13 @@ export class StaffsService {
     return data;
   }
 
-  async updateAdmin(id: string, isAdmin: boolean, requestingStaffId: string): Promise<Staff> {
+  async updateAdmin(id: string, isAdmin: boolean, requestingStaffId: string, organizationId: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
-    const organizationId = this.supabaseService.getOrganizationId();
 
-    // Safety: cannot demote yourself
     if (!isAdmin && id === requestingStaffId) {
       throw new BadRequestException('Cannot remove your own admin access');
     }
 
-    // Safety: cannot remove the last admin
     if (!isAdmin) {
       const { data: admins } = await supabase
         .from('staff')

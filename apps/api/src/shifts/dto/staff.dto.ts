@@ -87,6 +87,11 @@ export class UpdateStaffDto {
   @IsOptional()
   @IsObject()
   end_period?: { year: number; month: number; day: number };
+
+  @ApiPropertyOptional({ description: 'Staff metadata JSONB (e.g. capabilities: { canDoEarlyShifts, canDoLateShifts })' })
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, any>;
 }
 
 export class ReorderStaffDto {

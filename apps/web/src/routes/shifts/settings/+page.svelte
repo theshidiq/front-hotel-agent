@@ -36,9 +36,12 @@
 	import PriorityRulesTab from '$lib/shifts/components/PriorityRulesTab.svelte';
 	import EarlyShiftTab from '$lib/shifts/components/EarlyShiftTab.svelte';
 	import PeriodsTab from '$lib/shifts/components/PeriodsTab.svelte';
+	import BackupCoverageTab from '$lib/shifts/components/BackupCoverageTab.svelte';
+	import ShiftCapabilitiesTab from '$lib/shifts/components/ShiftCapabilitiesTab.svelte';
+	import StaffUnavailabilityTab from '$lib/shifts/components/StaffUnavailabilityTab.svelte';
 
 	// ── Tab Navigation ──
-	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods';
+	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup' | 'capabilities' | 'vacation';
 	let activeTab: SettingsTab = $state('groups');
 
 	// ── Department State ──
@@ -46,7 +49,7 @@
 	let activeDepartmentId: string | null = $state(null);
 
 	// Dept-specific tabs
-	const DEPT_TABS: SettingsTab[] = ['limits', 'groups', 'priority', 'early'];
+	const DEPT_TABS: SettingsTab[] = ['limits', 'groups', 'priority', 'early', 'capabilities', 'vacation', 'backup'];
 
 	// ── Data State ──
 	let dailyLimits: DailyLimits | null = $state(null);
@@ -141,6 +144,11 @@
 
 			if (!activeDepartmentId && depts.length > 0) {
 				activeDepartmentId = depts[0].id;
+				// Re-fetch staff scoped to the first department (initial load had no deptId)
+				if (!deptId) {
+					const deptStaff = await getShiftStaff(depts[0].id);
+					allStaff = deptStaff.map(s => ({ ...s, staff_status: s.status }));
+				}
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load settings';
@@ -201,6 +209,10 @@
 		earlyShiftPreferences = await getEarlyShiftPreferences(activeDepartmentId ?? undefined);
 	}
 
+	async function handleStaffChange() {
+		allStaff = (await getShiftStaff(activeDepartmentId ?? undefined)).map(s => ({ ...s, staff_status: s.status }));
+	}
+
 	async function handlePeriodsSave() {
 		const [config, list] = await Promise.all([
 			getPeriodConfiguration(),
@@ -213,6 +225,9 @@
 	// Tab definitions
 	const tabs = [
 		{ id: 'groups', label: 'グループ', icon: 'group', description: 'スタッフグループ管理' },
+		{ id: 'backup', label: 'バックアップ', icon: 'backup', description: 'バックアップカバレッジ設定' },
+		{ id: 'capabilities', label: 'シフト能力', icon: 'accessibility', description: '早番・遅番の可否設定' },
+		{ id: 'vacation', label: '休暇設定', icon: 'event_busy', description: 'スタッフ休暇・不在日管理' },
 		{ id: 'limits', label: '制限設定', icon: 'tune', description: '日次・月次の人数制限' },
 		{ id: 'priority', label: '優先ルール', icon: 'priority_high', description: 'シフト優先度ルール' },
 		{ id: 'calendar', label: 'カレンダー', icon: 'event_note', description: '祝日・定休日の設定' },
@@ -371,6 +386,20 @@
 								departmentId={activeDepartmentId ?? undefined}
 							/>
 
+						{:else if activeTab === 'backup'}
+							<BackupCoverageTab
+								{allStaff}
+								{staffGroups}
+								departmentId={activeDepartmentId ?? undefined}
+							/>
+
+						{:else if activeTab === 'capabilities'}
+							<ShiftCapabilitiesTab
+								{allStaff}
+								onStaffChange={handleStaffChange}
+								departmentId={activeDepartmentId ?? undefined}
+							/>
+
 						{:else if activeTab === 'priority'}
 							<PriorityRulesTab
 								{priorityRules}
@@ -392,6 +421,12 @@
 								{periodConfig}
 								{periods}
 								onSave={handlePeriodsSave}
+							/>
+
+						{:else if activeTab === 'vacation'}
+							<StaffUnavailabilityTab
+								{allStaff}
+								departmentId={activeDepartmentId ?? undefined}
 							/>
 						{/if}
 					</div>

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -139,7 +139,31 @@ export class QwenVisionService {
     }
   }
 
+  private validateImageUrl(imageUrl: string): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(imageUrl);
+    } catch {
+      throw new BadRequestException('Invalid image URL');
+    }
+    // Only allow HTTPS to our Supabase storage bucket
+    if (parsed.protocol !== 'https:') {
+      throw new BadRequestException('Image URL must use HTTPS');
+    }
+    const ALLOWED_HOSTS = [
+      'ymdyejrljmvajqjbejvh.supabase.co',
+      'supabase.co',
+    ];
+    const isAllowed = ALLOWED_HOSTS.some(
+      (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`),
+    );
+    if (!isAllowed) {
+      throw new BadRequestException('Image URL must point to an approved storage host');
+    }
+  }
+
   private async downloadImageAsBase64(imageUrl: string): Promise<string> {
+    this.validateImageUrl(imageUrl);
     try {
       const response = await axios.get(imageUrl, {
         responseType: 'arraybuffer',

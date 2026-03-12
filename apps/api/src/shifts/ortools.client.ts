@@ -86,10 +86,12 @@ export class ORToolsClient implements OnModuleInit {
   private readonly logger = new Logger(ORToolsClient.name);
   private baseUrl: string;
   private timeout: number;
+  private internalSecret: string;
 
   constructor(private configService: ConfigService) {
     this.baseUrl = this.configService.get<string>('ORTOOLS_URL', 'http://localhost:5050');
     this.timeout = this.configService.get<number>('ORTOOLS_TIMEOUT', 120000);
+    this.internalSecret = this.configService.get<string>('ORTOOLS_SECRET', '');
   }
 
   async onModuleInit() {
@@ -141,6 +143,7 @@ export class ORToolsClient implements OnModuleInit {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(this.internalSecret && { 'X-Internal-Token': this.internalSecret }),
         },
         body: JSON.stringify(ortoolsPayload),
         signal: controller.signal,
