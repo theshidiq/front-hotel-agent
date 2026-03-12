@@ -4,8 +4,17 @@
 	import { uploadImage, compressImage, compressImageForOCR } from '$lib/supabase';
 	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
-	import MenuTreeConfig from '$lib/components/MenuTreeConfig.svelte';
 	import MenuStructurePanel from '$lib/components/MenuStructurePanel.svelte';
+	import type MenuTreeConfigType from '$lib/components/MenuTreeConfig.svelte';
+
+	// Lazy-loaded — @xyflow/svelte + @dagrejs/dagre are ~600KB, only needed when tree view opens
+	let MenuTreeConfig: typeof MenuTreeConfigType | null = $state(null);
+	async function loadTreeConfig() {
+		if (!MenuTreeConfig) {
+			const mod = await import('$lib/components/MenuTreeConfig.svelte');
+			MenuTreeConfig = mod.default;
+		}
+	}
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { authState, can } from '$lib/auth.svelte';
 
@@ -272,8 +281,8 @@
 				isUploadingImage = false;
 			}
 
-			await createProduct(newProduct);
-			await loadProducts();
+			const created = await createProduct(newProduct);
+			products = [created, ...products];
 			createSuccess = true;
 			setTimeout(() => {
 				resetNewProduct();
@@ -364,8 +373,9 @@
 		isSaving = true;
 		saveError = null;
 		try {
-			await updateProduct(id, editForm);
-			await loadProducts();
+			const updated = await updateProduct(id, editForm);
+			const idx = products.findIndex(p => p.id === id);
+			if (idx !== -1) products = [...products.slice(0, idx), updated, ...products.slice(idx + 1)];
 			editingProductId = null;
 			editForm = {};
 		} catch (e: any) {
@@ -379,7 +389,7 @@
 		if (!confirm('Are you sure you want to delete this product?')) return;
 		try {
 			await deleteProduct(id);
-			await loadProducts();
+			products = products.filter(p => p.id !== id);
 			expandedProductId = null;
 			editingProductId = null;
 		} catch (e: any) {
@@ -1125,8 +1135,8 @@ ${coursesHtml}
 		scanSaveError = null;
 
 		try {
-			await createProduct(scanReviewProduct);
-			await loadProducts();
+			const scanned = await createProduct(scanReviewProduct);
+			products = [scanned, ...products];
 			scanSaveSuccess = true;
 		} catch (e: any) {
 			scanSaveError = e.message || 'Failed to save product';
@@ -1199,7 +1209,7 @@ ${coursesHtml}
 					{/if}
 					{#if mainTab === 'menu' && can('menus.structure')}
 						<button
-							onclick={() => showMenuTreeConfig = true}
+							onclick={() => { showMenuTreeConfig = true; loadTreeConfig(); }}
 							class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
 						>
 							<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1808,7 +1818,7 @@ ${coursesHtml}
 							>
 								{#if product.image_url}
 									<button onclick={(e) => { e.stopPropagation(); expandedImageUrl = product.image_url; }} class="flex-shrink-0">
-										<img src={product.image_url} alt={product.name} class="w-10 h-10 object-cover rounded-lg cursor-zoom-in" />
+										<img src={product.image_url} alt={product.name} class="w-10 h-10 object-cover rounded-lg cursor-zoom-in" loading="lazy" />
 									</button>
 								{:else}
 									<div class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -2166,7 +2176,7 @@ ${coursesHtml}
 							<!-- Large course image on the left -->
 							<div class="w-40 flex-shrink-0 bg-slate-800 relative">
 								{#if course.courseImage}
-									<img src={course.courseImage} alt={course.courseName} class="w-full h-full object-cover" />
+									<img src={course.courseImage} alt={course.courseName} class="w-full h-full object-cover" loading="lazy" />
 								{:else}
 									<div class="w-full h-full flex items-center justify-center bg-slate-700">
 										<svg class="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -2187,7 +2197,7 @@ ${coursesHtml}
 											<!-- Main product row -->
 											<div class="flex items-center gap-3 px-3 py-2 {pi % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} {pi === 0 && gi > 0 ? 'border-t-2 border-slate-200' : ''}">
 												{#if product.image_url}
-													<img src={product.image_url} alt={product.name} class="w-9 h-9 rounded object-cover flex-shrink-0" />
+													<img src={product.image_url} alt={product.name} class="w-9 h-9 rounded object-cover flex-shrink-0" loading="lazy" />
 												{:else}
 													<div class="w-9 h-9 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
 														<svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
@@ -2207,7 +2217,7 @@ ${coursesHtml}
 														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
 													</svg>
 													{#if alt.image_url}
-														<img src={alt.image_url} alt={alt.name} class="w-7 h-7 rounded object-cover flex-shrink-0" />
+														<img src={alt.image_url} alt={alt.name} class="w-7 h-7 rounded object-cover flex-shrink-0" loading="lazy" />
 													{:else}
 														<div class="w-7 h-7 rounded bg-orange-100 flex items-center justify-center flex-shrink-0">
 															<svg class="w-3 h-3 text-orange-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
@@ -2483,7 +2493,7 @@ ${coursesHtml}
 										>
 											<div class="flex items-center gap-2 min-w-0">
 												{#if product.image_url}
-													<img src={product.image_url} alt="" class="w-8 h-8 object-cover rounded" />
+													<img src={product.image_url} alt="" class="w-8 h-8 object-cover rounded" loading="lazy" />
 												{:else}
 													<div class="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-gray-400">
 														<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2609,34 +2619,47 @@ ${coursesHtml}
 			onCreateMenu={treeCreateMenu}
 			onUpdateMenu={treeUpdateMenu}
 			onDeleteMenu={treeDeleteMenu}
-			onSwitchToTree={() => { menuStructureView = 'tree'; }}
+			onSwitchToTree={() => { menuStructureView = 'tree'; loadTreeConfig(); }}
 			onClose={() => showMenuTreeConfig = false}
 		/>
 	{:else if showMenuTreeConfig && menuStructureView === 'tree'}
-		<MenuTreeConfig
-			{seasonalMenus}
-			{menuGroups}
-			{menuCategories}
-			{menus}
-			{products}
-			{productAlternates}
-			onAddAlternate={handleAddAlternate}
-			onRemoveAlternate={handleRemoveAlternate}
-			onCreateSeason={treeCreateSeason}
-			onUpdateSeason={treeUpdateSeason}
-			onDeleteSeason={treeDeleteSeason}
-			onCreateGroup={treeCreateGroup}
-			onUpdateGroup={treeUpdateGroup}
-			onDeleteGroup={treeDeleteGroup}
-			onCreateCourse={treeCreateCourse}
-			onUpdateCourse={treeUpdateCourse}
-			onUpdateCourseDetails={treeUpdateCourseDetails}
-			onDeleteCourse={treeDeleteCourse}
-			onCreateMenu={treeCreateMenu}
-			onUpdateMenu={treeUpdateMenu}
-			onDeleteMenu={treeDeleteMenu}
-			onSwitchToPanel={() => { menuStructureView = 'panel'; }}
-			onClose={() => showMenuTreeConfig = false}
-		/>
+		{#if MenuTreeConfig}
+			<svelte:component
+				this={MenuTreeConfig}
+				{seasonalMenus}
+				{menuGroups}
+				{menuCategories}
+				{menus}
+				{products}
+				{productAlternates}
+				onAddAlternate={handleAddAlternate}
+				onRemoveAlternate={handleRemoveAlternate}
+				onCreateSeason={treeCreateSeason}
+				onUpdateSeason={treeUpdateSeason}
+				onDeleteSeason={treeDeleteSeason}
+				onCreateGroup={treeCreateGroup}
+				onUpdateGroup={treeUpdateGroup}
+				onDeleteGroup={treeDeleteGroup}
+				onCreateCourse={treeCreateCourse}
+				onUpdateCourse={treeUpdateCourse}
+				onUpdateCourseDetails={treeUpdateCourseDetails}
+				onDeleteCourse={treeDeleteCourse}
+				onCreateMenu={treeCreateMenu}
+				onUpdateMenu={treeUpdateMenu}
+				onDeleteMenu={treeDeleteMenu}
+				onSwitchToPanel={() => { menuStructureView = 'panel'; }}
+				onClose={() => showMenuTreeConfig = false}
+			/>
+		{:else}
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+				<div class="bg-white rounded-xl p-8 flex items-center gap-3 text-gray-600 shadow-xl">
+					<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+					</svg>
+					Loading tree view...
+				</div>
+			</div>
+		{/if}
 	{/if}
 </div>

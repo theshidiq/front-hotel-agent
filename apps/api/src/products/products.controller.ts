@@ -38,9 +38,16 @@ export class ProductsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all products' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'category', required: false, type: String })
   @ApiResponse({ status: 200, type: [ProductResponse] })
-  async findAll(@Req() req: any, @Query('limit') limit?: number): Promise<ProductResponse[]> {
-    return this.productsService.findAll(req.user.organization_id, limit || 50);
+  async findAll(
+    @Req() req: any,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+  ): Promise<ProductResponse[]> {
+    return this.productsService.findAll(req.user.organization_id, limit || 50, search, category);
   }
 
   @Get(':id')

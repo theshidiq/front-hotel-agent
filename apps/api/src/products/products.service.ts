@@ -62,15 +62,25 @@ export class ProductsService {
     };
   }
 
-  async findAll(organizationId: string, limit = 50): Promise<ProductResponse[]> {
+  async findAll(organizationId: string, limit = 50, search?: string, category?: string): Promise<ProductResponse[]> {
     const supabase = this.supabaseService.getClient();
 
-    const { data: products, error } = await supabase
+    let query = supabase
       .from('products')
       .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    if (search) {
+      query = query.ilike('name', `%${search}%`);
+    }
+
+    if (category) {
+      query = query.eq('category', category);
+    }
+
+    const { data: products, error } = await query;
 
     if (error) {
       throw new Error(`Failed to fetch products: ${error.message}`);

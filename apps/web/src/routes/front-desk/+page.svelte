@@ -1142,13 +1142,26 @@
 					filter: `organization_id=eq.${organizationId}`,
 				},
 				(payload) => {
-					console.log(
-						"🔔 Reservation change detected:",
-						payload.eventType,
-						payload,
-					);
-					// Reload reservations to keep in sync with current date filter
-					loadReservations();
+					console.log("🔔 Reservation change:", payload.eventType);
+					if (payload.eventType === "INSERT") {
+						// INSERT may or may not match current date filter — do a targeted reload
+						loadReservations();
+					} else if (payload.eventType === "UPDATE") {
+						const updated = payload.new as Reservation;
+						const idx = reservations.findIndex((r) => r.id === updated.id);
+						if (idx !== -1) {
+							reservations = [
+								...reservations.slice(0, idx),
+								updated,
+								...reservations.slice(idx + 1),
+							];
+						} else {
+							loadReservations();
+						}
+					} else if (payload.eventType === "DELETE") {
+						const deletedId = (payload.old as { id: string }).id;
+						reservations = reservations.filter((r) => r.id !== deletedId);
+					}
 				},
 			)
 			// Listen to guest_alerts changes
@@ -1160,14 +1173,23 @@
 					table: "guest_alerts",
 					filter: `organization_id=eq.${organizationId}`,
 				},
-				async (payload) => {
+				(payload) => {
 					console.log("Alert change:", payload.eventType);
-					// Reload alerts
-					try {
-						const newAlerts = await getNewGuestAlerts();
-						alerts = newAlerts;
-					} catch (e) {
-						console.error("Failed to reload alerts:", e);
+					if (payload.eventType === "INSERT") {
+						alerts = [payload.new as GuestAlert, ...alerts];
+					} else if (payload.eventType === "UPDATE") {
+						const updated = payload.new as GuestAlert;
+						const idx = alerts.findIndex((a) => a.id === updated.id);
+						if (idx !== -1) {
+							alerts = [
+								...alerts.slice(0, idx),
+								updated,
+								...alerts.slice(idx + 1),
+							];
+						}
+					} else if (payload.eventType === "DELETE") {
+						const deletedId = (payload.old as { id: string }).id;
+						alerts = alerts.filter((a) => a.id !== deletedId);
 					}
 				},
 			)
@@ -1180,14 +1202,23 @@
 					table: "rooms",
 					filter: `organization_id=eq.${organizationId}`,
 				},
-				async (payload) => {
+				(payload) => {
 					console.log("Room change:", payload.eventType);
-					// Reload rooms
-					try {
-						const newRooms = await getRooms();
-						rooms = newRooms;
-					} catch (e) {
-						console.error("Failed to reload rooms:", e);
+					if (payload.eventType === "INSERT") {
+						rooms = [...rooms, payload.new as Room];
+					} else if (payload.eventType === "UPDATE") {
+						const updated = payload.new as Room;
+						const idx = rooms.findIndex((r) => r.id === updated.id);
+						if (idx !== -1) {
+							rooms = [
+								...rooms.slice(0, idx),
+								updated,
+								...rooms.slice(idx + 1),
+							];
+						}
+					} else if (payload.eventType === "DELETE") {
+						const deletedId = (payload.old as { id: string }).id;
+						rooms = rooms.filter((r) => r.id !== deletedId);
 					}
 				},
 			)
