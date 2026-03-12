@@ -550,7 +550,7 @@
 		loading = true;
 		try {
 			const [resData, mgData, menuData] = await Promise.all([
-				getReservations(undefined, "confirmed"), // Get ALL confirmed reservations
+				getReservations(selectedDate ?? undefined, "confirmed"),
 				getMenuGroups(),
 				getMenus(),
 			]);

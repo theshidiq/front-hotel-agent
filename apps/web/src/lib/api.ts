@@ -6,6 +6,15 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
 	return { ...extra, ...getAuthHeaders() };
 }
 
+// ── Allergen cache ─────────────────────────────────────────────────────────
+// Allergens are nearly static (changed only by admins). Cache for 10 minutes
+// across all pages so /front-desk, /menu, and /kitchen-production share one fetch.
+const ALLERGEN_TTL_MS = 10 * 60 * 1000;
+interface AllergenShape { id: string; name: string; category: string; source: string }
+let allergenCache: { data: AllergenShape[]; expiresAt: number } | null = null;
+let allergenPending: Promise<AllergenShape[]> | null = null;
+// ────────────────────────────────────────────────────────────────────────────
+
 /** Fetch wrapper that retries once on 401 by refreshing the Supabase token. */
 async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
 	const response = await fetch(url, options);
@@ -215,13 +224,30 @@ export async function createProduct(data: CreateProductData): Promise<Product> {
 }
 
 export async function getAllergens(): Promise<Allergen[]> {
-	const response = await apiFetch(`${API_URL}/allergens`, { headers: authHeaders() });
+	const now = Date.now();
 
-	if (!response.ok) {
-		throw new Error('Failed to fetch allergens');
+	// Return cached data if still fresh
+	if (allergenCache && now < allergenCache.expiresAt) {
+		return allergenCache.data as Allergen[];
 	}
 
-	return response.json();
+	// Deduplicate concurrent callers — return the same in-flight request
+	if (allergenPending) return allergenPending;
+
+	allergenPending = apiFetch(`${API_URL}/allergens`, { headers: authHeaders() })
+		.then(async (response) => {
+			if (!response.ok) throw new Error('Failed to fetch allergens');
+			const data: AllergenShape[] = await response.json();
+			allergenCache = { data, expiresAt: Date.now() + ALLERGEN_TTL_MS };
+			allergenPending = null;
+			return data as Allergen[];
+		})
+		.catch((err) => {
+			allergenPending = null;
+			throw err;
+		});
+
+	return allergenPending;
 }
 
 export async function createAllergen(name: string, category: string): Promise<Allergen> {
@@ -236,6 +262,7 @@ export async function createAllergen(name: string, category: string): Promise<Al
 		throw new Error(error.message || 'Create allergen failed');
 	}
 
+	allergenCache = null; // invalidate so next fetch is fresh
 	return response.json();
 }
 
@@ -249,6 +276,8 @@ export async function deleteAllergen(id: string): Promise<void> {
 		const error = await response.json();
 		throw new Error(error.message || 'Delete allergen failed');
 	}
+
+	allergenCache = null; // invalidate so next fetch is fresh
 }
 
 // Category Types
