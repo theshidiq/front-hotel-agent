@@ -312,23 +312,21 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 		// Save end period for local expiry checks
 		saveStaffPeriod(staff.end_period);
 
-		// Resolve organization ID
+		// Resolve org ID, fetch org details, and load role permissions all in parallel
 		const uid = authUserId ?? authState.user?.id;
-		const orgId = uid
-			? await resolveOrganizationId(uid, staff.organization_id)
-			: staff.organization_id;
+		const knownOrgId = staff.organization_id ?? getStoredOrgId() ?? import.meta.env.VITE_ORGANIZATION_ID ?? null;
+		const [orgId, roleResult, prefetchedOrg] = await Promise.all([
+			uid ? resolveOrganizationId(uid, staff.organization_id) : Promise.resolve(staff.organization_id),
+			staff.role_id ? loadRolePermissions(staff.role_id) : Promise.resolve(null),
+			knownOrgId ? fetchOrganization(knownOrgId) : Promise.resolve(null),
+		]);
 
-		if (orgId) {
-			authState.organizationId = orgId;
-			saveOrgId(orgId);
-			authState.organization = await fetchOrganization(orgId);
-		} else {
-			// Fall back to stored org or env fallback
-			const fallbackId = getStoredOrgId() ?? import.meta.env.VITE_ORGANIZATION_ID ?? null;
-			authState.organizationId = fallbackId;
-			if (fallbackId) {
-				authState.organization = await fetchOrganization(fallbackId);
-			}
+		const resolvedOrgId = orgId ?? getStoredOrgId() ?? import.meta.env.VITE_ORGANIZATION_ID ?? null;
+		if (resolvedOrgId) {
+			authState.organizationId = resolvedOrgId;
+			saveOrgId(resolvedOrgId);
+			// Use prefetched org if same ID, otherwise fetch the correct one
+			authState.organization = resolvedOrgId === knownOrgId ? prefetchedOrg : await fetchOrganization(resolvedOrgId);
 		}
 
 		authState.staff = { id: staff.id, name: staff.name, email: staff.email, position: staff.position };
@@ -336,18 +334,10 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 		authState.isAdmin = staff.is_admin ?? false;
 		authState.error = null;
 
-		// Load role and permissions
-		if (staff.is_admin) {
-			// Admins have all permissions, but still load role name for display
-			if (staff.role_id) {
-				const { role } = await loadRolePermissions(staff.role_id);
-				authState.role = role;
-			}
-			authState.permissions = [];
-		} else if (staff.role_id) {
-			const { role, permissions } = await loadRolePermissions(staff.role_id);
-			authState.role = role;
-			authState.permissions = permissions;
+		// Apply role and permissions
+		if (roleResult) {
+			authState.role = roleResult.role;
+			authState.permissions = staff.is_admin ? [] : roleResult.permissions;
 		} else {
 			authState.role = null;
 			authState.permissions = [];
