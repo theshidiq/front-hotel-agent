@@ -76,6 +76,38 @@ export function can(permission: string): boolean {
 const PENDING_EMAIL_KEY = 'pending_staff_email';
 const STAFF_END_PERIOD_KEY = 'staff_end_period';
 const ORG_ID_KEY = 'org_id';
+const STAFF_CACHE_KEY = 'staff_cache';
+
+interface StaffCache {
+	staff: Staff;
+	isAdmin: boolean;
+	role: StaffRole | null;
+	permissions: string[];
+	organization: Organization | null;
+	organizationId: string | null;
+}
+
+function saveStaffCache(data: StaffCache): void {
+	if (typeof window === 'undefined') return;
+	localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(data));
+}
+
+function getStaffCache(): StaffCache | null {
+	if (typeof window === 'undefined') return null;
+	const stored = localStorage.getItem(STAFF_CACHE_KEY);
+	if (!stored) return null;
+	try {
+		return JSON.parse(stored) as StaffCache;
+	} catch {
+		return null;
+	}
+}
+
+function clearStaffCache(): void {
+	if (typeof window !== 'undefined') {
+		localStorage.removeItem(STAFF_CACHE_KEY);
+	}
+}
 
 export function setPendingStaffEmail(email: string): void {
 	if (typeof window !== 'undefined') {
@@ -329,19 +361,27 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 			authState.organization = resolvedOrgId === knownOrgId ? prefetchedOrg : await fetchOrganization(resolvedOrgId);
 		}
 
-		authState.staff = { id: staff.id, name: staff.name, email: staff.email, position: staff.position };
-		authState.isStaff = true;
-		authState.isAdmin = staff.is_admin ?? false;
-		authState.error = null;
+		const staffRecord = { id: staff.id, name: staff.name, email: staff.email, position: staff.position };
+		const isAdmin = staff.is_admin ?? false;
+		const role = roleResult?.role ?? null;
+		const permissions = isAdmin ? [] : (roleResult?.permissions ?? []);
 
-		// Apply role and permissions
-		if (roleResult) {
-			authState.role = roleResult.role;
-			authState.permissions = staff.is_admin ? [] : roleResult.permissions;
-		} else {
-			authState.role = null;
-			authState.permissions = [];
-		}
+		authState.staff = staffRecord;
+		authState.isStaff = true;
+		authState.isAdmin = isAdmin;
+		authState.error = null;
+		authState.role = role;
+		authState.permissions = permissions;
+
+		// Persist to localStorage — next page load will render instantly from cache
+		saveStaffCache({
+			staff: staffRecord,
+			isAdmin,
+			role,
+			permissions,
+			organization: authState.organization,
+			organizationId: authState.organizationId,
+		});
 
 		authState.loading = false;
 		authInitialized = true;
@@ -377,6 +417,7 @@ export async function initAuth(): Promise<void> {
 	if (isStoredPeriodExpired()) {
 		clearStaffPeriod();
 		clearOrgId();
+		clearStaffCache();
 		await supabase.auth.signOut();
 		authState.loading = false;
 		return;
@@ -385,6 +426,20 @@ export async function initAuth(): Promise<void> {
 	// Restore cached org ID immediately so headers are ready before DB resolves
 	const cachedOrgId = getStoredOrgId();
 	if (cachedOrgId) authState.organizationId = cachedOrgId;
+
+	// Optimistic render: hydrate auth state from cache so UI shows instantly.
+	// The DB verification below will correct it if anything changed.
+	const cached = getStaffCache();
+	if (cached) {
+		authState.staff = cached.staff;
+		authState.isStaff = true;
+		authState.isAdmin = cached.isAdmin;
+		authState.role = cached.role;
+		authState.permissions = cached.permissions;
+		authState.organization = cached.organization;
+		if (cached.organizationId) authState.organizationId = cached.organizationId;
+		authState.loading = false; // show UI immediately — DB verify runs in background
+	}
 
 	// Parallel: load guest permissions + get session (independent operations)
 	const [, sessionResult] = await Promise.all([
@@ -399,6 +454,15 @@ export async function initAuth(): Promise<void> {
 		authState.session = session;
 		await handleSignedIn(session.user.email, session.user.id);
 	} else {
+		// No active session — clear stale cache and show as logged out
+		if (cached) {
+			clearStaffCache();
+			authState.staff = null;
+			authState.isStaff = false;
+			authState.isAdmin = false;
+			authState.role = null;
+			authState.permissions = [];
+		}
 		authState.loading = false;
 	}
 
@@ -433,6 +497,7 @@ export async function initAuth(): Promise<void> {
 			clearPendingStaffEmail();
 			clearStaffPeriod();
 			clearOrgId();
+			clearStaffCache();
 		}
 	});
 }
@@ -537,6 +602,7 @@ export async function signOut(): Promise<void> {
 	clearPendingStaffEmail();
 	clearStaffPeriod();
 	clearOrgId();
+	clearStaffCache();
 	// Reload guest permissions for non-logged-in view
 	loadGuestPermissions();
 	// Redirect to main page
