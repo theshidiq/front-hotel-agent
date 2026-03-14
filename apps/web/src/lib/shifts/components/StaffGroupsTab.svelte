@@ -11,12 +11,16 @@ import { isStaffActiveInCurrentPeriod } from '../staffUtils';
 
 interface Props {
   staffGroups: ScheduleStaffGroup[];
-  allStaff: ScheduleStaff[];
+  allStaff: ScheduleStaff[];          // dept-scoped — used for add-member dropdown
+  orgStaff?: ScheduleStaff[];         // org-wide — used for member display and cleanup
   onGroupsChange: () => Promise<void>;
   departmentId?: string;
 }
 
-let { staffGroups, allStaff, onGroupsChange, departmentId }: Props = $props();
+let { staffGroups, allStaff, orgStaff, onGroupsChange, departmentId }: Props = $props();
+
+// For member display/cleanup use org-wide staff; fall back to allStaff if orgStaff not provided
+const staffForMembers = $derived(orgStaff && orgStaff.length > 0 ? orgStaff : allStaff);
 
 const COLOR_PRESETS = [
   '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
@@ -30,7 +34,10 @@ const COLOR_PRESETS = [
 // Filter staff active as of today — same logic as the schedule page.
 // Uses start_period/end_period to exclude staff who haven't started or have already left.
 const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-let activeStaff = $derived(allStaff.filter(s => isStaffActiveInCurrentPeriod(s, [today])));
+// activeStaff: org-wide active staff (for member display and cleanup)
+let activeStaff = $derived(staffForMembers.filter(s => isStaffActiveInCurrentPeriod(s, [today])));
+// deptActiveStaff: dept-scoped active staff (for the "add member" dropdown)
+let deptActiveStaff = $derived(allStaff.filter(s => isStaffActiveInCurrentPeriod(s, [today])));
 
 // State
 let loading = $state(false);
@@ -48,24 +55,21 @@ let showColorPicker = $state<string | null>(null);
 let addingMemberToGroup = $state<string | null>(null);
 let selectedStaffId = $state<string | null>(null);
 
-// Derived: available active staff not yet in the group being edited
+// Derived: available dept-scoped active staff not yet in the group being edited
 let availableStaff = $derived.by(() => {
   if (addingMemberToGroup === null) return [];
   const currentIds = groupMembers.get(addingMemberToGroup) || [];
-  return activeStaff.filter(s => !currentIds.includes(String(s.id)));
+  return deptActiveStaff.filter(s => !currentIds.includes(String(s.id)));
 });
 
-// Sync members from group_config.members when prop changes.
+// Sync members from group_config.members when props change.
 // Also assign unique colors to any groups that don't have one yet.
-// Filter out any stored IDs that don't match an active staff member,
-// and silently persist the cleanup/color assignment to DB.
+// NOTE: no destructive member cleanup here — members are only removed via explicit user action.
 $effect(() => {
   const groups = staffGroups;
-  const staff = activeStaff;
   untrack(async () => {
-    const activeIds = new Set(staff.map(s => String(s.id)));
     const newMap = new Map<string, string[]>();
-    const toClean: { groupId: string; cleanIds: string[]; color?: string }[] = [];
+    const toColor: { groupId: string; color: string }[] = [];
 
     // Assign unique colors to groups that don't have one
     const assignedColors = new Set(
@@ -78,45 +82,32 @@ $effect(() => {
 
     for (const group of groups) {
       const raw = (group.group_config?.members as string[]) || [];
-      const cleanIds = raw.filter(id => activeIds.has(id));
-      newMap.set(group.id, cleanIds);
+      // Store all member IDs from DB — UI silently skips unknown ones via {#if s}
+      newMap.set(group.id, raw);
 
-      const needsClean = cleanIds.length !== raw.length;
       const needsColor = !group.group_config?.color;
-
-      if (needsClean || needsColor) {
-        let newColor: string | undefined;
-        if (needsColor) {
-          // Pick next unused color, cycling if we run out
-          newColor = colorQueue.length > 0
-            ? colorQueue[colorIdx % colorQueue.length]
-            : COLOR_PRESETS[colorIdx % COLOR_PRESETS.length];
-          assignedColors.add(newColor);
-          colorIdx++;
-        }
-        toClean.push({ groupId: group.id, cleanIds, color: newColor });
+      if (needsColor) {
+        const newColor = colorQueue.length > 0
+          ? colorQueue[colorIdx % colorQueue.length]
+          : COLOR_PRESETS[colorIdx % COLOR_PRESETS.length];
+        assignedColors.add(newColor);
+        colorIdx++;
+        toColor.push({ groupId: group.id, color: newColor });
       }
     }
     groupMembers = newMap;
 
-    // Silently persist member cleanup + color assignment to DB
-    for (const { groupId, cleanIds, color } of toClean) {
+    // Persist color assignments only
+    for (const { groupId, color } of toColor) {
       try {
-        if (color) {
-          // color goes via top-level field; backend merges it into group_config
-          await updateStaffGroup(groupId, { color });
-          // also sync the cleaned member list
-          await setStaffGroupMembers(groupId, cleanIds);
-        } else {
-          await setStaffGroupMembers(groupId, cleanIds);
-        }
+        await updateStaffGroup(groupId, { color });
       } catch {
-        // Best-effort, ignore errors
+        // Best-effort
       }
     }
 
-    // Refresh to pick up the newly saved colors
-    if (toClean.some(c => c.color)) {
+    // Refresh to pick up newly saved colors
+    if (toColor.length > 0) {
       await onGroupsChange();
     }
   });
@@ -259,7 +250,6 @@ function getStaffById(staffId: string): ScheduleStaff | undefined {
   return activeStaff.find(s => String(s.id) === String(staffId));
 }
 
-// groupMembers is already filtered to active staff only (see $effect above)
 function getActiveMemberIds(groupId: string): string[] {
   return groupMembers.get(groupId) || [];
 }

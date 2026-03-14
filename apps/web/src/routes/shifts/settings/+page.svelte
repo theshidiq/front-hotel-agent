@@ -58,6 +58,7 @@
 	let calendarRules: CalendarRule[] = $state([]);
 	let staffGroups: ScheduleStaffGroup[] = $state([]);
 	let allStaff: ScheduleStaff[] = $state([]);
+	let allOrgStaff: ScheduleStaff[] = $state([]); // unscoped — all org staff for group member lookup
 	let priorityRules: PriorityRule[] = $state([]);
 	let earlyShiftPreferences: EarlyShiftPreference[] = $state([]);
 	let periodConfig: PeriodConfiguration | null = $state(null);
@@ -116,13 +117,14 @@
 
 			const deptParam = deptId ?? undefined;
 
-			const [daily, monthly, solver, rules, groups, staff, priority, early, period, periodsList, depts] = await Promise.all([
+			const [daily, monthly, solver, rules, groups, staff, orgStaff, priority, early, period, periodsList, depts] = await Promise.all([
 				getDailyLimits(deptParam),
 				getMonthlyLimits(deptParam),
 				getSolverConfig(),
 				getCalendarRules(),
 				getStaffGroups(deptParam),
 				getShiftStaff(deptParam),
+				getShiftStaff(), // all org staff — needed for group member display across departments
 				getPriorityRules(deptParam),
 				getEarlyShiftPreferences(deptParam),
 				getPeriodConfiguration(),
@@ -136,6 +138,7 @@
 			calendarRules = rules;
 			staffGroups = groups;
 			allStaff = staff.map(s => ({ ...s, staff_status: s.status }));
+			allOrgStaff = orgStaff.map(s => ({ ...s, staff_status: s.status }));
 			priorityRules = priority;
 			earlyShiftPreferences = early;
 			periodConfig = period;
@@ -382,6 +385,7 @@
 							<StaffGroupsTab
 								{staffGroups}
 								{allStaff}
+								orgStaff={allOrgStaff}
 								onGroupsChange={handleGroupsChange}
 								departmentId={activeDepartmentId ?? undefined}
 							/>
