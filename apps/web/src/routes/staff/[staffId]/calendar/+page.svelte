@@ -298,6 +298,10 @@
 								<span class="text-gray-600 font-medium">{color.label}</span>
 							</div>
 						{/each}
+						<div class="flex items-center gap-1.5">
+							<span class="text-[11px] font-bold text-red-600 leading-none">祝</span>
+							<span class="text-gray-600 font-medium">祝日</span>
+						</div>
 					</div>
 					<div class="flex flex-wrap gap-2 text-xs">
 						{#if stats.off > 0}
