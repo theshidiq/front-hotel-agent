@@ -30,6 +30,20 @@
 	const canGoPrev = $derived(currentPeriodIdx > 0);
 	const canGoNext = $derived(currentPeriodIdx < periods.length - 1);
 
+	const periodHolidays = $derived.by(() => {
+		if (!currentPeriod) return [];
+		const result: { dateStr: string; name: string }[] = [];
+		const cursor = new Date(currentPeriod.start_date + 'T00:00:00');
+		const end = new Date(currentPeriod.end_date + 'T00:00:00');
+		while (cursor <= end) {
+			const dateStr = formatLocalDate(cursor);
+			const name = getHolidayName(dateStr);
+			if (name) result.push({ dateStr, name });
+			cursor.setDate(cursor.getDate() + 1);
+		}
+		return result;
+	});
+
 	const calendarWeeks = $derived.by(() => {
 		if (!currentPeriod) return [];
 
@@ -328,6 +342,19 @@
 						<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-800 text-white font-medium">合計 <strong>{stats.total}</strong></span>
 					</div>
 				</div>
+			{#if periodHolidays.length > 0}
+				<div class="bg-white rounded-xl shadow-sm p-4 mb-4">
+					<p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">この期間の祝日</p>
+					<ul class="space-y-1.5">
+						{#each periodHolidays as { dateStr, name }}
+							<li class="flex items-center gap-2.5 text-[12px]">
+								<span class="text-red-500 font-bold shrink-0">{dateStr.slice(5).replace('-', '/')}</span>
+								<span class="text-gray-700">{name}</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 			{/if}
 		</div>
 	</main>
