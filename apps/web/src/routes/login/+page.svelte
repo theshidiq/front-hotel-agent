@@ -151,6 +151,7 @@
 						<input type={showPassword ? 'text' : 'password'} bind:value={password} placeholder="パスワード"
 							autocomplete="current-password"
 							oninput={() => { passwordError = ''; formError = ''; }}
+							onkeydown={(e) => { if (e.key === 'Enter') handleEmailLogin(); }}
 							class="w-full px-3 py-2.5 pr-10 text-sm bg-white rounded-lg outline-none placeholder:text-gray-400 text-gray-900 transition-colors"
 							style="border:1.5px solid {passwordError ? '#f87171' : '#E5E1DA'}; border-radius:8px;"/>
 						<button type="button" onclick={() => showPassword = !showPassword} tabindex="-1"

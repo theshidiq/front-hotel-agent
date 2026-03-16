@@ -211,7 +211,21 @@ async function checkStaffStatus(email: string, preferOrgId?: string | null): Pro
 		if (data) return data as StaffWithPeriod;
 	}
 
-	// Fallback: find any active staff record for this email
+	// Try env-configured org ID as tiebreaker (handles multi-org deployments where same email exists in multiple orgs)
+	const envOrgId = import.meta.env.VITE_ORGANIZATION_ID;
+	if (envOrgId) {
+		const { data } = await supabase
+			.from('staff')
+			.select('id, name, email, position, start_period, end_period, is_admin, role_id, organization_id')
+			.eq('email', email)
+			.eq('organization_id', envOrgId)
+			.eq('is_active', true)
+			.limit(1)
+			.maybeSingle();
+		if (data) return data as StaffWithPeriod;
+	}
+
+	// Last resort: unscoped query (single-org deployments or new users)
 	const { data, error } = await supabase
 		.from('staff')
 		.select('id, name, email, position, start_period, end_period, is_admin, role_id, organization_id')
