@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { fetchStaffById, fetchPeriods, fetchStaffShifts, findCurrentPeriodIndex, calculateStats } from '$lib/calendar/api';
+	import { authState } from '$lib/auth.svelte';
 	import { getShiftColor, SHIFT_COLORS } from '$lib/calendar/shift-colors';
 	import type { Period, StaffInfo, Shifts, ShiftStats } from '$lib/calendar/types';
 
@@ -93,9 +93,10 @@
 
 			staff = staffData;
 			periods = periodsData;
-			currentPeriodIdx = findCurrentPeriodIndex(periodsData);
+			const idx = findCurrentPeriodIndex(periodsData);
+			currentPeriodIdx = idx;
 
-			await loadShifts();
+			await loadShifts(periodsData[idx]);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'データの取得に失敗しました';
 		} finally {
@@ -103,12 +104,12 @@
 		}
 	}
 
-	async function loadShifts() {
+	async function loadShifts(period: Period) {
 		if (!staff) return;
 		loadingShifts = true;
 		tappedDate = null;
 		try {
-			const data = await fetchStaffShifts(staff.id, currentPeriodIdx);
+			const data = await fetchStaffShifts(staff.id, period, staff.department_id);
 			shifts = data;
 			stats = calculateStats(data);
 		} catch {
@@ -121,21 +122,26 @@
 
 	function goPrev() {
 		if (!canGoPrev) return;
-		currentPeriodIdx--;
-		loadShifts();
+		const newIdx = currentPeriodIdx - 1;
+		currentPeriodIdx = newIdx;
+		loadShifts(periods[newIdx]);
 	}
 
 	function goNext() {
 		if (!canGoNext) return;
-		currentPeriodIdx++;
-		loadShifts();
+		const newIdx = currentPeriodIdx + 1;
+		currentPeriodIdx = newIdx;
+		loadShifts(periods[newIdx]);
 	}
 
 	function toggleTap(dateStr: string) {
 		tappedDate = tappedDate === dateStr ? null : dateStr;
 	}
 
-	onMount(() => {
+	let initialized = $state(false);
+	$effect(() => {
+		if (authState.loading || initialized) return;
+		initialized = true;
 		loadInitialData();
 	});
 </script>
@@ -191,8 +197,8 @@
 				<!-- Period Navigation -->
 				<div class="flex items-center justify-between mb-3 bg-white rounded-xl shadow-sm px-2 py-2.5">
 					<button
-						onclick={goPrev}
-						disabled={!canGoPrev}
+						onclick={goNext}
+						disabled={!canGoNext}
 						class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
 					>
 						<span class="material-symbols-rounded text-xl">chevron_left</span>
@@ -202,8 +208,8 @@
 						<p class="text-[10px] text-gray-400 mt-0.5">{currentPeriod.start_date.slice(5).replace('-', '/')} ~ {currentPeriod.end_date.slice(5).replace('-', '/')}</p>
 					</div>
 					<button
-						onclick={goNext}
-						disabled={!canGoNext}
+						onclick={goPrev}
+						disabled={!canGoPrev}
 						class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
 					>
 						<span class="material-symbols-rounded text-xl">chevron_right</span>

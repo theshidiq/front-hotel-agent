@@ -1,25 +1,33 @@
-import { supabase } from '$lib/supabase';
+import { getShiftStaff, getShiftPeriods, getSchedule } from '$lib/shifts/api';
+import type { ScheduleStaff, SchedulePeriod } from '$lib/shifts/types';
 import type { Period, StaffInfo, Shifts, ShiftStats } from './types';
 
-export async function fetchStaffById(id: string): Promise<StaffInfo | null> {
-	const { data, error } = await supabase
-		.from('staff')
-		.select('id, name, position, status, department')
-		.eq('id', id)
-		.single();
+// Convert SchedulePeriod → Period (same shape)
+function toPeriod(p: SchedulePeriod): Period {
+	return { id: p.id, start_date: p.start_date, end_date: p.end_date, label: p.label };
+}
 
-	if (error || !data) return null;
-	return data as StaffInfo;
+// Convert ScheduleStaff → StaffInfo
+function toStaffInfo(s: ScheduleStaff): StaffInfo {
+	return {
+		id: s.id,
+		name: s.name,
+		position: s.position ?? null,
+		status: s.status ?? null,
+		department: s.department ?? null,
+		department_id: s.department_id ?? null,
+	};
+}
+
+export async function fetchStaffById(id: string): Promise<StaffInfo | null> {
+	const all = await getShiftStaff();
+	const found = all.find(s => s.id === id);
+	return found ? toStaffInfo(found) : null;
 }
 
 export async function fetchPeriods(): Promise<Period[]> {
-	const { data, error } = await supabase
-		.from('periods')
-		.select('id, start_date, end_date, label')
-		.order('start_date', { ascending: true });
-
-	if (error || !data) return [];
-	return data as Period[];
+	const periods = await getShiftPeriods();
+	return periods.map(toPeriod);
 }
 
 export function findCurrentPeriodIndex(periods: Period[]): number {
@@ -29,26 +37,20 @@ export function findCurrentPeriodIndex(periods: Period[]): number {
 	return idx >= 0 ? idx : periods.length - 1;
 }
 
+
 export async function fetchStaffShifts(
 	staffId: string,
-	periodIndex: number
+	period: Period,
+	departmentId?: string | null
 ): Promise<Shifts> {
-	const { data, error } = await supabase
-		.from('schedule_staff_assignments')
-		.select('schedule_id, schedules(schedule_data)')
-		.eq('period_index', periodIndex)
-		.limit(1)
-		.single();
-
-	if (error || !data) return {};
-
-	const scheduleData = (data as any).schedules?.schedule_data;
-	if (!scheduleData || typeof scheduleData !== 'object') return {};
-
-	const staffShifts = scheduleData[staffId];
-	if (!staffShifts || typeof staffShifts !== 'object') return {};
-
-	return staffShifts as Shifts;
+	try {
+		const schedule = await getSchedule(period.id, departmentId ?? undefined);
+		const scheduleData = schedule?.schedule?.schedule_data;
+		if (!scheduleData || typeof scheduleData !== 'object') return {};
+		return (scheduleData[staffId] as Shifts) ?? {};
+	} catch {
+		return {};
+	}
 }
 
 const KNOWN_SYMBOLS = new Set(['×', '△', '○', '◇', '★', '●', '◎', '']);

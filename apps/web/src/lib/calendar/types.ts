@@ -11,6 +11,7 @@ export interface StaffInfo {
 	position: string | null;
 	status: string | null;
 	department: string | null;
+	department_id: string | null;
 }
 
 export interface ShiftStats {
