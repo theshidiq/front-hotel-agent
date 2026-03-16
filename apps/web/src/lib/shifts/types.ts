@@ -95,6 +95,7 @@ export interface ScheduleMetadata {
 export interface CalendarRule {
 	id: string;
 	organization_id: string;
+	department_id?: string | null;
 	date: string;
 	rule_type: 'must_work' | 'must_day_off';
 	reason?: string;

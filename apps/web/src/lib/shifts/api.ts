@@ -553,8 +553,9 @@ export async function checkOptimizerHealth(): Promise<{ healthy: boolean; url: s
 
 // ==================== CALENDAR RULES ====================
 
-export async function getCalendarRules(startDate?: string, endDate?: string): Promise<CalendarRule[]> {
+export async function getCalendarRules(departmentId?: string, startDate?: string, endDate?: string): Promise<CalendarRule[]> {
 	const params = new URLSearchParams();
+	if (departmentId) params.append('department_id', departmentId);
 	if (startDate) params.append('startDate', startDate);
 	if (endDate) params.append('endDate', endDate);
 
@@ -572,6 +573,7 @@ export interface CreateCalendarRuleData {
 	date: string;
 	rule_type: 'must_work' | 'must_day_off';
 	reason?: string;
+	department_id?: string;
 }
 
 export async function createCalendarRule(data: CreateCalendarRuleData): Promise<CalendarRule> {

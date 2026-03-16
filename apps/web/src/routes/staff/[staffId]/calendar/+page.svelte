@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { fetchStaffById, fetchPeriods, fetchStaffShifts, findCurrentPeriodIndex, calculateStats } from '$lib/calendar/api';
+	import { authState } from '$lib/auth.svelte';
 	import { getShiftColor, SHIFT_COLORS } from '$lib/calendar/shift-colors';
+	import { getHolidayName } from '$lib/calendar/japanese-holidays';
 	import type { Period, StaffInfo, Shifts, ShiftStats } from '$lib/calendar/types';
 
 	let { data } = $props();
@@ -29,6 +30,20 @@
 	const canGoPrev = $derived(currentPeriodIdx > 0);
 	const canGoNext = $derived(currentPeriodIdx < periods.length - 1);
 
+	const periodHolidays = $derived.by(() => {
+		if (!currentPeriod) return [];
+		const result: { dateStr: string; name: string }[] = [];
+		const cursor = new Date(currentPeriod.start_date + 'T00:00:00');
+		const end = new Date(currentPeriod.end_date + 'T00:00:00');
+		while (cursor <= end) {
+			const dateStr = formatLocalDate(cursor);
+			const name = getHolidayName(dateStr);
+			if (name) result.push({ dateStr, name });
+			cursor.setDate(cursor.getDate() + 1);
+		}
+		return result;
+	});
+
 	const calendarWeeks = $derived.by(() => {
 		if (!currentPeriod) return [];
 
@@ -43,7 +58,7 @@
 		const calEnd = new Date(endDate);
 		calEnd.setDate(calEnd.getDate() + (6 - calEnd.getDay()));
 
-		const weeks: { date: Date; dateStr: string; inPeriod: boolean; shift: string }[][] = [];
+		const weeks: { date: Date; dateStr: string; inPeriod: boolean; shift: string; holiday: string | null }[][] = [];
 		let currentWeek: typeof weeks[0] = [];
 		const cursor = new Date(calStart);
 
@@ -55,6 +70,7 @@
 				dateStr,
 				inPeriod,
 				shift: inPeriod ? (shifts[dateStr] ?? '') : '',
+				holiday: getHolidayName(dateStr),
 			});
 
 			if (currentWeek.length === 7) {
@@ -93,9 +109,10 @@
 
 			staff = staffData;
 			periods = periodsData;
-			currentPeriodIdx = findCurrentPeriodIndex(periodsData);
+			const idx = findCurrentPeriodIndex(periodsData);
+			currentPeriodIdx = idx;
 
-			await loadShifts();
+			await loadShifts(periodsData[idx]);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'データの取得に失敗しました';
 		} finally {
@@ -103,12 +120,12 @@
 		}
 	}
 
-	async function loadShifts() {
+	async function loadShifts(period: Period) {
 		if (!staff) return;
 		loadingShifts = true;
 		tappedDate = null;
 		try {
-			const data = await fetchStaffShifts(staff.id, currentPeriodIdx);
+			const data = await fetchStaffShifts(staff.id, period, staff.department_id);
 			shifts = data;
 			stats = calculateStats(data);
 		} catch {
@@ -121,21 +138,26 @@
 
 	function goPrev() {
 		if (!canGoPrev) return;
-		currentPeriodIdx--;
-		loadShifts();
+		const newIdx = currentPeriodIdx - 1;
+		currentPeriodIdx = newIdx;
+		loadShifts(periods[newIdx]);
 	}
 
 	function goNext() {
 		if (!canGoNext) return;
-		currentPeriodIdx++;
-		loadShifts();
+		const newIdx = currentPeriodIdx + 1;
+		currentPeriodIdx = newIdx;
+		loadShifts(periods[newIdx]);
 	}
 
 	function toggleTap(dateStr: string) {
 		tappedDate = tappedDate === dateStr ? null : dateStr;
 	}
 
-	onMount(() => {
+	let initialized = $state(false);
+	$effect(() => {
+		if (authState.loading || initialized) return;
+		initialized = true;
 		loadInitialData();
 	});
 </script>
@@ -191,8 +213,8 @@
 				<!-- Period Navigation -->
 				<div class="flex items-center justify-between mb-3 bg-white rounded-xl shadow-sm px-2 py-2.5">
 					<button
-						onclick={goPrev}
-						disabled={!canGoPrev}
+						onclick={goNext}
+						disabled={!canGoNext}
 						class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
 					>
 						<span class="material-symbols-rounded text-xl">chevron_left</span>
@@ -202,8 +224,8 @@
 						<p class="text-[10px] text-gray-400 mt-0.5">{currentPeriod.start_date.slice(5).replace('-', '/')} ~ {currentPeriod.end_date.slice(5).replace('-', '/')}</p>
 					</div>
 					<button
-						onclick={goNext}
-						disabled={!canGoNext}
+						onclick={goPrev}
+						disabled={!canGoPrev}
 						class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
 					>
 						<span class="material-symbols-rounded text-xl">chevron_right</span>
@@ -232,11 +254,12 @@
 						<tbody>
 							{#each calendarWeeks as week}
 								<tr>
-									{#each week as { dateStr, date, inPeriod, shift }}
+									{#each week as { dateStr, date, inPeriod, shift, holiday }}
 										{@const dayOfWeek = date.getDay()}
 										{@const color = getShiftColor(shift)}
 										{@const today = isToday(dateStr)}
 										{@const hasShift = shift !== undefined && shift !== ''}
+										{@const isHoliday = holiday !== null}
 										{#if inPeriod}
 											<td class="border border-gray-100/80 p-0 relative {hasShift ? color.bg : ''}
 												{today ? 'ring-2 ring-blue-500 ring-inset z-10' : ''}">
@@ -245,20 +268,22 @@
 													class="w-full flex flex-col items-center justify-center py-2 px-1 active:brightness-95 transition-all"
 												>
 													<span class="text-[13px] font-bold leading-none
-														{dayOfWeek === 0 ? 'text-red-600' : dayOfWeek === 6 ? 'text-blue-600' : hasShift ? color.text : 'text-gray-800'}">
+														{dayOfWeek === 0 || isHoliday ? 'text-red-600' : dayOfWeek === 6 ? 'text-blue-600' : hasShift ? color.text : 'text-gray-800'}">
 														{date.getDate()}
 													</span>
 													{#if hasShift}
 														<span class="mt-1.5 text-[9px] font-semibold leading-none {color.text}">
 															{SHIFT_COLORS[shift] ? SHIFT_COLORS[shift].label : shift.length > 3 ? shift.slice(0, 3) + '…' : shift}
 														</span>
+													{:else if isHoliday}
+														<span class="mt-1.5 text-[9px] leading-none text-red-400">祝</span>
 													{:else}
 														<span class="mt-1.5 text-[9px] leading-none text-gray-300">&nbsp;</span>
 													{/if}
 												</button>
 												{#if tappedDate === dateStr}
 													<div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20 pointer-events-none">
-														{dateStr.slice(5)} {shift ? (SHIFT_COLORS[shift] ? SHIFT_COLORS[shift].label : shift) : '勤務'}
+														{dateStr.slice(5)}{isHoliday ? ' ' + holiday : ''} {shift ? (SHIFT_COLORS[shift] ? SHIFT_COLORS[shift].label : shift) : ''}
 														<div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
 													</div>
 												{/if}
@@ -266,7 +291,7 @@
 										{:else}
 											<td class="border border-gray-100/40 p-0 bg-gray-50">
 												<div class="flex items-center justify-center py-2 px-1">
-													<span class="text-[11px] text-gray-300 leading-none">{date.getDate()}</span>
+													<span class="text-[11px] {getHolidayName(dateStr) ? 'text-red-300' : 'text-gray-300'} leading-none">{date.getDate()}</span>
 													<span class="mt-1.5 text-[9px] leading-none">&nbsp;</span>
 												</div>
 											</td>
@@ -287,6 +312,10 @@
 								<span class="text-gray-600 font-medium">{color.label}</span>
 							</div>
 						{/each}
+						<div class="flex items-center gap-1.5">
+							<span class="text-[11px] font-bold text-red-600 leading-none">祝</span>
+							<span class="text-gray-600 font-medium">祝日</span>
+						</div>
 					</div>
 					<div class="flex flex-wrap gap-2 text-xs">
 						{#if stats.off > 0}
@@ -313,6 +342,19 @@
 						<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-800 text-white font-medium">合計 <strong>{stats.total}</strong></span>
 					</div>
 				</div>
+			{#if periodHolidays.length > 0}
+				<div class="bg-white rounded-xl shadow-sm p-4 mb-4">
+					<p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">この期間の祝日</p>
+					<ul class="space-y-1.5">
+						{#each periodHolidays as { dateStr, name }}
+							<li class="flex items-center gap-2.5 text-[12px]">
+								<span class="text-red-500 font-bold shrink-0">{dateStr.slice(5).replace('-', '/')}</span>
+								<span class="text-gray-700">{name}</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 			{/if}
 		</div>
 	</main>

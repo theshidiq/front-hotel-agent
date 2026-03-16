@@ -49,7 +49,7 @@
 	let activeDepartmentId: string | null = $state(null);
 
 	// Dept-specific tabs
-	const DEPT_TABS: SettingsTab[] = ['limits', 'groups', 'priority', 'early', 'capabilities', 'vacation', 'backup'];
+	const DEPT_TABS: SettingsTab[] = ['limits', 'groups', 'priority', 'early', 'capabilities', 'vacation', 'backup', 'calendar'];
 
 	// ── Data State ──
 	let dailyLimits: DailyLimits | null = $state(null);
@@ -121,7 +121,7 @@
 				getDailyLimits(deptParam),
 				getMonthlyLimits(deptParam),
 				getSolverConfig(),
-				getCalendarRules(),
+				getCalendarRules(deptParam),
 				getStaffGroups(deptParam),
 				getShiftStaff(deptParam),
 				getShiftStaff(), // all org staff — needed for group member display across departments
@@ -163,13 +163,14 @@
 	async function handleDepartmentChange(deptId: string) {
 		activeDepartmentId = deptId;
 		const deptParam = deptId;
-		const [daily, monthly, groups, staff, priority, early] = await Promise.all([
+		const [daily, monthly, groups, staff, priority, early, rules] = await Promise.all([
 			getDailyLimits(deptParam),
 			getMonthlyLimits(deptParam),
 			getStaffGroups(deptParam),
 			getShiftStaff(deptParam),
 			getPriorityRules(deptParam),
 			getEarlyShiftPreferences(deptParam),
+			getCalendarRules(deptParam),
 		]);
 		dailyLimits = daily;
 		monthlyLimits = monthly;
@@ -177,6 +178,7 @@
 		allStaff = staff.map(s => ({ ...s, staff_status: s.status }));
 		priorityRules = priority;
 		earlyShiftPreferences = early;
+		calendarRules = rules;
 	}
 
 	// ── Callback Functions for Components ──
@@ -197,7 +199,7 @@
 	}
 
 	async function handleCalendarRulesChange() {
-		calendarRules = await getCalendarRules();
+		calendarRules = await getCalendarRules(activeDepartmentId ?? undefined);
 	}
 
 	async function handleGroupsChange() {
@@ -379,6 +381,7 @@
 							<CalendarRulesTab
 								{calendarRules}
 								onRulesChange={handleCalendarRulesChange}
+								departmentId={activeDepartmentId ?? undefined}
 							/>
 
 						{:else if activeTab === 'groups'}

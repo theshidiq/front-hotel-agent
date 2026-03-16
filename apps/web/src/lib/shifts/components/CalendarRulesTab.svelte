@@ -6,9 +6,10 @@
 	interface Props {
 		calendarRules: CalendarRule[];
 		onRulesChange: () => Promise<void>;
+		departmentId?: string;
 	}
 
-	let { calendarRules, onRulesChange }: Props = $props();
+	let { calendarRules, onRulesChange, departmentId }: Props = $props();
 
 	// State
 	let loading = $state(false);
@@ -121,10 +122,10 @@
 
 		try {
 			if (!existing) {
-				await createCalendarRule({ date: dateStr, rule_type: 'must_work', reason: '' });
+				await createCalendarRule({ date: dateStr, rule_type: 'must_work', reason: '', ...(departmentId ? { department_id: departmentId } : {}) });
 			} else if (existing.rule_type === 'must_work') {
 				await deleteCalendarRule(existing.id);
-				await createCalendarRule({ date: dateStr, rule_type: 'must_day_off', reason: existing.reason || '' });
+				await createCalendarRule({ date: dateStr, rule_type: 'must_day_off', reason: existing.reason || '', ...(departmentId ? { department_id: departmentId } : {}) });
 			} else {
 				await deleteCalendarRule(existing.id);
 			}
@@ -183,7 +184,7 @@
 		loading = true;
 		feedbackMessage = null;
 		try {
-			await createCalendarRule(ruleForm);
+			await createCalendarRule({ ...ruleForm, ...(departmentId ? { department_id: departmentId } : {}) });
 			await onRulesChange();
 			showModal = false;
 			feedbackMessage = { type: 'success', text: 'カレンダールールを追加しました' };
@@ -244,7 +245,7 @@
 		loading = true;
 		feedbackMessage = null;
 		try {
-			await createCalendarRule({ date, rule_type: 'must_day_off', reason: holiday.label });
+			await createCalendarRule({ date, rule_type: 'must_day_off', reason: holiday.label, ...(departmentId ? { department_id: departmentId } : {}) });
 			await onRulesChange();
 			feedbackMessage = { type: 'success', text: `${holiday.label}を追加しました` };
 			setTimeout(() => { feedbackMessage = null; }, 3000);
