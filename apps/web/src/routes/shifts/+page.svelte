@@ -809,7 +809,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 	}
 </script>
 
-<div class="flex h-screen overflow-hidden bg-gray-100">
+<div class="flex h-screen bg-gray-100">
 	<Sidebar
 		sections={sidebarSections}
 		bind:collapsed={sidebarCollapsed}

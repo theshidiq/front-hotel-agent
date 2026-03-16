@@ -56,13 +56,16 @@
 
 <!-- Mobile overlay sidebar -->
 {#if mobileOpen}
-	<button
-		class="fixed inset-0 bg-black/50 z-40 md:hidden"
+	<div
+		class="fixed inset-0 bg-black/50 z-[9998] md:hidden"
 		onclick={closeMobile}
 		aria-label="Close sidebar"
-	></button>
+		role="button"
+		tabindex="-1"
+		onkeydown={(e) => e.key === 'Escape' && closeMobile()}
+	></div>
 	<aside
-		class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-700 flex flex-col md:hidden"
+		class="fixed inset-y-0 left-0 z-[9999] w-64 bg-slate-900 border-r border-slate-700 flex flex-col md:hidden"
 	>
 		<!-- Brand Header + Close -->
 		<div
