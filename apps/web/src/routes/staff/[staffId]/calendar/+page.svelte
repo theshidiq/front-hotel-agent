@@ -2,6 +2,7 @@
 	import { fetchStaffById, fetchPeriods, fetchStaffShifts, findCurrentPeriodIndex, calculateStats } from '$lib/calendar/api';
 	import { authState } from '$lib/auth.svelte';
 	import { getShiftColor, SHIFT_COLORS } from '$lib/calendar/shift-colors';
+	import { getHolidayName } from '$lib/calendar/japanese-holidays';
 	import type { Period, StaffInfo, Shifts, ShiftStats } from '$lib/calendar/types';
 
 	let { data } = $props();
@@ -43,7 +44,7 @@
 		const calEnd = new Date(endDate);
 		calEnd.setDate(calEnd.getDate() + (6 - calEnd.getDay()));
 
-		const weeks: { date: Date; dateStr: string; inPeriod: boolean; shift: string }[][] = [];
+		const weeks: { date: Date; dateStr: string; inPeriod: boolean; shift: string; holiday: string | null }[][] = [];
 		let currentWeek: typeof weeks[0] = [];
 		const cursor = new Date(calStart);
 
@@ -55,6 +56,7 @@
 				dateStr,
 				inPeriod,
 				shift: inPeriod ? (shifts[dateStr] ?? '') : '',
+				holiday: getHolidayName(dateStr),
 			});
 
 			if (currentWeek.length === 7) {
@@ -238,11 +240,12 @@
 						<tbody>
 							{#each calendarWeeks as week}
 								<tr>
-									{#each week as { dateStr, date, inPeriod, shift }}
+									{#each week as { dateStr, date, inPeriod, shift, holiday }}
 										{@const dayOfWeek = date.getDay()}
 										{@const color = getShiftColor(shift)}
 										{@const today = isToday(dateStr)}
 										{@const hasShift = shift !== undefined && shift !== ''}
+										{@const isHoliday = holiday !== null}
 										{#if inPeriod}
 											<td class="border border-gray-100/80 p-0 relative {hasShift ? color.bg : ''}
 												{today ? 'ring-2 ring-blue-500 ring-inset z-10' : ''}">
@@ -251,20 +254,22 @@
 													class="w-full flex flex-col items-center justify-center py-2 px-1 active:brightness-95 transition-all"
 												>
 													<span class="text-[13px] font-bold leading-none
-														{dayOfWeek === 0 ? 'text-red-600' : dayOfWeek === 6 ? 'text-blue-600' : hasShift ? color.text : 'text-gray-800'}">
+														{dayOfWeek === 0 || isHoliday ? 'text-red-600' : dayOfWeek === 6 ? 'text-blue-600' : hasShift ? color.text : 'text-gray-800'}">
 														{date.getDate()}
 													</span>
 													{#if hasShift}
 														<span class="mt-1.5 text-[9px] font-semibold leading-none {color.text}">
 															{SHIFT_COLORS[shift] ? SHIFT_COLORS[shift].label : shift.length > 3 ? shift.slice(0, 3) + '…' : shift}
 														</span>
+													{:else if isHoliday}
+														<span class="mt-1.5 text-[9px] leading-none text-red-400">祝</span>
 													{:else}
 														<span class="mt-1.5 text-[9px] leading-none text-gray-300">&nbsp;</span>
 													{/if}
 												</button>
 												{#if tappedDate === dateStr}
 													<div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2.5 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20 pointer-events-none">
-														{dateStr.slice(5)} {shift ? (SHIFT_COLORS[shift] ? SHIFT_COLORS[shift].label : shift) : '勤務'}
+														{dateStr.slice(5)}{isHoliday ? ' ' + holiday : ''} {shift ? (SHIFT_COLORS[shift] ? SHIFT_COLORS[shift].label : shift) : ''}
 														<div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
 													</div>
 												{/if}
@@ -272,7 +277,7 @@
 										{:else}
 											<td class="border border-gray-100/40 p-0 bg-gray-50">
 												<div class="flex items-center justify-center py-2 px-1">
-													<span class="text-[11px] text-gray-300 leading-none">{date.getDate()}</span>
+													<span class="text-[11px] {getHolidayName(dateStr) ? 'text-red-300' : 'text-gray-300'} leading-none">{date.getDate()}</span>
 													<span class="mt-1.5 text-[9px] leading-none">&nbsp;</span>
 												</div>
 											</td>
