@@ -9,6 +9,7 @@
     let emailInput = $state("");
     let submitted = $state(false);
     let navScrolled = $state(false);
+    let mobileMenuOpen = $state(false);
 
     // Scroll-driven story state
     const PANELS = ["hero", "shift", "allergen", "stella"] as const;
@@ -62,7 +63,7 @@
     }
 
     function handleWheel(e: WheelEvent) {
-        if (!wrapperEl) return;
+        if (!wrapperEl || window.innerWidth <= 768) return;
 
         const rect = wrapperEl.getBoundingClientRect();
         const inSection =
@@ -98,7 +99,7 @@
         const handleScroll = () => {
             navScrolled = window.scrollY > 20;
             // Don't fight with goToPanel during a gesture
-            if (!wrapperEl || gestureActive) return;
+            if (!wrapperEl || gestureActive || window.innerWidth <= 768) return;
 
             const rect = wrapperEl.getBoundingClientRect();
             const scrollableHeight =
@@ -238,7 +239,31 @@
             <button onclick={startSetup} class="btn-secondary nav-start">Get started free</button>
             <a href="#contact" class="btn-primary">Book a Demo</a>
         </div>
+
+        <!-- Mobile: hamburger + login -->
+        <div class="nav-mobile-actions">
+            <a href="/login" class="nav-login">Log in</a>
+            <button class="hamburger" onclick={() => mobileMenuOpen = !mobileMenuOpen} aria-label="Toggle menu">
+                {#if mobileMenuOpen}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                {:else}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                {/if}
+            </button>
+        </div>
     </div>
+
+    <!-- Mobile drawer -->
+    {#if mobileMenuOpen}
+        <div class="mobile-menu">
+            <a href="#features" onclick={() => mobileMenuOpen = false}>Features</a>
+            <a href="#stella" onclick={() => mobileMenuOpen = false}>Stella</a>
+            <a href="#industries" onclick={() => mobileMenuOpen = false}>Industries</a>
+            <a href="#pricing" onclick={() => mobileMenuOpen = false}>Pricing</a>
+            <a href="/signup" class="mobile-menu-cta" onclick={() => mobileMenuOpen = false}>Get started free</a>
+            <a href="#contact" class="mobile-menu-demo" onclick={() => mobileMenuOpen = false}>Book a Demo</a>
+        </div>
+    {/if}
 </nav>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -1772,5 +1797,188 @@
     }
     .navbar .logo-text {
         color: #1a2744;
+    }
+
+    /* ── Mobile nav ── */
+    .nav-mobile-actions {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+    }
+    .hamburger {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #1a2744;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .mobile-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(245, 241, 236, 0.98);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(26, 39, 68, 0.1);
+        display: flex;
+        flex-direction: column;
+        padding: 16px 24px 24px;
+        gap: 4px;
+        z-index: 100;
+    }
+    .mobile-menu a {
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 15px;
+        color: #1a2744;
+        text-decoration: none;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(26, 39, 68, 0.07);
+        transition: color 0.2s;
+    }
+    .mobile-menu a:last-child { border-bottom: none; }
+    .mobile-menu a:hover { color: #b8956a; }
+    .mobile-menu-cta {
+        margin-top: 12px;
+        background: #1a2744 !important;
+        color: #f5f1ec !important;
+        text-align: center;
+        padding: 11px 20px !important;
+        border-radius: 8px !important;
+        border-bottom: none !important;
+        font-weight: 500;
+    }
+    .mobile-menu-demo {
+        background: transparent !important;
+        border: 1.5px solid #1a2744 !important;
+        color: #1a2744 !important;
+        text-align: center;
+        padding: 11px 20px !important;
+        border-radius: 8px !important;
+        margin-top: 8px;
+        font-weight: 500;
+    }
+
+    /* ── Responsive breakpoints ── */
+    @media (max-width: 768px) {
+        .nav-links,
+        .nav-actions {
+            display: none;
+        }
+        .nav-mobile-actions {
+            display: flex;
+        }
+        .nav-inner {
+            justify-content: space-between;
+            gap: 0;
+        }
+        .navbar {
+            padding: 0 20px;
+        }
+
+        /* Disable sticky scrollytelling on mobile */
+        .story-wrapper {
+            height: auto !important;
+        }
+        .story-shell {
+            position: relative !important;
+            height: auto !important;
+        }
+        .story-track {
+            transform: none !important;
+            transition: none !important;
+        }
+        .story-grid {
+            display: block !important;
+        }
+        .story-visuals {
+            display: none !important;
+        }
+        .story-slide {
+            min-height: auto !important;
+            height: auto !important;
+            padding: 88px 20px 40px !important;
+        }
+        .story-slide:not(:first-child) {
+            padding-top: 40px !important;
+        }
+
+        /* Hero */
+        .hero-eyebrow {
+            font-size: 10px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin-bottom: 0.75rem !important;
+        }
+        .hero-headline {
+            font-size: clamp(2.4rem, 10vw, 3.2rem) !important;
+            margin-bottom: 0.2rem !important;
+        }
+        .hero-sub-headline {
+            font-size: clamp(1.4rem, 6vw, 2rem) !important;
+            margin-bottom: 1rem !important;
+        }
+        .hero-sub {
+            font-size: 15px !important;
+            line-height: 1.6 !important;
+            margin-bottom: 1.5rem !important;
+        }
+        .hero-ctas {
+            flex-direction: column !important;
+            gap: 10px !important;
+        }
+        .hero-ctas .btn-primary,
+        .hero-ctas .btn-secondary {
+            width: 100% !important;
+            text-align: center !important;
+            justify-content: center !important;
+        }
+        .scroll-cue {
+            display: none !important;
+        }
+        .slide-progress {
+            display: none !important;
+        }
+
+        /* Industries grid */
+        .industry-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+
+        /* Waitlist form */
+        .waitlist-form {
+            flex-direction: column !important;
+            gap: 10px !important;
+        }
+        .waitlist-form input,
+        .waitlist-form button {
+            width: 100% !important;
+        }
+
+        /* Footer */
+        .footer-inner {
+            flex-direction: column !important;
+            gap: 16px !important;
+            text-align: center !important;
+        }
+        .footer-links {
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .industry-grid {
+            grid-template-columns: 1fr !important;
+        }
+        .hero-trust {
+            font-size: 11px !important;
+            flex-wrap: wrap !important;
+            gap: 4px !important;
+        }
     }
 </style>

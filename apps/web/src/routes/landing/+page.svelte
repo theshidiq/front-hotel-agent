@@ -6,6 +6,7 @@
     let emailInput = $state("");
     let submitted = $state(false);
     let navScrolled = $state(false);
+    let mobileMenuOpen = $state(false);
 
     // Scroll-driven story state
     const PANELS = ["hero", "shift", "allergen", "stella"] as const;
@@ -59,7 +60,7 @@
     }
 
     function handleWheel(e: WheelEvent) {
-        if (!wrapperEl) return;
+        if (!wrapperEl || window.innerWidth <= 768) return;
 
         const rect = wrapperEl.getBoundingClientRect();
         const inSection =
@@ -94,8 +95,8 @@
     onMount(() => {
         const handleScroll = () => {
             navScrolled = window.scrollY > 20;
-            // Don't fight with goToPanel during a gesture
-            if (!wrapperEl || gestureActive) return;
+            // Don't fight with goToPanel during a gesture, and skip on mobile
+            if (!wrapperEl || gestureActive || window.innerWidth <= 768) return;
 
             const rect = wrapperEl.getBoundingClientRect();
             const scrollableHeight =
@@ -236,7 +237,32 @@
             >
             <a href="#contact" class="btn-primary">Book a Demo</a>
         </div>
+
+        <!-- Mobile: hamburger + login -->
+        <div class="nav-mobile-actions">
+            <a href="/login" class="nav-login">Log in</a>
+            <button class="hamburger" onclick={() => mobileMenuOpen = !mobileMenuOpen} aria-label="Toggle menu">
+                {#if mobileMenuOpen}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                {:else}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="16" x2="21" y2="16"/></svg>
+                {/if}
+            </button>
+        </div>
     </div>
+
+    <!-- Mobile drawer -->
+    {#if mobileMenuOpen}
+        <div class="mobile-menu">
+            <a href="#features" onclick={() => mobileMenuOpen = false}>Features</a>
+            <a href="#stella" onclick={() => mobileMenuOpen = false}>Stella</a>
+            <a href="#industries" onclick={() => mobileMenuOpen = false}>Industries</a>
+            <a href="#pricing" onclick={() => mobileMenuOpen = false}>Pricing</a>
+            <div class="mobile-menu-divider"></div>
+            <a href="/signup" class="mobile-menu-cta">Get started free</a>
+            <a href="#contact" onclick={() => mobileMenuOpen = false} class="mobile-menu-demo">Book a Demo</a>
+        </div>
+    {/if}
 </nav>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -1771,5 +1797,172 @@
     }
     .navbar .logo-text {
         color: #1a2744;
+    }
+
+    /* ── MOBILE NAV ── */
+    .nav-mobile-actions {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto;
+    }
+    .hamburger {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        color: #1a2744;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .mobile-menu {
+        position: absolute;
+        top: 68px;
+        left: 0;
+        right: 0;
+        background: rgba(245, 241, 236, 0.98);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid #c8c0b4;
+        padding: 12px 1.5rem 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        z-index: 99;
+    }
+    .mobile-menu a {
+        color: #1a2744;
+        text-decoration: none;
+        font-family: "Instrument Sans", sans-serif;
+        font-size: 15px;
+        font-weight: 500;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(200, 192, 180, 0.4);
+        transition: color 0.2s;
+    }
+    .mobile-menu a:hover { color: #b8956a; }
+    .mobile-menu-divider { height: 8px; }
+    .mobile-menu-cta {
+        margin-top: 4px;
+        background: #1a2744 !important;
+        color: #ffffff !important;
+        text-align: center;
+        padding: 12px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        font-weight: 600 !important;
+    }
+    .mobile-menu-demo {
+        background: transparent !important;
+        color: #1a2744 !important;
+        text-align: center;
+        padding: 10px !important;
+        border-bottom: none !important;
+        font-size: 14px !important;
+        color: #6b7280 !important;
+    }
+
+    /* ── RESPONSIVE BREAKPOINTS ── */
+    @media (max-width: 768px) {
+        /* Nav */
+        .nav-links { display: none; }
+        .nav-actions { display: none; }
+        .nav-mobile-actions { display: flex; }
+
+        /* Scrollytelling: disable the JS-driven sticky layout, go linear */
+        .story-wrapper {
+            height: auto;
+        }
+        .story-shell {
+            position: relative;
+            height: auto;
+            overflow: visible;
+            padding: 0 1.25rem;
+        }
+        .story-grid {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+        /* Show all slides stacked, no JS sliding */
+        .story-track {
+            height: auto;
+            transform: none !important;
+            transition: none;
+        }
+        .story-slide {
+            height: auto;
+            min-height: 0;
+            padding-top: 80px;
+            padding-bottom: 56px;
+        }
+        .story-slide:first-child {
+            padding-top: 96px;
+        }
+        /* Hide decorative right visuals on mobile */
+        .story-visuals { display: none; }
+
+        /* Hero text */
+        .hero-headline {
+            font-size: clamp(40px, 10vw, 56px);
+        }
+        .hero-sub-headline {
+            font-size: clamp(22px, 5vw, 30px);
+        }
+        .hero-sub {
+            font-size: 15px;
+        }
+        .hero-ctas {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .hero-ctas a {
+            text-align: center;
+        }
+        .scroll-cue { display: none; }
+        .slide-progress { display: none; }
+
+        /* Section headings */
+        .section-heading {
+            font-size: clamp(28px, 7vw, 38px);
+        }
+
+        /* Industries */
+        .industries { padding: 64px 1.25rem; }
+        .industry-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        /* Philosophy */
+        .philosophy-section { padding: 64px 1.25rem; }
+
+        /* Waitlist */
+        .waitlist-section { padding: 80px 1.25rem; }
+        .waitlist-form {
+            flex-direction: column;
+        }
+        .waitlist-form button {
+            width: 100%;
+        }
+
+        /* Footer */
+        .footer { padding: 24px 1.25rem; }
+        .footer-inner {
+            flex-direction: column;
+            gap: 12px;
+            text-align: center;
+        }
+        .footer-links { gap: 16px; }
+    }
+
+    @media (max-width: 480px) {
+        .industry-grid {
+            grid-template-columns: 1fr;
+        }
+        .hero-trust {
+            font-size: 11px;
+            gap: 6px;
+        }
+        .story-shell { padding: 0 1rem; }
     }
 </style>
