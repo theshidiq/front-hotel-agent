@@ -12,7 +12,9 @@
 		checkOptimizerHealth,
 		prefetchManager,
 		apiCache,
+		getShiftSymbolConfig,
 		type CellUpdate,
+		type ShiftSymbolConfig,
 	} from "$lib/shifts/api";
 	import type {
 		ScheduleStaff,
@@ -86,6 +88,7 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 	let staff: ScheduleStaff[] = $state(sessionLoad<ScheduleStaff[]>(SESSION_KEY_STAFF) ?? []);
 	let periods: SchedulePeriod[] = $state(sessionLoad<SchedulePeriod[]>(SESSION_KEY_PERIODS) ?? []);
 	let departments: OrgDepartment[] = $state([]);
+	let symbolConfig: ShiftSymbolConfig[] = $state([]);
 	let activeDepartmentId: string | null = $state(null);
 	let selectedPeriodId: string | null = $state(null);
 	let scheduleData: Record<string, Record<string, string>> = $state({});
@@ -240,23 +243,32 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 		return `${period.label} (${year})`;
 	}
 
-	// Available shift symbols for legend
-	const availableSymbols: {
-		symbol: ShiftSymbol;
-		label: string;
-		color: string;
-	}[] = [
-		{ symbol: "", label: "出勤", color: "text-gray-600" },
-		{ symbol: "○", label: "出勤", color: "text-gray-700" },
-		{ symbol: "×", label: "休み", color: "text-red-600" },
-		{ symbol: "△", label: "早番", color: "text-blue-600" },
-		{ symbol: "◇", label: "遅番", color: "text-purple-600" },
-		{ symbol: "★", label: "管理", color: "text-yellow-600" },
-		{ symbol: "●", label: "特別", color: "text-green-600" },
-		{ symbol: "◎", label: "優先", color: "text-orange-600" },
-		{ symbol: "▣", label: "予備", color: "text-gray-500" },
-		{ symbol: "⊘", label: "バックアップ", color: "text-gray-400" },
-	];
+	// Default symbol colors used when no custom config is loaded yet
+	const DEFAULT_SYMBOL_COLORS: Record<string, string> = {
+		'':  '#4b5563',
+		'○': '#374151',
+		'×': '#dc2626',
+		'△': '#2563eb',
+		'◇': '#9333ea',
+		'★': '#ca8a04',
+		'●': '#16a34a',
+		'◎': '#ea580c',
+		'▣': '#6b7280',
+		'⊘': '#9ca3af',
+	};
+
+	// Available shift symbols for legend — driven by symbolConfig when loaded
+	const availableSymbols = $derived(
+		symbolConfig.length > 0
+			? symbolConfig
+				.filter(s => s.enabled)
+				.map(s => ({ symbol: s.symbol, label: s.label, color: s.color }))
+			: Object.entries(DEFAULT_SYMBOL_COLORS).map(([symbol, color]) => ({
+				symbol,
+				label: SHIFT_LABELS[symbol as ShiftSymbol] ?? symbol,
+				color,
+			}))
+	);
 
 	// ── Lifecycle ──
 	let initialized = $state(false);
@@ -341,15 +353,17 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 			loading = !hasCachedData;
 			error = "";
 
-			const [staffResult, periodsResult, deptResult] = await Promise.all([
+			const [staffResult, periodsResult, deptResult, symConfig] = await Promise.all([
 				getShiftStaff(),
 				getShiftPeriods(),
 				getDepartments(),
+				getShiftSymbolConfig(),
 			]);
 
 			staff = staffResult;
 			periods = periodsResult;
 			departments = deptResult;
+			symbolConfig = symConfig;
 			// Default to first department if none selected
 			if (!activeDepartmentId && deptResult.length > 0) {
 				activeDepartmentId = deptResult[0].id;
@@ -1189,6 +1203,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 								{scheduleData}
 								onCellUpdate={handleCellUpdate}
 								onBulkUpdate={handleBulkUpdate}
+								{symbolConfig}
 							/>
 						{/if}
 					</div>
@@ -1202,13 +1217,12 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 							{#each availableSymbols as { symbol, label, color }}
 								<div class="flex items-center gap-2">
 									<span
-										class="w-8 h-8 flex items-center justify-center border rounded text-lg font-bold {color}"
+										class="w-8 h-8 flex items-center justify-center border rounded text-lg font-bold"
+										style="color: {color}"
 									>
 										{symbol || "-"}
 									</span>
-									<span class="text-sm text-gray-600"
-										>{label}</span
-									>
+									<span class="text-sm text-gray-600">{label}</span>
 								</div>
 							{/each}
 						</div>

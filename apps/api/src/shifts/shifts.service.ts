@@ -26,6 +26,7 @@ import {
   UpdateEarlyShiftPreferenceDto,
   BulkEarlyShiftPreferenceDto,
   UpdatePeriodConfigurationDto,
+  UpdateShiftSymbolConfigDto,
 } from './dto/settings.dto';
 
 @Injectable()
@@ -1190,6 +1191,53 @@ export class ShiftsService {
 
       return data;
     }
+  }
+
+  // ==================== SETTINGS: Shift Symbol Config ====================
+
+  private readonly DEFAULT_SHIFT_SYMBOLS = [
+    { symbol: '',  label: '出勤',       color: '#4b5563', enabled: true, isDefault: true },
+    { symbol: '○', label: '出勤',       color: '#374151', enabled: true, isDefault: true },
+    { symbol: '×', label: '休み',       color: '#dc2626', enabled: true, isDefault: true },
+    { symbol: '△', label: '早番',       color: '#2563eb', enabled: true, isDefault: true },
+    { symbol: '◇', label: '遅番',       color: '#9333ea', enabled: true, isDefault: true },
+    { symbol: '★', label: '管理',       color: '#ca8a04', enabled: true, isDefault: true },
+    { symbol: '●', label: '特別',       color: '#16a34a', enabled: true, isDefault: true },
+    { symbol: '◎', label: '優先',       color: '#ea580c', enabled: true, isDefault: true },
+    { symbol: '▣', label: '予備',       color: '#6b7280', enabled: true, isDefault: true },
+    { symbol: '⊘', label: 'バックアップ', color: '#9ca3af', enabled: true, isDefault: true },
+  ];
+
+  async getShiftSymbolConfig(organizationId: string) {
+    const { data, error } = await this.supabase
+      .from('shift_symbol_config')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      this.logger.error('Failed to fetch shift symbol config', error);
+    }
+
+    return data ?? { symbols: this.DEFAULT_SHIFT_SYMBOLS };
+  }
+
+  async updateShiftSymbolConfig(organizationId: string, dto: UpdateShiftSymbolConfigDto) {
+    const { data, error } = await this.supabase
+      .from('shift_symbol_config')
+      .upsert(
+        { organization_id: organizationId, symbols: dto.symbols, updated_at: new Date().toISOString() },
+        { onConflict: 'organization_id' },
+      )
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error('Failed to save shift symbol config', error);
+      throw new BadRequestException('Failed to save symbol config');
+    }
+
+    return data;
   }
 
   // ==================== SETTINGS: Staff Groups ====================

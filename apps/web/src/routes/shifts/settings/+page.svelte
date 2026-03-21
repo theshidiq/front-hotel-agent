@@ -39,9 +39,10 @@
 	import BackupCoverageTab from '$lib/shifts/components/BackupCoverageTab.svelte';
 	import ShiftCapabilitiesTab from '$lib/shifts/components/ShiftCapabilitiesTab.svelte';
 	import StaffUnavailabilityTab from '$lib/shifts/components/StaffUnavailabilityTab.svelte';
+	import ShiftSymbolsTab from '$lib/shifts/components/ShiftSymbolsTab.svelte';
 
 	// ── Tab Navigation ──
-	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup' | 'capabilities' | 'vacation';
+	type SettingsTab = 'limits' | 'solver' | 'calendar' | 'groups' | 'priority' | 'early' | 'periods' | 'backup' | 'capabilities' | 'vacation' | 'symbols';
 	let activeTab: SettingsTab = $state('groups');
 
 	// ── Department State ──
@@ -238,7 +239,8 @@
 		{ id: 'calendar', label: 'カレンダー', icon: 'event_note', description: '祝日・定休日の設定' },
 		{ id: 'early', label: '早番設定', icon: 'wb_sunny', description: '早番可能スタッフ' },
 		{ id: 'periods', label: '期間設定', icon: 'date_range', description: 'シフト期間の設定' },
-		{ id: 'solver', label: 'ソルバー設定', icon: 'psychology', description: '最適化エンジンの設定' }
+		{ id: 'solver', label: 'ソルバー設定', icon: 'psychology', description: '最適化エンジンの設定' },
+		{ id: 'symbols', label: 'シンボル設定', icon: 'tag', description: 'シフトシンボルの管理' }
 	] as const;
 </script>
 
@@ -376,6 +378,9 @@
 								{solverConfig}
 								onSave={handleSolverSave}
 							/>
+
+						{:else if activeTab === 'symbols'}
+							<ShiftSymbolsTab />
 
 						{:else if activeTab === 'calendar'}
 							<CalendarRulesTab

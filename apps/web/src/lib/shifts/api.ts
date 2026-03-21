@@ -772,6 +772,31 @@ export async function updateSolverConfig(data: UpdateSolverConfigData): Promise<
 	return handleResponse(response);
 }
 
+// ==================== SHIFT SYMBOL CONFIG ====================
+
+export interface ShiftSymbolConfig {
+	symbol: string;
+	label: string;
+	color: string;
+	enabled: boolean;
+	isDefault: boolean;
+}
+
+export async function getShiftSymbolConfig(): Promise<ShiftSymbolConfig[]> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/shift-symbols`, { headers: authHeaders() });
+	const data = await handleResponse<{ symbols: ShiftSymbolConfig[] } | ShiftSymbolConfig[]>(response);
+	return Array.isArray(data) ? data : data.symbols;
+}
+
+export async function updateShiftSymbolConfig(symbols: ShiftSymbolConfig[]): Promise<void> {
+	const response = await apiFetch(`${API_URL}/shifts/settings/shift-symbols`, {
+		method: 'PUT',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ symbols })
+	});
+	await handleResponse(response);
+}
+
 // ==================== STAFF GROUPS ====================
 
 export async function getStaffGroups(departmentId?: string): Promise<ScheduleStaffGroup[]> {

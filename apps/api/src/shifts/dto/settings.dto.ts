@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsObject, IsNumber, IsBoolean, IsArray, IsHexColor } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsNumber, IsBoolean, IsArray, IsHexColor, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateDailyLimitsDto {
@@ -533,4 +534,34 @@ export class BulkCreateStaffUnavailabilityDto {
   @IsOptional()
   @IsString()
   reason?: string;
+}
+
+export class ShiftSymbolConfigItemDto {
+  @ApiProperty()
+  @IsString()
+  symbol: string;
+
+  @ApiProperty()
+  @IsString()
+  label: string;
+
+  @ApiProperty()
+  @IsString()
+  color: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean;
+
+  @ApiProperty()
+  @IsBoolean()
+  isDefault: boolean;
+}
+
+export class UpdateShiftSymbolConfigDto {
+  @ApiProperty({ type: [ShiftSymbolConfigItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ShiftSymbolConfigItemDto)
+  symbols: ShiftSymbolConfigItemDto[];
 }
