@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ScheduleStaff, ShiftSymbol } from "$lib/shifts/types";
 	import { SHIFT_SYMBOLS, SHIFT_LABELS } from "$lib/shifts/types";
+	import type { ShiftSymbolConfig } from "$lib/shifts/api";
 	import {
 		createSelectionStore,
 		setSelectionContext,
@@ -22,6 +23,7 @@
 		) => void;
 		onStaffEdit?: (staff: ScheduleStaff) => void;
 		onStaffDelete?: (staff: ScheduleStaff) => void;
+		symbolConfig?: ShiftSymbolConfig[];
 		}
 
 	let {
@@ -32,7 +34,13 @@
 		onBulkUpdate,
 		onStaffEdit,
 		onStaffDelete,
+		symbolConfig = [],
 	}: Props = $props();
+
+	// Build a lookup map from symbol → hex color for dynamic overrides
+	let symbolColorMap = $derived(
+		Object.fromEntries(symbolConfig.filter(s => s.enabled).map(s => [s.symbol, s.color]))
+	);
 
 	// Derived: Ordered staff members (社員 > 派遣 > パート, sorted by start date, 中田 at end)
 	// This applies the same ordering logic as React's staffUtils.js
@@ -157,8 +165,16 @@
 		return scheduleData[staffId]?.[date] || "";
 	}
 
+	// Returns inline style string if the symbol has a custom hex color configured, otherwise ''
+	function getSymbolStyle(value: string): string {
+		const hex = symbolColorMap[value];
+		return hex ? `color: ${hex};` : '';
+	}
+
 	// Get symbol color class - matches React getSymbolColor
 	function getSymbolColor(value: string, staffStatus?: string): string {
+		// If there's a custom hex color, skip Tailwind class (inline style will be used instead)
+		if (symbolColorMap[value]) return '';
 		// For パート staff, if value is empty, default to unavailable color
 		if (staffStatus === "パート" && (!value || value === "")) {
 			return shiftSymbols.unavailable.color;
@@ -825,7 +841,7 @@
 													cellValue,
 													s.status,
 												)}"
-												style="display:inline-block"
+												style="display:inline-block; {getSymbolStyle(cellValue)}"
 											>
 												<polygon
 													points="11,2 21,18 1,18"
@@ -841,9 +857,7 @@
 													cellValue,
 													s.status,
 												)}"
-												style={cellValue === "×"
-													? "font-size: 2rem; line-height: 2rem;"
-													: ""}
+												style="{cellValue === '×' ? 'font-size: 2rem; line-height: 2rem;' : ''} {getSymbolStyle(cellValue)}"
 											>
 												{getCellDisplayValue(
 													cellValue,

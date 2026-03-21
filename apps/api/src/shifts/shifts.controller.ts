@@ -59,6 +59,7 @@ import {
   UpdateBackupAssignmentDto,
   CreateStaffUnavailabilityDto,
   BulkCreateStaffUnavailabilityDto,
+  UpdateShiftSymbolConfigDto,
 } from './dto/settings.dto';
 
 @ApiTags('shifts')
@@ -327,6 +328,21 @@ export class ShiftsController {
   @ApiResponse({ status: 200, description: 'Solver configuration updated' })
   async updateSolverConfig(@GetUser() user: any, @Body() updateDto: UpdateSolverConfigDto) {
     return this.shiftsService.updateSolverConfig(user.organization_id, updateDto);
+  }
+
+  // Shift Symbol Config
+  @Get('settings/shift-symbols')
+  @ApiOperation({ summary: 'Get shift symbol configuration for the organisation' })
+  @ApiResponse({ status: 200, description: 'Shift symbol config' })
+  async getShiftSymbols(@GetUser() user: any) {
+    return this.shiftsService.getShiftSymbolConfig(user.organization_id);
+  }
+
+  @Put('settings/shift-symbols')
+  @ApiOperation({ summary: 'Update shift symbol configuration for the organisation' })
+  @ApiResponse({ status: 200, description: 'Shift symbol config updated' })
+  async updateShiftSymbols(@GetUser() user: any, @Body() dto: UpdateShiftSymbolConfigDto) {
+    return this.shiftsService.updateShiftSymbolConfig(user.organization_id, dto);
   }
 
   // Staff Groups
