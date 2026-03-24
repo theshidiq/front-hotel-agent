@@ -308,6 +308,15 @@
                                     : "厨房生産管理"}</a
                             >
                         </li>
+                        <li>
+                            <a
+                                href="/docs/shifts"
+                                class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors"
+                                >{$lang === "en"
+                                    ? "Shift Management"
+                                    : "シフト管理"}</a
+                            >
+                        </li>
                     </ul>
                 </div>
                 <div>
