@@ -3,6 +3,7 @@
 	import MenuPreviewPanel from './flow/MenuPreviewPanel.svelte';
 	import MenuFormSidebar from './flow/MenuFormSidebar.svelte';
 	import CourseDetailSidebar from './flow/CourseDetailSidebar.svelte';
+	import MenuScanModal from './MenuScanModal.svelte';
 
 	interface Props {
 		seasonalMenus: SeasonalMenu[];
@@ -57,6 +58,8 @@
 	}: Props = $props();
 
 	// --- State ---
+
+	let showScanModal = $state(false);
 
 	// Accordion: which seasons are expanded (all expanded by default)
 	let expandedSeasons: Set<string> = $state(new Set(seasonalMenus.map(s => s.id)));
@@ -864,6 +867,18 @@
 				{/if}
 			</div>
 			<button
+				onclick={() => { showScanModal = true; }}
+				class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+				title="Scan handwritten menu"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+						d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+				</svg>
+				Scan Menu
+			</button>
+			<button
 				onclick={onSwitchToTree}
 				class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
 				title="Switch to tree view"
@@ -1103,6 +1118,14 @@
 		{products}
 		onSubmit={handleCreateMenuFromSidebar}
 		onClose={() => { sidebarContext = null; }}
+	/>
+{/if}
+
+{#if showScanModal}
+	<MenuScanModal
+		menuGroups={menuGroups}
+		onConfirmed={() => { showScanModal = false; }}
+		onClose={() => { showScanModal = false; }}
 	/>
 {/if}
 
