@@ -1041,7 +1041,7 @@ export interface StaffMember {
 
 export interface CreateStaffData {
 	name: string;
-	email: string;
+	email?: string;
 	position?: string;
 	department_id?: string | null;
 	position_id?: string | null;
@@ -1430,4 +1430,102 @@ export async function removeProductAlternate(productId: string, alternateProduct
 		const error = await response.json();
 		throw new Error(error.message || 'Failed to remove product alternate');
 	}
+}
+
+// ── Menu Scan (handwritten menu OCR) ──────────────────────────────────────────
+
+export interface ScannedMenuCourse {
+	name: string;
+	reading: string | null;
+	description: string | null;
+	category: string;
+	sort_order: number;
+}
+
+export interface MenuScanExtractResult {
+	courses: ScannedMenuCourse[];
+	menu_title: string | null;
+	image_url: string;
+	session_id?: string;
+}
+
+export interface MenuScanDraft {
+	session_id: string;
+	menu_group_id: string;
+	menu_title: string | null;
+	courses: ScannedMenuCourse[];
+	image_url: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export async function menuScanExtract(file: File, menuGroupId: string, signal?: AbortSignal): Promise<MenuScanExtractResult> {
+	const formData = new FormData();
+	formData.append('file', file);
+	formData.append('menu_group_id', menuGroupId);
+	const response = await apiFetch(`${API_URL}/menu-scan/extract`, {
+		method: 'POST',
+		headers: authHeaders(),
+		body: formData,
+		signal,
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Menu scan extraction failed');
+	}
+	return response.json();
+}
+
+export async function menuScanGetDrafts(): Promise<MenuScanDraft[]> {
+	const response = await apiFetch(`${API_URL}/menu-scan/drafts`, {
+		headers: authHeaders(),
+	});
+	if (!response.ok) return [];
+	return response.json();
+}
+
+export async function menuScanSaveDraft(data: {
+	menu_group_id: string;
+	menu_title?: string | null;
+	courses: ScannedMenuCourse[];
+	image_url?: string;
+	session_id?: string | null;
+}): Promise<{ session_id: string }> {
+	const response = await apiFetch(`${API_URL}/menu-scan/drafts`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to save draft');
+	}
+	return response.json();
+}
+
+export async function menuScanDeleteDraft(sessionId: string): Promise<void> {
+	await apiFetch(`${API_URL}/menu-scan/drafts/${sessionId}`, {
+		method: 'DELETE',
+		headers: authHeaders(),
+	});
+}
+
+export interface MenuScanConfirmData {
+	courses: { name: string; description?: string | null; category?: string | null }[];
+	menu_group_id: string;
+	seasonal_menu_id?: string | null;
+	draft_session_id?: string | null;
+}
+
+export async function menuScanConfirm(data: MenuScanConfirmData): Promise<Menu[]> {
+	const response = await apiFetch(`${API_URL}/menu-scan/confirm`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Menu scan confirm failed');
+	}
+	return response.json();
 }

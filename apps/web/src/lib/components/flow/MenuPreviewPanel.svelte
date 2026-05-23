@@ -39,6 +39,7 @@
 		onLinkKidsGroup?: (kidsGroupId: string | null) => void;
 		onDeleteMenu?: (menuId: string) => void;
 		onClose: () => void;
+		onMenusCreated?: () => void;
 	}
 
 	let {
@@ -57,6 +58,7 @@
 		onLinkKidsGroup,
 		onDeleteMenu,
 		onClose,
+		onMenusCreated,
 	}: Props = $props();
 
 	// --- Japanese era + season auto-detection ---
