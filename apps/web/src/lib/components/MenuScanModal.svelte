@@ -30,6 +30,15 @@
 	let abortController: AbortController | null = $state(null);
 	let fileInput: HTMLInputElement = $state() as HTMLInputElement;
 	let dragOver = $state(false);
+	let editingDescIdx: number | null = $state(null);  // which course's description is being edited
+	let editingNameIdx: number | null = $state(null);  // which course's name is being edited
+
+	// Kids menu callout box (overlay on the お品書き paper)
+	let kidsName: string = $state('子供 CK70');
+	let kidsItems: string[] = $state(['造里', '本日の肉料理', '香物', '香物']);
+	let showKidsBox: boolean = $state(true);
+	let editingKidsName = $state(false);
+	let editingKidsItemIdx: number | null = $state(null);
 	let drafts: MenuScanDraft[] = $state([]);
 	let loadingDrafts = $state(true);
 	let savingDraft = $state(false);
@@ -99,6 +108,69 @@
 		dragOver = false;
 		const file = e.dataTransfer?.files?.[0];
 		if (file && file.type.startsWith('image/')) handleFileSelect(file);
+	}
+
+	// Auto-focus for plain <input> elements
+	function autoFocusInput(node: HTMLInputElement) {
+		node.focus();
+		node.select();
+	}
+
+	// Auto-focus action — places caret at end when switching to edit mode
+	function autoFocusContentEditable(node: HTMLElement) {
+		node.focus();
+		const range = document.createRange();
+		range.selectNodeContents(node);
+		range.collapse(false);
+		const sel = window.getSelection();
+		sel?.removeAllRanges();
+		sel?.addRange(range);
+	}
+
+	// Split long course names (> 3 chars) into 2 balanced vertical lines.
+	// Returns [firstHalf, secondHalf]. Caller renders firstHalf on the RIGHT,
+	// secondHalf on the LEFT (Japanese reading order — top-to-bottom, right-to-left).
+	// Names ≤ 3 chars are returned as a single-element array.
+	function splitCourseName(name: string): string[] {
+		if (!name) return [''];
+		if (name.length <= 3) return [name];
+		const mid = Math.ceil(name.length / 2);
+		return [name.slice(0, mid), name.slice(mid)];
+	}
+
+	// Split description into individual dish items (by ・、,，or newline)
+	function splitItems(description: string | null | undefined): string[] {
+		if (!description) return [];
+		return description.trim().split(/[・、,，\n]+/).map(s => s.trim()).filter(Boolean);
+	}
+
+	// Group items into balanced sub-columns based on total character length.
+	// `targetPerCol` defaults to 14 chars per visual column. For columns sitting
+	// next to the kids box overlay, pass a smaller value (e.g. 8) so the text
+	// stays shorter vertically and wraps into more sub-columns horizontally.
+	function balanceByLength(items: string[], targetPerCol = 14): string[][] {
+		if (items.length === 0) return [];
+		if (items.length <= 3 && targetPerCol >= 10) return [items];
+
+		const totalChars = items.reduce((s, i) => s + i.length, 0);
+		const numCols = Math.max(1, Math.ceil(totalChars / targetPerCol));
+		const targetActual = totalChars / numCols;
+
+		const groups: string[][] = [];
+		let current: string[] = [];
+		let currentLen = 0;
+
+		for (const item of items) {
+			current.push(item);
+			currentLen += item.length + 1;
+			if (currentLen >= targetActual && groups.length < numCols - 1) {
+				groups.push(current);
+				current = [];
+				currentLen = 0;
+			}
+		}
+		if (current.length > 0) groups.push(current);
+		return groups;
 	}
 
 	async function startScan() {
@@ -447,19 +519,25 @@
 			<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative">
 				<div class="flex-1 flex overflow-hidden" dir="rtl">
 
-					<!-- Title column (far right) — readonly preview -->
+					<!-- Title column (far right) — centered, larger font -->
 					<div class="flex-none flex flex-col border-l border-stone-200 paper-title-col" dir="ltr">
-						<div class="flex-1 flex items-start justify-center pt-4 pb-3 px-1">
-							<div class="tategaki font-serif-jp text-lg font-light text-stone-800 leading-loose h-fit mt-1">
+						<div class="flex-1 flex items-center justify-center px-1">
+							<div class="tategaki font-serif-jp text-3xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center">
 								{menuTitle || selectedGroupName}
 							</div>
 						</div>
 					</div>
 
-					<!-- Course columns — right to left -->
+					<!-- Course columns — right to left, evenly distributed. -->
 					{#each courses as course, idx}
+					{@const isUnderKidsBox = showKidsBox && (idx === 0 || idx === 1)}
+					{@const items = splitItems(course.description)}
+					{@const groups = balanceByLength(items, 14)}
+					{@const nameLines = splitCourseName(course.name)}
+					{@const isEditing = editingDescIdx === idx}
+					{@const isEditingName = editingNameIdx === idx}
 					<div
-						class="flex-none border-l border-stone-200 flex flex-col relative group course-col"
+						class="flex-1 min-w-0 border-l border-stone-200 flex flex-col relative group course-col"
 						dir="ltr"
 					>
 						<!-- Delete button -->
@@ -474,17 +552,40 @@
 							</svg>
 						</button>
 
-						<!-- Course header (vertical text, top) -->
-						<div class="px-2 pt-5 pb-1 flex flex-col items-center flex-shrink-0 course-header-box">
-							<div
-								class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none text-center hover:bg-stone-50/60 focus:bg-orange-50/40 rounded transition-colors px-1 min-h-[3em] tracking-[0.15em]"
-								contenteditable="plaintext-only"
-								spellcheck="false"
-								onblur={(e) => updateCourse(idx, 'name', (e.target as HTMLElement).innerText)}
-								role="textbox"
-								tabindex="0"
-								aria-label="コース名"
-							>{course.name}</div>
+						<!-- Course header — long names pre-split into 2 vertical lines (right-to-left)
+						     so the 一 separator stays at the same height across all columns.
+						     Click → flat edit mode; blur → saves & re-splits. -->
+						<div class="pt-5 pb-1 flex items-start justify-center flex-shrink-0 course-header-box">
+							{#if isEditingName}
+								<div
+									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center"
+									contenteditable="plaintext-only"
+									spellcheck="false"
+									use:autoFocusContentEditable
+									onblur={(e) => {
+										updateCourse(idx, 'name', (e.target as HTMLElement).innerText);
+										editingNameIdx = null;
+									}}
+									role="textbox"
+									tabindex="0"
+									aria-label="コース名"
+								>{course.name}</div>
+							{:else}
+								<div
+									class="flex flex-row-reverse gap-1 cursor-text hover:bg-stone-50/60 rounded transition-colors px-1"
+									onclick={() => { editingNameIdx = idx; }}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => { if (e.key === 'Enter') editingNameIdx = idx; }}
+									aria-label="コース名を編集"
+								>
+									{#each nameLines as line}
+										<div class="tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">
+											{line}
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
 
 						<!-- 一 dash separator -->
@@ -492,18 +593,52 @@
 							<span class="font-serif-jp text-lg text-stone-800">一</span>
 						</div>
 
-						<!-- Dish details (vertical text, flows right→left into sub-columns when overflowing) -->
-						<div class="flex-1 px-2 pt-2 pb-4 overflow-hidden flex justify-end">
-							<div
-								class="dish-details tategaki font-serif-jp text-lg leading-loose text-stone-700 outline-none hover:bg-stone-50/60 focus:bg-orange-50/40 rounded transition-colors px-1 h-full"
-								contenteditable="plaintext-only"
-								spellcheck="false"
-								data-placeholder="料理詳細..."
-								onblur={(e) => updateCourse(idx, 'description', (e.target as HTMLElement).innerText)}
-								role="textbox"
-								tabindex="0"
-								aria-label="料理の詳細"
-							>{course.description ?? ''}</div>
+						<!-- Dish details: pre-balanced groups, each rendered as its own vertical column.
+						     Columns next to the kids box get extra bottom padding so dishes stop above it. -->
+						<div
+							class="flex-1 px-2 pt-3 overflow-hidden flex {groups.length <= 1 ? 'justify-center' : 'justify-center gap-2'} items-start"
+							style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
+						>
+							{#if isEditing}
+								<div
+									class="dish-details tategaki font-serif-jp text-lg leading-loose text-stone-700 outline-none bg-orange-50/40 rounded px-2 py-1 h-full"
+									contenteditable="plaintext-only"
+									spellcheck="false"
+									data-placeholder="料理詳細..."
+									use:autoFocusContentEditable
+									onblur={(e) => {
+										updateCourse(idx, 'description', (e.target as HTMLElement).innerText);
+										editingDescIdx = null;
+									}}
+									role="textbox"
+									tabindex="0"
+									aria-label="料理の詳細"
+								>{course.description ?? ''}</div>
+							{:else if items.length === 0}
+								<div
+									class="tategaki font-serif-jp text-base text-stone-300 cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
+									onclick={() => { editingDescIdx = idx; }}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => { if (e.key === 'Enter') editingDescIdx = idx; }}
+									aria-label="料理詳細を編集"
+								>料理詳細...</div>
+							{:else}
+								<div
+									class="flex flex-row-reverse items-start gap-2 cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
+									onclick={() => { editingDescIdx = idx; }}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => { if (e.key === 'Enter') editingDescIdx = idx; }}
+									aria-label="料理詳細を編集"
+								>
+									{#each groups as group}
+										<div class="dish-display tategaki font-serif-jp text-lg text-stone-700 h-fit">
+											{group.join('　')}
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
 					</div>
 					{/each}
@@ -518,6 +653,101 @@
 					{/if}
 
 				</div>
+
+				<!-- Kids menu callout box — anchored bottom-right, between 食前酒 and 前菜 -->
+				{#if showKidsBox}
+				<div class="kids-box absolute bottom-4 right-[15%] border-2 border-dashed border-stone-400 bg-white px-4 py-3 flex flex-col gap-1.5 group/kids shadow-sm w-[180px]" dir="ltr">
+					<!-- Remove button (only on hover) -->
+					<button
+						onclick={() => { showKidsBox = false; }}
+						class="absolute top-1 right-1 opacity-0 group-hover/kids:opacity-100 transition-opacity text-stone-400 hover:text-red-500 p-0.5"
+						aria-label="子供メニューを削除"
+					>
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+
+					<!-- Kids menu header -->
+					{#if editingKidsName}
+						<input
+							type="text"
+							bind:value={kidsName}
+							onblur={() => { editingKidsName = false; }}
+							onkeydown={(e) => { if (e.key === 'Enter') editingKidsName = false; }}
+							use:autoFocusInput
+							class="font-serif-jp text-lg font-medium text-stone-800 bg-white outline-none border border-stone-300 rounded px-1.5 py-0.5 tracking-wider"
+						/>
+					{:else}
+						<button
+							onclick={() => { editingKidsName = true; }}
+							class="font-serif-jp text-lg font-medium text-stone-800 tracking-wider text-left hover:bg-stone-50 rounded px-1.5 py-0.5 transition-colors"
+						>
+							{kidsName}
+						</button>
+					{/if}
+
+					<!-- Divider -->
+					<div class="w-full border-t border-dashed border-stone-300"></div>
+
+					<!-- Items -->
+					<div class="flex flex-col gap-1">
+						{#each kidsItems as item, kidsIdx}
+							{#if editingKidsItemIdx === kidsIdx}
+								<input
+									type="text"
+									bind:value={kidsItems[kidsIdx]}
+									onblur={() => { editingKidsItemIdx = null; }}
+									onkeydown={(e) => { if (e.key === 'Enter') editingKidsItemIdx = null; }}
+									use:autoFocusInput
+									class="font-serif-jp text-base text-stone-700 bg-white outline-none border border-stone-300 rounded px-1.5 py-0.5"
+								/>
+							{:else}
+								<div class="group/item flex items-center gap-2">
+									<span class="text-stone-500 text-sm">・</span>
+									<button
+										onclick={() => { editingKidsItemIdx = kidsIdx; }}
+										class="font-serif-jp text-base text-stone-700 hover:bg-stone-50 rounded px-1.5 py-0.5 transition-colors flex-1 text-left tracking-wide"
+									>
+										{item}
+									</button>
+									<button
+										onclick={() => { kidsItems = kidsItems.filter((_, i) => i !== kidsIdx); }}
+										class="opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-300 hover:text-red-500 p-0.5"
+										aria-label="項目を削除"
+									>
+										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</div>
+							{/if}
+						{/each}
+
+						<!-- Add item button -->
+						<button
+							onclick={() => { kidsItems = [...kidsItems, '']; editingKidsItemIdx = kidsItems.length; }}
+							class="flex items-center gap-1 text-xs text-stone-500 hover:text-stone-700 mt-1.5 transition-colors"
+						>
+							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+							</svg>
+							追加
+						</button>
+					</div>
+				</div>
+				{:else}
+				<!-- Show "Add kids menu" button when hidden -->
+				<button
+					onclick={() => { showKidsBox = true; }}
+					class="absolute bottom-6 right-[14%] flex items-center gap-1 px-2 py-1 border border-dashed border-stone-300 text-[10px] text-stone-400 hover:text-stone-600 hover:border-stone-400 transition-colors"
+				>
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+					</svg>
+					子供メニュー
+				</button>
+				{/if}
 			</div>
 		</div>
 
@@ -565,29 +795,34 @@
 	}
 
 	.paper-title-col {
-		width: clamp(60px, 7%, 120px);
+		width: clamp(70px, 8%, 120px);
 	}
 
+	/* Fixed header zone — fits 3 vertical kanji.
+	   Names with 4+ chars are pre-split into 2 vertical lines side-by-side. */
 	.course-header-box {
-		min-height: 5.5em;
-		justify-content: center;
+		height: 6em;
 	}
 
-	/* Each course column is wide enough to allow multiple vertical sub-lines */
+	/* Course columns share the paper width evenly via flex-1.
+	   Min width ensures readability when there are many courses. */
 	.course-col {
-		width: clamp(80px, 9%, 130px);
+		min-width: 60px;
 	}
 
-	/* Dish details:
-	   writing-mode: vertical-rl means text reads top-to-bottom.
-	   When the text exceeds container height, it naturally wraps into a new
-	   line to the LEFT — exactly like Japanese kaiseki menu paper.
-	   We just need to ensure the container has a constrained height
-	   and the text can expand horizontally inside the column. */
+	/* Dish details — editing mode (single contenteditable line) */
 	.dish-details {
 		max-height: 100%;
 		max-width: 100%;
 		word-break: break-all;
+	}
+
+	/* Dish details — display mode. Each sub-column flows naturally; groups
+	   are pre-calculated in JS for balanced length. */
+	.dish-display {
+		max-height: 100%;
+		word-break: keep-all;
+		line-height: 1.9;
 	}
 
 	/* Placeholder for empty contenteditable */
