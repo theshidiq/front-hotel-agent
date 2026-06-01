@@ -32,6 +32,13 @@
 	let dragOver = $state(false);
 	let editingDescIdx: number | null = $state(null);  // which course's description is being edited
 	let editingNameIdx: number | null = $state(null);  // which course's name is being edited
+
+	// Kids menu callout box (overlay on the お品書き paper)
+	let kidsName: string = $state('子供 CK70');
+	let kidsItems: string[] = $state(['造里', '本日の肉料理', '香物', '香物']);
+	let showKidsBox: boolean = $state(true);
+	let editingKidsName = $state(false);
+	let editingKidsItemIdx: number | null = $state(null);
 	let drafts: MenuScanDraft[] = $state([]);
 	let loadingDrafts = $state(true);
 	let savingDraft = $state(false);
@@ -103,6 +110,12 @@
 		if (file && file.type.startsWith('image/')) handleFileSelect(file);
 	}
 
+	// Auto-focus for plain <input> elements
+	function autoFocusInput(node: HTMLInputElement) {
+		node.focus();
+		node.select();
+	}
+
 	// Auto-focus action — places caret at end when switching to edit mode
 	function autoFocusContentEditable(node: HTMLElement) {
 		node.focus();
@@ -132,16 +145,16 @@
 	}
 
 	// Group items into balanced sub-columns based on total character length.
-	// Each sub-column targets ~10-14 characters worth of content so visually
-	// the columns end at roughly the same height.
-	function balanceByLength(items: string[]): string[][] {
+	// `targetPerCol` defaults to 14 chars per visual column. For columns sitting
+	// next to the kids box overlay, pass a smaller value (e.g. 8) so the text
+	// stays shorter vertically and wraps into more sub-columns horizontally.
+	function balanceByLength(items: string[], targetPerCol = 14): string[][] {
 		if (items.length === 0) return [];
-		if (items.length <= 3) return [items];
+		if (items.length <= 3 && targetPerCol >= 10) return [items];
 
 		const totalChars = items.reduce((s, i) => s + i.length, 0);
-		const TARGET_PER_COL = 14;  // characters per visual column
-		const numCols = Math.max(1, Math.ceil(totalChars / TARGET_PER_COL));
-		const targetPerCol = totalChars / numCols;
+		const numCols = Math.max(1, Math.ceil(totalChars / targetPerCol));
+		const targetActual = totalChars / numCols;
 
 		const groups: string[][] = [];
 		let current: string[] = [];
@@ -149,8 +162,8 @@
 
 		for (const item of items) {
 			current.push(item);
-			currentLen += item.length + 1;  // +1 for separator
-			if (currentLen >= targetPerCol && groups.length < numCols - 1) {
+			currentLen += item.length + 1;
+			if (currentLen >= targetActual && groups.length < numCols - 1) {
 				groups.push(current);
 				current = [];
 				currentLen = 0;
@@ -515,10 +528,11 @@
 						</div>
 					</div>
 
-					<!-- Course columns — right to left, evenly distributed -->
+					<!-- Course columns — right to left, evenly distributed. -->
 					{#each courses as course, idx}
+					{@const isUnderKidsBox = showKidsBox && (idx === 0 || idx === 1)}
 					{@const items = splitItems(course.description)}
-					{@const groups = balanceByLength(items)}
+					{@const groups = balanceByLength(items, 14)}
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditing = editingDescIdx === idx}
 					{@const isEditingName = editingNameIdx === idx}
@@ -580,8 +594,11 @@
 						</div>
 
 						<!-- Dish details: pre-balanced groups, each rendered as its own vertical column.
-						     Click → flat edit mode; blur → saves & re-balances. -->
-						<div class="flex-1 px-2 pt-3 pb-4 overflow-hidden flex {groups.length <= 1 ? 'justify-center' : 'justify-center gap-2'} items-start">
+						     Columns next to the kids box get extra bottom padding so dishes stop above it. -->
+						<div
+							class="flex-1 px-2 pt-3 overflow-hidden flex {groups.length <= 1 ? 'justify-center' : 'justify-center gap-2'} items-start"
+							style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
+						>
 							{#if isEditing}
 								<div
 									class="dish-details tategaki font-serif-jp text-lg leading-loose text-stone-700 outline-none bg-orange-50/40 rounded px-2 py-1 h-full"
@@ -636,6 +653,101 @@
 					{/if}
 
 				</div>
+
+				<!-- Kids menu callout box — anchored bottom-right, between 食前酒 and 前菜 -->
+				{#if showKidsBox}
+				<div class="kids-box absolute bottom-4 right-[15%] border-2 border-dashed border-stone-400 bg-white px-4 py-3 flex flex-col gap-1.5 group/kids shadow-sm w-[180px]" dir="ltr">
+					<!-- Remove button (only on hover) -->
+					<button
+						onclick={() => { showKidsBox = false; }}
+						class="absolute top-1 right-1 opacity-0 group-hover/kids:opacity-100 transition-opacity text-stone-400 hover:text-red-500 p-0.5"
+						aria-label="子供メニューを削除"
+					>
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+
+					<!-- Kids menu header -->
+					{#if editingKidsName}
+						<input
+							type="text"
+							bind:value={kidsName}
+							onblur={() => { editingKidsName = false; }}
+							onkeydown={(e) => { if (e.key === 'Enter') editingKidsName = false; }}
+							use:autoFocusInput
+							class="font-serif-jp text-lg font-medium text-stone-800 bg-white outline-none border border-stone-300 rounded px-1.5 py-0.5 tracking-wider"
+						/>
+					{:else}
+						<button
+							onclick={() => { editingKidsName = true; }}
+							class="font-serif-jp text-lg font-medium text-stone-800 tracking-wider text-left hover:bg-stone-50 rounded px-1.5 py-0.5 transition-colors"
+						>
+							{kidsName}
+						</button>
+					{/if}
+
+					<!-- Divider -->
+					<div class="w-full border-t border-dashed border-stone-300"></div>
+
+					<!-- Items -->
+					<div class="flex flex-col gap-1">
+						{#each kidsItems as item, kidsIdx}
+							{#if editingKidsItemIdx === kidsIdx}
+								<input
+									type="text"
+									bind:value={kidsItems[kidsIdx]}
+									onblur={() => { editingKidsItemIdx = null; }}
+									onkeydown={(e) => { if (e.key === 'Enter') editingKidsItemIdx = null; }}
+									use:autoFocusInput
+									class="font-serif-jp text-base text-stone-700 bg-white outline-none border border-stone-300 rounded px-1.5 py-0.5"
+								/>
+							{:else}
+								<div class="group/item flex items-center gap-2">
+									<span class="text-stone-500 text-sm">・</span>
+									<button
+										onclick={() => { editingKidsItemIdx = kidsIdx; }}
+										class="font-serif-jp text-base text-stone-700 hover:bg-stone-50 rounded px-1.5 py-0.5 transition-colors flex-1 text-left tracking-wide"
+									>
+										{item}
+									</button>
+									<button
+										onclick={() => { kidsItems = kidsItems.filter((_, i) => i !== kidsIdx); }}
+										class="opacity-0 group-hover/item:opacity-100 transition-opacity text-stone-300 hover:text-red-500 p-0.5"
+										aria-label="項目を削除"
+									>
+										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</div>
+							{/if}
+						{/each}
+
+						<!-- Add item button -->
+						<button
+							onclick={() => { kidsItems = [...kidsItems, '']; editingKidsItemIdx = kidsItems.length; }}
+							class="flex items-center gap-1 text-xs text-stone-500 hover:text-stone-700 mt-1.5 transition-colors"
+						>
+							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+							</svg>
+							追加
+						</button>
+					</div>
+				</div>
+				{:else}
+				<!-- Show "Add kids menu" button when hidden -->
+				<button
+					onclick={() => { showKidsBox = true; }}
+					class="absolute bottom-6 right-[14%] flex items-center gap-1 px-2 py-1 border border-dashed border-stone-300 text-[10px] text-stone-400 hover:text-stone-600 hover:border-stone-400 transition-colors"
+				>
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+					</svg>
+					子供メニュー
+				</button>
+				{/if}
 			</div>
 		</div>
 
