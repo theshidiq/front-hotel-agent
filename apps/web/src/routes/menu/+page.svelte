@@ -415,6 +415,8 @@
 		}
 		if (canViewMenus) {
 			foodItems.push({ icon: 'restaurant_menu', label: 'メニュー管理', badge: menus.length, active: mainTab === 'menu', onclick: () => mainTab = 'menu' });
+			foodItems.push({ icon: 'account_tree', label: 'メニュー構成', active: showMenuTreeConfig && !openScanOnMount, onclick: () => openMenuStructure(false) });
+			foodItems.push({ icon: 'document_scanner', label: 'メニュースキャン', active: showMenuTreeConfig && openScanOnMount, onclick: () => openMenuStructure(true) });
 		}
 		const sections: { label: string; items: any[] }[] = [];
 		if (canAccessFrontDesk) {
@@ -472,6 +474,13 @@
 	// Menu Tree Config overlay
 	let showMenuTreeConfig = $state(false);
 	let menuStructureView: 'panel' | 'tree' = $state('panel');
+	let openScanOnMount = $state(false);  // when true, auto-open the scan modal after opening Menu Structure
+
+	function openMenuStructure(withScan = false) {
+		openScanOnMount = withScan;
+		showMenuTreeConfig = true;
+		loadTreeConfig();
+	}
 
 	// Seasonal Menus
 	let seasonalMenus: SeasonalMenu[] = $state([]);
@@ -2620,7 +2629,8 @@ ${coursesHtml}
 			onUpdateMenu={treeUpdateMenu}
 			onDeleteMenu={treeDeleteMenu}
 			onSwitchToTree={() => { menuStructureView = 'tree'; loadTreeConfig(); }}
-			onClose={() => showMenuTreeConfig = false}
+			onClose={() => { showMenuTreeConfig = false; openScanOnMount = false; }}
+			autoOpenScan={openScanOnMount}
 		/>
 	{:else if showMenuTreeConfig && menuStructureView === 'tree'}
 		{#if MenuTreeConfig}

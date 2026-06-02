@@ -326,6 +326,20 @@
 	<!-- ── Header ── -->
 	<header class="border-b border-stone-200 px-6 py-3 flex justify-between items-center bg-white flex-shrink-0 print:hidden">
 		<div class="flex items-center gap-5">
+			{#if step === 'review'}
+			<button
+				onclick={() => { step = 'upload'; }}
+				class="flex items-center gap-1.5 px-2 py-1.5 text-stone-500 hover:text-stone-800 hover:bg-stone-50 transition-colors rounded print:hidden"
+				title="戻る"
+				aria-label="戻る"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+				</svg>
+				<span class="text-[10px] tracking-[0.12em] uppercase font-medium">戻る</span>
+			</button>
+			<div class="h-6 w-px bg-stone-200"></div>
+			{/if}
 			<div class="flex items-center gap-2">
 				<div class="w-1 h-5 bg-accent"></div>
 				<h1 class="font-serif-jp text-lg tracking-[0.15em]">手書きメニュースキャン</h1>
@@ -821,25 +835,13 @@
 		</div>
 
 		<!-- Bottom bar -->
-		<div class="flex-shrink-0 border-t border-stone-200 bg-white px-6 py-3 flex justify-between items-center print:hidden">
-			<button
-				onclick={() => { step = 'upload'; }}
-				disabled={step === 'saving'}
-				class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] tracking-widest uppercase border border-stone-200 hover:bg-stone-50 transition-colors text-stone-500 disabled:opacity-40"
-			>
-				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-				</svg>
-				戻る
-			</button>
-
-			{#if step === 'saving'}
-			<div class="flex items-center gap-2 text-stone-500 text-xs">
-				<div class="w-3.5 h-3.5 border border-t-stone-600 rounded-full animate-spin"></div>
-				メニューを作成中...
-			</div>
-			{/if}
+		{#if step === 'saving'}
+		<!-- Floating saving spinner overlay (no full bottom bar) -->
+		<div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-stone-800 text-white text-xs rounded-full shadow-lg print:hidden">
+			<div class="w-3.5 h-3.5 border border-white/40 border-t-white rounded-full animate-spin"></div>
+			メニューを作成中...
 		</div>
+		{/if}
 	</div>
 	{/if}
 
@@ -919,20 +921,40 @@
 			overflow: hidden !important;
 		}
 
-		/* Generous spacing for kaiseki-style breathing room in print */
+		/* Print: smaller fonts + comfortable line-height */
 		:global(.menu-scan-modal .tategaki) {
-			line-height: 2.6 !important;
-			letter-spacing: 0.15em !important;
+			line-height: 1.8 !important;
+			letter-spacing: 0.05em !important;
 		}
 		:global(.menu-scan-modal .font-serif-jp) {
-			line-height: 2 !important;
+			line-height: 1.6 !important;
 		}
 		:global(.menu-scan-modal .leading-loose) {
-			line-height: 2.6 !important;
+			line-height: 1.8 !important;
 		}
 		:global(.menu-scan-modal .leading-relaxed) {
-			line-height: 2.2 !important;
+			line-height: 1.7 !important;
 		}
+
+		/* Reduce font sizes for print to give more breathing room overall */
+		:global(.menu-scan-modal .text-3xl) { font-size: 1.4rem !important; }
+		:global(.menu-scan-modal .text-2xl) { font-size: 0.95rem !important; }
+		:global(.menu-scan-modal .text-lg)  { font-size: 0.75rem !important; }
+		:global(.menu-scan-modal .text-base){ font-size: 0.7rem !important; }
+		:global(.menu-scan-modal .text-sm)  { font-size: 0.65rem !important; }
+
+		/* Slim course header zone proportionally */
+		:global(.menu-scan-modal .course-header-box) {
+			height: 4em !important;
+		}
+
+		/* Remove the dividing borders between course columns + title column on print */
+		:global(.menu-scan-modal .course-col),
+		:global(.menu-scan-modal .paper-title-col) {
+			border: none !important;
+		}
+		:global(.menu-scan-modal .border-l) { border-left: none !important; }
+		:global(.menu-scan-modal .border-r) { border-right: none !important; }
 
 
 		/* Kids box — compact print version */
