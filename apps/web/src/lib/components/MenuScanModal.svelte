@@ -116,6 +116,50 @@
 		node.select();
 	}
 
+	// ── Print & Share ───────────────────────────────────────────────────────
+
+	function handlePrint() {
+		window.print();
+	}
+
+	// Web Share API — opens native share sheet (AirDrop on iOS/macOS Safari, etc.)
+	let canShare = $state(false);
+	let sharing = $state(false);
+	$effect(() => {
+		canShare = typeof navigator !== 'undefined' && !!navigator.share;
+	});
+
+	async function handleShare() {
+		if (!navigator.share) {
+			alert('お使いのブラウザは共有機能に対応していません。Safari をお試しください。');
+			return;
+		}
+		sharing = true;
+		try {
+			// Build a plain-text version of the menu for sharing
+			const lines = [
+				menuTitle || selectedGroupName,
+				'',
+				...courses.map(c => `【${c.name}】\n${c.description ?? ''}`),
+			];
+			if (showKidsBox) {
+				lines.push('', `【${kidsName}】`, ...kidsItems.map(i => `・${i}`));
+			}
+			const text = lines.join('\n');
+
+			await navigator.share({
+				title: menuTitle || 'お品書き',
+				text,
+			});
+		} catch (err: any) {
+			if (err.name !== 'AbortError') {
+				console.error('Share failed:', err);
+			}
+		} finally {
+			sharing = false;
+		}
+	}
+
 	// Auto-focus action — places caret at end when switching to edit mode
 	function autoFocusContentEditable(node: HTMLElement) {
 		node.focus();
@@ -277,11 +321,25 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="fixed inset-0 bg-stone-100 z-[60] flex flex-col overflow-hidden font-sans">
+<div class="menu-scan-modal fixed inset-0 bg-stone-100 z-[60] flex flex-col overflow-hidden font-sans">
 
 	<!-- ── Header ── -->
-	<header class="border-b border-stone-200 px-6 py-3 flex justify-between items-center bg-white flex-shrink-0">
+	<header class="border-b border-stone-200 px-6 py-3 flex justify-between items-center bg-white flex-shrink-0 print:hidden">
 		<div class="flex items-center gap-5">
+			{#if step === 'review'}
+			<button
+				onclick={() => { step = 'upload'; }}
+				class="flex items-center gap-1.5 px-2 py-1.5 text-stone-500 hover:text-stone-800 hover:bg-stone-50 transition-colors rounded print:hidden"
+				title="戻る"
+				aria-label="戻る"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+				</svg>
+				<span class="text-[10px] tracking-[0.12em] uppercase font-medium">戻る</span>
+			</button>
+			<div class="h-6 w-px bg-stone-200"></div>
+			{/if}
 			<div class="flex items-center gap-2">
 				<div class="w-1 h-5 bg-accent"></div>
 				<h1 class="font-serif-jp text-lg tracking-[0.15em]">手書きメニュースキャン</h1>
@@ -313,17 +371,42 @@
 			{#if step === 'review'}
 			<button
 				onclick={addCourse}
-				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium"
+				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden"
 			>
 				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
 				</svg>
 				Add Course
 			</button>
+			{#if canShare}
+			<button
+				onclick={handleShare}
+				disabled={sharing}
+				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden disabled:opacity-40"
+				title="共有 (AirDrop, メッセージなど)"
+			>
+				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+						d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+				</svg>
+				Share
+			</button>
+			{/if}
+			<button
+				onclick={handlePrint}
+				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden"
+				title="印刷"
+			>
+				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+						d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+				</svg>
+				Print
+			</button>
 			<button
 				onclick={confirmSave}
 				disabled={courses.length === 0 || courses.some(c => !c.name.trim())}
-				class="flex items-center gap-1.5 px-3 py-1.5 bg-stone-800 text-white text-[9px] tracking-[0.12em] hover:bg-stone-700 transition-colors uppercase font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+				class="flex items-center gap-1.5 px-3 py-1.5 bg-stone-800 text-white text-[9px] tracking-[0.12em] hover:bg-stone-700 transition-colors uppercase font-medium disabled:opacity-40 disabled:cursor-not-allowed print:hidden"
 			>
 				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -334,7 +417,7 @@
 			{#if step !== 'saving'}
 			<button
 				onclick={onClose}
-				class="px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium"
+				class="px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden"
 			>
 				Close
 			</button>
@@ -505,7 +588,7 @@
 	<div class="flex-1 overflow-hidden flex flex-col bg-stone-100">
 
 		<!-- Sub-header bar -->
-		<div class="flex-shrink-0 border-b border-stone-200 bg-white px-6 py-2 flex items-center gap-4">
+		<div class="flex-shrink-0 border-b border-stone-200 bg-white px-6 py-2 flex items-center gap-4 print:hidden">
 			<span class="text-[9px] uppercase tracking-widest text-stone-400">
 				{courses.length} コース抽出 — 各列をクリックして編集
 			</span>
@@ -724,10 +807,10 @@
 							{/if}
 						{/each}
 
-						<!-- Add item button -->
+						<!-- Add item button (hidden on print) -->
 						<button
 							onclick={() => { kidsItems = [...kidsItems, '']; editingKidsItemIdx = kidsItems.length; }}
-							class="flex items-center gap-1 text-xs text-stone-500 hover:text-stone-700 mt-1.5 transition-colors"
+							class="flex items-center gap-1 text-xs text-stone-500 hover:text-stone-700 mt-1.5 transition-colors print:hidden"
 						>
 							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -752,25 +835,13 @@
 		</div>
 
 		<!-- Bottom bar -->
-		<div class="flex-shrink-0 border-t border-stone-200 bg-white px-6 py-3 flex justify-between items-center">
-			<button
-				onclick={() => { step = 'upload'; }}
-				disabled={step === 'saving'}
-				class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] tracking-widest uppercase border border-stone-200 hover:bg-stone-50 transition-colors text-stone-500 disabled:opacity-40"
-			>
-				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-				</svg>
-				戻る
-			</button>
-
-			{#if step === 'saving'}
-			<div class="flex items-center gap-2 text-stone-500 text-xs">
-				<div class="w-3.5 h-3.5 border border-t-stone-600 rounded-full animate-spin"></div>
-				メニューを作成中...
-			</div>
-			{/if}
+		{#if step === 'saving'}
+		<!-- Floating saving spinner overlay (no full bottom bar) -->
+		<div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-stone-800 text-white text-xs rounded-full shadow-lg print:hidden">
+			<div class="w-3.5 h-3.5 border border-white/40 border-t-white rounded-full animate-spin"></div>
+			メニューを作成中...
 		</div>
+		{/if}
 	</div>
 	{/if}
 
@@ -792,6 +863,120 @@
 	.a4-paper {
 		aspect-ratio: 297 / 210;
 		max-height: 100%;
+	}
+
+	@media print {
+		@page {
+			size: A4 landscape;
+			margin: 0;
+		}
+
+		/* Hide everything except the modal */
+		:global(html, body) {
+			margin: 0 !important;
+			padding: 0 !important;
+			overflow: visible !important;
+		}
+		:global(body > *) { visibility: hidden !important; }
+		:global(.menu-scan-modal),
+		:global(.menu-scan-modal *) { visibility: visible !important; }
+
+		/* Fill the entire printable area, whatever the user's margin choice */
+		:global(.menu-scan-modal) {
+			position: fixed !important;
+			top: 0 !important;
+			left: 0 !important;
+			width: 100% !important;
+			height: 100% !important;
+			background: white !important;
+			padding: 4mm !important;
+			margin: 0 !important;
+			overflow: hidden !important;
+			display: flex !important;
+			flex-direction: column !important;
+			box-sizing: border-box !important;
+		}
+
+		/* Remove inner paddings AND remove the items-center alignment so
+		   the paper stretches to fill the page instead of being vertically centered. */
+		:global(.menu-scan-modal .p-6),
+		:global(.menu-scan-modal .px-6),
+		:global(.menu-scan-modal .py-2),
+		:global(.menu-scan-modal .py-3) {
+			padding: 0 !important;
+		}
+		:global(.menu-scan-modal .items-center) {
+			align-items: stretch !important;
+		}
+
+		.a4-paper {
+			box-shadow: none !important;
+			border: none !important;
+			width: 100% !important;
+			height: 100% !important;
+			min-height: 100% !important;
+			max-height: 100% !important;
+			aspect-ratio: auto !important;
+			page-break-inside: avoid;
+			overflow: hidden !important;
+		}
+
+		/* Print: smaller fonts + comfortable line-height */
+		:global(.menu-scan-modal .tategaki) {
+			line-height: 1.8 !important;
+			letter-spacing: 0.05em !important;
+		}
+		:global(.menu-scan-modal .font-serif-jp) {
+			line-height: 1.6 !important;
+		}
+		:global(.menu-scan-modal .leading-loose) {
+			line-height: 1.8 !important;
+		}
+		:global(.menu-scan-modal .leading-relaxed) {
+			line-height: 1.7 !important;
+		}
+
+		/* Reduce font sizes for print to give more breathing room overall */
+		:global(.menu-scan-modal .text-3xl) { font-size: 1.4rem !important; }
+		:global(.menu-scan-modal .text-2xl) { font-size: 0.95rem !important; }
+		:global(.menu-scan-modal .text-lg)  { font-size: 0.75rem !important; }
+		:global(.menu-scan-modal .text-base){ font-size: 0.7rem !important; }
+		:global(.menu-scan-modal .text-sm)  { font-size: 0.65rem !important; }
+
+		/* Slim course header zone proportionally */
+		:global(.menu-scan-modal .course-header-box) {
+			height: 4em !important;
+		}
+
+		/* Remove the dividing borders between course columns + title column on print */
+		:global(.menu-scan-modal .course-col),
+		:global(.menu-scan-modal .paper-title-col) {
+			border: none !important;
+		}
+		:global(.menu-scan-modal .border-l) { border-left: none !important; }
+		:global(.menu-scan-modal .border-r) { border-right: none !important; }
+
+
+		/* Kids box — compact print version */
+		.kids-box {
+			page-break-inside: avoid;
+			width: 130px !important;
+			padding: 0.4rem 0.6rem !important;
+			gap: 0.2rem !important;
+			border-width: 1px !important;
+			bottom: 0.3cm !important;
+		}
+		:global(.menu-scan-modal .kids-box .gap-1) { gap: 0.1rem !important; }
+		:global(.menu-scan-modal .kids-box .gap-1\.5) { gap: 0.15rem !important; }
+		:global(.menu-scan-modal .kids-box .gap-2) { gap: 0.2rem !important; }
+		:global(.menu-scan-modal .kids-box .py-0\.5) { padding-top: 0 !important; padding-bottom: 0 !important; }
+
+		/* Hide all delete buttons & non-essential controls on print */
+		:global(.menu-scan-modal button[aria-label="このコースを削除"]),
+		:global(.menu-scan-modal button[aria-label="子供メニューを削除"]),
+		:global(.menu-scan-modal button[aria-label="項目を削除"]) {
+			display: none !important;
+		}
 	}
 
 	.paper-title-col {

@@ -29,6 +29,7 @@
 		onDeleteMenu: (id: string) => Promise<void>;
 		onSwitchToTree: () => void;
 		onClose: () => void;
+		autoOpenScan?: boolean;
 	}
 
 	let {
@@ -55,11 +56,17 @@
 		onDeleteMenu,
 		onSwitchToTree,
 		onClose,
+		autoOpenScan = false,
 	}: Props = $props();
 
 	// --- State ---
 
-	let showScanModal = $state(false);
+	let showScanModal = $state(autoOpenScan);
+
+	// Open scan modal when the autoOpenScan flag flips to true (e.g. user clicks the sidebar shortcut)
+	$effect(() => {
+		if (autoOpenScan) showScanModal = true;
+	});
 
 	// Accordion: which seasons are expanded (all expanded by default)
 	let expandedSeasons: Set<string> = $state(new Set(seasonalMenus.map(s => s.id)));
