@@ -138,12 +138,7 @@
         name="description"
         content="Sinara handles the operational weight so your team can focus on what only humans can do — making guests feel seen, welcome, and cared for."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Gloock:ital@0;1&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
-        rel="stylesheet"
-    />
+    <!-- App fonts are loaded globally in +layout.svelte -->
 </svelte:head>
 
 <!-- NOISE OVERLAY (Tactile Premium Feel) -->
