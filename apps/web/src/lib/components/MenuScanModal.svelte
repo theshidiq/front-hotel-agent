@@ -884,10 +884,9 @@
 
 				</div>
 
-				<!-- Kids menu callout — on screen it sits in its own block below the
-				     menu (with a separator); during PDF capture it floats to the
-				     bottom-right corner of the A4 (see .capturing styles). -->
-				<div class="scan-kids-wrap flex justify-end px-3 pt-2 pb-3">
+				<!-- Kids menu callout — sits inside the menu, anchored to the
+				     bottom-right corner of the paper (over the 食前酒 / 前菜 area). -->
+				<div class="scan-kids-wrap">
 				{#if showKidsBox}
 				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-4 py-3 flex flex-col gap-1.5 group/kids shadow-sm w-[180px]" dir="ltr">
 					<!-- Remove button (only on hover) -->
@@ -1119,33 +1118,33 @@
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
 	}
 
-	/* On screen the paper is a fixed-width A4-landscape canvas (so the layout is
-	   consistent across devices) whose column band keeps true A4 proportions.
-	   The outer area scrolls if the canvas + kids box exceed the window — but on
-	   a normal screen it looks like a single A4 page (same as before on Mac).
-	   During PDF capture (.capturing) the fit-to-page A4 + corner kids box win. */
+	/* On screen the paper is a fixed-width canvas (consistent across devices),
+	   wide enough that the vertical columns are comfortably spaced. The outer
+	   area scrolls if it exceeds the window. The kids box sits INSIDE the menu,
+	   anchored to the bottom-right corner. During PDF capture (.capturing) the
+	   paper is fit to a single A4 page. */
 	.a4-paper {
-		width: 1123px;
+		width: 1480px;
 		flex: none;
 	}
 
 	.scan-paper-columns {
-		/* 1123px wide at A4 landscape ratio (297:210) ≈ 794px tall */
 		height: 794px;
 	}
 
-	/* Each course column keeps a readable min-width; paper scrolls if too many. */
+	/* Roomier columns so the vertical text isn't cramped. */
 	.scan-paper-columns > :global(.course-col) {
-		min-width: 96px;
+		min-width: 120px;
 	}
 
-	/* Kids area sits below the menu on screen with a clear separating space */
+	/* Kids box lives inside the layout, pinned to the paper's bottom-right. */
 	.scan-kids-wrap {
-		border-top: 1px dashed #e7e5e4;
-		margin-top: 8px;
+		position: absolute;
+		bottom: 1rem;
+		right: 14%;
 	}
 
-	/* ---- PDF capture: restore single-page A4 with corner kids box ---- */
+	/* ---- PDF capture: fit the paper to a single A4 page ---- */
 	:global(.a4-paper.capturing) {
 		width: 100% !important;
 		aspect-ratio: 297 / 210;
@@ -1158,15 +1157,6 @@
 	}
 	:global(.a4-paper.capturing) .scan-paper-columns > :global(.course-col) {
 		min-width: 0 !important;
-	}
-	:global(.a4-paper.capturing) .scan-kids-wrap {
-		position: absolute;
-		bottom: 1rem;
-		right: 15%;
-		border-top: 0 !important;
-		margin-top: 0 !important;
-		padding: 0 !important;
-		width: auto;
 	}
 
 	@media print {
