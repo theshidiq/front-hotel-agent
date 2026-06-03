@@ -1,7 +1,16 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
     import { cubicOut } from "svelte/easing";
     import ConstellationCanvas from "$lib/components/ConstellationCanvas.svelte";
+
+    // Returning staff — skip the landing page entirely
+    if (typeof window !== 'undefined') {
+        try {
+            if (localStorage.getItem('staff_cache')) goto('/dashboard');
+        } catch { /* ignore */ }
+    }
+
     function startSetup() {
         window.location.href = "/signup";
     }
