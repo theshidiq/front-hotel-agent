@@ -743,13 +743,13 @@
 
 		<!-- A4-landscape paper area -->
 		<div class="flex-1 flex items-center justify-center p-6 overflow-hidden">
-			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative">
+			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative pt-6 px-4">
 				<div class="flex-1 flex overflow-hidden" dir="rtl">
 
 					<!-- Title column (far right) — top-aligned to match course columns, larger font -->
 					<div class="flex-none flex flex-col border-l border-stone-200 paper-title-col" dir="ltr">
 						<div class="flex-1 flex items-start justify-center px-1 pt-[8%]">
-							<div class="tategaki font-serif-jp text-3xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center">
+							<div class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center">
 								{displayTitle}
 							</div>
 						</div>
@@ -816,7 +816,7 @@
 
 						<!-- 一 dash separator -->
 						<div class="flex justify-center flex-shrink-0 py-1">
-							<span class="font-serif-jp text-lg text-stone-800">一</span>
+							<span class="font-serif-jp text-xl text-stone-800">一</span>
 						</div>
 
 						<!-- Dish details: pre-balanced groups, each rendered as its own vertical column.
@@ -846,7 +846,7 @@
 									onkeydown={(e) => { if (e.key === 'Enter') openDescEditor(idx); }}
 									aria-label="料理詳細を編集"
 								>
-									<div class="dish-display tategaki font-serif-jp text-lg text-stone-700 h-fit">
+									<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
 										{groups[0].join('　')}
 									</div>
 								</div>
@@ -862,7 +862,7 @@
 									{#each groups as group, gIdx}
 										<!-- First sub-column (main dish) sits at the top; the rest step down equally. -->
 										<div
-											class="dish-display tategaki font-serif-jp text-lg text-stone-700 h-fit {gIdx > 0 ? 'mt-[2.5em]' : ''}"
+											class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit {gIdx > 0 ? 'mt-[2.5em]' : ''}"
 										>
 											{group.join('　')}
 										</div>
