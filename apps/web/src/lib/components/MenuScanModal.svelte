@@ -741,10 +741,10 @@
 			{/if}
 		</div>
 
-		<!-- A4-landscape paper area -->
-		<div class="flex-1 flex items-center justify-center p-6 overflow-hidden">
-			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative pt-6 px-4">
-				<div class="flex-1 flex overflow-hidden" dir="rtl">
+		<!-- A4-landscape paper area (scrolls on screen; fixed A4 for PDF capture) -->
+		<div class="scan-paper-scroll flex-1 flex items-start justify-center p-6 overflow-auto">
+			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4">
+				<div class="scan-paper-columns flex" dir="rtl">
 
 					<!-- Title column (far right) — top-aligned to match course columns, larger font -->
 					<div class="flex-none flex flex-col border-l border-stone-200 paper-title-col" dir="ltr">
@@ -884,9 +884,12 @@
 
 				</div>
 
-				<!-- Kids menu callout box — anchored bottom-right, between 食前酒 and 前菜 -->
+				<!-- Kids menu callout — on screen it sits in its own block below the
+				     menu (with a separator); during PDF capture it floats to the
+				     bottom-right corner of the A4 (see .capturing styles). -->
+				<div class="scan-kids-wrap flex justify-end px-3 pt-2 pb-3">
 				{#if showKidsBox}
-				<div class="kids-box absolute bottom-4 right-[15%] border-2 border-dashed border-stone-400 bg-white px-4 py-3 flex flex-col gap-1.5 group/kids shadow-sm w-[180px]" dir="ltr">
+				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-4 py-3 flex flex-col gap-1.5 group/kids shadow-sm w-[180px]" dir="ltr">
 					<!-- Remove button (only on hover) -->
 					<button
 						onclick={() => { showKidsBox = false; }}
@@ -970,7 +973,7 @@
 				<!-- Show "Add kids menu" button when hidden -->
 				<button
 					onclick={() => { showKidsBox = true; }}
-					class="absolute bottom-6 right-[14%] flex items-center gap-1 px-2 py-1 border border-dashed border-stone-300 text-[10px] text-stone-400 hover:text-stone-600 hover:border-stone-400 transition-colors"
+					class="scan-add-kids flex items-center gap-1 px-2 py-1 border border-dashed border-stone-300 text-[10px] text-stone-400 hover:text-stone-600 hover:border-stone-400 transition-colors print:hidden"
 				>
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -978,6 +981,7 @@
 					子供メニュー
 				</button>
 				{/if}
+				</div>
 			</div>
 		</div>
 
@@ -1115,9 +1119,52 @@
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
 	}
 
+	/* On screen the paper is a FIXED-pixel A4-landscape canvas so the layout is
+	   identical on every device/resolution and the outer area scrolls when the
+	   canvas + kids box exceed the window. During PDF capture (.capturing) the
+	   fit-to-page A4 proportions and corner kids box are restored. */
 	.a4-paper {
+		width: 1123px;
+		flex: none;
+	}
+
+	.scan-paper-columns {
+		height: 920px;
+	}
+
+	/* Each course column keeps a readable min-width; paper scrolls if too many. */
+	.scan-paper-columns > :global(.course-col) {
+		min-width: 96px;
+	}
+
+	/* Kids area sits below the menu on screen with a clear separating space */
+	.scan-kids-wrap {
+		border-top: 1px dashed #e7e5e4;
+		margin-top: 8px;
+	}
+
+	/* ---- PDF capture: restore single-page A4 with corner kids box ---- */
+	:global(.a4-paper.capturing) {
+		width: 100% !important;
 		aspect-ratio: 297 / 210;
 		max-height: 100%;
+	}
+	:global(.a4-paper.capturing) .scan-paper-columns {
+		height: auto !important;
+		flex: 1 1 auto !important;
+		overflow: hidden !important;
+	}
+	:global(.a4-paper.capturing) .scan-paper-columns > :global(.course-col) {
+		min-width: 0 !important;
+	}
+	:global(.a4-paper.capturing) .scan-kids-wrap {
+		position: absolute;
+		bottom: 1rem;
+		right: 15%;
+		border-top: 0 !important;
+		margin-top: 0 !important;
+		padding: 0 !important;
+		width: auto;
 	}
 
 	@media print {
