@@ -9,6 +9,14 @@
 	let signingIn = $state(false);
 	let redirected = false;
 
+	// If there's a cached staff session, redirect immediately without waiting for DB
+	if (typeof window !== 'undefined' && !redirected) {
+		try {
+			const cached = localStorage.getItem('staff_cache');
+			if (cached) { redirected = true; goto('/dashboard'); }
+		} catch { /* ignore */ }
+	}
+
 	let email = $state('');
 	let password = $state('');
 	let showPassword = $state(false);
