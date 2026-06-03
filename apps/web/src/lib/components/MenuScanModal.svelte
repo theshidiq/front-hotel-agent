@@ -32,6 +32,42 @@
 	let dragOver = $state(false);
 	let editingNameIdx: number | null = $state(null);  // which course's name is being edited
 
+	// ── Fit-to-width scaling ──
+	// The paper has a fixed natural width so the layout is identical on every
+	// device. When the viewport is narrower, we scale the whole paper down so it
+	// always fits with no horizontal scroll (proportions stay the same).
+	let paperScale = $state(1);
+	let scaledPaperH = $state(0);   // height the scaled paper occupies in layout flow
+	let scaledPaperW = $state(0);   // width  the scaled paper occupies in layout flow
+
+	function fitPaper(scrollEl: HTMLElement) {
+		// Available width inside the scroll area (minus its horizontal padding)
+		const cs = getComputedStyle(scrollEl);
+		const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+		const avail = scrollEl.clientWidth - padX;
+		const paper = scrollEl.querySelector('.a4-paper') as HTMLElement | null;
+		if (!paper) return;
+		// Measure natural (unscaled) size
+		const naturalW = paper.offsetWidth;
+		const naturalH = paper.offsetHeight;
+		const scale = Math.min(1, avail / naturalW);
+		paperScale = scale;
+		scaledPaperH = naturalH * scale;
+		scaledPaperW = naturalW * scale;
+	}
+
+	// Svelte action: keep the paper fitted to the scroll area on mount + resize.
+	function fitToWidth(node: HTMLElement) {
+		const update = () => fitPaper(node);
+		const ro = new ResizeObserver(update);
+		ro.observe(node);
+		// Also observe the paper itself (its height changes as columns are edited)
+		const paper = node.querySelector('.a4-paper');
+		if (paper) ro.observe(paper);
+		update();
+		return { destroy() { ro.disconnect(); } };
+	}
+
 	// Dish-detail editor popup
 	let descEditorIdx: number | null = $state(null);   // which course's description is open in the editor
 	let descEditorItems: string[] = $state([]);        // working list of dish items
@@ -741,9 +777,13 @@
 			{/if}
 		</div>
 
-		<!-- A4-landscape paper area (scrolls on screen; fixed A4 for PDF capture) -->
-		<div class="scan-paper-scroll flex-1 flex items-start justify-center p-6 overflow-auto">
-			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4">
+		<!-- A4-landscape paper area. The paper has a fixed natural width (consistent
+		     across devices) and is scaled down to fit narrower screens — no
+		     horizontal scroll. PDF capture removes the scale (see .capturing). -->
+		<div class="scan-paper-scroll flex-1 flex items-start justify-center p-6 overflow-auto" use:fitToWidth>
+			<!-- Sizing wrapper reserves the *scaled* footprint so the flow size is correct -->
+			<div class="scan-paper-fit" style="height: {scaledPaperH ? scaledPaperH + 'px' : 'auto'}; width: {scaledPaperW ? scaledPaperW + 'px' : '1600px'};">
+			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4" style="transform: scale({paperScale}); transform-origin: top center;">
 				<div class="scan-paper-columns flex" dir="rtl">
 
 					<!-- Title column (far right) — top-aligned to match course columns, larger font -->
@@ -981,6 +1021,7 @@
 				</div>
 				</div>
 			</div>
+			</div>
 		</div>
 
 		<!-- Bottom bar -->
@@ -1127,6 +1168,14 @@
 		flex: none;
 	}
 
+	/* Wrapper that holds the scaled paper; its width/height are set in JS to the
+	   scaled footprint so the scroll area reserves the right space and the
+	   unscaled paper box (1600px) doesn't push out a horizontal scrollbar. */
+	.scan-paper-fit {
+		max-width: 100%;
+		overflow: hidden;
+	}
+
 	.scan-paper-columns {
 		height: 794px;
 		position: relative;   /* anchor for the kids box */
@@ -1137,11 +1186,12 @@
 		min-width: 130px;
 	}
 
-	/* Kids box lives INSIDE the menu band, pinned to its bottom-right corner. */
+	/* Kids box lives INSIDE the menu band, in the lower-right area (over the
+	   前菜 region, offset from the right edge so it isn't flush to the corner). */
 	.scan-kids-wrap {
 		position: absolute;
 		bottom: 1.5rem;
-		right: 2rem;
+		right: 12%;
 		left: auto;
 	}
 
@@ -1150,6 +1200,7 @@
 		width: 100% !important;
 		aspect-ratio: 297 / 210;
 		max-height: 100%;
+		transform: none !important;   /* drop the on-screen fit scaling */
 	}
 	:global(.a4-paper.capturing) .scan-paper-columns {
 		height: auto !important;
