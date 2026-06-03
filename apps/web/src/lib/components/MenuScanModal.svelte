@@ -40,20 +40,25 @@
 	let scaledPaperH = $state(0);   // height the scaled paper occupies in layout flow
 	let scaledPaperW = $state(0);   // width  the scaled paper occupies in layout flow
 
+	const COL_W = 130;        // course column width (matches CSS)
+	const TITLE_W = 115;      // title column width (matches CSS)
+	const PAPER_PAD_X = 32;   // .a4-paper px-4 → 16px * 2
+
+	// Natural paper width computed directly from the column count, so the paper
+	// is always exactly wide enough to show every course (no clipping).
+	let paperNaturalW = $derived(TITLE_W + courses.length * COL_W + PAPER_PAD_X);
+
 	function fitPaper(scrollEl: HTMLElement) {
-		// Available width inside the scroll area (minus its horizontal padding)
 		const cs = getComputedStyle(scrollEl);
 		const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
 		const avail = scrollEl.clientWidth - padX;
 		const paper = scrollEl.querySelector('.a4-paper') as HTMLElement | null;
 		if (!paper) return;
-		// Measure natural (unscaled) size
-		const naturalW = paper.offsetWidth;
 		const naturalH = paper.offsetHeight;
-		const scale = Math.min(1, avail / naturalW);
+		const scale = Math.min(1, avail / paperNaturalW);
 		paperScale = scale;
 		scaledPaperH = naturalH * scale;
-		scaledPaperW = naturalW * scale;
+		scaledPaperW = paperNaturalW * scale;
 	}
 
 	// Svelte action: keep the paper fitted to the scroll area on mount + resize.
@@ -783,7 +788,7 @@
 		<div class="scan-paper-scroll flex-1 flex items-start justify-center p-6 overflow-auto" use:fitToWidth>
 			<!-- Sizing wrapper reserves the *scaled* footprint so the flow size is correct -->
 			<div class="scan-paper-fit" style="height: {scaledPaperH ? scaledPaperH + 'px' : 'auto'}; width: {scaledPaperW ? scaledPaperW + 'px' : '1360px'};">
-			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4" style="transform: scale({paperScale}); transform-origin: top left;">
+			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4" style="width: {paperNaturalW ? paperNaturalW + 'px' : 'max-content'}; transform: scale({paperScale}); transform-origin: top left;">
 				<div class="scan-paper-columns flex" dir="rtl">
 
 					<!-- Title column (far right) — top-aligned to match course columns, larger font -->
@@ -1158,13 +1163,12 @@
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
 	}
 
-	/* On screen the paper is a fixed-width canvas (consistent across devices),
-	   wide enough that the vertical columns are comfortably spaced. The outer
-	   area scrolls if it exceeds the window. The kids box sits INSIDE the menu,
-	   anchored to the bottom-right corner. During PDF capture (.capturing) the
-	   paper is fit to a single A4 page. */
+	/* The paper width is driven by its columns (max-content) so EVERY course
+	   column is fully shown at a readable width — no matter how many there are.
+	   fitToWidth then scales the whole paper down to fit the screen with no
+	   horizontal scroll. During PDF capture (.capturing) it fits a single A4. */
 	.a4-paper {
-		width: 1360px;
+		width: max-content;
 		flex: none;
 	}
 
@@ -1179,11 +1183,16 @@
 	.scan-paper-columns {
 		height: 794px;
 		position: relative;   /* anchor for the kids box */
+		width: 100%;          /* fills the explicit-width paper */
+		flex: none;
 	}
 
-	/* Roomier columns so the vertical text isn't cramped. */
+	/* Fixed, roomy column width so every course shows fully and the paper's
+	   max-content width is the exact sum of all columns. */
 	.scan-paper-columns > :global(.course-col) {
-		min-width: 130px;
+		width: 130px;
+		flex: 0 0 130px;   /* override Tailwind flex-1 so columns don't shrink/grow */
+		min-width: 0;
 	}
 
 	/* Kids box lives INSIDE the menu band, in the lower-right area (over the
