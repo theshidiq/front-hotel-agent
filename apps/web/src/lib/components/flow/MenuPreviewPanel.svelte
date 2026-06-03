@@ -551,13 +551,14 @@
 	   Print reapplies viewport-filling A4 (see @media print below). */
 	.a4-paper {
 		width: 1123px;   /* ~A4 landscape width  @ 96dpi minus margins */
-		max-width: 100%;
+		flex: none;      /* true fixed canvas — never shrink to fit the screen */
 	}
 
 	/* The vertical-text column band gets a real, fixed height so menu items have
-	   room to lay out instead of cramming to fit the screen height. */
+	   room to lay out instead of cramming to fit the screen height. Taller than a
+	   typical laptop viewport so the page reliably scrolls. */
 	.paper-columns {
-		height: 760px;
+		height: 920px;
 	}
 
 	.paper-title-col {
