@@ -186,12 +186,12 @@
 
 	// ── Staff actions ────────────────────────────────────────────
 	async function saveNewStaff() {
-		if (!newStaff.name.trim() || !newStaff.email.trim() || !selectedDeptId) return;
+		if (!newStaff.name.trim() || !selectedDeptId) return;
 		saving = true;
 		try {
 			const created = await createStaff({
 				name: newStaff.name.trim(),
-				email: newStaff.email.trim(),
+				email: newStaff.email.trim() || undefined,
 				department_id: selectedDeptId,
 				position_id: newStaff.position_id || null,
 			});
@@ -697,7 +697,7 @@
 										/>
 									</div>
 									<div>
-										<label class="block text-xs font-medium text-gray-600 mb-1">メール <span class="text-red-500">*</span></label>
+										<label class="block text-xs font-medium text-gray-600 mb-1">メール</label>
 										<input
 											type="email"
 											bind:value={newStaff.email}
@@ -830,7 +830,7 @@
 									<button
 										type="button"
 										onclick={saveNewStaff}
-										disabled={saving || !newStaff.name.trim() || !newStaff.email.trim()}
+										disabled={saving || !newStaff.name.trim()}
 										class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
 									>追加</button>
 									<button

@@ -876,57 +876,6 @@
     ];
 </script>
 
-<div class="min-h-screen bg-[#F5F6FA] text-slate-800 font-sans flex flex-col antialiased">
-    <main class="flex-1 flex flex-col min-h-screen w-full overflow-hidden relative">
-        <!-- Top Header -->
-        <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-6 py-3.5 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-medium text-sm">
-                <span class="material-symbols-outlined text-base">arrow_back</span>
-                Back to Dashboard
-            </a>
-            <span class="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-widest rounded-full border border-indigo-200">
-                {t.badge}
-            </span>
-        </header>
-
-        <!-- 3-Column Layout -->
-        <div class="flex flex-1 w-full relative">
-            <!-- Left Sidebar -->
-            <aside class="hidden lg:flex lg:flex-col w-64 border-r border-slate-200 bg-white overflow-y-auto pt-8 pb-10 px-4 h-[calc(100vh-57px)] sticky top-[57px]">
-                <div class="mb-6">
-                    <p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3 px-3">{t.nav_everyone}</p>
-                    <ul class="space-y-0.5">
-                        <li><a href="#overview" class="block px-3 py-2 text-sm font-semibold bg-indigo-50 text-indigo-700 rounded-lg">{t.nav_overview}</a></li>
-                        <li><a href="#schedule-grid" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_grid}</a></li>
-                        <li><a href="#shift-symbols" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_symbols}</a></li>
-                        <li><a href="#toolbar" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_toolbar}</a></li>
-                        <li><a href="#keyboard" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_kb}</a></li>
-                    </ul>
-                </div>
-                <div class="mb-6">
-                    <p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3 px-3">{t.nav_settings}</p>
-                    <ul class="space-y-0.5">
-                        <li><a href="#settings-groups" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_groups}</a></li>
-                        <li><a href="#settings-backup" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_backup}</a></li>
-                        <li><a href="#settings-caps" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_caps}</a></li>
-                        <li><a href="#settings-unavail" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_unavail}</a></li>
-                        <li><a href="#settings-limits" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_limits}</a></li>
-                        <li><a href="#settings-priority" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_priority}</a></li>
-                        <li><a href="#settings-calendar" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_calendar}</a></li>
-                        <li><a href="#settings-early" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_early}</a></li>
-                        <li><a href="#settings-periods" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_periods}</a></li>
-                        <li><a href="#settings-solver" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_solver}</a></li>
-                        <li><a href="#settings-symbols" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_symconfig}</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3 px-3">{t.nav_dev}</p>
-                    <ul class="space-y-0.5">
-                        <li><a href="#api-endpoints" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_api}</a></li>
-                        <li><a href="#llm-tooling" class="block px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">{t.nav_llm}</a></li>
-                    </ul>
-                </div>
-            </aside>
 
             <!-- Main Content -->
             <div class="flex-1 overflow-y-auto h-[calc(100vh-57px)] bg-white">
@@ -1489,6 +1438,3 @@
                     <a href="#llm-tooling" class="px-3 py-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">{t.nav_llm}</a>
                 </nav>
             </aside>
-        </div>
-    </main>
-</div>

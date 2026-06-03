@@ -7,9 +7,10 @@ export class CreateStaffDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'tanaka@example.com' })
+  @ApiPropertyOptional({ example: 'tanaka@example.com' })
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @ApiPropertyOptional({ example: 'スタッフ' })
   @IsOptional()

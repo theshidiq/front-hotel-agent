@@ -123,7 +123,7 @@ export class StaffsService {
     return data;
   }
 
-  async create(name: string, email: string, position: string, organizationId: string, departmentId?: string | null, positionId?: string | null): Promise<Staff> {
+  async create(name: string, email: string | undefined, position: string, organizationId: string, departmentId?: string | null, positionId?: string | null): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase
@@ -131,7 +131,7 @@ export class StaffsService {
       .insert({
         organization_id: organizationId,
         name: name.trim(),
-        email: email.trim().toLowerCase(),
+        email: email ? email.trim().toLowerCase() : null,
         position: position.trim(),
         department_id: departmentId ?? null,
         position_id: positionId ?? null,
