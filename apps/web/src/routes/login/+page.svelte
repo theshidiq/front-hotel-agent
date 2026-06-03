@@ -93,7 +93,6 @@
 	<!-- Brand -->
 	<a href="/" class="mb-10 text-center block">
 		<div class="text-2xl font-bold text-[#1A2744] tracking-tight">Sinara</div>
-		<div class="mt-1 text-sm text-gray-400">スタッフポータル</div>
 	</a>
 
 	<!-- Card -->

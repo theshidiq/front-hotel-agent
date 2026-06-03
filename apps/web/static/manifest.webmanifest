@@ -1,7 +1,7 @@
 {
-  "name": "Sinara — スタッフポータル",
+  "name": "Sinara",
   "short_name": "Sinara",
-  "description": "Hotel staff portal — shifts, front desk, kitchen production, and allergen management.",
+  "description": "Sinara — shifts, front desk, kitchen production, and allergen management.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
