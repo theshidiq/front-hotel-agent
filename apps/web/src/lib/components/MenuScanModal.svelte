@@ -882,11 +882,9 @@
 					</div>
 					{/if}
 
-				</div>
-
-				<!-- Kids menu callout — sits inside the menu, anchored to the
-				     bottom-right corner of the paper (over the 食前酒 / 前菜 area). -->
-				<div class="scan-kids-wrap">
+				<!-- Kids menu callout — sits inside the menu band, anchored to the
+				     bottom-right corner (over the 食前酒 / 前菜 area). -->
+				<div class="scan-kids-wrap" dir="ltr">
 				{#if showKidsBox}
 				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-4 py-3 flex flex-col gap-1.5 group/kids shadow-sm w-[180px]" dir="ltr">
 					<!-- Remove button (only on hover) -->
@@ -980,6 +978,7 @@
 					子供メニュー
 				</button>
 				{/if}
+				</div>
 				</div>
 			</div>
 		</div>
@@ -1124,24 +1123,26 @@
 	   anchored to the bottom-right corner. During PDF capture (.capturing) the
 	   paper is fit to a single A4 page. */
 	.a4-paper {
-		width: 1480px;
+		width: 1600px;
 		flex: none;
 	}
 
 	.scan-paper-columns {
 		height: 794px;
+		position: relative;   /* anchor for the kids box */
 	}
 
 	/* Roomier columns so the vertical text isn't cramped. */
 	.scan-paper-columns > :global(.course-col) {
-		min-width: 120px;
+		min-width: 130px;
 	}
 
-	/* Kids box lives inside the layout, pinned to the paper's bottom-right. */
+	/* Kids box lives INSIDE the menu band, pinned to its bottom-right corner. */
 	.scan-kids-wrap {
 		position: absolute;
-		bottom: 1rem;
-		right: 14%;
+		bottom: 1.5rem;
+		right: 2rem;
+		left: auto;
 	}
 
 	/* ---- PDF capture: fit the paper to a single A4 page ---- */
