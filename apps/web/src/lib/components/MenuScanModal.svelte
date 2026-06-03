@@ -1119,17 +1119,19 @@
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
 	}
 
-	/* On screen the paper is a FIXED-pixel A4-landscape canvas so the layout is
-	   identical on every device/resolution and the outer area scrolls when the
-	   canvas + kids box exceed the window. During PDF capture (.capturing) the
-	   fit-to-page A4 proportions and corner kids box are restored. */
+	/* On screen the paper is a fixed-width A4-landscape canvas (so the layout is
+	   consistent across devices) whose column band keeps true A4 proportions.
+	   The outer area scrolls if the canvas + kids box exceed the window — but on
+	   a normal screen it looks like a single A4 page (same as before on Mac).
+	   During PDF capture (.capturing) the fit-to-page A4 + corner kids box win. */
 	.a4-paper {
 		width: 1123px;
 		flex: none;
 	}
 
 	.scan-paper-columns {
-		height: 920px;
+		/* 1123px wide at A4 landscape ratio (297:210) ≈ 794px tall */
+		height: 794px;
 	}
 
 	/* Each course column keeps a readable min-width; paper scrolls if too many. */
