@@ -84,6 +84,14 @@
 		selectableGroups.find(g => g.id === selectedGroupId)?.name ?? ''
 	);
 
+	// Convert ASCII digits to full-width so they render upright in vertical text
+	// (e.g. 令和8年 → 令和８年). Letters are left as-is.
+	function toFullWidthDigits(s: string): string {
+		return s.replace(/[0-9]/g, (d) => String.fromCharCode(d.charCodeAt(0) + 0xFEE0));
+	}
+
+	const displayTitle = $derived(toFullWidthDigits(menuTitle || selectedGroupName));
+
 	// Drafts for the currently selected group
 	const groupDrafts = $derived(
 		drafts.filter(d => d.menu_group_id === selectedGroupId)
@@ -150,8 +158,84 @@
 
 	// ── Print & Share ───────────────────────────────────────────────────────
 
-	function handlePrint() {
-		window.print();
+	let paperEl: HTMLDivElement | null = $state(null);   // the お品書き A4 paper element
+	let generatingPdf = $state(false);
+
+	// Render the on-screen paper to an A4 landscape PDF (looks exactly like the screen).
+	async function buildPdf(): Promise<import('jspdf').jsPDF | null> {
+		if (!paperEl) return null;
+		const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+			import('html2canvas-pro'),
+			import('jspdf'),
+		]);
+
+		// Hide editing affordances during capture
+		paperEl.classList.add('capturing');
+		await new Promise(r => requestAnimationFrame(r));   // let the DOM repaint
+
+		let canvas: HTMLCanvasElement;
+		try {
+			canvas = await html2canvas(paperEl, {
+				scale: 2,                 // crisp output
+				backgroundColor: '#ffffff',
+				useCORS: true,
+				logging: false,
+			});
+		} finally {
+			paperEl.classList.remove('capturing');
+		}
+
+		const imgData = canvas.toDataURL('image/jpeg', 0.95);
+		const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+		const pageW = pdf.internal.pageSize.getWidth();   // 297
+		const pageH = pdf.internal.pageSize.getHeight();  // 210
+
+		// Fit the captured paper within the page while preserving aspect ratio
+		const imgRatio = canvas.width / canvas.height;
+		const pageRatio = pageW / pageH;
+		let w = pageW, h = pageH;
+		if (imgRatio > pageRatio) {
+			h = pageW / imgRatio;
+		} else {
+			w = pageH * imgRatio;
+		}
+		const x = (pageW - w) / 2;
+		const y = (pageH - h) / 2;
+		pdf.addImage(imgData, 'JPEG', x, y, w, h);
+		return pdf;
+	}
+
+	async function handlePrint() {
+		generatingPdf = true;
+		try {
+			const pdf = await buildPdf();
+			if (pdf) {
+				pdf.autoPrint();
+				// Open the PDF in a new tab/window which triggers the print dialog
+				const blobUrl = pdf.output('bloburl');
+				window.open(blobUrl, '_blank');
+			}
+		} catch (err) {
+			console.error('Print failed:', err);
+			window.print();   // fallback
+		} finally {
+			generatingPdf = false;
+		}
+	}
+
+	async function handleDownloadPdf() {
+		generatingPdf = true;
+		try {
+			const pdf = await buildPdf();
+			if (pdf) {
+				const title = (menuTitle || selectedGroupName || 'menu').replace(/[\s\/\\]+/g, '_');
+				pdf.save(`${title}.pdf`);
+			}
+		} catch (err) {
+			console.error('PDF download failed:', err);
+		} finally {
+			generatingPdf = false;
+		}
 	}
 
 	// Web Share API — opens native share sheet (AirDrop on iOS/macOS Safari, etc.)
@@ -168,21 +252,27 @@
 		}
 		sharing = true;
 		try {
-			// Build a plain-text version of the menu for sharing
-			const lines = [
-				menuTitle || selectedGroupName,
-				'',
-				...courses.map(c => `【${c.name}】\n${c.description ?? ''}`),
-			];
-			if (showKidsBox) {
-				lines.push('', `【${kidsName}】`, ...kidsItems.map(i => `・${i}`));
-			}
-			const text = lines.join('\n');
+			const title = (menuTitle || selectedGroupName || 'お品書き');
+			const fileName = title.replace(/[\s\/\\]+/g, '_');
 
-			await navigator.share({
-				title: menuTitle || 'お品書き',
-				text,
-			});
+			// Try to share the visual PDF (AirDrop sends the actual menu image)
+			const pdf = await buildPdf();
+			const blob = pdf ? pdf.output('blob') : null;
+			const file = blob ? new File([blob], `${fileName}.pdf`, { type: 'application/pdf' }) : null;
+
+			if (file && navigator.canShare?.({ files: [file] })) {
+				await navigator.share({ title, files: [file] });
+			} else {
+				// Fallback to plain-text share
+				const lines = [
+					title, '',
+					...courses.map(c => `【${c.name}】\n${c.description ?? ''}`),
+				];
+				if (showKidsBox) {
+					lines.push('', `【${kidsName}】`, ...kidsItems.map(i => `・${i}`));
+				}
+				await navigator.share({ title, text: lines.join('\n') });
+			}
 		} catch (err: any) {
 			if (err.name !== 'AbortError') {
 				console.error('Share failed:', err);
@@ -430,14 +520,31 @@
 			</button>
 			{/if}
 			<button
+				onclick={handleDownloadPdf}
+				disabled={generatingPdf}
+				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden disabled:opacity-40"
+				title="PDF保存"
+			>
+				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+						d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+				</svg>
+				PDF
+			</button>
+			<button
 				onclick={handlePrint}
-				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden"
+				disabled={generatingPdf}
+				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden disabled:opacity-40"
 				title="印刷"
 			>
+				{#if generatingPdf}
+				<div class="w-3 h-3 border border-stone-300 border-t-stone-600 rounded-full animate-spin"></div>
+				{:else}
 				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
 						d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
 				</svg>
+				{/if}
 				Print
 			</button>
 			<button
@@ -636,14 +743,14 @@
 
 		<!-- A4-landscape paper area -->
 		<div class="flex-1 flex items-center justify-center p-6 overflow-hidden">
-			<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative">
+			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative">
 				<div class="flex-1 flex overflow-hidden" dir="rtl">
 
-					<!-- Title column (far right) — centered, larger font -->
+					<!-- Title column (far right) — top-aligned to match course columns, larger font -->
 					<div class="flex-none flex flex-col border-l border-stone-200 paper-title-col" dir="ltr">
-						<div class="flex-1 flex items-center justify-center px-1">
+						<div class="flex-1 flex items-start justify-center px-1 pt-[8%]">
 							<div class="tategaki font-serif-jp text-3xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center">
-								{menuTitle || selectedGroupName}
+								{displayTitle}
 							</div>
 						</div>
 					</div>
@@ -674,7 +781,7 @@
 						<!-- Course header — long names pre-split into 2 vertical lines (right-to-left)
 						     so the 一 separator stays at the same height across all columns.
 						     Click → flat edit mode; blur → saves & re-splits. -->
-						<div class="pt-5 pb-1 flex items-start justify-center flex-shrink-0 course-header-box">
+						<div class="pt-2 pb-1 flex items-start justify-center flex-shrink-0 course-header-box">
 							{#if isEditingName}
 								<div
 									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center"
@@ -715,18 +822,34 @@
 						<!-- Dish details: pre-balanced groups, each rendered as its own vertical column.
 						     Columns next to the kids box get extra bottom padding so dishes stop above it. -->
 						<div
-							class="flex-1 px-2 pt-3 overflow-hidden flex {groups.length <= 1 ? 'justify-center' : 'justify-center gap-2'} items-start"
+							class="flex-1 px-2 pt-3 overflow-hidden {groups.length <= 1 ? 'block' : 'flex justify-center items-start gap-2'}"
 							style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 						>
 							{#if items.length === 0}
 								<div
-									class="tategaki font-serif-jp text-base text-stone-300 cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
+									class="w-full grid place-items-center cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
 									onclick={() => openDescEditor(idx)}
 									role="button"
 									tabindex="0"
 									onkeydown={(e) => { if (e.key === 'Enter') openDescEditor(idx); }}
 									aria-label="料理詳細を編集"
-								>料理詳細...</div>
+								>
+									<div class="dish-placeholder tategaki font-serif-jp text-base text-stone-300">料理詳細...</div>
+								</div>
+							{:else if groups.length <= 1}
+								<!-- Single sub-column: grid place-items-center reliably centers in both browser & html2canvas. -->
+								<div
+									class="w-full grid place-items-center cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
+									onclick={() => openDescEditor(idx)}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => { if (e.key === 'Enter') openDescEditor(idx); }}
+									aria-label="料理詳細を編集"
+								>
+									<div class="dish-display tategaki font-serif-jp text-lg text-stone-700 h-fit">
+										{groups[0].join('　')}
+									</div>
+								</div>
 							{:else}
 								<div
 									class="flex flex-row-reverse items-start gap-2 cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
@@ -955,6 +1078,32 @@
 
 <style>
 	.bg-accent { background-color: #C2410C; }
+
+	/* During PDF capture, hide all editing affordances so the output is clean */
+	:global(.a4-paper.capturing) button[aria-label="このコースを削除"],
+	:global(.a4-paper.capturing) button[aria-label="子供メニューを削除"],
+	:global(.a4-paper.capturing) button[aria-label="項目を削除"],
+	:global(.a4-paper.capturing) .kids-box button:last-child {
+		display: none !important;
+	}
+	/* Hide the "+ 追加" add-item buttons inside the kids box during capture */
+	:global(.a4-paper.capturing) .kids-box > div:last-child > button {
+		display: none !important;
+	}
+	/* Remove the paper border + shadow + all column dividers in the captured output */
+	:global(.a4-paper.capturing) {
+		border: none !important;
+		box-shadow: none !important;
+	}
+	/* Hide empty-course placeholders in the captured output */
+	:global(.a4-paper.capturing) .dish-placeholder {
+		display: none !important;
+	}
+	:global(.a4-paper.capturing) .course-col,
+	:global(.a4-paper.capturing) .paper-title-col,
+	:global(.a4-paper.capturing) .border-l {
+		border-left: none !important;
+	}
 
 	.font-serif-jp {
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
