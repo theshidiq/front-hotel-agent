@@ -782,8 +782,8 @@
 		     horizontal scroll. PDF capture removes the scale (see .capturing). -->
 		<div class="scan-paper-scroll flex-1 flex items-start justify-center p-6 overflow-auto" use:fitToWidth>
 			<!-- Sizing wrapper reserves the *scaled* footprint so the flow size is correct -->
-			<div class="scan-paper-fit" style="height: {scaledPaperH ? scaledPaperH + 'px' : 'auto'}; width: {scaledPaperW ? scaledPaperW + 'px' : '1600px'};">
-			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4" style="transform: scale({paperScale}); transform-origin: top center;">
+			<div class="scan-paper-fit" style="height: {scaledPaperH ? scaledPaperH + 'px' : 'auto'}; width: {scaledPaperW ? scaledPaperW + 'px' : '1360px'};">
+			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4" style="transform: scale({paperScale}); transform-origin: top left;">
 				<div class="scan-paper-columns flex" dir="rtl">
 
 					<!-- Title column (far right) — top-aligned to match course columns, larger font -->
@@ -1164,7 +1164,7 @@
 	   anchored to the bottom-right corner. During PDF capture (.capturing) the
 	   paper is fit to a single A4 page. */
 	.a4-paper {
-		width: 1600px;
+		width: 1360px;
 		flex: none;
 	}
 
