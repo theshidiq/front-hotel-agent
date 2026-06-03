@@ -342,11 +342,11 @@
 		</div>
 	</header>
 
-	<!-- A4 Landscape paper area -->
+	<!-- A4 Landscape paper area (scrolls on screen; fixed A4 for print) -->
 	<div class="flex-1 flex items-start justify-center p-6 overflow-auto print:p-0 print:overflow-visible print:items-stretch">
-		<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full relative print:shadow-none print:border-0" data-print-area>
+		<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative print:shadow-none print:border-0" data-print-area>
 			<!-- Paper content -->
-			<div class="paper-columns flex-1 flex print:overflow-hidden" dir="rtl">
+			<div class="paper-columns flex" dir="rtl">
 
 				<!-- Title column (far right) -->
 				<div class="flex-none flex flex-col border-l border-stone-200 relative paper-title-col" dir="ltr">
@@ -545,28 +545,29 @@
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
 	}
 
-	/* On screen the paper grows with its content and the outer area scrolls,
-	   so columns stay a readable width on any device/resolution. The fixed A4
-	   aspect ratio is reapplied only for print (see @media print below). */
+	/* On screen the paper is a FIXED-pixel A4-landscape canvas so the layout is
+	   identical on every device/resolution (no viewport-relative shrinking).
+	   The outer area scrolls when this canvas + the kids box exceed the window.
+	   Print reapplies viewport-filling A4 (see @media print below). */
 	.a4-paper {
-		min-height: 70vh;
+		width: 1123px;   /* ~A4 landscape width  @ 96dpi minus margins */
+		max-width: 100%;
 	}
 
-	/* Column band keeps a comfortable minimum height so vertical text has room */
+	/* The vertical-text column band gets a real, fixed height so menu items have
+	   room to lay out instead of cramming to fit the screen height. */
 	.paper-columns {
-		min-height: 60vh;
+		height: 760px;
 	}
 
 	.paper-title-col {
-		/* fixed readable width on screen instead of a viewport-relative % */
 		width: 110px;
 		flex: none;
 	}
 
-	/* Each course column keeps a minimum readable width; the paper scrolls
-	   horizontally if there are too many to fit. */
+	/* Each course column keeps a readable min-width; paper scrolls if too many. */
 	.paper-columns > :global(div[class*="border-l"]) {
-		min-width: 90px;
+		min-width: 96px;
 	}
 
 	.course-header-box {
@@ -574,9 +575,23 @@
 		justify-content: center;
 	}
 
+	/* Kids area sits below the menu on screen with a clear separating space */
+	.kids-box-wrap {
+		border-top: 1px dashed #e7e5e4;
+		margin-top: 8px;
+	}
+
 	.kids-box {
-		width: clamp(160px, 20vw, 240px);
+		width: 240px;
 		overflow: hidden;
+	}
+
+	/* No separator line / top margin when printing (kids box floats to corner) */
+	@media print {
+		.kids-box-wrap {
+			border-top: 0 !important;
+			margin-top: 0 !important;
+		}
 	}
 
 	.menu-items-column {
@@ -612,16 +627,17 @@
 			position: fixed;
 			top: 0;
 			left: 0;
-			width: 100vw;
-			height: 100vh;
-			/* Restore single-page A4 behaviour for print/PDF (screen scrolls instead) */
-			min-height: 0 !important;
+			/* Restore single-page A4 fill for print/PDF (screen uses a fixed canvas) */
+			width: 100vw !important;
+			height: 100vh !important;
+			max-width: none !important;
 			overflow: hidden !important;
 		}
 
-		/* Reapply fixed proportions and bring the kids box back into the corner */
+		/* Reapply viewport-relative proportions and corner kids box for print */
 		:global([data-print-area] .paper-columns) {
-			min-height: 0 !important;
+			height: auto !important;
+			flex: 1 1 auto !important;
 			overflow: hidden !important;
 		}
 		:global([data-print-area] .paper-columns > div[class*='border-l']) {
