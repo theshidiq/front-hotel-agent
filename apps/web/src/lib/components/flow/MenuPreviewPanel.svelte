@@ -343,10 +343,10 @@
 	</header>
 
 	<!-- A4 Landscape paper area -->
-	<div class="flex-1 flex items-center justify-center p-6 overflow-hidden print:p-0">
-		<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full h-full relative print:shadow-none print:border-0" data-print-area>
+	<div class="flex-1 flex items-start justify-center p-6 overflow-auto print:p-0 print:overflow-visible print:items-stretch">
+		<div class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col w-full relative print:shadow-none print:border-0" data-print-area>
 			<!-- Paper content -->
-			<div class="flex-1 flex overflow-hidden" dir="rtl">
+			<div class="paper-columns flex-1 flex print:overflow-hidden" dir="rtl">
 
 				<!-- Title column (far right) -->
 				<div class="flex-none flex flex-col border-l border-stone-200 relative paper-title-col" dir="ltr">
@@ -503,23 +503,26 @@
 				{/if}
 			</div>
 
-			<!-- Kids group box (bottom-right corner, like actual menu) -->
+			<!-- Kids group box — its own block below the menu (screen),
+			     pinned to bottom-right corner only when printing -->
 			{#if kidsGroup}
-				<div class="absolute bottom-3 right-3 kids-box border border-dashed border-stone-400 bg-white p-3" dir="ltr">
-					<div class="font-serif-jp text-xs font-medium text-stone-800 text-center border-b border-stone-300 pb-1.5 mb-2">
-						{kidsGroup.name}
+				<div class="kids-box-wrap flex justify-end px-3 pb-3 pt-2 print:p-0" dir="ltr">
+					<div class="kids-box border border-dashed border-stone-400 bg-white p-3 print:absolute print:bottom-3 print:right-3">
+						<div class="font-serif-jp text-xs font-medium text-stone-800 text-center border-b border-stone-300 pb-1.5 mb-2">
+							{kidsGroup.name}
+						</div>
+						{#if kidsGroup.courseNames.length > 0}
+							<div class="flex flex-col items-center gap-0.5">
+								{#each kidsGroup.courseNames as name}
+									<span class="font-serif-jp text-[11px] text-stone-700">・{name}</span>
+								{/each}
+							</div>
+						{:else}
+							<div class="font-serif-jp text-[10px] text-stone-300 text-center py-2">
+								コース未設定
+							</div>
+						{/if}
 					</div>
-					{#if kidsGroup.courseNames.length > 0}
-						<div class="flex flex-col items-center gap-0.5">
-							{#each kidsGroup.courseNames as name}
-								<span class="font-serif-jp text-[11px] text-stone-700">・{name}</span>
-							{/each}
-						</div>
-					{:else}
-						<div class="font-serif-jp text-[10px] text-stone-300 text-center py-2">
-							コース未設定
-						</div>
-					{/if}
 				</div>
 			{/if}
 
@@ -542,12 +545,28 @@
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
 	}
 
+	/* On screen the paper grows with its content and the outer area scrolls,
+	   so columns stay a readable width on any device/resolution. The fixed A4
+	   aspect ratio is reapplied only for print (see @media print below). */
 	.a4-paper {
-		aspect-ratio: 297 / 210;
+		min-height: 70vh;
+	}
+
+	/* Column band keeps a comfortable minimum height so vertical text has room */
+	.paper-columns {
+		min-height: 60vh;
 	}
 
 	.paper-title-col {
-		width: clamp(60px, 7%, 120px);
+		/* fixed readable width on screen instead of a viewport-relative % */
+		width: 110px;
+		flex: none;
+	}
+
+	/* Each course column keeps a minimum readable width; the paper scrolls
+	   horizontally if there are too many to fit. */
+	.paper-columns > :global(div[class*="border-l"]) {
+		min-width: 90px;
 	}
 
 	.course-header-box {
@@ -556,8 +575,7 @@
 	}
 
 	.kids-box {
-		width: clamp(140px, 15%, 220px);
-		max-height: 45%;
+		width: clamp(160px, 20vw, 240px);
 		overflow: hidden;
 	}
 
@@ -596,6 +614,24 @@
 			left: 0;
 			width: 100vw;
 			height: 100vh;
+			/* Restore single-page A4 behaviour for print/PDF (screen scrolls instead) */
+			min-height: 0 !important;
+			overflow: hidden !important;
+		}
+
+		/* Reapply fixed proportions and bring the kids box back into the corner */
+		:global([data-print-area] .paper-columns) {
+			min-height: 0 !important;
+			overflow: hidden !important;
+		}
+		:global([data-print-area] .paper-columns > div[class*='border-l']) {
+			min-width: 0 !important;
+		}
+		:global([data-print-area] .paper-title-col) {
+			width: clamp(60px, 7%, 120px) !important;
+		}
+		:global([data-print-area] .kids-box-wrap) {
+			padding: 0 !important;
 		}
 
 		/* Hide interactive buttons (delete, dropdown, etc.) but NOT the title column button */
