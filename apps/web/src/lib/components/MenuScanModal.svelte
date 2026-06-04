@@ -210,8 +210,14 @@
 			import('jspdf'),
 		]);
 
-		// Hide editing affordances during capture
+		// Hide editing affordances during capture, and neutralise the on-screen
+		// fit-to-width scaling so the FULL paper (all columns) is captured at its
+		// natural size — otherwise the scaled/clipped layout drops the last column.
+		const prevTransform = paperEl.style.transform;
+		const prevWidth = paperEl.style.width;
 		paperEl.classList.add('capturing');
+		paperEl.style.transform = 'none';
+		paperEl.style.width = paperNaturalW + 'px';
 		await new Promise(r => requestAnimationFrame(r));   // let the DOM repaint
 
 		let canvas: HTMLCanvasElement;
@@ -221,9 +227,14 @@
 				backgroundColor: '#ffffff',
 				useCORS: true,
 				logging: false,
+				width: paperEl.scrollWidth,
+				height: paperEl.scrollHeight,
+				windowWidth: paperEl.scrollWidth,
 			});
 		} finally {
 			paperEl.classList.remove('capturing');
+			paperEl.style.transform = prevTransform;
+			paperEl.style.width = prevWidth;
 		}
 
 		const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -1204,20 +1215,16 @@
 		left: auto;
 	}
 
-	/* ---- PDF capture: fit the paper to a single A4 page ---- */
+	/* ---- PDF capture ----
+	   Capture the paper at its full natural width (all columns, no fit-scaling).
+	   The captured image is then fitted to the A4 page in buildPdf() via
+	   addImage(), so we must NOT squish columns here — that dropped the last
+	   column. Width/transform are cleared in JS during capture. */
 	:global(.a4-paper.capturing) {
-		width: 100% !important;
-		aspect-ratio: 297 / 210;
-		max-height: 100%;
 		transform: none !important;   /* drop the on-screen fit scaling */
 	}
 	:global(.a4-paper.capturing) .scan-paper-columns {
-		height: auto !important;
-		flex: 1 1 auto !important;
-		overflow: hidden !important;
-	}
-	:global(.a4-paper.capturing) .scan-paper-columns > :global(.course-col) {
-		min-width: 0 !important;
+		overflow: visible !important;   /* never clip a column during capture */
 	}
 
 	@media print {
