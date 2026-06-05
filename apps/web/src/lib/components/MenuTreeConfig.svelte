@@ -856,7 +856,7 @@
 				</div>
 				<button
 					onclick={() => { showAddCourse = !showAddCourse; newCourseName = ''; }}
-					class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+					class="text-sm text-slate-800 hover:text-slate-900 font-medium"
 				>
 					{showAddCourse ? 'Cancel' : '+ Add Course'}
 				</button>
@@ -874,7 +874,7 @@
 					<button
 						onclick={submitNewCourse}
 						disabled={isAddingCourse || !newCourseName.trim()}
-						class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+						class="bg-navy text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-navy-700 disabled:opacity-50"
 					>
 						{isAddingCourse ? 'Adding...' : 'Add'}
 					</button>
@@ -913,7 +913,7 @@
 								onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitRenameCourse(course.id); if (e.key === 'Escape') renamingCourseId = null; }}
 								autofocus
 							/>
-							<button onclick={() => submitRenameCourse(course.id)} class="text-blue-600 hover:text-blue-800 transition-colors" title="Save">
+							<button onclick={() => submitRenameCourse(course.id)} class="text-slate-800 hover:text-slate-900 transition-colors" title="Save">
 								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
 							</button>
 							<button onclick={() => { renamingCourseId = null; }} class="text-gray-400 hover:text-gray-600 transition-colors" title="Cancel">
@@ -924,7 +924,7 @@
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
 							<span
-								class="text-sm text-blue-800 cursor-pointer hover:underline"
+								class="text-sm text-slate-900 cursor-pointer hover:underline"
 								ondblclick={() => startRenameCourse(course)}
 								title="Double-click to rename"
 							>{course.label}</span>

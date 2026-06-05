@@ -188,7 +188,7 @@
 				? 'border-red-500 bg-red-50 dark:bg-red-950'
 				: 'border-gray-200 hover:border-red-300 dark:border-gray-700',
 			blue: isSelected
-				? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+				? 'border-navy bg-blue-50 dark:bg-blue-950'
 				: 'border-gray-200 hover:border-blue-300 dark:border-gray-700',
 			green: isSelected
 				? 'border-green-500 bg-green-50 dark:bg-green-950'
@@ -229,7 +229,7 @@
 						</div>
 					</div>
 					{#if selectedPreset === key}
-						<div class="mt-3 flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+						<div class="mt-3 flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-blue-400">
 							<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
 								<path
 									fill-rule="evenodd"
@@ -417,7 +417,7 @@
 						class="peer sr-only"
 					/>
 					<div
-						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-navy peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-navy"
 					></div>
 				</label>
 			</div>
@@ -438,7 +438,7 @@
 						class="peer sr-only"
 					/>
 					<div
-						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-navy peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-navy"
 					></div>
 				</label>
 			</div>
@@ -459,7 +459,7 @@
 						class="peer sr-only"
 					/>
 					<div
-						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-navy peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-navy"
 					></div>
 				</label>
 			</div>
@@ -480,7 +480,7 @@
 						class="peer sr-only"
 					/>
 					<div
-						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-blue-800"
+						class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-navy peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:border-gray-600 dark:bg-gray-700 dark:peer-focus:ring-navy"
 					></div>
 				</label>
 			</div>
@@ -502,7 +502,7 @@
 					max="300"
 					step="5"
 					bind:value={localConfig.solver_settings.timeout}
-					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 				/>
 				<p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
 					最適化の最大実行時間（推奨：30-60秒）
@@ -516,7 +516,7 @@
 				</label>
 				<select
 					bind:value={localConfig.solver_settings.numWorkers}
-					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 				>
 					<option value={1}>1 スレッド</option>
 					<option value={2}>2 スレッド</option>
@@ -555,7 +555,7 @@
 			type="button"
 			onclick={handleSave}
 			disabled={!hasChanges || isSaving}
-			class="rounded-lg bg-blue-600 px-8 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+			class="rounded-lg bg-navy px-8 py-2 font-medium text-white transition-colors hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
 		>
 			{#if isSaving}
 				保存中...

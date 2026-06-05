@@ -126,7 +126,7 @@ async function handleDelete(id: string) {
     <button
       onclick={() => { showAddForm = !showAddForm; addStaffId = ''; addGroupId = ''; }}
       disabled={loading}
-      class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+      class="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
     >
       <span class="material-symbols-rounded text-xl">{showAddForm ? 'close' : 'add'}</span>
       {showAddForm ? 'キャンセル' : '追加'}
@@ -134,8 +134,8 @@ async function handleDelete(id: string) {
   </div>
 
   <!-- Info banner -->
-  <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-    <span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">backup</span>
+  <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-slate-900">
+    <span class="material-symbols-rounded text-slate-800 mt-0.5 shrink-0">backup</span>
     <div>
       <span class="font-medium">OR-Tools連携：</span>
       バックアップスタッフは通常グループの休み制約から除外され、カバレッジルールに従って自動配置されます。
@@ -170,7 +170,7 @@ async function handleDelete(id: string) {
           <label class="block text-xs font-medium text-gray-500 mb-1">バックアップスタッフ</label>
           <select
             bind:value={addStaffId}
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent bg-white"
           >
             <option value="">スタッフを選択...</option>
             {#each allStaff.filter(s => s.is_active) as s (s.id)}
@@ -182,7 +182,7 @@ async function handleDelete(id: string) {
           <label class="block text-xs font-medium text-gray-500 mb-1">カバーするグループ</label>
           <select
             bind:value={addGroupId}
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent bg-white"
           >
             <option value="">グループを選択...</option>
             {#each staffGroups as g (g.id)}
@@ -195,7 +195,7 @@ async function handleDelete(id: string) {
         <button
           onclick={handleAdd}
           disabled={!addStaffId || !addGroupId || loadingId === 'add'}
-          class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          class="px-4 py-2 text-sm bg-navy text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
         >
           {loadingId === 'add' ? '追加中...' : '追加'}
         </button>
@@ -221,7 +221,7 @@ async function handleDelete(id: string) {
             onclick={() => handleToggleActive(a)}
             disabled={loadingId === a.id}
             title={a.isActive ? '無効にする' : '有効にする'}
-            class="shrink-0 w-10 h-6 rounded-full transition-colors {a.isActive ? 'bg-blue-500' : 'bg-gray-300'} relative disabled:opacity-50"
+            class="shrink-0 w-10 h-6 rounded-full transition-colors {a.isActive ? 'bg-slate-800' : 'bg-gray-300'} relative disabled:opacity-50"
           >
             <span
               class="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform {a.isActive ? 'translate-x-4' : 'translate-x-0.5'}"
@@ -236,7 +236,7 @@ async function handleDelete(id: string) {
               <span class="text-sm text-gray-600">{getGroupName(a.groupId)}</span>
             </div>
             <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-xs px-1.5 py-0.5 rounded {a.isActive ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}">
+              <span class="text-xs px-1.5 py-0.5 rounded {a.isActive ? 'bg-blue-50 text-slate-800' : 'bg-gray-100 text-gray-500'}">
                 {a.isActive ? '有効' : '無効'}
               </span>
               {#if a.assignmentType}

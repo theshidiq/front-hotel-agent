@@ -725,9 +725,9 @@
 									onclick={() => selectSpecificDate(dateStr)}
 									class="aspect-square p-1 text-xs rounded-lg transition-colors relative
 										{isSelected
-										? 'bg-blue-500 text-white font-semibold'
+										? 'bg-slate-800 text-white font-semibold'
 										: isToday
-											? 'bg-blue-100 text-blue-700 font-semibold'
+											? 'bg-blue-100 text-slate-800 font-semibold'
 											: isPast &&
 												  date.getMonth() !==
 														new Date().getMonth()
@@ -776,7 +776,7 @@
 			<div class="flex items-center justify-center h-64">
 				<div class="text-center">
 					<div
-						class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"
+						class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-navy"
 					></div>
 					<p class="mt-4 text-gray-600">読み込み中...</p>
 				</div>
@@ -873,7 +873,7 @@
 								type="text"
 								bind:value={allergenSearchQuery}
 								placeholder="部屋番号・アレルゲン検索..."
-								class="w-64 px-3 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+								class="w-64 px-3 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent"
 							/>
 							<span
 								class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
@@ -903,7 +903,7 @@
 								onclick={() => (selectedStayPeriod = "all")}
 								class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {selectedStayPeriod ===
 								'all'
-									? 'bg-blue-100 text-blue-700 border border-blue-300'
+									? 'bg-blue-100 text-slate-800 border border-blue-300'
 									: 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'}"
 							>
 								全て
@@ -913,7 +913,7 @@
 									onclick={() => (selectedStayPeriod = 1)}
 									class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {selectedStayPeriod ===
 									1
-										? 'bg-blue-100 text-blue-700 border border-blue-300'
+										? 'bg-blue-100 text-slate-800 border border-blue-300'
 										: 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'}"
 								>
 									1泊目
@@ -924,7 +924,7 @@
 									onclick={() => (selectedStayPeriod = 2)}
 									class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {selectedStayPeriod ===
 									2
-										? 'bg-blue-100 text-blue-700 border border-blue-300'
+										? 'bg-blue-100 text-slate-800 border border-blue-300'
 										: 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'}"
 								>
 									2泊目
@@ -935,7 +935,7 @@
 									onclick={() => (selectedStayPeriod = "3+")}
 									class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {selectedStayPeriod ===
 									'3+'
-										? 'bg-blue-100 text-blue-700 border border-blue-300'
+										? 'bg-blue-100 text-slate-800 border border-blue-300'
 										: 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'}"
 								>
 									3+泊目
@@ -1107,7 +1107,7 @@
 																						class="flex-shrink-0"
 																					>
 																						<span
-																							class="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold whitespace-nowrap"
+																							class="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-slate-800 border border-blue-200 rounded-lg text-xs font-semibold whitespace-nowrap"
 																						>
 																							<span
 																								class="material-symbols-rounded text-[13px]"

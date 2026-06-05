@@ -296,7 +296,7 @@
 					type="button"
 					onclick={() => viewMode = 'grid'}
 					class="px-3 py-1.5 flex items-center gap-1.5 text-sm transition-colors
-						{viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+						{viewMode === 'grid' ? 'bg-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
 					title="カレンダー表示"
 				>
 					<Grid3x3 class="w-4 h-4" />
@@ -306,7 +306,7 @@
 					type="button"
 					onclick={() => viewMode = 'list'}
 					class="px-3 py-1.5 flex items-center gap-1.5 text-sm transition-colors border-l border-gray-200
-						{viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+						{viewMode === 'list' ? 'bg-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
 					title="リスト表示"
 				>
 					<List class="w-4 h-4" />
@@ -327,7 +327,7 @@
 			<button
 				type="button"
 				onclick={openAddModal}
-				class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+				class="flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 transition-colors font-medium"
 			>
 				<Plus class="w-4 h-4" />
 				ルール追加
@@ -338,8 +338,8 @@
 	<!-- Info Box -->
 	<div class="rounded-lg bg-blue-50 p-4 border border-blue-200">
 		<div class="flex items-start gap-3">
-			<Calendar class="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-			<div class="text-sm text-blue-800">
+			<Calendar class="h-5 w-5 text-slate-800 mt-0.5 flex-shrink-0" />
+			<div class="text-sm text-slate-900">
 				<p class="font-medium mb-1">カレンダールールについて</p>
 				{#if viewMode === 'grid'}
 					<p>日付をクリックするとルールが切り替わります: <span class="font-semibold text-green-700">全員出勤</span> → <span class="font-semibold text-red-700">全員休み</span> → 削除。全画面ボタンで年間カレンダーを表示できます。</p>
@@ -416,7 +416,7 @@
 					<span>祝日</span>
 				</div>
 				<div class="flex items-center gap-1.5">
-					<div class="w-4 h-4 rounded border-2 border-blue-500 flex items-center justify-center text-blue-600 font-bold" style="font-size:9px">今</div>
+					<div class="w-4 h-4 rounded border-2 border-navy flex items-center justify-center text-slate-800 font-bold" style="font-size:9px">今</div>
 					<span>今日</span>
 				</div>
 				<span class="text-gray-400">※ クリックで切り替え</span>
@@ -433,7 +433,7 @@
 						<div class="grid grid-cols-7 mb-1">
 							{#each ['日','月','火','水','木','金','土'] as dow, i}
 								<div class="text-center text-xs font-medium py-1
-									{i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}">
+									{i === 0 ? 'text-red-500' : i === 6 ? 'text-slate-700' : 'text-gray-500'}">
 									{dow}
 								</div>
 							{/each}
@@ -456,7 +456,7 @@
 										class="aspect-square rounded text-xs font-medium transition-all
 											flex flex-col items-center justify-center leading-none
 											disabled:cursor-not-allowed
-											{isToday ? 'ring-2 ring-blue-500 ring-inset z-10' : ''}
+											{isToday ? 'ring-2 ring-slate-700 ring-inset z-10' : ''}
 											{rule?.rule_type === 'must_work'
 												? 'bg-green-100 text-green-800 border border-green-400 hover:bg-green-200'
 												: rule?.rule_type === 'must_day_off'
@@ -474,7 +474,7 @@
 											? `${formatDate(dateStr)}: ${holidayName}`
 											: isToday ? '今日' : formatDate(dateStr)}
 									>
-										<span class="{isToday ? 'font-bold text-blue-600' : ''}">{cell}</span>
+										<span class="{isToday ? 'font-bold text-slate-800' : ''}">{cell}</span>
 										{#if rule}
 											<span style="font-size:8px; line-height:1; margin-top:1px">
 												{rule.rule_type === 'must_work' ? '出' : '休'}
@@ -590,7 +590,7 @@
 					<div class="w-3 h-3 rounded bg-orange-200 border border-orange-300"></div><span class="text-gray-700">祝日</span>
 				</div>
 				<div class="flex items-center gap-1.5">
-					<div class="w-3 h-3 rounded border-2 border-blue-500"></div><span class="text-gray-700">今日</span>
+					<div class="w-3 h-3 rounded border-2 border-navy"></div><span class="text-gray-700">今日</span>
 				</div>
 				<span class="text-gray-400">クリックで切り替え · ESCで閉じる</span>
 			</div>
@@ -630,7 +630,7 @@
 							<div class="grid grid-cols-7 shrink-0 mb-0.5">
 								{#each ['日','月','火','水','木','金','土'] as d, i}
 									<div class="text-center font-medium leading-none py-0.5
-										{i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-400'}"
+										{i === 0 ? 'text-red-500' : i === 6 ? 'text-slate-700' : 'text-gray-400'}"
 										style="font-size:9px">
 										{d}
 									</div>
@@ -659,7 +659,7 @@
 											disabled={loading}
 											class="w-full h-full rounded flex flex-col items-center justify-center leading-none
 												transition-colors disabled:cursor-not-allowed font-medium
-												{isToday ? 'ring-2 ring-blue-500 ring-inset z-10' : ''}
+												{isToday ? 'ring-2 ring-slate-700 ring-inset z-10' : ''}
 												{rule?.rule_type === 'must_work'
 													? 'bg-green-100 text-green-800 border border-green-400 hover:bg-green-200'
 													: rule?.rule_type === 'must_day_off'
@@ -678,7 +678,7 @@
 												? `${formatDate(dateStr)}: ${holidayName}`
 												: isToday ? '今日' : formatDate(dateStr)}
 										>
-											<span class="{isToday ? 'font-bold text-blue-600' : ''}" style="font-size:10px">{day}</span>
+											<span class="{isToday ? 'font-bold text-slate-800' : ''}" style="font-size:10px">{day}</span>
 											{#if rule}
 												<span style="font-size:7px; line-height:1; margin-top:1px">
 													{rule.rule_type === 'must_work' ? '出' : '休'}
@@ -720,7 +720,7 @@
 					<label class="block text-sm font-medium text-gray-700 mb-1">日付 <span class="text-red-500">*</span></label>
 					<input
 						type="date"
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 						bind:value={ruleForm.date}
 						required
 					/>
@@ -729,7 +729,7 @@
 				<div>
 					<label class="block text-sm font-medium text-gray-700 mb-1">ルールタイプ <span class="text-red-500">*</span></label>
 					<select
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 						bind:value={ruleForm.rule_type}
 					>
 						<option value="must_day_off">全員休み</option>
@@ -741,7 +741,7 @@
 					<label class="block text-sm font-medium text-gray-700 mb-1">理由</label>
 					<input
 						type="text"
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 						bind:value={ruleForm.reason}
 						placeholder="例: 定休日、正月、祝日"
 					/>
@@ -761,7 +761,7 @@
 					type="button"
 					onclick={saveRule}
 					disabled={loading || !ruleForm.date}
-					class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					class="px-4 py-2 text-white bg-navy rounded-lg hover:bg-navy-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 				>
 					{loading ? '追加中...' : '追加'}
 				</button>

@@ -294,7 +294,7 @@
 				<h2 class="text-xl font-semibold text-gray-700 mb-2">ログインが必要です</h2>
 				<p class="text-gray-500 mb-4">シフト設定機能を利用するにはログインしてください</p>
 				<button
-					class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+					class="px-6 py-3 bg-navy text-white rounded-lg hover:bg-navy-700 transition-colors flex items-center gap-2 mx-auto"
 					onclick={() => signInWithGoogle(window.location.href)}
 				>
 					<svg class="w-5 h-5" viewBox="0 0 24 24">
@@ -310,7 +310,7 @@
 	{:else if loading}
 		<div class="flex items-center justify-center h-64">
 			<div class="text-center">
-				<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+				<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto mb-4"></div>
 				<p class="text-gray-500">設定を読み込んでいます...</p>
 			</div>
 		</div>
@@ -326,10 +326,10 @@
 								onclick={() => activeTab = tab.id as SettingsTab}
 								class="w-full flex items-start gap-3 p-4 text-left transition-colors border-l-4
 									{activeTab === tab.id
-										? 'bg-blue-50 border-blue-600 text-blue-700'
+										? 'bg-blue-50 border-navy text-slate-800'
 										: 'border-transparent text-gray-600 hover:bg-gray-50'}"
 							>
-								<span class="material-symbols-rounded {activeTab === tab.id ? 'text-blue-600' : 'text-gray-400'}">
+								<span class="material-symbols-rounded {activeTab === tab.id ? 'text-slate-800' : 'text-gray-400'}">
 									{tab.icon}
 								</span>
 								<div class="flex-1 min-w-0">
@@ -348,10 +348,10 @@
 					<!-- Help Box -->
 					<div class="mt-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
 						<div class="flex items-start gap-2">
-							<span class="material-symbols-rounded text-blue-600">help_outline</span>
+							<span class="material-symbols-rounded text-slate-800">help_outline</span>
 							<div>
 								<h4 class="font-medium text-blue-900 text-sm">ヘルプ</h4>
-								<p class="text-xs text-blue-700 mt-1">
+								<p class="text-xs text-slate-800 mt-1">
 									各タブで設定を変更後、保存ボタンを押して反映してください。
 								</p>
 							</div>

@@ -695,7 +695,7 @@
 		'牛肉': 'bg-red-500', '豚肉': 'bg-red-400', '鶏肉': 'bg-red-300',
 		'小麦': 'bg-amber-500', '大麦': 'bg-amber-400', 'ライ麦': 'bg-amber-400', 'オーツ麦': 'bg-amber-400',
 		'卵': 'bg-orange-500',
-		'乳': 'bg-blue-500', 'チーズ': 'bg-blue-400',
+		'乳': 'bg-slate-800', 'チーズ': 'bg-blue-400',
 		'えび': 'bg-pink-500', 'かに': 'bg-cyan-500',
 		'大豆': 'bg-violet-500',
 		'ごま': 'bg-yellow-600',
@@ -937,8 +937,16 @@ ${coursesHtml}
 	let dataLoaded = $state(false);
 
 	onMount(() => {
-		const tab = $page.url.searchParams.get('tab');
+		const params = $page.url.searchParams;
+		const tab = params.get('tab');
 		if (tab === 'menu' || tab === 'menus') mainTab = 'menu';
+		else if (tab === 'products' || tab === 'product') mainTab = 'products';
+
+		// Deep-link sub-actions from the global search bar
+		const wantsScan = params.get('scan') === '1';
+		if (params.get('structure') === '1' || wantsScan) {
+			openMenuStructure(wantsScan);
+		}
 	});
 
 	$effect(() => {
@@ -1208,7 +1216,7 @@ ${coursesHtml}
 					{#if mainTab === 'products' && (can('products.create') || can('products.scan'))}
 						<button
 							onclick={() => showAddProduct = !showAddProduct}
-							class="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+							class="hidden md:flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy-700 transition-colors"
 						>
 							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -1230,7 +1238,7 @@ ${coursesHtml}
 					{#if !authState.isStaff && !authState.loading}
 						<a
 							href="/login"
-							class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+							class="flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy-700 transition-colors"
 						>
 							<span class="material-symbols-rounded text-lg">login</span>
 							ログイン
@@ -1332,7 +1340,7 @@ ${coursesHtml}
 								</svg>
 								<p class="text-gray-600 text-sm mb-3">Drag & drop or browse</p>
 								<div class="flex gap-2 justify-center">
-									<label class="cursor-pointer px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+									<label class="cursor-pointer px-3 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy-700">
 										Choose File
 										<input type="file" accept="image/*" class="hidden" onchange={handleFileInput} />
 									</label>
@@ -1358,7 +1366,7 @@ ${coursesHtml}
 							<button
 								onclick={startScan}
 								disabled={isScanning}
-								class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+								class="flex-1 px-4 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy-700 disabled:opacity-50 flex items-center justify-center gap-2"
 							>
 								{#if isScanning}
 									<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -1381,7 +1389,7 @@ ${coursesHtml}
 				<div>
 					{#if isScanning}
 						<div class="flex flex-col items-center justify-center h-full py-8 text-center">
-							<svg class="w-8 h-8 text-blue-600 animate-pulse mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-8 h-8 text-slate-800 animate-pulse mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
 							</svg>
 							<p class="text-gray-600 text-sm">Analyzing image...</p>
@@ -1395,7 +1403,7 @@ ${coursesHtml}
 								</svg>
 								<span class="text-green-700 text-sm font-medium">Product saved successfully!</span>
 							</div>
-							<button onclick={scanAnother} class="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+							<button onclick={scanAnother} class="w-full px-4 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy-700">
 								Scan Another
 							</button>
 						</div>
@@ -1403,10 +1411,10 @@ ${coursesHtml}
 						<!-- Editable review form pre-filled with OCR data -->
 						<div class="space-y-4">
 							<div class="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
-								<svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg class="w-4 h-4 text-slate-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 								</svg>
-								<span class="text-blue-700 text-xs">Review extracted data and confirm to save</span>
+								<span class="text-slate-800 text-xs">Review extracted data and confirm to save</span>
 							</div>
 
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1418,7 +1426,7 @@ ${coursesHtml}
 											type="text"
 											bind:value={scanReviewProduct.name}
 											placeholder="Product name"
-											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 										/>
 									</div>
 
@@ -1429,7 +1437,7 @@ ${coursesHtml}
 												type="text"
 												bind:value={scanReviewProduct.brand}
 												placeholder="Brand"
-												class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+												class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 											/>
 										</div>
 										<div>
@@ -1486,7 +1494,7 @@ ${coursesHtml}
 										{/if}
 										<!-- Search and all allergens -->
 										<div class="mb-2">
-											<input type="text" bind:value={scanAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+											<input type="text" bind:value={scanAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-navy" />
 										</div>
 										<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg max-h-32 overflow-y-auto">
 											{#each scanSearchedAllergens.filter(a => !(scanReviewProduct.allergen_ids || []).includes(a.id)) as allergen}
@@ -1513,7 +1521,7 @@ ${coursesHtml}
 											bind:value={scanReviewProduct.ingredients_raw}
 											rows="3"
 											placeholder="Ingredients list..."
-											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 										></textarea>
 									</div>
 
@@ -1523,7 +1531,7 @@ ${coursesHtml}
 											bind:value={scanReviewProduct.storage_instructions}
 											rows="2"
 											placeholder="Storage instructions..."
-											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 										></textarea>
 									</div>
 
@@ -1533,7 +1541,7 @@ ${coursesHtml}
 											bind:value={scanReviewProduct.preparation_instructions}
 											rows="2"
 											placeholder="Preparation instructions..."
-											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 										></textarea>
 									</div>
 								</div>
@@ -1547,7 +1555,7 @@ ${coursesHtml}
 								<button
 									onclick={confirmScanSave}
 									disabled={isSavingScan}
-									class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+									class="flex-1 px-4 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy-700 disabled:opacity-50 flex items-center justify-center gap-2"
 								>
 									{#if isSavingScan}
 										<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -1634,7 +1642,7 @@ ${coursesHtml}
 										type="text"
 										bind:value={newProduct.name}
 										placeholder="e.g., House Special Curry"
-										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 									/>
 								</div>
 								<div class="grid grid-cols-2 gap-3">
@@ -1644,13 +1652,13 @@ ${coursesHtml}
 											type="text"
 											bind:value={newProduct.brand}
 											placeholder="e.g., In-house"
-											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+											class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 										/>
 									</div>
 									<div>
 										<div class="flex items-center justify-between mb-1">
 											<label class="text-sm font-medium text-gray-700">Category</label>
-											<button type="button" onclick={openManageProductCategories} class="p-0.5 text-gray-400 hover:text-blue-600 transition-colors" title="Manage categories">
+											<button type="button" onclick={openManageProductCategories} class="p-0.5 text-gray-400 hover:text-slate-900 transition-colors" title="Manage categories">
 												<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 											</button>
 										</div>
@@ -1694,7 +1702,7 @@ ${coursesHtml}
 										</button>
 									</div>
 									<div class="mb-2">
-										<input type="text" bind:value={allergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+										<input type="text" bind:value={allergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-navy" />
 									</div>
 									<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg">
 										{#each searchedAllergens as allergen}
@@ -1721,7 +1729,7 @@ ${coursesHtml}
 										bind:value={newProduct.ingredients_raw}
 										rows="3"
 										placeholder="List all ingredients..."
-										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 									></textarea>
 								</div>
 								<div>
@@ -1730,7 +1738,7 @@ ${coursesHtml}
 										bind:value={newProduct.storage_instructions}
 										rows="2"
 										placeholder="How to store this product..."
-										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 									></textarea>
 								</div>
 								<div>
@@ -1739,7 +1747,7 @@ ${coursesHtml}
 										bind:value={newProduct.preparation_instructions}
 										rows="2"
 										placeholder="How to prepare/serve..."
-										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 									></textarea>
 								</div>
 							</div>
@@ -1753,7 +1761,7 @@ ${coursesHtml}
 							<button
 								onclick={handleCreateProduct}
 								disabled={isCreating}
-								class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+								class="flex-1 px-4 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy-700 disabled:opacity-50 flex items-center justify-center gap-2"
 							>
 								{#if isCreating}
 									<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -1783,7 +1791,7 @@ ${coursesHtml}
 					type="text"
 					placeholder="Search..."
 					bind:value={searchQuery}
-					class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+					class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy w-48"
 				/>
 			</div>
 
@@ -1791,14 +1799,14 @@ ${coursesHtml}
 				<div class="flex flex-wrap gap-1.5 mb-4">
 					<button
 						onclick={() => selectedProductMenuGroup = 'all'}
-						class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+						class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === 'all' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 					>
 						All
 					</button>
 					{#each menuGroups as group}
 						<button
 							onclick={() => selectedProductMenuGroup = group.id}
-							class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === group.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+							class="px-3 py-1 rounded-full text-xs font-medium transition-colors {selectedProductMenuGroup === group.id ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 						>
 							{group.name}
 						</button>
@@ -1876,7 +1884,7 @@ ${coursesHtml}
 											<button
 												onclick={() => saveProduct(product.id)}
 												disabled={isSaving}
-												class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+												class="px-3 py-1.5 bg-navy text-white text-sm rounded-lg hover:bg-navy-700 disabled:opacity-50 flex items-center gap-1"
 											>
 												{#if isSaving}
 													<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -1924,7 +1932,7 @@ ${coursesHtml}
 													<input
 														type="text"
 														bind:value={editForm.name}
-														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 													/>
 												</div>
 												<div class="grid grid-cols-2 gap-3">
@@ -1933,13 +1941,13 @@ ${coursesHtml}
 														<input
 															type="text"
 															bind:value={editForm.brand}
-															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+															class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 														/>
 													</div>
 													<div>
 														<div class="flex items-center justify-between mb-1">
 															<label class="text-sm font-medium text-gray-700">Category</label>
-															<button type="button" onclick={openManageProductCategories} class="p-0.5 text-gray-400 hover:text-blue-600 transition-colors" title="Manage categories">
+															<button type="button" onclick={openManageProductCategories} class="p-0.5 text-gray-400 hover:text-slate-900 transition-colors" title="Manage categories">
 																<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
 															</button>
 														</div>
@@ -1983,7 +1991,7 @@ ${coursesHtml}
 														</button>
 													</div>
 													<div class="mb-2">
-														<input type="text" bind:value={editAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+														<input type="text" bind:value={editAllergenSearch} placeholder="Search allergens..." class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-navy" />
 													</div>
 													<div class="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
 														{#each searchedEditAllergens as allergen}
@@ -2010,7 +2018,7 @@ ${coursesHtml}
 													<textarea
 														bind:value={editForm.ingredients_raw}
 														rows="4"
-														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 													></textarea>
 												</div>
 
@@ -2020,7 +2028,7 @@ ${coursesHtml}
 													<textarea
 														bind:value={editForm.storage_instructions}
 														rows="2"
-														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 													></textarea>
 												</div>
 
@@ -2030,7 +2038,7 @@ ${coursesHtml}
 													<textarea
 														bind:value={editForm.preparation_instructions}
 														rows="2"
-														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+														class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 													></textarea>
 												</div>
 											</div>
@@ -2149,13 +2157,13 @@ ${coursesHtml}
 						type="text"
 						bind:value={allergenReportSearch}
 						placeholder="Search course, product, allergen..."
-						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+						class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy w-64"
 					/>
 					{#if can('reports.print')}
 					<button
 						onclick={printAllergenReport}
 						disabled={isPrinting}
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
 					>
 						<span class="material-symbols-rounded text-base">print</span>
 						{isPrinting ? 'Preparing...' : 'Print PDF'}
@@ -2271,7 +2279,7 @@ ${coursesHtml}
 				<div class="px-6 py-4 border-b border-gray-200 bg-blue-50">
 					<div class="flex items-center gap-3">
 						<div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-							<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
 							</svg>
 						</div>
@@ -2289,13 +2297,13 @@ ${coursesHtml}
 								type="text"
 								bind:value={newProductCategoryName}
 								placeholder="e.g., Dairy, Sauce"
-								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+								class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy"
 								onkeydown={(e) => e.key === 'Enter' && !e.isComposing && addProductCategory()}
 							/>
 							<button
 								onclick={addProductCategory}
 								disabled={!newProductCategoryName.trim() || isAddingProductCategory}
-								class="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+								class="px-3 py-2 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 focus:outline-none focus:ring-2 focus:ring-navy disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 							>
 								{isAddingProductCategory ? '...' : 'Add'}
 							</button>
@@ -2462,7 +2470,7 @@ ${coursesHtml}
 				<!-- Modal Body -->
 				<div class="px-6 py-4 space-y-4">
 					<!-- Info Banner -->
-					<div class="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+					<div class="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-slate-800">
 						<svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 						</svg>

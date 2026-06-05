@@ -236,7 +236,7 @@
 							type="button"
 							class="px-4 py-3 rounded-lg text-center font-medium transition-colors {
 								period.id === selectedPeriodId
-									? 'bg-blue-600 text-white'
+									? 'bg-navy text-white'
 									: 'bg-gray-100 text-gray-700 hover:bg-gray-200'
 							}"
 							onclick={() => handleSelect(period.id)}

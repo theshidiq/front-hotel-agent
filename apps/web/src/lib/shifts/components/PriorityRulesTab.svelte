@@ -263,7 +263,7 @@
 		<button
 			onclick={startCreate}
 			disabled={isCreating || editingRuleId !== null}
-			class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+			class="px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
 		>
 			+ 新規ルール追加
 		</button>
@@ -278,7 +278,7 @@
 			<select
 				id="staff-filter"
 				bind:value={filterStaffId}
-				class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+				class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
 			>
 				<option value="">すべて表示</option>
 				{#each allStaff as staff}
@@ -298,7 +298,7 @@
 
 	<!-- Form (Create/Edit) -->
 	{#if isCreating || editingRuleId}
-		<div class="bg-white border-2 border-blue-500 rounded-xl p-6 shadow-lg">
+		<div class="bg-white border-2 border-navy rounded-xl p-6 shadow-lg">
 			<div class="flex items-center justify-between mb-6">
 				<h4 class="text-lg font-semibold text-gray-900">
 					{editingRuleId ? 'ルールを編集' : '新規ルール作成'}
@@ -323,7 +323,7 @@
 						type="text"
 						bind:value={formData.name}
 						placeholder="例: 木曜日早番希望"
-						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
 					/>
 				</div>
 
@@ -337,7 +337,7 @@
 						bind:value={formData.description}
 						placeholder="ルールの詳細を記入"
 						rows="2"
-						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
 					></textarea>
 				</div>
 
@@ -353,7 +353,7 @@
 								onclick={() => (formData.rule_type = type.value)}
 								class="flex items-start gap-3 p-3 border rounded-lg transition-all {formData.rule_type ===
 								type.value
-									? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+									? 'border-navy bg-blue-50 ring-2 ring-blue-200'
 									: 'border-gray-300 hover:border-gray-400'}"
 							>
 								<span class="text-2xl">{type.icon}</span>
@@ -378,7 +378,7 @@
 								onclick={() => (formData.shift_type = shift.value)}
 								class="px-4 py-2 border rounded-lg font-medium transition-all {formData.shift_type ===
 								shift.value
-									? 'border-blue-500 bg-blue-500 text-white'
+									? 'border-navy bg-slate-800 text-white'
 									: 'border-gray-300 text-gray-700 hover:border-gray-400'}"
 							>
 								{shift.symbol} {shift.label}
@@ -400,7 +400,7 @@
 								class="w-12 h-12 rounded-full font-bold transition-all {formData.days_of_week?.includes(
 									day.value
 								)
-									? 'bg-blue-500 text-white ring-2 ring-blue-300'
+									? 'bg-slate-800 text-white ring-2 ring-blue-300'
 									: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 							>
 								{day.short}
@@ -448,7 +448,7 @@
 									type="checkbox"
 									checked={formData.staff_ids?.includes(staff.id)}
 									onchange={() => toggleStaff(staff.id)}
-									class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+									class="w-4 h-4 text-slate-800 rounded focus:ring-2 focus:ring-navy"
 								/>
 								<span class="text-sm text-gray-700">{staff.name}</span>
 								{#if staff.position}
@@ -468,7 +468,7 @@
 						type="checkbox"
 						id="hard-constraint"
 						bind:checked={formData.is_hard_constraint}
-						class="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+						class="w-5 h-5 text-slate-800 rounded focus:ring-2 focus:ring-navy"
 					/>
 					<label for="hard-constraint" class="flex-1">
 						<div class="text-sm font-medium text-gray-900">厳格な制約として扱う</div>
@@ -506,7 +506,7 @@
 						type="checkbox"
 						id="is-active"
 						bind:checked={formData.is_active}
-						class="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+						class="w-5 h-5 text-slate-800 rounded focus:ring-2 focus:ring-navy"
 					/>
 					<label for="is-active" class="flex-1">
 						<div class="text-sm font-medium text-gray-900">ルールを有効化</div>
@@ -528,7 +528,7 @@
 					<button
 						onclick={handleSave}
 						disabled={isLoading}
-						class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+						class="flex-1 px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
 					>
 						{isLoading ? '保存中...' : editingRuleId ? '更新' : '作成'}
 					</button>
@@ -582,7 +582,7 @@
 						<!-- Badges -->
 						<div class="flex flex-wrap gap-2 mb-3">
 							<span
-								class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full font-medium"
+								class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-slate-900 text-sm rounded-full font-medium"
 							>
 								{ruleTypeConfig.icon}
 								{ruleTypeConfig.label}
@@ -648,7 +648,7 @@
 								</div>
 								<div class="w-full bg-gray-200 rounded-full h-2">
 									<div
-										class="bg-blue-500 h-2 rounded-full transition-all"
+										class="bg-slate-800 h-2 rounded-full transition-all"
 										style="width: {rule.penalty_weight || 50}%"
 									></div>
 								</div>
@@ -660,7 +660,7 @@
 							<button
 								onclick={() => startEdit(rule)}
 								disabled={isLoading}
-								class="flex-1 px-3 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+								class="flex-1 px-3 py-2 border border-navy text-slate-800 rounded-lg hover:bg-blue-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
 							>
 								編集
 							</button>

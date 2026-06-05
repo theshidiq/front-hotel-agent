@@ -383,7 +383,7 @@
 					<button
 						type="button"
 						onclick={() => { showNewDept = !showNewDept; }}
-						class="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+						class="flex items-center gap-1 px-2.5 py-1.5 bg-navy text-white text-xs rounded-lg hover:bg-navy-700 transition-colors"
 					>
 						<span class="material-symbols-rounded text-sm">add</span>
 						追加
@@ -397,7 +397,7 @@
 							type="text"
 							bind:value={newDeptName}
 							placeholder="部署名"
-							class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-300 focus:outline-none"
+							class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-1 focus:ring-blue-300 focus:outline-none"
 						/>
 						<div class="flex flex-wrap gap-1.5">
 							{#each COLORS as c}
@@ -414,7 +414,7 @@
 								type="button"
 								onclick={saveDept}
 								disabled={saving || !newDeptName.trim()}
-								class="flex-1 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+								class="flex-1 py-1.5 text-sm bg-navy text-white rounded-lg hover:bg-navy-700 disabled:opacity-50"
 							>追加</button>
 							<button
 								type="button"
@@ -439,7 +439,7 @@
 							<input
 								type="text"
 								bind:value={editingDeptName}
-								class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:border-navy focus:outline-none"
 							/>
 							<div class="flex flex-wrap gap-1.5">
 								{#each COLORS as c}
@@ -456,7 +456,7 @@
 									type="button"
 									onclick={() => saveEditDept(dept.id)}
 									disabled={saving}
-									class="flex-1 py-1 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
+									class="flex-1 py-1 text-sm bg-navy text-white rounded-lg disabled:opacity-50"
 								>保存</button>
 								<button
 									type="button"
@@ -562,7 +562,7 @@
 							<button
 								type="button"
 								onclick={() => { showNewPos = !showNewPos; newPosName = ''; }}
-								class="flex items-center gap-1 px-2.5 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+								class="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
 							>
 								<span class="material-symbols-rounded text-sm">add</span>
 								役職追加
@@ -575,13 +575,13 @@
 									type="text"
 									bind:value={newPosName}
 									placeholder="役職名"
-									class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+									class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:border-navy focus:outline-none"
 								/>
 								<button
 									type="button"
 									onclick={savePos}
 									disabled={saving || !newPosName.trim()}
-									class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
+									class="px-3 py-1.5 text-sm bg-navy text-white rounded-lg disabled:opacity-50"
 								>追加</button>
 								<button
 									type="button"
@@ -601,13 +601,13 @@
 											<input
 												type="text"
 												bind:value={editingPosName}
-												class="w-28 text-sm border border-gray-300 rounded px-2 py-0.5 focus:outline-none focus:border-blue-500"
+												class="w-28 text-sm border border-gray-300 rounded px-2 py-0.5 focus:outline-none focus:border-navy"
 											/>
 											<button
 												type="button"
 												onclick={() => saveEditPos(pos.id)}
 												disabled={saving}
-												class="text-xs text-blue-600 font-medium hover:underline disabled:opacity-50"
+												class="text-xs text-slate-800 font-medium hover:underline disabled:opacity-50"
 											>保存</button>
 											<button
 												type="button"
@@ -647,7 +647,7 @@
 							<button
 								type="button"
 								onclick={() => { showNewStaff = !showNewStaff; newStaff = { name: '', email: '', position_id: '', role_id: '', is_admin: false, employment_type: '', start_period: null, end_period: null }; }}
-								class="flex items-center gap-1 px-2.5 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+								class="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
 							>
 								<span class="material-symbols-rounded text-sm">person_add</span>
 								スタッフ追加
@@ -693,7 +693,7 @@
 											type="text"
 											bind:value={newStaff.name}
 											placeholder="田中 太郎"
-											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:outline-none"
 										/>
 									</div>
 									<div>
@@ -702,14 +702,14 @@
 											type="email"
 											bind:value={newStaff.email}
 											placeholder="tanaka@example.com"
-											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:outline-none"
 										/>
 									</div>
 									<div>
 										<label class="block text-xs font-medium text-gray-600 mb-1">役職</label>
 										<select
 											bind:value={newStaff.position_id}
-											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:outline-none"
 										>
 											<option value="">— 未設定 —</option>
 											{#each dept.positions as p}
@@ -721,7 +721,7 @@
 										<label class="block text-xs font-medium text-gray-600 mb-1">ロール</label>
 										<select
 											bind:value={newStaff.role_id}
-											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+											class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:outline-none"
 										>
 											<option value="">— ロールなし —</option>
 											{#each roles as r}
@@ -746,7 +746,7 @@
 												<button
 													type="button"
 													onclick={() => newStaff.employment_type = et.value}
-													class="px-3 py-1 text-xs rounded-full border transition-all {newStaff.employment_type === et.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}"
+													class="px-3 py-1 text-xs rounded-full border transition-all {newStaff.employment_type === et.value ? 'bg-navy text-white border-navy' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}"
 												>{et.label}</button>
 											{/each}
 										</div>
@@ -759,7 +759,7 @@
 												<select
 													value={newStaff.start_period?.year ?? ""}
 													onchange={(e) => setNewPeriodField('start_period', 'year', (e.target as HTMLSelectElement).value)}
-													class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 												>
 													<option value="">年</option>
 													{#each YEARS as y}
@@ -769,7 +769,7 @@
 												<select
 													value={newStaff.start_period?.month ?? 1}
 													onchange={(e) => setNewPeriodField('start_period', 'month', (e.target as HTMLSelectElement).value)}
-													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 													disabled={!newStaff.start_period}
 												>
 													{#each MONTHS as m}
@@ -779,7 +779,7 @@
 												<select
 													value={newStaff.start_period?.day ?? 1}
 													onchange={(e) => setNewPeriodField('start_period', 'day', (e.target as HTMLSelectElement).value)}
-													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 													disabled={!newStaff.start_period}
 												>
 													{#each getPeriodDays(newStaff.start_period) as d}
@@ -794,7 +794,7 @@
 												<select
 													value={newStaff.end_period?.year ?? ""}
 													onchange={(e) => setNewPeriodField('end_period', 'year', (e.target as HTMLSelectElement).value)}
-													class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 												>
 													<option value="">年</option>
 													{#each YEARS as y}
@@ -804,7 +804,7 @@
 												<select
 													value={newStaff.end_period?.month ?? 1}
 													onchange={(e) => setNewPeriodField('end_period', 'month', (e.target as HTMLSelectElement).value)}
-													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 													disabled={!newStaff.end_period}
 												>
 													{#each MONTHS as m}
@@ -814,7 +814,7 @@
 												<select
 													value={newStaff.end_period?.day ?? 1}
 													onchange={(e) => setNewPeriodField('end_period', 'day', (e.target as HTMLSelectElement).value)}
-													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+													class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 													disabled={!newStaff.end_period}
 												>
 													{#each getPeriodDays(newStaff.end_period) as d}
@@ -831,7 +831,7 @@
 										type="button"
 										onclick={saveNewStaff}
 										disabled={saving || !newStaff.name.trim()}
-										class="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+										class="px-4 py-1.5 bg-navy text-white text-sm rounded-lg hover:bg-navy-700 disabled:opacity-50"
 									>追加</button>
 									<button
 										type="button"
@@ -933,14 +933,14 @@
 					<input
 						type="text"
 						bind:value={editingStaff.name}
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:outline-none"
 					/>
 				</div>
 				<div>
 					<label class="block text-xs font-medium text-gray-600 mb-1">役職</label>
 					<select
 						bind:value={editingStaff.position_id}
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:outline-none"
 					>
 						<option value="">— 未設定 —</option>
 						{#each positions as p}
@@ -952,7 +952,7 @@
 					<label class="block text-xs font-medium text-gray-600 mb-1">ロール</label>
 					<select
 						bind:value={editingStaff.role_id}
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:outline-none"
 					>
 						<option value="">— ロールなし —</option>
 						{#each roles as r}
@@ -981,7 +981,7 @@
 							<button
 								type="button"
 								onclick={() => editingStaff.employment_type = et.value}
-								class="px-3 py-1 text-xs rounded-full border transition-all {editingStaff.employment_type === et.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}"
+								class="px-3 py-1 text-xs rounded-full border transition-all {editingStaff.employment_type === et.value ? 'bg-navy text-white border-navy' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}"
 							>{et.label}</button>
 						{/each}
 					</div>
@@ -994,7 +994,7 @@
 							<select
 								value={editingStaff.start_period?.year ?? ""}
 								onchange={(e) => setPeriodField('start_period', 'year', (e.target as HTMLSelectElement).value)}
-								class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 							>
 								<option value="">年</option>
 								{#each YEARS as y}
@@ -1004,7 +1004,7 @@
 							<select
 								value={editingStaff.start_period?.month ?? 1}
 								onchange={(e) => setPeriodField('start_period', 'month', (e.target as HTMLSelectElement).value)}
-								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 								disabled={!editingStaff.start_period}
 							>
 								{#each MONTHS as m}
@@ -1014,7 +1014,7 @@
 							<select
 								value={editingStaff.start_period?.day ?? 1}
 								onchange={(e) => setPeriodField('start_period', 'day', (e.target as HTMLSelectElement).value)}
-								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 								disabled={!editingStaff.start_period}
 							>
 								{#each getPeriodDays(editingStaff.start_period) as d}
@@ -1030,7 +1030,7 @@
 							<select
 								value={editingStaff.end_period?.year ?? ""}
 								onchange={(e) => setPeriodField('end_period', 'year', (e.target as HTMLSelectElement).value)}
-								class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								class="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 							>
 								<option value="">年</option>
 								{#each YEARS as y}
@@ -1040,7 +1040,7 @@
 							<select
 								value={editingStaff.end_period?.month ?? 1}
 								onchange={(e) => setPeriodField('end_period', 'month', (e.target as HTMLSelectElement).value)}
-								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 								disabled={!editingStaff.end_period}
 							>
 								{#each MONTHS as m}
@@ -1050,7 +1050,7 @@
 							<select
 								value={editingStaff.end_period?.day ?? 1}
 								onchange={(e) => setPeriodField('end_period', 'day', (e.target as HTMLSelectElement).value)}
-								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+								class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:border-navy focus:outline-none"
 								disabled={!editingStaff.end_period}
 							>
 								{#each getPeriodDays(editingStaff.end_period) as d}
@@ -1067,7 +1067,7 @@
 					type="button"
 					onclick={() => saveEditStaff(staff)}
 					disabled={saving}
-					class="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
+					class="px-4 py-1.5 text-sm bg-navy text-white rounded-lg disabled:opacity-50"
 				>保存</button>
 				<button
 					type="button"
@@ -1095,7 +1095,7 @@
 			</div>
 			<!-- Avatar -->
 			<div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0
-				{staff.is_admin ? 'bg-amber-500' : staff.is_active ? 'bg-blue-600' : 'bg-gray-300'}">
+				{staff.is_admin ? 'bg-amber-500' : staff.is_active ? 'bg-navy' : 'bg-gray-300'}">
 				{staff.name.charAt(0).toUpperCase()}
 			</div>
 			<!-- Info -->

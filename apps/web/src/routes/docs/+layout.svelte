@@ -4,19 +4,48 @@
 
     let { children } = $props();
 
-    const navItems = [
-        { href: "/docs", en: "Allergen Management", ja: "アレルゲン管理" },
-        { href: "/docs/menus", en: "Menu System", ja: "メニューシステム" },
-        { href: "/docs/front-desk", en: "Front Desk", ja: "フロントデスク" },
+    const navSections = [
         {
-            href: "/docs/kitchen-production",
-            en: "Kitchen Production",
-            ja: "厨房生産管理",
+            label_en: "Guides",
+            label_ja: "ガイド",
+            items: [
+                { href: "/docs/dashboard", en: "Dashboard", ja: "ダッシュボード" },
+                { href: "/docs", en: "Allergen Management", ja: "アレルゲン管理" },
+                { href: "/docs/menus", en: "Menu System", ja: "メニューシステム" },
+                { href: "/docs/front-desk", en: "Front Desk", ja: "フロントデスク" },
+                {
+                    href: "/docs/kitchen-production",
+                    en: "Kitchen Production",
+                    ja: "厨房生産管理",
+                },
+                {
+                    href: "/docs/shifts",
+                    en: "Shift Management",
+                    ja: "シフト管理",
+                },
+                {
+                    href: "/docs/staff-calendar",
+                    en: "Staff Calendar & Settings",
+                    ja: "スタッフカレンダー・設定",
+                },
+                {
+                    href: "/docs/guest-form",
+                    en: "Guest Allergen Form",
+                    ja: "ゲストアレルギー入力",
+                },
+            ],
         },
         {
-            href: "/docs/shifts",
-            en: "Shift Management",
-            ja: "シフト管理",
+            label_en: "Setup & Admin",
+            label_ja: "設定・管理",
+            items: [
+                { href: "/docs/admin", en: "Admin Dashboard", ja: "管理者ダッシュボード" },
+                {
+                    href: "/docs/account-setup",
+                    en: "Account & Setup",
+                    ja: "アカウント・初期設定",
+                },
+            ],
         },
     ];
 
@@ -24,7 +53,7 @@
 
     function isActive(href: string): boolean {
         if (href === "/docs") return currentPath === "/docs";
-        return currentPath.startsWith(href);
+        return currentPath === href || currentPath.startsWith(href + "/");
     }
 </script>
 
@@ -86,27 +115,29 @@
             <aside
                 class="hidden lg:flex lg:flex-col w-56 shrink-0 border-r border-slate-200 bg-white overflow-y-auto pt-8 pb-10 px-4 h-[calc(100vh-57px)] sticky top-[57px]"
             >
-                <div>
-                    <p
-                        class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3 px-2"
-                    >
-                        {$lang === "en" ? "Guides" : "ガイド"}
-                    </p>
-                    <ul class="space-y-0.5">
-                        {#each navItems as item}
-                            <li>
-                                <a
-                                    href={item.href}
-                                    class="flex items-center gap-2 px-2 py-2 text-sm rounded-lg transition-colors {isActive(item.href)
-                                        ? 'font-semibold bg-indigo-50 text-indigo-700'
-                                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}"
-                                >
-                                    {$lang === "en" ? item.en : item.ja}
-                                </a>
-                            </li>
-                        {/each}
-                    </ul>
-                </div>
+                {#each navSections as section, si}
+                    <div class={si > 0 ? "mt-6" : ""}>
+                        <p
+                            class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-3 px-2"
+                        >
+                            {$lang === "en" ? section.label_en : section.label_ja}
+                        </p>
+                        <ul class="space-y-0.5">
+                            {#each section.items as item}
+                                <li>
+                                    <a
+                                        href={item.href}
+                                        class="flex items-center gap-2 px-2 py-2 text-sm rounded-lg transition-colors {isActive(item.href)
+                                            ? 'font-semibold bg-indigo-50 text-indigo-700'
+                                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}"
+                                    >
+                                        {$lang === "en" ? item.en : item.ja}
+                                    </a>
+                                </li>
+                            {/each}
+                        </ul>
+                    </div>
+                {/each}
             </aside>
 
             <!-- Page Content (injected by each sub-page) -->

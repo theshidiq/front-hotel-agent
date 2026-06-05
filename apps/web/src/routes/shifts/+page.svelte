@@ -808,7 +808,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 			case "×":
 				return "text-red-600 bg-red-50";
 			case "△":
-				return "text-blue-600 bg-blue-50";
+				return "text-slate-800 bg-blue-50";
 			case "◇":
 				return "text-purple-600 bg-purple-50";
 			case "★":
@@ -1019,7 +1019,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 							シフト管理機能を利用するにはログインしてください
 						</p>
 						<button
-							class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+							class="px-6 py-3 bg-navy text-white rounded-lg hover:bg-navy-700 transition-colors flex items-center gap-2 mx-auto"
 							onclick={() =>
 								signInWithGoogle(window.location.href)}
 						>
@@ -1064,7 +1064,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 
 						<!-- Optimize Button (left, next to period picker) -->
 						<button
-							class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+							class="px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
 							onclick={handleOptimize}
 							disabled={optimizing || clearing || !optimizerHealthy || !selectedPeriodId}
 							title={!selectedPeriodId ? '期間を先に選択してください' : !optimizerHealthy ? 'OR-Toolsオフライン — 最適化サービスを起動してください' : '自動最適化を実行'}
@@ -1150,7 +1150,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 								</p>
 								<a
 									href="/shifts/settings"
-									class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+									class="px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 inline-flex items-center gap-2"
 								>
 									<span class="material-symbols-rounded text-sm">settings</span>
 									設定を開く
@@ -1181,7 +1181,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 										class="flex items-center justify-center gap-3"
 									>
 										<button
-											class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+											class="px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 flex items-center gap-2"
 											onclick={handleOptimize}
 											disabled={optimizing || !optimizerHealthy || !selectedPeriodId}
 										>
@@ -1272,7 +1272,7 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 					キャンセル
 				</button>
 				<button
-					class="flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors {confirmModal.confirmClass ?? 'bg-blue-600 hover:bg-blue-700 text-white'}"
+					class="flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors {confirmModal.confirmClass ?? 'bg-navy hover:bg-navy-700 text-white'}"
 					onclick={() => { const fn = confirmModal!.onConfirm; closeConfirmModal(); fn(); }}
 				>
 					{confirmModal.confirmLabel ?? '確認'}

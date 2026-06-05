@@ -29,7 +29,7 @@
 	<div class="flex items-center justify-center min-h-screen">
 		<div class="text-center">
 			<p class="text-lg text-gray-600">Please log in to view your account</p>
-			<a href="/login" class="mt-4 inline-block text-blue-600 hover:underline">Login</a>
+			<a href="/login" class="mt-4 inline-block text-slate-800 hover:underline">Login</a>
 		</div>
 	</div>
 {:else if authState.staff}
@@ -50,7 +50,7 @@
 		<!-- Profile card -->
 		<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
 			<div class="flex items-center gap-4">
-				<div class="w-14 h-14 rounded-full {authState.isAdmin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center text-white text-xl font-bold">
+				<div class="w-14 h-14 rounded-full {authState.isAdmin ? 'bg-amber-500' : 'bg-navy'} flex items-center justify-center text-white text-xl font-bold">
 					{authState.staff.name.charAt(0).toUpperCase()}
 				</div>
 				<div>

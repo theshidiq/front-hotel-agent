@@ -325,7 +325,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden mb-6"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span
                                     class="text-xs font-semibold text-slate-400 uppercase tracking-widest"
@@ -374,7 +374,7 @@
                             class="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl max-w-3xl"
                         >
                             <svg
-                                class="shrink-0 text-blue-500 mt-0.5"
+                                class="shrink-0 text-slate-700 mt-0.5"
                                 width="16"
                                 height="16"
                                 viewBox="0 0 24 24"
@@ -395,7 +395,7 @@
                                     y2="16"
                                 /></svg
                             >
-                            <p class="text-sm text-blue-800 leading-relaxed">
+                            <p class="text-sm text-slate-900 leading-relaxed">
                                 {t.pax_note}
                             </p>
                         </div>
@@ -416,7 +416,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden mb-6"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span
                                     class="text-xs font-semibold text-slate-400 uppercase tracking-widest"
@@ -548,7 +548,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden mb-6"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span class="text-xs font-mono text-slate-400"
                                     >{t.synonym_table_title}</span
@@ -589,7 +589,7 @@
                                                 </td>
                                                 <td class="px-4 py-3">
                                                     <span
-                                                        class="inline-block bg-blue-50 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-100"
+                                                        class="inline-block bg-blue-50 text-slate-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-100"
                                                         >{db}</span
                                                     >
                                                 </td>
@@ -614,7 +614,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden max-w-3xl"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span class="text-xs font-mono text-slate-400"
                                     >{t.synonym_code_label}</span
@@ -691,7 +691,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden max-w-3xl mb-6"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span
                                     class="text-xs font-semibold text-slate-400 uppercase tracking-widest"
@@ -754,7 +754,7 @@
                                         </div>
                                         <span class="text-slate-400">→</span>
                                         <div
-                                            class="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 font-semibold shadow-sm"
+                                            class="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-slate-800 font-semibold shadow-sm"
                                         >
                                             {$lang === "en"
                                                 ? "Detail Panel"

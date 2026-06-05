@@ -87,7 +87,7 @@
 				</svg>
 			</button>
 			<button
-				class="nodrag p-1 rounded hover:bg-blue-100 text-blue-500 transition-colors"
+				class="nodrag p-1 rounded hover:bg-blue-100 text-slate-700 transition-colors"
 				title="Add course"
 				onclick={(e) => { e.stopPropagation(); data.onToggleCourses(data.group.id); }}
 			>

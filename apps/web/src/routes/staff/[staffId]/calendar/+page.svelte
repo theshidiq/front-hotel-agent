@@ -245,7 +245,7 @@
 							<tr>
 								{#each DAY_HEADERS as day, i}
 									<th class="text-center text-[11px] font-bold py-2.5
-										{i === 0 ? 'text-red-600' : i === 6 ? 'text-blue-600' : 'text-gray-700'}">
+										{i === 0 ? 'text-red-600' : i === 6 ? 'text-slate-800' : 'text-gray-700'}">
 										{day}
 									</th>
 								{/each}
@@ -262,13 +262,13 @@
 										{@const isHoliday = holiday !== null}
 										{#if inPeriod}
 											<td class="border border-gray-100/80 p-0 relative {hasShift ? color.bg : ''}
-												{today ? 'ring-2 ring-blue-500 ring-inset z-10' : ''}">
+												{today ? 'ring-2 ring-slate-700 ring-inset z-10' : ''}">
 												<button
 													onclick={() => toggleTap(dateStr)}
 													class="w-full flex flex-col items-center justify-center py-2 px-1 active:brightness-95 transition-all"
 												>
 													<span class="text-[13px] font-bold leading-none
-														{dayOfWeek === 0 || isHoliday ? 'text-red-600' : dayOfWeek === 6 ? 'text-blue-600' : hasShift ? color.text : 'text-gray-800'}">
+														{dayOfWeek === 0 || isHoliday ? 'text-red-600' : dayOfWeek === 6 ? 'text-slate-800' : hasShift ? color.text : 'text-gray-800'}">
 														{date.getDate()}
 													</span>
 													{#if hasShift}
@@ -322,7 +322,7 @@
 							<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 text-red-700 font-medium">休み <strong>{stats.off}</strong></span>
 						{/if}
 						{#if stats.early > 0}
-							<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium">早番 <strong>{stats.early}</strong></span>
+							<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-slate-800 font-medium">早番 <strong>{stats.early}</strong></span>
 						{/if}
 						{#if stats.normal > 0}
 							<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">通常 <strong>{stats.normal}</strong></span>

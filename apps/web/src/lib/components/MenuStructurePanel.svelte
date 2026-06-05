@@ -640,7 +640,7 @@
 						Preview
 					</button>
 				{/if}
-				<button data-course-toggle-button onclick={() => { courseToggleGroupId = courseToggleGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors" title="Manage courses">
+				<button data-course-toggle-button onclick={() => { courseToggleGroupId = courseToggleGroupId === group.id ? null : group.id; }} class="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-slate-800 rounded-md text-xs font-medium hover:bg-blue-100 transition-colors" title="Manage courses">
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
 					Courses
 				</button>
@@ -657,7 +657,7 @@
 						<button
 							data-stay-dropdown-button
 							onclick={() => { stayDropdownGroupId = stayDropdownGroupId === group.id ? null : group.id; }}
-							class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 {currentValue ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100 focus:ring-teal-500' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 focus:ring-blue-500'}"
+							class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 {currentValue ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100 focus:ring-teal-500' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 focus:ring-navy'}"
 							title="Stay period"
 						>
 							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -668,7 +668,7 @@
 							<div data-stay-dropdown-menu class="absolute z-10 mt-1 left-0 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px]">
 								<button
 									onclick={() => { handleStayPeriodChange(group.id, ''); stayDropdownGroupId = null; }}
-									class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors {currentValue === '' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}"
+									class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors {currentValue === '' ? 'bg-blue-50 text-slate-800 font-medium' : 'text-gray-700'}"
 								>
 									Any duration
 								</button>
@@ -712,13 +712,13 @@
 		<!-- Course toggle dropdown -->
 		{#if courseToggleGroupId === group.id}
 			<div data-course-toggle-dropdown class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-				<p class="text-xs font-medium text-blue-800 mb-2">Toggle courses for this group:</p>
+				<p class="text-xs font-medium text-slate-900 mb-2">Toggle courses for this group:</p>
 				<div class="flex flex-wrap gap-1.5">
 					{#each menuCategories as course}
 						{@const isAssigned = group.allowed_courses.some(c => c.category_id === course.id)}
 						<button
 							onclick={() => handleToggleCourse(group.id, course.id)}
-							class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {isAssigned ? 'bg-blue-600 text-white' : 'bg-white border border-blue-200 text-blue-700 hover:bg-blue-100'}"
+							class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors {isAssigned ? 'bg-navy text-white' : 'bg-white border border-blue-200 text-slate-800 hover:bg-blue-100'}"
 						>
 							{course.label}
 						</button>
@@ -796,21 +796,21 @@
 			<div class="relative" data-courses-dropdown>
 				<button
 					onclick={(e) => { e.stopPropagation(); showCoursesDropdown = !showCoursesDropdown; if (!showCoursesDropdown) { showAddCourse = false; } }}
-					class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors {showCoursesDropdown ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}"
+					class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors {showCoursesDropdown ? 'bg-blue-100 text-slate-800' : 'text-gray-600 hover:bg-gray-100'}"
 					title="Manage courses"
 				>
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
 					</svg>
 					Courses
-					<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{menuCategories.length}</span>
+					<span class="bg-blue-100 text-slate-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{menuCategories.length}</span>
 				</button>
 				{#if showCoursesDropdown}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div class="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-[55] p-4" onclick={(e) => e.stopPropagation()}>
 						<div class="flex items-center justify-between mb-3">
 							<h3 class="text-sm font-semibold text-gray-900">Available Courses</h3>
-							<button onclick={() => { showAddCourse = !showAddCourse; newCourseName = ''; addCourseError = ''; }} class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+							<button onclick={() => { showAddCourse = !showAddCourse; newCourseName = ''; addCourseError = ''; }} class="text-xs text-slate-800 hover:text-slate-900 font-medium">
 								{showAddCourse ? 'Cancel' : '+ Add'}
 							</button>
 						</div>
@@ -818,7 +818,7 @@
 						{#if showAddCourse}
 							<div class="flex gap-2 mb-3">
 								<input type="text" bind:value={newCourseName} placeholder="Course name" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400" onkeydown={(e) => e.key === 'Enter' && !e.isComposing && submitNewCourse()} />
-								<button onclick={submitNewCourse} disabled={isAddingCourse || !newCourseName.trim()} class="bg-blue-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+								<button onclick={submitNewCourse} disabled={isAddingCourse || !newCourseName.trim()} class="bg-navy text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-navy-700 disabled:opacity-50">
 									{isAddingCourse ? '...' : 'Add'}
 								</button>
 							</div>
@@ -845,7 +845,7 @@
 											onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) submitRenameCourse(course.id); if (e.key === 'Escape') renamingCourseId = null; }}
 											autofocus
 										/>
-										<button onclick={() => submitRenameCourse(course.id)} class="text-blue-600 hover:text-blue-800 transition-colors" title="Save">
+										<button onclick={() => submitRenameCourse(course.id)} class="text-slate-800 hover:text-slate-900 transition-colors" title="Save">
 											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
 										</button>
 										<button onclick={() => { renamingCourseId = null; }} class="text-gray-400 hover:text-gray-600 transition-colors" title="Cancel">
@@ -856,7 +856,7 @@
 									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
 										<span
-											class="text-sm text-blue-800 cursor-pointer hover:underline"
+											class="text-sm text-slate-900 cursor-pointer hover:underline"
 											ondblclick={() => startRenameCourse(course)}
 											title="Double-click to rename"
 										>{course.label}</span>

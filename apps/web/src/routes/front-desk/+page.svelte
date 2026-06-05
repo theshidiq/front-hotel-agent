@@ -145,7 +145,7 @@
 
 	const roomStatusColors: Record<string, string> = {
 		available: "bg-emerald-100 text-emerald-800 border-emerald-200",
-		occupied: "bg-blue-100 text-blue-800 border-blue-200",
+		occupied: "bg-blue-100 text-slate-900 border-blue-200",
 		cleaning: "bg-amber-100 text-amber-800 border-amber-200",
 		maintenance: "bg-purple-100 text-purple-800 border-purple-200",
 		out_of_order: "bg-red-100 text-red-800 border-red-200",
@@ -480,7 +480,7 @@
 		agoda: "bg-purple-100 text-purple-800",
 		direct: "bg-green-100 text-green-800",
 		phone: "bg-gray-100 text-gray-800",
-		walk_in: "bg-blue-100 text-blue-800",
+		walk_in: "bg-blue-100 text-slate-900",
 	};
 
 	const sourceLabels: Record<string, string> = {
@@ -503,7 +503,7 @@
 	};
 
 	const statusColors: Record<string, string> = {
-		confirmed: "bg-blue-100 text-blue-800",
+		confirmed: "bg-blue-100 text-slate-900",
 		checked_in: "bg-green-100 text-green-800",
 		checked_out: "bg-gray-100 text-gray-800",
 		cancelled: "bg-red-100 text-red-800",
@@ -1373,7 +1373,7 @@
 											selectDateFilter("today")}
 										class="flex-1 px-3 py-1.5 text-xs rounded {!selectedDate &&
 										dateFilter === 'today'
-											? 'bg-blue-500 text-white'
+											? 'bg-slate-800 text-white'
 											: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 									>
 										本日
@@ -1383,7 +1383,7 @@
 											selectDateFilter("past7")}
 										class="flex-1 px-3 py-1.5 text-xs rounded {!selectedDate &&
 										dateFilter === 'past7'
-											? 'bg-blue-500 text-white'
+											? 'bg-slate-800 text-white'
 											: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 									>
 										過去7日
@@ -1392,7 +1392,7 @@
 										onclick={() => selectDateFilter("all")}
 										class="flex-1 px-3 py-1.5 text-xs rounded {!selectedDate &&
 										dateFilter === 'all'
-											? 'bg-blue-500 text-white'
+											? 'bg-slate-800 text-white'
 											: 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
 									>
 										全期間
@@ -1432,9 +1432,9 @@
 												selectSpecificDate(dateStr)}
 											class="aspect-square p-1 text-xs rounded-lg transition-colors relative
 											{isSelected
-												? 'bg-blue-500 text-white font-semibold'
+												? 'bg-slate-800 text-white font-semibold'
 												: isToday
-													? 'bg-blue-100 text-blue-700 font-semibold'
+													? 'bg-blue-100 text-slate-800 font-semibold'
 													: isPast &&
 														  date.getMonth() !==
 																new Date().getMonth()
@@ -1496,7 +1496,7 @@
 					<button
 						onclick={() => openCheckInWizard()}
 						disabled={!can("reservations.checkin")}
-						class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						class="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-md text-sm font-medium hover:bg-navy-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						<span class="material-symbols-rounded text-lg"
 							>qr_code_scanner</span
@@ -1507,7 +1507,7 @@
 						<div class="w-px h-8 bg-gray-200"></div>
 						<a
 							href="/login"
-							class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+							class="flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy-700 transition-colors"
 						>
 							<span class="material-symbols-rounded text-lg"
 								>login</span
@@ -1557,7 +1557,7 @@
 							class="bg-white rounded-lg border border-gray-200 p-12 text-center"
 						>
 							<div
-								class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"
+								class="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"
 							></div>
 							<p class="mt-4 text-gray-500">読み込み中...</p>
 						</div>
@@ -1605,7 +1605,7 @@
 													class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"
 												>
 													<span
-														class="material-symbols-rounded text-blue-600"
+														class="material-symbols-rounded text-slate-800"
 														>star</span
 													>
 												</div>
@@ -1662,7 +1662,7 @@
 													</span>
 												{:else if alert.alert_type === "special_request"}
 													<span
-														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-slate-900"
 													>
 														特別リクエスト
 													</span>
@@ -1798,8 +1798,8 @@
 						<div
 							class="bg-blue-50 rounded-lg border border-blue-300 p-4"
 						>
-							<p class="text-sm text-blue-700">利用中</p>
-							<p class="text-2xl font-bold text-blue-700 mt-1">
+							<p class="text-sm text-slate-800">利用中</p>
+							<p class="text-2xl font-bold text-slate-800 mt-1">
 								{roomStats.occupied}
 							</p>
 						</div>
@@ -1849,7 +1849,7 @@
 								type="text"
 								bind:value={roomSearchQuery}
 								placeholder="部屋番号・部屋名..."
-								class="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+								class="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-navy focus:border-navy"
 							/>
 						</div>
 					</div>
@@ -1860,7 +1860,7 @@
 							class="bg-white rounded-lg border border-gray-200 p-12 text-center"
 						>
 							<div
-								class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"
+								class="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"
 							></div>
 							<p class="mt-4 text-gray-500">読み込み中...</p>
 						</div>
@@ -1941,7 +1941,7 @@
 													class="flex items-start gap-2"
 												>
 													<span
-														class="material-symbols-rounded text-blue-500 text-lg"
+														class="material-symbols-rounded text-slate-700 text-lg"
 														>person</span
 													>
 													<div>
@@ -1991,7 +1991,7 @@
 													</p>
 													{#if activeRes.total_nights && activeRes.current_stay_night}
 														<p
-															class="text-xs text-blue-600 font-medium"
+															class="text-xs text-slate-800 font-medium"
 														>
 															滞在中（{activeRes.current_stay_night}泊目
 															/ {activeRes.total_nights}泊）
@@ -2009,12 +2009,12 @@
 														>schedule</span
 													>
 													<p
-														class="text-sm font-medium text-blue-800"
+														class="text-sm font-medium text-slate-900"
 													>
 														本日のチェックイン予定
 													</p>
 													<p
-														class="text-sm text-blue-600 mt-1"
+														class="text-sm text-slate-800 mt-1"
 													>
 														{pendingRes.guest_name} 様
 														({pendingRes.party_size}名)
@@ -2109,7 +2109,7 @@
 											>
 										{:else}
 											<span
-												class="material-symbols-rounded text-blue-600 text-lg"
+												class="material-symbols-rounded text-slate-800 text-lg"
 												>info</span
 											>
 										{/if}
@@ -2182,8 +2182,8 @@
 					<div
 						class="bg-blue-50 rounded-lg border border-blue-300 p-4"
 					>
-						<p class="text-sm text-blue-700">到着待ち</p>
-						<p class="text-2xl font-bold text-blue-700 mt-1">
+						<p class="text-sm text-slate-800">到着待ち</p>
+						<p class="text-2xl font-bold text-slate-800 mt-1">
 							{stats.pending}
 						</p>
 					</div>
@@ -2218,7 +2218,7 @@
 							onclick={() => (filterStatus = "confirmed")}
 							class="px-4 py-2 rounded-md text-sm font-medium transition-colors {filterStatus ===
 							'confirmed'
-								? 'bg-blue-600 text-white'
+								? 'bg-navy text-white'
 								: 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}"
 						>
 							到着待ち ({stats.pending})
@@ -2261,7 +2261,7 @@
 							type="text"
 							bind:value={tableSearchQuery}
 							placeholder="ゲスト名・部屋番号で検索..."
-							class="w-72 pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							class="w-72 pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-navy focus:border-navy"
 						/>
 					</div>
 				</div>
@@ -2272,7 +2272,7 @@
 						class="bg-white rounded-lg border border-gray-200 p-12 text-center"
 					>
 						<div
-							class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"
+							class="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"
 						></div>
 						<p class="mt-4 text-gray-500">読み込み中...</p>
 					</div>
@@ -2495,7 +2495,7 @@
 													disabled={!can(
 														"reservations.checkin",
 													)}
-													class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+													class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-navy hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed"
 												>
 													チェックイン
 												</button>
@@ -2593,7 +2593,7 @@
 							<button
 								onclick={searchByQR}
 								disabled={searchLoading || !qrInput.trim()}
-								class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
+								class="px-4 py-2 bg-navy text-white rounded-md text-sm font-medium disabled:opacity-50"
 							>
 								検索
 							</button>
@@ -2645,7 +2645,7 @@
 							disabled={searchLoading ||
 								(!guestNameSearch.trim() &&
 									!phoneSearch.trim())}
-							class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-md text-sm font-semibold disabled:opacity-50"
+							class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-navy text-white rounded-md text-sm font-semibold disabled:opacity-50"
 						>
 							<span class="material-symbols-rounded text-lg"
 								>search</span
@@ -2775,7 +2775,7 @@
 					</button>
 					<button
 						onclick={proceedToStep3}
-						class="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700"
+						class="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-navy text-white rounded-md text-sm font-semibold hover:bg-navy-700"
 					>
 						<span class="material-symbols-rounded text-lg"
 							>arrow_forward</span
@@ -2890,7 +2890,7 @@
 												selectDinnerTime(option.value)}
 											class="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between {checkInForm.dinner_time ===
 											option.value
-												? 'text-blue-600 font-medium bg-blue-50'
+												? 'text-slate-800 font-medium bg-blue-50'
 												: 'text-gray-700'}"
 										>
 											<span
@@ -2899,7 +2899,7 @@
 												<span
 													class="material-symbols-rounded text-base {checkInForm.dinner_time ===
 													option.value
-														? 'text-blue-600'
+														? 'text-slate-800'
 														: 'text-gray-400'}"
 													>schedule</span
 												>
@@ -2907,7 +2907,7 @@
 											</span>
 											{#if checkInForm.dinner_time === option.value}
 												<span
-													class="material-symbols-rounded text-base text-blue-600"
+													class="material-symbols-rounded text-base text-slate-800"
 													>check</span
 												>
 											{/if}
@@ -3139,7 +3139,7 @@
 					<button
 						onclick={completeCheckIn}
 						disabled={checkInLoading}
-						class="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+						class="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-navy text-white rounded-lg text-sm font-semibold hover:bg-navy-700 disabled:opacity-50"
 					>
 						<span
 							class="material-symbols-rounded text-lg"

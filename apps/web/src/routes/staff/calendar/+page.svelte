@@ -24,7 +24,7 @@
 	);
 
 	const avatarColors = [
-		'bg-blue-500',
+		'bg-slate-800',
 		'bg-emerald-500',
 		'bg-purple-500',
 		'bg-rose-500',
@@ -98,7 +98,7 @@
 					bind:value={searchQuery}
 					placeholder="スタッフを検索..."
 					class="w-full pl-10 pr-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-gray-900 text-sm
-						placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent"
 				/>
 			</div>
 			<!-- Department filter tabs -->
@@ -107,7 +107,7 @@
 					<button
 						onclick={() => activeDeptId = null}
 						class="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-							{activeDeptId === null ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+							{activeDeptId === null ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 					>
 						すべて
 					</button>
@@ -115,7 +115,7 @@
 						<button
 							onclick={() => activeDeptId = dept.id}
 							class="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-								{activeDeptId === dept.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+								{activeDeptId === dept.id ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 						>
 							{dept.name}
 						</button>
@@ -165,7 +165,7 @@
 								<p class="text-sm font-medium text-gray-900 truncate">{staff.name}</p>
 								<p class="text-xs text-gray-500 truncate">{staff.position || staff.status || 'スタッフ'}</p>
 							</div>
-							<span class="text-xs text-gray-400 group-hover:text-blue-500 flex items-center gap-1 transition-colors">
+							<span class="text-xs text-gray-400 group-hover:text-slate-900 flex items-center gap-1 transition-colors">
 								<span class="material-symbols-rounded text-sm">calendar_month</span>
 								カレンダー
 							</span>

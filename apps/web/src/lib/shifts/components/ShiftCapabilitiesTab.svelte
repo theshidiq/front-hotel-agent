@@ -90,7 +90,7 @@ async function setCapability(staff: ScheduleStaff, key: 'canDoEarlyShifts' | 'ca
 function statusColor(status: string | undefined): string {
   if (status === '派遣') return 'bg-orange-100 text-orange-700';
   if (status === 'パート') return 'bg-purple-100 text-purple-700';
-  return 'bg-blue-100 text-blue-700';
+  return 'bg-blue-100 text-slate-800';
 }
 </script>
 
@@ -104,14 +104,14 @@ function statusColor(status: string | undefined): string {
   </div>
 
   <!-- Info banner -->
-  <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-    <span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">info</span>
+  <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-slate-900">
+    <span class="material-symbols-rounded text-slate-800 mt-0.5 shrink-0">info</span>
     <div>
       <span class="font-medium">デフォルト設定：</span>
       <span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">派遣</span>
       <span class="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium ml-1">パート</span>
       は早番・遅番不可。
-      <span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium ml-1">社員</span>
+      <span class="px-1.5 py-0.5 bg-blue-100 text-slate-800 rounded text-xs font-medium ml-1">社員</span>
       はすべて可。個別に変更した項目は「上書き」と表示されます。
     </div>
   </div>

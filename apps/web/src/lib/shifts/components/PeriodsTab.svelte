@@ -208,14 +208,14 @@
 		<!-- Info Box -->
 		<div class="mb-6 rounded-lg bg-blue-50 p-4 border border-blue-200">
 			<div class="flex items-start gap-3">
-				<svg class="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+				<svg class="h-5 w-5 text-slate-800 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
 					<path
 						fill-rule="evenodd"
 						d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
 						clip-rule="evenodd"
 					/>
 				</svg>
-				<div class="text-sm text-blue-800">
+				<div class="text-sm text-slate-900">
 					<p class="font-medium mb-1">シフト期間について</p>
 					<p>スケジュール期間は月をまたいで設定できます。例えば「21日〜20日」とすると、毎月21日から翌月20日までが1つの期間になります。</p>
 				</div>
@@ -231,7 +231,7 @@
 				<select
 					id="start-day"
 					bind:value={startDay}
-					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 				>
 					{#each dayOptions as day}
 						<option value={day}>{day}日</option>
@@ -246,7 +246,7 @@
 				<select
 					id="end-day"
 					bind:value={endDay}
-					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+					class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 				>
 					{#each dayOptions as day}
 						<option value={day}>{day}日</option>
@@ -269,7 +269,7 @@
 					<button
 						type="button"
 						onclick={() => applyPreset(preset)}
-						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+						class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-navy transition-colors"
 					>
 						{preset.label}
 					</button>
@@ -283,7 +283,7 @@
 				type="button"
 				onclick={handleSave}
 				disabled={isSaving}
-				class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+				class="px-6 py-2.5 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 focus:outline-none focus:ring-2 focus:ring-navy disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 			>
 				{isSaving ? '保存中...' : '設定を保存'}
 			</button>
@@ -298,14 +298,14 @@
 				<button
 					type="button"
 					onclick={() => (showConfirmModal = true)}
-					class="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+					class="px-3 py-1.5 text-sm font-medium text-slate-800 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
 				>
 					再生成
 				</button>
 				<button
 					type="button"
 					onclick={() => { addForm = { label: '', start_date: '', end_date: '' }; showAddModal = true; }}
-					class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+					class="px-3 py-1.5 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 transition-colors"
 				>
 					追加
 				</button>
@@ -374,7 +374,7 @@
 						type="text"
 						bind:value={addForm.label}
 						placeholder="例: 2026年4月"
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 					/>
 				</div>
 				<div>
@@ -382,7 +382,7 @@
 					<input
 						type="date"
 						bind:value={addForm.start_date}
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 					/>
 				</div>
 				<div>
@@ -390,7 +390,7 @@
 					<input
 						type="date"
 						bind:value={addForm.end_date}
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+						class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 					/>
 				</div>
 			</div>
@@ -406,7 +406,7 @@
 					type="button"
 					onclick={handleAdd}
 					disabled={isAdding || !addForm.label || !addForm.start_date || !addForm.end_date}
-					class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-4 py-2 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					{isAdding ? '追加中...' : '追加'}
 				</button>
@@ -436,7 +436,7 @@
 					type="button"
 					onclick={handleRegenerate}
 					disabled={isRegenerating}
-					class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-4 py-2 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					{isRegenerating ? '再生成中...' : '再生成する'}
 				</button>

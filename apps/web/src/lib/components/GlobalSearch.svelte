@@ -4,11 +4,28 @@
 	import { authState, can } from '$lib/auth.svelte';
 	import { searchDestinations, type NavDestination } from '$lib/navigation';
 
+	let { variant = 'dark' }: { variant?: 'dark' | 'light' } = $props();
+
 	let query = $state('');
 	let open = $state(false);
 	let activeIndex = $state(0);
 	let inputEl: HTMLInputElement | null = $state(null);
 	let containerEl: HTMLDivElement | null = $state(null);
+
+	// Theme the input for a dark global header vs a light (white) page header
+	const inputClass = $derived(
+		variant === 'light'
+			? 'w-full bg-gray-100 border border-gray-200 rounded-lg pl-10 pr-16 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent focus:bg-white transition-colors'
+			: 'w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-16 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent transition-colors'
+	);
+	const iconClass = $derived(
+		variant === 'light' ? 'text-gray-400' : 'text-slate-400'
+	);
+	const kbdClass = $derived(
+		variant === 'light'
+			? 'text-gray-400 bg-gray-200/70 border-gray-300'
+			: 'text-slate-400 bg-slate-700/70 border-slate-600'
+	);
 
 	const hasQuery = $derived(query.trim().length > 0);
 
@@ -85,7 +102,7 @@
 <div bind:this={containerEl} class="relative w-full max-w-md">
 	<div class="relative">
 		<span
-			class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400 pointer-events-none"
+			class="material-symbols-rounded absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none {iconClass}"
 			>search</span
 		>
 		<input
@@ -97,10 +114,10 @@
 			type="text"
 			placeholder="機能を検索… (例: メニュースキャン)"
 			aria-label="機能を検索"
-			class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-16 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+			class={inputClass}
 		/>
 		<kbd
-			class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-400 bg-slate-700/70 border border-slate-600 rounded px-1.5 py-0.5 pointer-events-none hidden sm:block"
+			class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium border rounded px-1.5 py-0.5 pointer-events-none hidden sm:block {kbdClass}"
 			>⌘K</kbd
 		>
 	</div>
@@ -121,27 +138,22 @@
 							onmouseenter={() => (activeIndex = i)}
 							class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors {i ===
 							activeIndex
-								? 'bg-blue-50'
+								? 'bg-navy-50'
 								: 'hover:bg-gray-50'}"
 						>
 							<span
 								class="material-symbols-rounded text-xl shrink-0 {i === activeIndex
-									? 'text-blue-600'
+									? 'text-navy'
 									: 'text-gray-400'}">{dest.icon}</span
 							>
 							<div class="flex-1 min-w-0">
 								<p class="text-sm font-semibold text-gray-900 truncate">
 									{dest.label}
-									<span class="font-normal text-gray-400">· {dest.labelEn}</span>
 								</p>
-								{#if dest.description}
-									<p class="text-xs text-gray-400 truncate">{dest.description}</p>
-								{/if}
+								<p class="text-xs text-gray-400 truncate">
+									{dest.description ?? dest.labelEn}
+								</p>
 							</div>
-							<span
-								class="text-[10px] font-medium text-gray-400 bg-gray-100 rounded-full px-2 py-0.5 shrink-0"
-								>{dest.group}</span
-							>
 						</button>
 					</li>
 				{/each}

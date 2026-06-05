@@ -255,7 +255,7 @@
                         <div
                             class="grid grid-cols-1 xl:grid-cols-3 gap-3 max-w-3xl"
                         >
-                            {#each [{ label: t.stat1, color: "bg-slate-50 border-slate-200 text-slate-700" }, { label: t.stat2, color: "bg-blue-50 border-blue-100 text-blue-700" }, { label: t.stat3, color: "bg-green-50 border-green-100 text-green-700" }, { label: t.stat4, color: "bg-slate-50 border-slate-100 text-slate-600" }, { label: t.stat5, color: "bg-amber-50 border-amber-100 text-amber-700" }] as card}
+                            {#each [{ label: t.stat1, color: "bg-slate-50 border-slate-200 text-slate-700" }, { label: t.stat2, color: "bg-blue-50 border-blue-100 text-slate-800" }, { label: t.stat3, color: "bg-green-50 border-green-100 text-green-700" }, { label: t.stat4, color: "bg-slate-50 border-slate-100 text-slate-600" }, { label: t.stat5, color: "bg-amber-50 border-amber-100 text-amber-700" }] as card}
                                 <div
                                     class="flex items-start gap-3 p-4 rounded-xl border {card.color}"
                                 >
@@ -484,7 +484,7 @@
                     >
                         <div class="flex-1 h-px bg-slate-200"></div>
                         <div
-                            class="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-bold tracking-widest uppercase shrink-0"
+                            class="flex items-center gap-2 px-4 py-2 rounded-full bg-navy text-white text-xs font-bold tracking-widest uppercase shrink-0"
                         >
                             <svg
                                 width="12"
@@ -527,7 +527,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span
                                     class="text-xs font-semibold text-slate-400 uppercase tracking-widest"

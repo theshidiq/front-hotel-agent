@@ -96,7 +96,7 @@
 
 	// Shift symbols - matches React shiftConstants.js
 	const shiftSymbols = {
-		early: { symbol: "△", label: "早番", color: "text-blue-600" },
+		early: { symbol: "△", label: "早番", color: "text-slate-800" },
 		normal: { symbol: "", label: "出勤（空白）", color: "text-gray-600" },
 		late: { symbol: "◇", label: "遅番", color: "text-purple-600" },
 		special: { symbol: "●", label: "特別", color: "text-green-600" },
@@ -599,7 +599,7 @@
 			>
 				<Clipboard
 					class="w-4 h-4 {selection.getSelectionStats().hasClipboard
-						? 'text-blue-600'
+						? 'text-slate-800'
 						: 'text-gray-400'}"
 				/>
 			</button>
@@ -621,7 +621,7 @@
 					e.preventDefault();
 					handleQuickAction("early");
 				}}
-				class="px-2 py-1 hover:bg-gray-100 rounded text-blue-600 flex items-center"
+				class="px-2 py-1 hover:bg-gray-100 rounded text-slate-800 flex items-center"
 				title="Early Shift (Press 1)"
 			>
 				<svg
@@ -789,7 +789,7 @@
 										? 'cursor-not-allowed text-gray-400'
 										: 'cursor-pointer hover:bg-gray-100'}
 										{isActive && isSelected ? 'bg-blue-100 hover:bg-blue-200' : ''}
-										{isFocused ? 'ring-2 ring-blue-500 ring-inset' : ''}"
+										{isFocused ? 'ring-2 ring-slate-700 ring-inset' : ''}"
 									role="gridcell"
 									tabindex="-1"
 									onclick={(e) =>
@@ -870,7 +870,7 @@
 									<!-- Selection indicator -->
 									{#if isSelected}
 										<div
-											class="absolute top-0 right-0 w-2 h-2 bg-blue-500 rounded-full transform translate-x-1 -translate-y-1"
+											class="absolute top-0 right-0 w-2 h-2 bg-slate-800 rounded-full transform translate-x-1 -translate-y-1"
 										></div>
 									{/if}
 								</div>
@@ -928,7 +928,7 @@
 											>
 												<input
 													type="text"
-													class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+													class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-navy"
 													placeholder="カスタムテキスト..."
 													bind:value={customInputText}
 													onkeydown={(e) => {
@@ -1043,7 +1043,7 @@
 			</button>
 			<button
 				type="button"
-				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-blue-600 flex items-center gap-2"
+				class="w-full px-4 py-2 text-left hover:bg-gray-100 text-slate-800 flex items-center gap-2"
 				onclick={() => handleQuickAction("early")}
 			>
 				<svg

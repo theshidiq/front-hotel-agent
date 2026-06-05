@@ -267,7 +267,7 @@ function getActiveMemberIds(groupId: string): string[] {
     <button
       onclick={handleAddGroup}
       disabled={loading}
-      class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+      class="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
     >
       <span class="material-symbols-rounded text-xl">add</span>
       グループを追加
@@ -275,8 +275,8 @@ function getActiveMemberIds(groupId: string): string[] {
   </div>
 
   <!-- OR-Tools info banner -->
-  <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-    <span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+  <div class="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-slate-900">
+    <span class="material-symbols-rounded text-slate-800 mt-0.5 shrink-0">auto_fix_high</span>
     <div>
       <span class="font-medium">OR-Tools連携：</span>
       同じグループのスタッフが同じ日に休む（×）のを最小化します。ハード制約にすると必ず1人以下になります。
@@ -315,7 +315,7 @@ function getActiveMemberIds(groupId: string): string[] {
       <button
         onclick={handleAddGroup}
         disabled={loading}
-        class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
       >
         <span class="material-symbols-rounded text-xl">add</span>
         グループを追加
@@ -367,7 +367,7 @@ function getActiveMemberIds(groupId: string): string[] {
                   <input
                     type="text"
                     bind:value={editForm.name}
-                    class="w-full px-2 py-1 text-sm font-medium border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    class="w-full px-2 py-1 text-sm font-medium border border-gray-300 rounded focus:ring-2 focus:ring-navy focus:border-transparent"
                     placeholder="グループ名"
                   />
                 {:else}
@@ -427,7 +427,7 @@ function getActiveMemberIds(groupId: string): string[] {
             {#if editingGroupId === group.id}
               <textarea
                 bind:value={editForm.description}
-                class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mb-3"
+                class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-navy focus:border-transparent resize-none mb-3"
                 placeholder="説明（任意）"
                 rows="2"
               ></textarea>
@@ -442,7 +442,7 @@ function getActiveMemberIds(groupId: string): string[] {
                 <button
                   onclick={() => { addingMemberToGroup = group.id; selectedStaffId = null; }}
                   disabled={loading || editingGroupId === group.id}
-                  class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+                  class="p-1 text-gray-400 hover:text-slate-900 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
                   title="メンバーを追加"
                 >
                   <span class="material-symbols-rounded text-sm">person_add</span>
@@ -454,7 +454,7 @@ function getActiveMemberIds(groupId: string): string[] {
                 <div class="mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
                   <select
                     bind:value={selectedStaffId}
-                    class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2 bg-white"
+                    class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-navy focus:border-transparent mb-2 bg-white"
                   >
                     <option value={null}>スタッフを選択...</option>
                     {#each availableStaff as s (s.id)}
@@ -465,7 +465,7 @@ function getActiveMemberIds(groupId: string): string[] {
                     <button
                       onclick={() => handleAddMember(group.id)}
                       disabled={loading || !selectedStaffId}
-                      class="flex-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      class="flex-1 px-2 py-1 text-xs bg-navy text-white rounded hover:bg-navy-700 disabled:opacity-50 transition-colors"
                     >
                       追加
                     </button>

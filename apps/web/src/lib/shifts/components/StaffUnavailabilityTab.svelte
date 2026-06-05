@@ -191,7 +191,7 @@ async function clearAll() {
 function statusColor(status: string | undefined): string {
   if (status === '派遣') return 'bg-orange-100 text-orange-700';
   if (status === 'パート') return 'bg-purple-100 text-purple-700';
-  return 'bg-blue-100 text-blue-700';
+  return 'bg-blue-100 text-slate-800';
 }
 
 let selectedStaff = $derived(activeStaff.find(s => String(s.id) === String(selectedStaffId)));
@@ -245,7 +245,7 @@ let selectedStaff = $derived(activeStaff.find(s => String(s.id) === String(selec
               onclick={() => selectedStaffId = String(s.id)}
               class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-l-2
                 {selectedStaffId === String(s.id)
-                  ? 'bg-blue-50 border-blue-500'
+                  ? 'bg-blue-50 border-navy'
                   : 'border-transparent hover:bg-gray-100'}"
             >
               <div class="flex-1 min-w-0">
@@ -288,7 +288,7 @@ let selectedStaff = $derived(activeStaff.find(s => String(s.id) === String(selec
             <div class="flex gap-2">
               <button
                 onclick={() => { showRangeForm = !showRangeForm; error = null; }}
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-navy text-white rounded-lg hover:bg-navy-700 transition-colors"
               >
                 <span class="material-symbols-rounded text-sm">date_range</span>
                 期間設定
@@ -309,29 +309,29 @@ let selectedStaff = $derived(activeStaff.find(s => String(s.id) === String(selec
           <!-- Range form -->
           {#if showRangeForm}
             <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-              <p class="text-xs font-medium text-blue-800">期間一括設定</p>
+              <p class="text-xs font-medium text-slate-900">期間一括設定</p>
               <div class="grid grid-cols-2 gap-2">
                 <div>
                   <label class="text-xs text-gray-500 block mb-0.5">開始日</label>
-                  <input type="date" bind:value={rangeStart} class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500" />
+                  <input type="date" bind:value={rangeStart} class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-navy" />
                 </div>
                 <div>
                   <label class="text-xs text-gray-500 block mb-0.5">終了日</label>
-                  <input type="date" bind:value={rangeEnd} class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500" />
+                  <input type="date" bind:value={rangeEnd} class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-navy" />
                 </div>
               </div>
               <input
                 type="text"
                 bind:value={rangeReason}
                 placeholder="理由（任意）：有給、休暇、研修など"
-                class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-navy"
               />
               <div class="flex justify-end gap-2">
                 <button onclick={() => showRangeForm = false} class="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">キャンセル</button>
                 <button
                   onclick={handleRangeAdd}
                   disabled={!rangeStart || !rangeEnd || savingRange}
-                  class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  class="px-3 py-1 text-xs bg-navy text-white rounded hover:bg-navy-700 disabled:opacity-50"
                 >
                   {savingRange ? '設定中...' : '設定'}
                 </button>
@@ -355,7 +355,7 @@ let selectedStaff = $derived(activeStaff.find(s => String(s.id) === String(selec
             <!-- Day headers -->
             <div class="grid grid-cols-7 border-b border-gray-100">
               {#each DAY_NAMES as d, i}
-                <div class="py-1.5 text-center text-xs font-medium {i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}">
+                <div class="py-1.5 text-center text-xs font-medium {i === 0 ? 'text-red-500' : i === 6 ? 'text-slate-700' : 'text-gray-500'}">
                   {d}
                 </div>
               {/each}

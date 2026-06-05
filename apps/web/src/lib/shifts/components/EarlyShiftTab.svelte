@@ -145,7 +145,7 @@
 	function getTypeBadgeColor(type: string): string {
 		switch (type) {
 			case '社員':
-				return 'bg-blue-100 text-blue-800 border-blue-200';
+				return 'bg-blue-100 text-slate-900 border-blue-200';
 			case '派遣':
 				return 'bg-green-100 text-green-800 border-green-200';
 			case 'パート':
@@ -206,7 +206,7 @@
 						e.currentTarget.value = '';
 					}
 				}}
-				class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-sm cursor-pointer appearance-none pr-10"
+				class="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-navy-700 transition-colors font-medium shadow-sm cursor-pointer appearance-none pr-10"
 			>
 				<option value="">雇用形態別で有効化</option>
 				<option value="社員">社員のみ有効化</option>
@@ -291,7 +291,7 @@
 		<button
 			onclick={handleSave}
 			disabled={!hasChanges || isSaving}
-			class="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-lg disabled:shadow-none"
+			class="w-full px-6 py-3 bg-navy text-white rounded-lg font-semibold hover:bg-navy-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-lg disabled:shadow-none"
 		>
 			{#if isSaving}
 				保存中...

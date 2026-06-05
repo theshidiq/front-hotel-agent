@@ -331,7 +331,7 @@
 	<div class="flex items-center justify-center min-h-screen">
 		<div class="text-center">
 			<p class="text-lg text-gray-600">Admin access required</p>
-			<a href="/" class="mt-4 inline-block text-blue-600 hover:underline">Back to App</a>
+			<a href="/" class="mt-4 inline-block text-slate-800 hover:underline">Back to App</a>
 		</div>
 	</div>
 {:else}
@@ -363,7 +363,7 @@
 
 		{#if authState.loading}
 			<div class="flex flex-col items-center justify-center py-20 gap-3">
-				<svg class="w-8 h-8 animate-spin text-blue-600" viewBox="0 0 24 24">
+				<svg class="w-8 h-8 animate-spin text-slate-800" viewBox="0 0 24 24">
 					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
 					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 				</svg>
@@ -378,7 +378,7 @@
 				>
 					<div class="flex items-center gap-4">
 						<div class="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-							<span class="material-symbols-rounded text-2xl text-blue-600">corporate_fare</span>
+							<span class="material-symbols-rounded text-2xl text-slate-800">corporate_fare</span>
 						</div>
 						<div>
 							<h3 class="text-lg font-semibold text-gray-900">Organization</h3>
@@ -425,7 +425,7 @@
 
 			{#if loading}
 				<div class="flex items-center justify-center py-20">
-					<svg class="w-8 h-8 animate-spin text-blue-600" viewBox="0 0 24 24">
+					<svg class="w-8 h-8 animate-spin text-slate-800" viewBox="0 0 24 24">
 						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
 						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 					</svg>
@@ -441,7 +441,7 @@
 					</h2>
 					<button
 						onclick={startNewRole}
-						class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+						class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-blue-50 rounded-lg transition-colors"
 					>
 						<span class="material-symbols-rounded text-lg">add</span>
 						New Role
@@ -455,7 +455,7 @@
 							<button
 								onclick={() => startEditingRole(role)}
 								class="px-4 py-3 border rounded-lg text-left transition-all min-w-[120px]
-									{editingRole?.id === role.id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}"
+									{editingRole?.id === role.id ? 'border-navy bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}"
 							>
 								<div class="flex items-center gap-1.5">
 									<p class="text-sm font-medium text-gray-900">{role.name}</p>
@@ -475,12 +475,12 @@
 								<div class="flex items-center gap-3 flex-1 min-w-0">
 									<input
 										bind:value={editRoleName}
-										class="text-sm font-semibold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 w-40"
+										class="text-sm font-semibold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-navy focus:outline-none px-0 py-0.5 w-40"
 										placeholder="Role name"
 									/>
 									<input
 										bind:value={editRoleDescription}
-										class="text-xs text-gray-500 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 flex-1"
+										class="text-xs text-gray-500 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-navy focus:outline-none px-0 py-0.5 flex-1"
 										placeholder="Description (optional)"
 									/>
 								</div>
@@ -516,7 +516,7 @@
 										type="text"
 										bind:value={permissionSearch}
 										placeholder="Search permissions..."
-										class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+										class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-navy"
 									/>
 									{#if permissionSearch}
 										<button
@@ -562,7 +562,7 @@
 																		type="button"
 																		onclick={() => togglePermission(perm.key)}
 																		class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
-																			{editingPermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
+																			{editingPermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-slate-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
 																	>
 																		<span class="material-symbols-rounded text-sm">
 																			{editingPermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
@@ -584,7 +584,7 @@
 								<button
 									onclick={saveRoleChanges}
 									disabled={roleSaving || !editRoleName.trim()}
-									class="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+									class="px-5 py-2 text-sm font-medium bg-navy text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
 								>
 									{roleSaving ? 'Saving...' : 'Save Changes'}
 								</button>
@@ -599,12 +599,12 @@
 								<div class="flex items-center gap-3 flex-1 min-w-0">
 									<input
 										bind:value={newRoleName}
-										class="text-sm font-semibold text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 w-40"
+										class="text-sm font-semibold text-gray-900 bg-transparent border-b border-gray-300 focus:border-navy focus:outline-none px-0 py-0.5 w-40"
 										placeholder="Role name"
 									/>
 									<input
 										bind:value={newRoleDescription}
-										class="text-xs text-gray-500 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none px-0 py-0.5 flex-1"
+										class="text-xs text-gray-500 bg-transparent border-b border-gray-300 focus:border-navy focus:outline-none px-0 py-0.5 flex-1"
 										placeholder="Description (optional)"
 									/>
 								</div>
@@ -624,7 +624,7 @@
 										type="text"
 										bind:value={newRolePermissionSearch}
 										placeholder="Search permissions..."
-										class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+										class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-navy"
 									/>
 									{#if newRolePermissionSearch}
 										<button
@@ -670,7 +670,7 @@
 																		type="button"
 																		onclick={() => toggleNewRolePermission(perm.key)}
 																		class="flex items-center gap-2 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors
-																			{newRolePermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
+																			{newRolePermissions.has(perm.key) ? 'bg-blue-50 border-blue-300 text-slate-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}"
 																	>
 																		<span class="material-symbols-rounded text-sm">
 																			{newRolePermissions.has(perm.key) ? 'check_box' : 'check_box_outline_blank'}
@@ -692,7 +692,7 @@
 								<button
 									onclick={handleCreateRole}
 									disabled={roleSaving || !newRoleName.trim()}
-									class="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+									class="px-5 py-2 text-sm font-medium bg-navy text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
 								>
 									{roleSaving ? 'Creating...' : 'Create Role'}
 								</button>

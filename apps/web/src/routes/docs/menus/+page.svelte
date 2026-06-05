@@ -657,7 +657,7 @@
                     >
                         <div class="flex-1 h-px bg-slate-200"></div>
                         <div
-                            class="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-bold tracking-widest uppercase shrink-0"
+                            class="flex items-center gap-2 px-4 py-2 rounded-full bg-navy text-white text-xs font-bold tracking-widest uppercase shrink-0"
                         >
                             <svg
                                 width="12"
@@ -700,7 +700,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span
                                     class="text-xs font-semibold text-slate-400 uppercase tracking-widest"

@@ -428,7 +428,7 @@
 
 	function getSectionClass(section: string): string {
 		return activeSection === section
-			? 'border-blue-600 text-blue-600 bg-blue-50'
+			? 'border-navy text-slate-800 bg-blue-50'
 			: 'border-gray-200 text-gray-600 hover:bg-gray-50';
 	}
 </script>
@@ -503,8 +503,8 @@
 			<p class="text-sm text-gray-600 mb-6">1日あたりの休みや早番の人数制限を設定します。</p>
 
 			<!-- OR-Tools info banner -->
-			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-slate-900">
+				<span class="material-symbols-rounded text-slate-800 mt-0.5 shrink-0">auto_fix_high</span>
 				<div>
 					<span class="font-medium">OR-Tools連携：</span>
 					各日の休み・早番人数がこの範囲に収まるよう最適化します。ハード制約にすると必ず守られ、ソフト制約はペナルティで調整されます。
@@ -519,7 +519,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">最小</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={dailyForm.minOffPerDay}
 							onchange={markChanged}
 							min="0"
@@ -529,7 +529,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">最大</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={dailyForm.maxOffPerDay}
 							onchange={markChanged}
 							min="0"
@@ -544,7 +544,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">最小</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={dailyForm.minEarlyPerDay}
 							onchange={markChanged}
 							min="0"
@@ -554,7 +554,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">最大</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={dailyForm.maxEarlyPerDay}
 							onchange={markChanged}
 							min="0"
@@ -569,7 +569,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">人数</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={dailyForm.minWorkingStaffPerDay}
 							onchange={markChanged}
 							min="0"
@@ -586,7 +586,7 @@
 						type="checkbox"
 						bind:checked={dailyForm.is_hard_constraint}
 						onchange={markChanged}
-						class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+						class="w-5 h-5 rounded border-gray-300 text-slate-800 focus:ring-navy"
 					/>
 					<div>
 						<span class="font-medium text-gray-900">ハード制約として設定</span>
@@ -601,7 +601,7 @@
 					type="button"
 					onclick={saveDailyLimits}
 					disabled={isSaving}
-					class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-6 py-2.5 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 focus:outline-none focus:ring-2 focus:ring-navy disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					{isSaving ? '保存中...' : '日次制限を保存'}
 				</button>
@@ -616,8 +616,8 @@
 			<p class="text-sm text-gray-600 mb-6">1ヶ月あたりの休み日数を設定します。デフォルト（全員）と個別スタッフの両方を設定できます。</p>
 
 			<!-- OR-Tools info banner -->
-			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-slate-900">
+				<span class="material-symbols-rounded text-slate-800 mt-0.5 shrink-0">auto_fix_high</span>
 				<div>
 					<span class="font-medium">OR-Tools連携：</span>
 					個別設定 &gt; スタッフ種別 &gt; 全員（デフォルト）の優先順でスタッフに適用されます。
@@ -632,7 +632,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">最小休み日数</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={monthlyForm.min_count}
 							onchange={markChanged}
 							min="0"
@@ -642,7 +642,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">最大休み日数</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={monthlyForm.max_count}
 							onchange={markChanged}
 							min="0"
@@ -650,13 +650,13 @@
 					</div>
 					<div class="flex items-center gap-3">
 						<label class="flex items-center gap-2 cursor-pointer">
-							<input type="checkbox" bind:checked={monthlyForm.is_hard_constraint} onchange={markChanged} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+							<input type="checkbox" bind:checked={monthlyForm.is_hard_constraint} onchange={markChanged} class="w-4 h-4 rounded border-gray-300 text-slate-800" />
 							<span class="text-sm font-medium text-gray-700">ハード制約</span>
 						</label>
 					</div>
 					<div class="flex items-center gap-3">
 						<label class="flex items-center gap-2 cursor-pointer">
-							<input type="checkbox" bind:checked={monthlyForm.exclude_calendar_rules} onchange={markChanged} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+							<input type="checkbox" bind:checked={monthlyForm.exclude_calendar_rules} onchange={markChanged} class="w-4 h-4 rounded border-gray-300 text-slate-800" />
 							<span class="text-sm font-medium text-gray-700">カレンダールール除外</span>
 						</label>
 					</div>
@@ -666,7 +666,7 @@
 						type="button"
 						onclick={saveMonthlyLimits}
 						disabled={isSaving}
-						class="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none disabled:opacity-50 transition-colors"
+						class="px-5 py-2 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 focus:outline-none disabled:opacity-50 transition-colors"
 					>
 						{isSaving ? '保存中...' : 'デフォルト設定を保存'}
 					</button>
@@ -679,7 +679,7 @@
 				<button
 					type="button"
 					onclick={() => { showAddForm = !showAddForm; }}
-					class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+					class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-800 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
 				>
 					<span class="material-symbols-rounded text-base">add</span>
 					追加
@@ -688,7 +688,7 @@
 
 			{#if showAddForm}
 				<div class="mb-4 p-4 rounded-lg border border-blue-200 bg-blue-50">
-					<h5 class="font-medium text-blue-800 mb-3">新しい個別制限</h5>
+					<h5 class="font-medium text-slate-900 mb-3">新しい個別制限</h5>
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<!-- Scope selector -->
 						<div class="md:col-span-2">
@@ -698,7 +698,7 @@
 									<button
 										type="button"
 										onclick={() => { addForm.scope = val as 'individual' | 'staff_status'; addForm.targetIds = []; }}
-										class="px-3 py-1.5 text-sm rounded-lg border-2 transition-colors {addForm.scope === val ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
+										class="px-3 py-1.5 text-sm rounded-lg border-2 transition-colors {addForm.scope === val ? 'border-navy bg-blue-100 text-slate-800' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
 									>
 										{label}
 									</button>
@@ -723,7 +723,7 @@
 													addForm.targetIds = [...addForm.targetIds, s.id];
 												}
 											}}
-											class="px-2.5 py-1 text-xs rounded-full border transition-colors {addForm.targetIds.includes(s.id) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
+											class="px-2.5 py-1 text-xs rounded-full border transition-colors {addForm.targetIds.includes(s.id) ? 'border-navy bg-blue-100 text-slate-800' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
 										>
 											{s.name}
 										</button>
@@ -739,7 +739,7 @@
 													addForm.targetIds = [...addForm.targetIds, status];
 												}
 											}}
-											class="px-3 py-1.5 text-sm rounded-full border transition-colors {addForm.targetIds.includes(status) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
+											class="px-3 py-1.5 text-sm rounded-full border transition-colors {addForm.targetIds.includes(status) ? 'border-navy bg-blue-100 text-slate-800' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}"
 										>
 											{status}
 										</button>
@@ -750,15 +750,15 @@
 
 						<div>
 							<label class="block text-sm font-medium text-gray-700 mb-1">最小休み日数</label>
-							<input type="number" class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none" bind:value={addForm.min_count} min="0" />
+							<input type="number" class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none" bind:value={addForm.min_count} min="0" />
 						</div>
 						<div>
 							<label class="block text-sm font-medium text-gray-700 mb-1">最大休み日数</label>
-							<input type="number" class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none" bind:value={addForm.max_count} min="0" />
+							<input type="number" class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none" bind:value={addForm.max_count} min="0" />
 						</div>
 						<div class="flex items-center gap-3">
 							<label class="flex items-center gap-2 cursor-pointer">
-								<input type="checkbox" bind:checked={addForm.is_hard_constraint} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+								<input type="checkbox" bind:checked={addForm.is_hard_constraint} class="w-4 h-4 rounded border-gray-300 text-slate-800" />
 								<span class="text-sm font-medium text-gray-700">ハード制約</span>
 							</label>
 						</div>
@@ -769,7 +769,7 @@
 							type="button"
 							onclick={addMonthlyLimitRecord}
 							disabled={isSaving || (addForm.scope !== 'all' && addForm.targetIds.length === 0)}
-							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+							class="px-4 py-2 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors"
 						>
 							{isSaving ? '保存中...' : '追加'}
 						</button>
@@ -797,7 +797,7 @@
 												{#each [['individual','個別スタッフ'], ['staff_status','スタッフ種別']] as [val, lbl]}
 													<button type="button"
 														onclick={() => { editForm.scope = val as 'individual' | 'staff_status'; editForm.targetIds = []; }}
-														class="px-3 py-1.5 text-xs rounded-lg border-2 transition-colors {editForm.scope === val ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-white'}"
+														class="px-3 py-1.5 text-xs rounded-lg border-2 transition-colors {editForm.scope === val ? 'border-navy bg-blue-100 text-slate-800' : 'border-gray-200 text-gray-600 hover:bg-white'}"
 													>{lbl}</button>
 												{/each}
 											</div>
@@ -818,7 +818,7 @@
 																	editForm.targetIds = [...editForm.targetIds, s.id];
 																}
 															}}
-															class="px-2.5 py-1 text-xs rounded-full border transition-colors {editForm.targetIds.includes(s.id) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}"
+															class="px-2.5 py-1 text-xs rounded-full border transition-colors {editForm.targetIds.includes(s.id) ? 'border-navy bg-blue-100 text-slate-800' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}"
 														>{s.name}</button>
 													{/each}
 												{:else}
@@ -831,7 +831,7 @@
 																	editForm.targetIds = [...editForm.targetIds, status];
 																}
 															}}
-															class="px-3 py-1.5 text-xs rounded-full border transition-colors {editForm.targetIds.includes(status) ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}"
+															class="px-3 py-1.5 text-xs rounded-full border transition-colors {editForm.targetIds.includes(status) ? 'border-navy bg-blue-100 text-slate-800' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}"
 														>{status}</button>
 													{/each}
 												{/if}
@@ -840,20 +840,20 @@
 										<!-- Min/Max -->
 										<div>
 											<label class="block text-xs font-medium text-gray-600 mb-1">最小休み日数</label>
-											<input type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white" bind:value={editForm.min_count} min="0" max="31" />
+											<input type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white" bind:value={editForm.min_count} min="0" max="31" />
 										</div>
 										<div>
 											<label class="block text-xs font-medium text-gray-600 mb-1">最大休み日数</label>
-											<input type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white" bind:value={editForm.max_count} min="0" max="31" />
+											<input type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white" bind:value={editForm.max_count} min="0" max="31" />
 										</div>
 										<!-- Toggles -->
 										<div class="flex items-center gap-4">
 											<label class="flex items-center gap-2 cursor-pointer">
-												<input type="checkbox" bind:checked={editForm.is_hard_constraint} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+												<input type="checkbox" bind:checked={editForm.is_hard_constraint} class="w-4 h-4 rounded border-gray-300 text-slate-800" />
 												<span class="text-xs font-medium text-gray-700">ハード制約</span>
 											</label>
 											<label class="flex items-center gap-2 cursor-pointer">
-												<input type="checkbox" bind:checked={editForm.exclude_calendar_rules} class="w-4 h-4 rounded border-gray-300 text-blue-600" />
+												<input type="checkbox" bind:checked={editForm.exclude_calendar_rules} class="w-4 h-4 rounded border-gray-300 text-slate-800" />
 												<span class="text-xs font-medium text-gray-700">カレンダー除外</span>
 											</label>
 										</div>
@@ -866,7 +866,7 @@
 										<div class="flex gap-2">
 											<button type="button" onclick={cancelEdit} class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-white">キャンセル</button>
 											<button type="button" onclick={() => saveEdit(record.id)} disabled={isSaving || editForm.targetIds.length === 0}
-												class="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+												class="px-4 py-1.5 text-xs font-medium text-white bg-navy rounded-lg hover:bg-navy-700 disabled:opacity-50 transition-colors">
 												{isSaving ? '保存中...' : '保存'}
 											</button>
 										</div>
@@ -904,8 +904,8 @@
 			<p class="text-sm text-gray-600 mb-6">OR-Toolsの制約モードとペナルティウェイトを設定します。</p>
 
 			<!-- OR-Tools info banner -->
-			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-slate-900">
+				<span class="material-symbols-rounded text-slate-800 mt-0.5 shrink-0">auto_fix_high</span>
 				<div>
 					<span class="font-medium">OR-Tools連携：</span>
 					ハード制約は必ず守られます（違反時は解なし）。ソフト制約はペナルティで調整され、スケジュール生成に柔軟性を持たせます。
@@ -926,7 +926,7 @@
 								type="checkbox"
 								bind:checked={solverForm.fiveDayRestIsHard}
 								onchange={markChanged}
-								class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+								class="w-5 h-5 rounded border-gray-300 text-slate-800 focus:ring-navy"
 							/>
 							<div>
 								<span class="font-medium text-gray-900">ハード制約として設定</span>
@@ -938,7 +938,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">ペナルティウェイト（ソフト時）</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none disabled:opacity-50"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none disabled:opacity-50"
 							bind:value={solverForm.penaltyFiveDayRest}
 							onchange={markChanged}
 							disabled={solverForm.fiveDayRestIsHard}
@@ -959,7 +959,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">スタッフグループ</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={solverForm.penaltyStaffGroup}
 							onchange={markChanged}
 							min="0"
@@ -969,7 +969,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">月次制限</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={solverForm.penaltyMonthlyLimit}
 							onchange={markChanged}
 							min="0"
@@ -979,7 +979,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">日次制限（最大超過）</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={solverForm.penaltyDailyLimitMax}
 							onchange={markChanged}
 							min="0"
@@ -989,7 +989,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">日次制限（最小未満）</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={solverForm.penaltyDailyLimitMin}
 							onchange={markChanged}
 							min="0"
@@ -999,7 +999,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">隣接シフト矛盾</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={solverForm.penaltyAdjacentConflict}
 							onchange={markChanged}
 							disabled={solverForm.disableAdjacentConflict}
@@ -1011,7 +1011,7 @@
 						<label class="block text-sm font-medium text-gray-700 mb-1">雇用形態シフト制限違反</label>
 						<input
 							type="number"
-							class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+							class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 							bind:value={solverForm.penaltyStaffStatusShift}
 							onchange={markChanged}
 							disabled={solverForm.disableStaffStatusShiftRestrictions}
@@ -1035,7 +1035,7 @@
 							type="checkbox"
 							bind:checked={solverForm.disableStaffStatusShiftRestrictions}
 							onchange={markChanged}
-							class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+							class="w-5 h-5 rounded border-gray-300 text-slate-800 focus:ring-navy"
 						/>
 						<div>
 							<span class="font-medium text-gray-900">制限を無効化</span>
@@ -1058,7 +1058,7 @@
 							type="checkbox"
 							bind:checked={solverForm.disableAdjacentConflict}
 							onchange={markChanged}
-							class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+							class="w-5 h-5 rounded border-gray-300 text-slate-800 focus:ring-navy"
 						/>
 						<div>
 							<span class="font-medium text-gray-900">防止を無効化</span>
@@ -1095,7 +1095,7 @@
 							<label class="block text-sm font-medium text-gray-700 mb-1">保護日数</label>
 							<input
 								type="number"
-								class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+								class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 								bind:value={solverForm.postPeriodDays}
 								onchange={markChanged}
 								disabled={!solverForm.postPeriodEnabled}
@@ -1108,7 +1108,7 @@
 							<label class="block text-sm font-medium text-gray-700 mb-1">最小クローズ日数</label>
 							<input
 								type="number"
-								class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+								class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 								bind:value={solverForm.postPeriodMinLength}
 								onchange={markChanged}
 								disabled={!solverForm.postPeriodEnabled}
@@ -1142,7 +1142,7 @@
 					type="button"
 					onclick={saveSolverConfig}
 					disabled={isSaving}
-					class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-6 py-2.5 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 focus:outline-none focus:ring-2 focus:ring-navy disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					{isSaving ? '保存中...' : 'ソルバー設定を保存'}
 				</button>
@@ -1157,8 +1157,8 @@
 			<p class="text-sm text-gray-600 mb-6">雇用形態ごとに1日あたりの休み人数を制限します。</p>
 
 			<!-- OR-Tools info banner -->
-			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-				<span class="material-symbols-rounded text-blue-600 mt-0.5 shrink-0">auto_fix_high</span>
+			<div class="mb-6 flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-slate-900">
+				<span class="material-symbols-rounded text-slate-800 mt-0.5 shrink-0">auto_fix_high</span>
 				<div>
 					<span class="font-medium">OR-Tools連携：</span>
 					雇用形態ごとの制限は <code class="bg-blue-100 px-1 rounded">limit_config.staffTypeLimits</code> に保存され、OR-Toolsが各タイプの同日休み人数を制御します。
@@ -1171,7 +1171,7 @@
 						<div class="flex items-center justify-between mb-4">
 							<div class="flex items-center gap-2">
 								<span class="px-3 py-1 rounded-full text-sm font-medium
-									{type === '社員' ? 'bg-blue-100 text-blue-800' :
+									{type === '社員' ? 'bg-blue-100 text-slate-900' :
 									 type === '派遣' ? 'bg-green-100 text-green-800' :
 									 'bg-purple-100 text-purple-800'}">
 									{type}
@@ -1183,7 +1183,7 @@
 								<label class="block text-sm font-medium text-gray-700 mb-1">最小休み人数/日</label>
 								<input
 									type="number"
-									class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+									class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 									bind:value={limits.minOff}
 									onchange={markChanged}
 									min="0"
@@ -1193,7 +1193,7 @@
 								<label class="block text-sm font-medium text-gray-700 mb-1">最大休み人数/日</label>
 								<input
 									type="number"
-									class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+									class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 									bind:value={limits.maxOff}
 									onchange={markChanged}
 									min="0"
@@ -1203,7 +1203,7 @@
 								<label class="block text-sm font-medium text-gray-700 mb-1">最大早番人数/日</label>
 								<input
 									type="number"
-									class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+									class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 									bind:value={limits.maxEarly}
 									onchange={markChanged}
 									min="0"
@@ -1213,7 +1213,7 @@
 								<label class="block text-sm font-medium text-gray-700 mb-1">最大早番数/月</label>
 								<input
 									type="number"
-									class="w-full border rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
+									class="w-full border rounded-lg px-3 py-2 focus:border-navy focus:ring-2 focus:ring-blue-200 focus:outline-none"
 									bind:value={limits.maxMonthlyEarlyShifts}
 									onchange={markChanged}
 									min="0"
@@ -1226,7 +1226,7 @@
 										type="checkbox"
 										bind:checked={limits.isHard}
 										onchange={markChanged}
-										class="w-4 h-4 rounded border-gray-300 text-blue-600"
+										class="w-4 h-4 rounded border-gray-300 text-slate-800"
 									/>
 									<span class="text-sm font-medium text-gray-700">ハード制約</span>
 								</label>
@@ -1242,7 +1242,7 @@
 					type="button"
 					onclick={saveStaffTypeLimits}
 					disabled={isSaving}
-					class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					class="px-6 py-2.5 text-sm font-medium text-white bg-navy rounded-lg hover:bg-navy-700 focus:outline-none focus:ring-2 focus:ring-navy disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
 					{isSaving ? '保存中...' : 'スタッフタイプ別制限を保存'}
 				</button>

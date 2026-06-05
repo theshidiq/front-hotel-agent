@@ -366,7 +366,7 @@
                         <div
                             class="grid grid-cols-2 xl:grid-cols-3 gap-3 max-w-3xl"
                         >
-                            {#each $lang === "en" ? [{ label: "Grains", ex: "Wheat, buckwheat", color: "bg-amber-50 border-amber-100 text-amber-800" }, { label: "Egg", ex: "Egg", color: "bg-yellow-50 border-yellow-100 text-yellow-800" }, { label: "Dairy", ex: "Milk, butter", color: "bg-blue-50 border-blue-100 text-blue-800" }, { label: "Meat", ex: "Chicken, pork, beef", color: "bg-red-50 border-red-100 text-red-800" }, { label: "Fish", ex: "Salmon, tuna", color: "bg-cyan-50 border-cyan-100 text-cyan-800" }, { label: "Shellfish", ex: "Shrimp, crab", color: "bg-orange-50 border-orange-100 text-orange-800" }] : [{ label: "穀類", ex: "小麦・そば", color: "bg-amber-50 border-amber-100 text-amber-800" }, { label: "卵", ex: "卵", color: "bg-yellow-50 border-yellow-100 text-yellow-800" }, { label: "乳製品", ex: "乳・バター", color: "bg-blue-50 border-blue-100 text-blue-800" }, { label: "肉類", ex: "鶏肉・豚肉・牛肉", color: "bg-red-50 border-red-100 text-red-800" }, { label: "魚類", ex: "サーモン・まぐろ", color: "bg-cyan-50 border-cyan-100 text-cyan-800" }, { label: "甲殻類", ex: "えび・かに", color: "bg-orange-50 border-orange-100 text-orange-800" }] as item}
+                            {#each $lang === "en" ? [{ label: "Grains", ex: "Wheat, buckwheat", color: "bg-amber-50 border-amber-100 text-amber-800" }, { label: "Egg", ex: "Egg", color: "bg-yellow-50 border-yellow-100 text-yellow-800" }, { label: "Dairy", ex: "Milk, butter", color: "bg-blue-50 border-blue-100 text-slate-900" }, { label: "Meat", ex: "Chicken, pork, beef", color: "bg-red-50 border-red-100 text-red-800" }, { label: "Fish", ex: "Salmon, tuna", color: "bg-cyan-50 border-cyan-100 text-cyan-800" }, { label: "Shellfish", ex: "Shrimp, crab", color: "bg-orange-50 border-orange-100 text-orange-800" }] : [{ label: "穀類", ex: "小麦・そば", color: "bg-amber-50 border-amber-100 text-amber-800" }, { label: "卵", ex: "卵", color: "bg-yellow-50 border-yellow-100 text-yellow-800" }, { label: "乳製品", ex: "乳・バター", color: "bg-blue-50 border-blue-100 text-slate-900" }, { label: "肉類", ex: "鶏肉・豚肉・牛肉", color: "bg-red-50 border-red-100 text-red-800" }, { label: "魚類", ex: "サーモン・まぐろ", color: "bg-cyan-50 border-cyan-100 text-cyan-800" }, { label: "甲殻類", ex: "えび・かに", color: "bg-orange-50 border-orange-100 text-orange-800" }] as item}
                                 <div
                                     class="p-3.5 rounded-xl border {item.color}"
                                 >
@@ -470,7 +470,7 @@
                     >
                         <div class="flex-1 h-px bg-slate-200"></div>
                         <div
-                            class="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900 text-white text-xs font-bold tracking-widest uppercase shrink-0"
+                            class="flex items-center gap-2 px-4 py-2 rounded-full bg-navy text-white text-xs font-bold tracking-widest uppercase shrink-0"
                         >
                             <svg
                                 width="12"
@@ -513,7 +513,7 @@
                             class="rounded-xl border border-slate-200 overflow-hidden"
                         >
                             <div
-                                class="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700"
+                                class="flex items-center justify-between px-4 py-2.5 bg-navy border-b border-slate-700"
                             >
                                 <span
                                     class="text-xs font-semibold text-slate-400 uppercase tracking-widest"

@@ -126,7 +126,7 @@
 										bind:value={symbols[i].label}
 										onchange={markChanged}
 										maxlength={20}
-										class="w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+										class="w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-navy focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 									/>
 								</td>
 
@@ -153,7 +153,7 @@
 											class="peer sr-only"
 										/>
 										<div
-											class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"
+											class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-navy peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700"
 										></div>
 									</label>
 								</td>
@@ -188,7 +188,7 @@
 				<button
 					type="button"
 					onclick={() => { showAddForm = true; }}
-					class="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm text-gray-600 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400"
+					class="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm text-gray-600 transition-colors hover:border-blue-400 hover:text-slate-900 dark:border-gray-600 dark:text-gray-400 dark:hover:border-navy dark:hover:text-blue-400"
 				>
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -205,7 +205,7 @@
 								bind:value={newSymbol}
 								placeholder="例: ◆"
 								maxlength={2}
-								class="w-20 rounded border border-gray-300 px-2 py-1.5 text-center text-lg focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+								class="w-20 rounded border border-gray-300 px-2 py-1.5 text-center text-lg focus:border-navy focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 							/>
 						</div>
 						<div>
@@ -215,7 +215,7 @@
 								bind:value={newLabel}
 								placeholder="例: 夜番"
 								maxlength={20}
-								class="w-32 rounded border border-gray-300 px-2 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+								class="w-32 rounded border border-gray-300 px-2 py-1.5 focus:border-navy focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 							/>
 						</div>
 						<div>
@@ -231,7 +231,7 @@
 								type="button"
 								onclick={addSymbol}
 								disabled={!newSymbol.trim() || !newLabel.trim()}
-								class="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+								class="rounded-lg bg-navy px-4 py-1.5 text-sm font-medium text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								追加
 							</button>
@@ -265,7 +265,7 @@
 				type="button"
 				onclick={handleSave}
 				disabled={!hasChanges || isSaving}
-				class="rounded-lg bg-blue-600 px-8 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded-lg bg-navy px-8 py-2 font-medium text-white transition-colors hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
 			>
 				{#if isSaving}
 					保存中...
