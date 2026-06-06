@@ -1016,7 +1016,7 @@
 							     a dish into another sub-column, or onto another course. Drag a
 							     dish into the leftmost dashed zone to start a NEW column. -->
 							<div
-								class="flex-1 px-2 pt-3 overflow-auto flex flex-row-reverse justify-center items-start gap-3 cursor-pointer"
+								class="flex-1 px-2 pt-3 overflow-auto flex flex-row-reverse justify-center items-start gap-1.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
@@ -1032,7 +1032,7 @@
 								{/if}
 								{#each course.cols as col, colIdx (colIdx)}
 									<div
-										class="dish-dndzone flex flex-col items-center gap-1 min-w-[2.2em] {colIdx > 0 ? 'mt-[2.5em]' : ''}"
+										class="dish-dndzone flex flex-col items-center gap-1 {colIdx > 0 ? 'mt-[2.5em]' : ''}"
 										use:dndzone={{ items: col, flipDurationMs, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
 										onconsider={(e) => considerSubCol(idx, colIdx, e)}
 										onfinalize={(e) => finalizeSubCol(idx, colIdx, e)}
@@ -1346,6 +1346,8 @@
 	}
 	.dish-dndzone {
 		min-height: 3em;
+		width: max-content;   /* hug the vertical text so columns aren't artificially wide */
+		min-width: 1.4em;     /* but stay droppable even when empty */
 	}
 	/* The drag placeholder/shadow the library inserts — show it faintly so the
 	   chef sees where the dish will land, without it looking like a real dish. */
