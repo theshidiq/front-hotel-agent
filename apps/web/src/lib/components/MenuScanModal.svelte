@@ -982,11 +982,6 @@
 							{/if}
 						</div>
 
-						<!-- 一 dash separator -->
-						<div class="flex justify-center flex-shrink-0 py-1">
-							<span class="font-serif-jp text-xl text-stone-800">一</span>
-						</div>
-
 						{#if isCapturing}
 							<!-- PDF/PRINT view: pre-balanced groups, each its own vertical sub-column
 							     (the handwritten-menu look). Static, no drag affordances. -->
@@ -996,15 +991,23 @@
 							>
 								{#if dishCount > 0 && groups.length <= 1}
 									<div class="w-full grid place-items-center py-1">
-										<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
-											{groups[0].join('　')}
+										<div class="flex flex-col items-center gap-1">
+											<span class="font-serif-jp text-xl text-stone-800">一</span>
+											<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
+												{groups[0].join('　')}
+											</div>
 										</div>
 									</div>
 								{:else if dishCount > 0}
 									<div class="flex flex-row-reverse items-start gap-2 py-1">
 										{#each groups as group, gIdx}
-											<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit {gIdx > 0 ? 'mt-[2.5em]' : ''}">
-												{group.join('　')}
+											<div class="flex flex-col items-center {gIdx > 0 ? 'mt-[2.5em]' : ''}">
+												{#if gIdx === 0}
+													<span class="font-serif-jp text-xl text-stone-800 mb-1">一</span>
+												{/if}
+												<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
+													{group.join('　')}
+												</div>
 											</div>
 										{/each}
 									</div>
@@ -1031,12 +1034,16 @@
 									>料理詳細...</button>
 								{/if}
 								{#each course.cols as col, colIdx (colIdx)}
-									<div
-										class="dish-dndzone flex flex-col items-center gap-1 {colIdx > 0 ? 'mt-[2.5em]' : ''}"
-										use:dndzone={{ items: col, flipDurationMs, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
-										onconsider={(e) => considerSubCol(idx, colIdx, e)}
-										onfinalize={(e) => finalizeSubCol(idx, colIdx, e)}
-									>
+									<div class="flex flex-col items-center {colIdx > 0 ? 'mt-[2.5em]' : ''}">
+										{#if colIdx === 0}
+											<span class="font-serif-jp text-xl text-stone-800 mb-1 select-none">一</span>
+										{/if}
+										<div
+											class="dish-dndzone flex flex-col items-center gap-1"
+											use:dndzone={{ items: col, flipDurationMs, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
+											onconsider={(e) => considerSubCol(idx, colIdx, e)}
+											onfinalize={(e) => finalizeSubCol(idx, colIdx, e)}
+										>
 										{#each col as dish (dish.id)}
 											<div
 												class="dish-card group/dish relative tategaki font-serif-jp text-xl text-stone-700 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-orange-50/60 transition-colors"
@@ -1051,6 +1058,7 @@
 												{dish.text}
 											</div>
 										{/each}
+									</div>
 									</div>
 								{/each}
 								{#if dishCount > 0}
