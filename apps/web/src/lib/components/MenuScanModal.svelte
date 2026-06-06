@@ -964,9 +964,10 @@
 							</div>
 						{:else}
 							<!-- EDIT view: single column of draggable dish cards. Drag to reorder
-							     within a course or move between courses. -->
+							     within a course or move between courses. Cards keep their
+							     natural vertical-text height; the column scrolls when full. -->
 							<div
-								class="dish-dndzone flex-1 px-2 pt-3 overflow-y-auto flex flex-col items-center gap-1"
+								class="dish-dndzone flex-1 px-2 pt-3 overflow-y-auto overflow-x-hidden flex flex-col items-center gap-1"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								use:dndzone={{ items: course.dishes, flipDurationMs, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
 								onconsider={(e) => handleDishDnd(idx, e)}
@@ -974,7 +975,7 @@
 							>
 								{#each course.dishes as dish (dish.id)}
 									<div
-										class="dish-card group/dish relative tategaki font-serif-jp text-xl text-stone-700 h-fit px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-orange-50/60 transition-colors"
+										class="dish-card group/dish relative tategaki font-serif-jp text-xl text-stone-700 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-orange-50/60 transition-colors"
 										animate:flip={{ duration: flipDurationMs }}
 									>
 										{dish.text}
@@ -1243,14 +1244,17 @@
 		writing-mode: horizontal-tb;
 	}
 
-	/* Draggable dish cards — vertical text, comfortable hit area for touch */
+	/* Draggable dish cards — vertical text, comfortable hit area for touch.
+	   Must NOT shrink (flex parent would otherwise squish the height and force
+	   the vertical text to wrap sideways). Width hugs the text. */
 	.dish-card {
+		flex: 0 0 auto;            /* keep natural vertical-text height, never shrink */
+		height: auto;
+		width: max-content;        /* hug the single vertical line of text */
+		max-width: 100%;
+		white-space: nowrap;       /* one vertical line — don't wrap into side columns */
 		touch-action: none;        /* let the DnD lib own the gesture on touch */
 		user-select: none;
-	}
-	.dish-card::before {
-		/* subtle grab affordance dot row on hover */
-		content: '';
 	}
 	.dish-dndzone {
 		min-height: 3em;
