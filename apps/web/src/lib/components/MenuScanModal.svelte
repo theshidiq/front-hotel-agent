@@ -7,6 +7,8 @@
 		menuScanGetDrafts,
 	} from '$lib/api';
 	import type { ScannedMenuCourse, MenuGroup, MenuScanDraft } from '$lib/api';
+	import { dndzone, type DndEvent } from 'svelte-dnd-action';
+	import { flip } from 'svelte/animate';
 
 	interface Props {
 		menuGroups: MenuGroup[];
@@ -23,6 +25,46 @@
 	let previewUrl: string | null = $state(null);
 	let menuTitle: string | null = $state(null);
 	let courses: ScannedMenuCourse[] = $state([]);
+
+	// ── Editable dish model (drag-and-drop source of truth) ──
+	// Dishes are stored as ID'd objects so they can be reordered and moved
+	// between courses. `courses` (above) stays the serialized form consumed by
+	// save/draft/share/PDF — kept in sync via syncCoursesFromWork().
+	type Dish = { id: string; text: string };
+	type WorkCourse = {
+		id: string;
+		name: string;
+		reading: string | null;
+		category: string;
+		sort_order: number;
+		dishes: Dish[];
+	};
+	let workCourses: WorkCourse[] = $state([]);
+	let dishIdSeq = 0;
+	const newId = (p: string) => `${p}-${Date.now().toString(36)}-${(dishIdSeq++).toString(36)}`;
+
+	// Build the ID'd work model from the serialized courses (called on enter-review)
+	function buildWorkCourses(src: ScannedMenuCourse[]): WorkCourse[] {
+		return src.map((c) => ({
+			id: newId('course'),
+			name: c.name,
+			reading: c.reading,
+			category: c.category,
+			sort_order: c.sort_order,
+			dishes: splitItems(c.description).map((text) => ({ id: newId('dish'), text })),
+		}));
+	}
+
+	// Serialize the work model back into `courses` (dishes joined with ・)
+	function syncCoursesFromWork() {
+		courses = workCourses.map((wc, i) => ({
+			name: wc.name,
+			reading: wc.reading,
+			category: wc.category,
+			sort_order: i + 1,
+			description: wc.dishes.map((d) => d.text).join('・') || null,
+		}));
+	}
 	let selectedGroupId: string = $state(menuGroups[0]?.id ?? '');
 	let sessionId: string | null = $state(null);
 	let imageUrl: string = $state('');
@@ -79,7 +121,7 @@
 	let descEditorItemFocus: number | null = $state(null);  // which item input to autofocus
 
 	function openDescEditor(idx: number) {
-		descEditorItems = splitItems(courses[idx].description);
+		descEditorItems = workCourses[idx].dishes.map((d) => d.text);
 		if (descEditorItems.length === 0) descEditorItems = [''];
 		descEditorIdx = idx;
 		descEditorItemFocus = descEditorItems.length - 1;
@@ -96,8 +138,11 @@
 
 	function saveDescEditor() {
 		if (descEditorIdx === null) return;
-		const cleaned = descEditorItems.map(s => s.trim()).filter(Boolean).join('・');
-		updateCourse(descEditorIdx, 'description', cleaned);
+		const dishes = descEditorItems
+			.map((s) => s.trim())
+			.filter(Boolean)
+			.map((text) => ({ id: newId('dish'), text }));
+		workCourses = workCourses.map((c, i) => (i === descEditorIdx ? { ...c, dishes } : c));
 		descEditorIdx = null;
 	}
 
@@ -144,6 +189,13 @@
 			drafts = d;
 			loadingDrafts = false;
 		});
+	});
+
+	// Keep the serialized `courses` in sync with the editable work model.
+	$effect(() => {
+		// touch workCourses deeply so this re-runs on any dish/name/order change
+		JSON.stringify(workCourses);
+		syncCoursesFromWork();
 	});
 
 	// Auto-save draft whenever courses change (debounced 2s)
@@ -201,6 +253,7 @@
 
 	let paperEl: HTMLDivElement | null = $state(null);   // the お品書き A4 paper element
 	let generatingPdf = $state(false);
+	let isCapturing = $state(false);   // true only while rendering for PDF/print → dishes auto-balance
 
 	// Render the on-screen paper to an A4 landscape PDF (looks exactly like the screen).
 	async function buildPdf(): Promise<import('jspdf').jsPDF | null> {
@@ -215,10 +268,12 @@
 		// natural size — otherwise the scaled/clipped layout drops the last column.
 		const prevTransform = paperEl.style.transform;
 		const prevWidth = paperEl.style.width;
+		isCapturing = true;                 // switch dishes to balanced multi-column layout
 		paperEl.classList.add('capturing');
 		paperEl.style.transform = 'none';
 		paperEl.style.width = paperNaturalW + 'px';
-		await new Promise(r => requestAnimationFrame(r));   // let the DOM repaint
+		// two frames so the balanced layout fully renders before capture
+		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
 		let canvas: HTMLCanvasElement;
 		try {
@@ -235,6 +290,7 @@
 			paperEl.classList.remove('capturing');
 			paperEl.style.transform = prevTransform;
 			paperEl.style.width = prevWidth;
+			isCapturing = false;
 		}
 
 		const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -400,7 +456,7 @@
 		try {
 			const result = await menuScanExtract(selectedFile, selectedGroupId, abortController.signal);
 			menuTitle = result.menu_title;
-			courses = result.courses.map(c => ({ ...c }));
+			workCourses = buildWorkCourses(result.courses);
 			sessionId = result.session_id ?? null;
 			imageUrl = result.image_url;
 			step = 'review';
@@ -424,7 +480,7 @@
 	function resumeDraft(draft: MenuScanDraft) {
 		sessionId = draft.session_id;
 		menuTitle = draft.menu_title;
-		courses = draft.courses.map(c => ({ ...c }));
+		workCourses = buildWorkCourses(draft.courses);
 		imageUrl = draft.image_url;
 		selectedGroupId = draft.menu_group_id;
 		step = 'review';
@@ -440,21 +496,29 @@
 		}
 	}
 
-	function updateCourse(idx: number, field: keyof ScannedMenuCourse, value: string) {
-		courses = courses.map((c, i) =>
-			i === idx ? { ...c, [field]: value || null } : c,
+	function updateCourse(idx: number, field: 'name' | 'reading' | 'category', value: string) {
+		workCourses = workCourses.map((c, i) =>
+			i === idx ? { ...c, [field]: value || (field === 'category' ? 'other' : null) } : c,
 		);
 	}
 
 	function addCourse() {
-		courses = [
-			...courses,
-			{ name: '', reading: null, description: null, category: 'other', sort_order: courses.length + 1 },
+		workCourses = [
+			...workCourses,
+			{ id: newId('course'), name: '', reading: null, category: 'other', sort_order: workCourses.length + 1, dishes: [] },
 		];
 	}
 
 	function removeCourse(idx: number) {
-		courses = courses.filter((_, i) => i !== idx);
+		workCourses = workCourses.filter((_, i) => i !== idx);
+	}
+
+	// ── Dish drag-and-drop (svelte-dnd-action) ──
+	const flipDurationMs = 160;
+
+	function handleDishDnd(courseIdx: number, e: CustomEvent<DndEvent<Dish>>) {
+		const newDishes = e.detail.items;
+		workCourses = workCourses.map((c, i) => (i === courseIdx ? { ...c, dishes: newDishes } : c));
 	}
 
 	async function confirmSave() {
@@ -812,9 +876,9 @@
 					</div>
 
 					<!-- Course columns — right to left, evenly distributed. -->
-					{#each courses as course, idx}
+					{#each workCourses as course, idx (course.id)}
 					{@const isUnderKidsBox = showKidsBox && (idx === 0 || idx === 1)}
-					{@const items = splitItems(course.description)}
+					{@const items = course.dishes.map((d) => d.text)}
 					{@const groups = balanceByLength(items, 14)}
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditingName = editingNameIdx === idx}
@@ -875,61 +939,61 @@
 							<span class="font-serif-jp text-xl text-stone-800">一</span>
 						</div>
 
-						<!-- Dish details: pre-balanced groups, each rendered as its own vertical column.
-						     Columns next to the kids box get extra bottom padding so dishes stop above it. -->
-						<div
-							class="flex-1 px-2 pt-3 overflow-hidden {groups.length <= 1 ? 'block' : 'flex justify-center items-start gap-2'}"
-							style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
-						>
-							{#if items.length === 0}
-								<div
-									class="w-full grid place-items-center cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
-									onclick={() => openDescEditor(idx)}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => { if (e.key === 'Enter') openDescEditor(idx); }}
-									aria-label="料理詳細を編集"
-								>
-									<div class="dish-placeholder tategaki font-serif-jp text-base text-stone-300">料理詳細...</div>
-								</div>
-							{:else if groups.length <= 1}
-								<!-- Single sub-column: grid place-items-center reliably centers in both browser & html2canvas. -->
-								<div
-									class="w-full grid place-items-center cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
-									onclick={() => openDescEditor(idx)}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => { if (e.key === 'Enter') openDescEditor(idx); }}
-									aria-label="料理詳細を編集"
-								>
-									<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
-										{groups[0].join('　')}
-									</div>
-								</div>
-							{:else}
-								<div
-									class="flex flex-row-reverse items-start gap-2 cursor-text hover:bg-stone-50/60 rounded transition-colors py-1"
-									onclick={() => openDescEditor(idx)}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => { if (e.key === 'Enter') openDescEditor(idx); }}
-									aria-label="料理詳細を編集"
-								>
-									{#each groups as group, gIdx}
-										<!-- First sub-column (main dish) sits at the top; the rest step down equally. -->
-										<div
-											class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit {gIdx > 0 ? 'mt-[2.5em]' : ''}"
-										>
-											{group.join('　')}
+						{#if isCapturing}
+							<!-- PDF/PRINT view: pre-balanced groups, each its own vertical sub-column
+							     (the handwritten-menu look). Static, no drag affordances. -->
+							<div
+								class="flex-1 px-2 pt-3 overflow-hidden {groups.length <= 1 ? 'block' : 'flex justify-center items-start gap-2'}"
+								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
+							>
+								{#if items.length > 0 && groups.length <= 1}
+									<div class="w-full grid place-items-center py-1">
+										<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
+											{groups[0].join('　')}
 										</div>
-									{/each}
-								</div>
-							{/if}
-						</div>
+									</div>
+								{:else if items.length > 0}
+									<div class="flex flex-row-reverse items-start gap-2 py-1">
+										{#each groups as group, gIdx}
+											<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit {gIdx > 0 ? 'mt-[2.5em]' : ''}">
+												{group.join('　')}
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{:else}
+							<!-- EDIT view: single column of draggable dish cards. Drag to reorder
+							     within a course or move between courses. -->
+							<div
+								class="dish-dndzone flex-1 px-2 pt-3 overflow-y-auto flex flex-col items-center gap-1"
+								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
+								use:dndzone={{ items: course.dishes, flipDurationMs, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
+								onconsider={(e) => handleDishDnd(idx, e)}
+								onfinalize={(e) => handleDishDnd(idx, e)}
+							>
+								{#each course.dishes as dish (dish.id)}
+									<div
+										class="dish-card group/dish relative tategaki font-serif-jp text-xl text-stone-700 h-fit px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-orange-50/60 transition-colors"
+										animate:flip={{ duration: flipDurationMs }}
+									>
+										{dish.text}
+									</div>
+								{/each}
+								<!-- Add / edit dishes -->
+								<button
+									onclick={() => openDescEditor(idx)}
+									class="mt-1 text-[10px] text-stone-400 hover:text-stone-700 transition-colors print:hidden writing-mode-horizontal"
+									aria-label="料理を編集"
+								>
+									{course.dishes.length === 0 ? '＋ 料理' : '編集'}
+								</button>
+							</div>
+						{/if}
 					</div>
 					{/each}
 
-					{#if courses.length === 0}
+					{#if workCourses.length === 0}
 					<div class="flex-1 flex flex-col items-center justify-center text-stone-300 gap-2 p-8" dir="ltr">
 						<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4" />
@@ -1172,6 +1236,24 @@
 		writing-mode: vertical-rl;
 		text-orientation: mixed;
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
+	}
+
+	/* Horizontal text (e.g. the small edit button under a vertical dish list) */
+	.writing-mode-horizontal {
+		writing-mode: horizontal-tb;
+	}
+
+	/* Draggable dish cards — vertical text, comfortable hit area for touch */
+	.dish-card {
+		touch-action: none;        /* let the DnD lib own the gesture on touch */
+		user-select: none;
+	}
+	.dish-card::before {
+		/* subtle grab affordance dot row on hover */
+		content: '';
+	}
+	.dish-dndzone {
+		min-height: 3em;
 	}
 
 	/* The paper width is driven by its columns (max-content) so EVERY course

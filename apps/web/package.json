@@ -37,6 +37,7 @@
     "lucide-svelte": "^0.575.0",
     "qrcode": "^1.5.4",
     "rollup": "^4.59.0",
+    "svelte-dnd-action": "^0.9.69",
     "xlsx": "^0.18.5"
   },
   "type": "module"
