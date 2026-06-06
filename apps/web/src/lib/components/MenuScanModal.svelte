@@ -515,7 +515,7 @@
 
 	// ── Dish drag-and-drop (svelte-dnd-action) ──
 	const flipDurationMs = 160;
-	const DISHES_PER_COL = 5;   // a sub-column holds ~5 dishes before overflowing left
+	const DISHES_PER_COL = 3;   // a sub-column holds max 3 dishes, then overflows left (stepped)
 
 	// Chunk a course's flat dish list into stepped sub-columns (col 0 = first/right).
 	function chunkDishes(dishes: Dish[]): Dish[][] {
@@ -900,7 +900,7 @@
 					{#each workCourses as course, idx (course.id)}
 					{@const isUnderKidsBox = showKidsBox && (idx === 0 || idx === 1)}
 					{@const items = course.dishes.map((d) => d.text)}
-					{@const groups = balanceByLength(items, 14)}
+					{@const groups = chunkDishes(course.dishes).map((col) => col.map((d) => d.text))}
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditingName = editingNameIdx === idx}
 					<div
