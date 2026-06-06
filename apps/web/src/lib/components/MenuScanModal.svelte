@@ -1001,7 +1001,7 @@
 								{:else if dishCount > 0}
 									<div class="flex flex-row-reverse items-start gap-2 py-1">
 										{#each groups as group, gIdx}
-											<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 2 + gIdx * 1.8}em;">
+											<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 3.8}em;">
 												{#if gIdx === 0}
 													<span class="font-serif-jp text-xl text-stone-800 mb-1">一</span>
 												{/if}
@@ -1034,10 +1034,10 @@
 									>料理詳細...</button>
 								{/if}
 								{#each course.cols as col, colIdx (colIdx)}
-									<!-- Each column steps down a bit more than the previous (staircase),
-									     so the first/rightmost column reads as the "main". The +2em base
-									     for cols>0 accounts for the 一 height above col 0's first dish. -->
-									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : 2 + colIdx * 1.8}em;">
+									<!-- First/rightmost column (with 一) sits highest = the "main".
+									     Every other column drops by the SAME single step (not a
+									     continuous staircase) — they all align at one lower level. -->
+									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : 3.8}em;">
 										{#if colIdx === 0}
 											<span class="font-serif-jp text-xl text-stone-800 mb-1 select-none">一</span>
 										{/if}
