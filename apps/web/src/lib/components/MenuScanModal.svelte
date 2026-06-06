@@ -1428,7 +1428,7 @@
 		:global(.menu-scan-modal),
 		:global(.menu-scan-modal *) { visibility: visible !important; }
 
-		/* Fill the entire printable area, whatever the user's margin choice */
+		/* Fill the entire printable area with comfortable margins on all sides */
 		:global(.menu-scan-modal) {
 			position: fixed !important;
 			top: 0 !important;
@@ -1436,7 +1436,7 @@
 			width: 100% !important;
 			height: 100% !important;
 			background: white !important;
-			padding: 4mm !important;
+			padding: 8mm 12mm !important;
 			margin: 0 !important;
 			overflow: hidden !important;
 			display: flex !important;
@@ -1468,31 +1468,30 @@
 			overflow: hidden !important;
 		}
 
-		/* Print: smaller fonts + comfortable line-height */
+		/* Print: comfortable line-height for vertical Japanese text */
 		:global(.menu-scan-modal .tategaki) {
-			line-height: 1.8 !important;
-			letter-spacing: 0.05em !important;
+			line-height: 2 !important;
+			letter-spacing: 0.08em !important;
 		}
 		:global(.menu-scan-modal .font-serif-jp) {
-			line-height: 1.6 !important;
-		}
-		:global(.menu-scan-modal .leading-loose) {
 			line-height: 1.8 !important;
 		}
-		:global(.menu-scan-modal .leading-relaxed) {
-			line-height: 1.7 !important;
+		:global(.menu-scan-modal .leading-loose) {
+			line-height: 2 !important;
 		}
 
-		/* Reduce font sizes for print to give more breathing room overall */
-		:global(.menu-scan-modal .text-3xl) { font-size: 1.4rem !important; }
-		:global(.menu-scan-modal .text-2xl) { font-size: 0.95rem !important; }
-		:global(.menu-scan-modal .text-lg)  { font-size: 0.75rem !important; }
-		:global(.menu-scan-modal .text-base){ font-size: 0.7rem !important; }
-		:global(.menu-scan-modal .text-sm)  { font-size: 0.65rem !important; }
+		/* Font sizes — larger for readability, matching the screen sizes closely */
+		:global(.menu-scan-modal .text-4xl) { font-size: 1.8rem !important; }  /* title */
+		:global(.menu-scan-modal .text-3xl) { font-size: 1.5rem !important; }
+		:global(.menu-scan-modal .text-2xl) { font-size: 1.2rem !important; }  /* course names */
+		:global(.menu-scan-modal .text-xl)  { font-size: 1rem !important; }    /* dish items + 一 */
+		:global(.menu-scan-modal .text-lg)  { font-size: 0.9rem !important; }
+		:global(.menu-scan-modal .text-base){ font-size: 0.85rem !important; }
+		:global(.menu-scan-modal .text-sm)  { font-size: 0.8rem !important; }
 
-		/* Slim course header zone proportionally */
+		/* Course header zone — taller for larger font */
 		:global(.menu-scan-modal .course-header-box) {
-			height: 4em !important;
+			height: 5em !important;
 		}
 
 		/* Remove the dividing borders between course columns + title column on print */
@@ -1504,19 +1503,15 @@
 		:global(.menu-scan-modal .border-r) { border-right: none !important; }
 
 
-		/* Kids box — compact print version */
+		/* Kids box — readable print version */
 		.kids-box {
 			page-break-inside: avoid;
-			width: 130px !important;
-			padding: 0.4rem 0.6rem !important;
-			gap: 0.2rem !important;
-			border-width: 1px !important;
-			bottom: 0.3cm !important;
+			width: 180px !important;
+			padding: 0.6rem 0.8rem !important;
+			gap: 0.4rem !important;
+			border-width: 1.5px !important;
+			bottom: 0.5cm !important;
 		}
-		:global(.menu-scan-modal .kids-box .gap-1) { gap: 0.1rem !important; }
-		:global(.menu-scan-modal .kids-box .gap-1\.5) { gap: 0.15rem !important; }
-		:global(.menu-scan-modal .kids-box .gap-2) { gap: 0.2rem !important; }
-		:global(.menu-scan-modal .kids-box .py-0\.5) { padding-top: 0 !important; padding-bottom: 0 !important; }
 
 		/* Hide all delete buttons & non-essential controls on print */
 		:global(.menu-scan-modal button[aria-label="このコースを削除"]),
