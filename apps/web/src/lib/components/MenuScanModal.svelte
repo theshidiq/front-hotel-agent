@@ -30,20 +30,25 @@
 	// Dishes are stored as ID'd objects so they can be reordered and moved
 	// between courses. `courses` (above) stays the serialized form consumed by
 	// save/draft/share/PDF — kept in sync via syncCoursesFromWork().
-	type Dish = { id: string; text: string };
+	// `col` = which sub-column this dish sits in (0 = first/rightmost). The chef
+	// can drag dishes between columns, so the split is part of the data.
+	type Dish = { id: string; text: string; col: number };
 	type WorkCourse = {
 		id: string;
 		name: string;
 		reading: string | null;
 		category: string;
 		sort_order: number;
-		dishes: Dish[];
+		dishes: Dish[];   // flat, ordered by (col, then position within col)
 	};
 	let workCourses: WorkCourse[] = $state([]);
 	let dishIdSeq = 0;
 	const newId = (p: string) => `${p}-${Date.now().toString(36)}-${(dishIdSeq++).toString(36)}`;
 
-	// Build the ID'd work model from the serialized courses (called on enter-review)
+	const DEFAULT_PER_COL = 3;   // default split: 3 dishes per column
+
+	// Build the ID'd work model from the serialized courses (called on enter-review).
+	// Dishes get a default column split of DEFAULT_PER_COL.
 	function buildWorkCourses(src: ScannedMenuCourse[]): WorkCourse[] {
 		return src.map((c) => ({
 			id: newId('course'),
@@ -51,19 +56,36 @@
 			reading: c.reading,
 			category: c.category,
 			sort_order: c.sort_order,
-			dishes: splitItems(c.description).map((text) => ({ id: newId('dish'), text })),
+			dishes: splitItems(c.description).map((text, i) => ({
+				id: newId('dish'),
+				text,
+				col: Math.floor(i / DEFAULT_PER_COL),
+			})),
 		}));
 	}
 
-	// Serialize the work model back into `courses` (dishes joined with ・)
+	// Group a course's dishes into sub-columns (array indexed by col, each a Dish[]).
+	function dishCols(dishes: Dish[]): Dish[][] {
+		if (dishes.length === 0) return [[]];
+		const maxCol = Math.max(0, ...dishes.map((d) => d.col));
+		const cols: Dish[][] = Array.from({ length: maxCol + 1 }, () => []);
+		for (const d of dishes) cols[d.col]?.push(d);
+		return cols;
+	}
+
+	// Serialize the work model back into `courses`. Dishes are emitted in
+	// column order (col 0 first), joined with ・ — backend stays a flat string.
 	function syncCoursesFromWork() {
-		courses = workCourses.map((wc, i) => ({
-			name: wc.name,
-			reading: wc.reading,
-			category: wc.category,
-			sort_order: i + 1,
-			description: wc.dishes.map((d) => d.text).join('・') || null,
-		}));
+		courses = workCourses.map((wc, i) => {
+			const ordered = dishCols(wc.dishes).flat();
+			return {
+				name: wc.name,
+				reading: wc.reading,
+				category: wc.category,
+				sort_order: i + 1,
+				description: ordered.map((d) => d.text).join('・') || null,
+			};
+		});
 	}
 	let selectedGroupId: string = $state(menuGroups[0]?.id ?? '');
 	let sessionId: string | null = $state(null);
@@ -138,10 +160,12 @@
 
 	function saveDescEditor() {
 		if (descEditorIdx === null) return;
+		// The editor is a flat text list; re-apply the default column split.
+		// (Fine column arrangement is done by dragging dishes between columns.)
 		const dishes = descEditorItems
 			.map((s) => s.trim())
 			.filter(Boolean)
-			.map((text) => ({ id: newId('dish'), text }));
+			.map((text, i) => ({ id: newId('dish'), text, col: Math.floor(i / DEFAULT_PER_COL) }));
 		workCourses = workCourses.map((c, i) => (i === descEditorIdx ? { ...c, dishes } : c));
 		descEditorIdx = null;
 	}
@@ -515,31 +539,40 @@
 
 	// ── Dish drag-and-drop (svelte-dnd-action) ──
 	const flipDurationMs = 160;
-	const DISHES_PER_COL = 3;   // a sub-column holds max 3 dishes, then overflows left (stepped)
 
-	// Chunk a course's flat dish list into stepped sub-columns (col 0 = first/right).
-	function chunkDishes(dishes: Dish[]): Dish[][] {
-		if (dishes.length === 0) return [[]];
-		const cols: Dish[][] = [];
-		for (let i = 0; i < dishes.length; i += DISHES_PER_COL) {
-			cols.push(dishes.slice(i, i + DISHES_PER_COL));
-		}
-		return cols;
-	}
-
-	// A drop happened in one sub-column. Rebuild the course's flat dishes[] by
-	// replacing that sub-column's slice with the dropped items, preserving the
-	// order of the other sub-columns (col 0, col 1, …).
+	// A drop happened in sub-column `colIdx` of course `courseIdx`. The dropped
+	// items become that column's contents (their col is set to colIdx); the other
+	// columns keep their dishes. Rebuilt flat list is ordered by column.
 	function handleSubColDnd(courseIdx: number, colIdx: number, e: CustomEvent<DndEvent<Dish>>) {
 		const course = workCourses[courseIdx];
 		if (!course) return;
-		const cols = chunkDishes(course.dishes);
-		cols[colIdx] = e.detail.items;
-		const flat = cols.flat();
-		// de-dupe by id in case the lib momentarily places a shadow item in two zones
-		const seen = new Set<string>();
-		const deduped = flat.filter((d) => (seen.has(d.id) ? false : (seen.add(d.id), true)));
-		workCourses = workCourses.map((c, i) => (i === courseIdx ? { ...c, dishes: deduped } : c));
+		const cols = dishCols(course.dishes);
+		// items dropped into this column (tag them with this col)
+		const dropped = e.detail.items.map((d) => ({ ...d, col: colIdx }));
+		// rebuild every column: this one = dropped; others = their existing dishes
+		// minus any dish that just moved into this column (by id).
+		const droppedIds = new Set(dropped.map((d) => d.id));
+		const rebuilt: Dish[] = [];
+		const colCount = Math.max(cols.length, colIdx + 1);
+		for (let c = 0; c < colCount; c++) {
+			if (c === colIdx) {
+				rebuilt.push(...dropped);
+			} else {
+				for (const d of cols[c] ?? []) {
+					if (!droppedIds.has(d.id)) rebuilt.push({ ...d, col: c });
+				}
+			}
+		}
+		// drop empty trailing columns by renumbering compactly
+		workCourses = workCourses.map((c, i) => (i === courseIdx ? { ...c, dishes: renumberCols(rebuilt) } : c));
+	}
+
+	// Collapse gaps in column numbering (e.g. after a column becomes empty) so
+	// cols stay 0,1,2,… contiguous.
+	function renumberCols(dishes: Dish[]): Dish[] {
+		const used = Array.from(new Set(dishes.map((d) => d.col))).sort((a, b) => a - b);
+		const remap = new Map(used.map((c, i) => [c, i]));
+		return dishes.map((d) => ({ ...d, col: remap.get(d.col) ?? 0 }));
 	}
 
 	async function confirmSave() {
@@ -900,7 +933,7 @@
 					{#each workCourses as course, idx (course.id)}
 					{@const isUnderKidsBox = showKidsBox && (idx === 0 || idx === 1)}
 					{@const items = course.dishes.map((d) => d.text)}
-					{@const groups = chunkDishes(course.dishes).map((col) => col.map((d) => d.text))}
+					{@const groups = dishCols(course.dishes).map((col) => col.map((d) => d.text))}
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditingName = editingNameIdx === idx}
 					<div
@@ -987,10 +1020,12 @@
 							<!-- EDIT view: dishes flow into stepped sub-columns (right→left),
 							     each a drop zone. Drag up/down to reorder, left/right to move
 							     a dish into another sub-column, or onto another course. -->
-							{@const subCols = chunkDishes(course.dishes)}
-							<!-- Clicking empty space in the dish area opens the editor too. -->
+							{@const subCols = dishCols(course.dishes)}
+							<!-- Clicking empty space in the dish area opens the editor too.
+							     Dishes flow into sub-columns (right→left, stepped down). Drag a
+							     dish into the leftmost dashed zone to start a NEW column. -->
 							<div
-								class="flex-1 px-2 pt-3 overflow-auto flex flex-row-reverse justify-center items-start gap-1 cursor-pointer"
+								class="flex-1 px-2 pt-3 overflow-auto flex flex-row-reverse justify-center items-start gap-3 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
@@ -1026,6 +1061,16 @@
 										{/each}
 									</div>
 								{/each}
+								{#if course.dishes.length > 0}
+									<!-- New-column drop target (leftmost). Drag a dish here to split. -->
+									<div
+										class="dish-newcol-zone flex flex-col items-center justify-start gap-1 min-w-[1.6em] self-stretch rounded border border-dashed border-transparent hover:border-stone-200 transition-colors mt-[2.5em]"
+										use:dndzone={{ items: [], flipDurationMs, dropFromOthersDisabled: false, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
+										onconsider={(e) => handleSubColDnd(idx, subCols.length, e)}
+										onfinalize={(e) => handleSubColDnd(idx, subCols.length, e)}
+										aria-label="新しい列に移動"
+									></div>
+								{/if}
 							</div>
 							<!-- Add / edit dishes -->
 							<div class="flex justify-center flex-shrink-0 pb-1 print:hidden">
