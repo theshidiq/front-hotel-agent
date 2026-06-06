@@ -988,10 +988,22 @@
 							     each a drop zone. Drag up/down to reorder, left/right to move
 							     a dish into another sub-column, or onto another course. -->
 							{@const subCols = chunkDishes(course.dishes)}
+							<!-- Clicking empty space in the dish area opens the editor too. -->
 							<div
-								class="flex-1 px-2 pt-3 overflow-auto flex flex-row-reverse justify-center items-start gap-1"
+								class="flex-1 px-2 pt-3 overflow-auto flex flex-row-reverse justify-center items-start gap-1 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
+								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
+								role="button"
+								tabindex="-1"
+								aria-label="料理を編集"
 							>
+								{#if course.dishes.length === 0}
+									<button
+										onclick={() => openDescEditor(idx)}
+										class="dish-placeholder tategaki font-serif-jp text-base text-stone-300 hover:text-stone-500 transition-colors py-2"
+										aria-label="料理を追加"
+									>料理詳細...</button>
+								{/if}
 								{#each subCols as col, colIdx (colIdx)}
 									<div
 										class="dish-dndzone flex flex-col items-center gap-1 min-w-[2.2em] {colIdx > 0 ? 'mt-[2.5em]' : ''}"
@@ -1003,6 +1015,11 @@
 											<div
 												class="dish-card group/dish relative tategaki font-serif-jp text-xl text-stone-700 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-orange-50/60 transition-colors"
 												animate:flip={{ duration: flipDurationMs }}
+												onclick={() => openDescEditor(idx)}
+												onkeydown={(e) => { if (e.key === 'Enter') openDescEditor(idx); }}
+												role="button"
+												tabindex="0"
+												aria-label="{dish.text} を編集"
 											>
 												{dish.text}
 											</div>
