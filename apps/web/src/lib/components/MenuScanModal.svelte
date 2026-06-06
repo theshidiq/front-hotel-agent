@@ -515,10 +515,31 @@
 
 	// ── Dish drag-and-drop (svelte-dnd-action) ──
 	const flipDurationMs = 160;
+	const DISHES_PER_COL = 5;   // a sub-column holds ~5 dishes before overflowing left
 
-	function handleDishDnd(courseIdx: number, e: CustomEvent<DndEvent<Dish>>) {
-		const newDishes = e.detail.items;
-		workCourses = workCourses.map((c, i) => (i === courseIdx ? { ...c, dishes: newDishes } : c));
+	// Chunk a course's flat dish list into stepped sub-columns (col 0 = first/right).
+	function chunkDishes(dishes: Dish[]): Dish[][] {
+		if (dishes.length === 0) return [[]];
+		const cols: Dish[][] = [];
+		for (let i = 0; i < dishes.length; i += DISHES_PER_COL) {
+			cols.push(dishes.slice(i, i + DISHES_PER_COL));
+		}
+		return cols;
+	}
+
+	// A drop happened in one sub-column. Rebuild the course's flat dishes[] by
+	// replacing that sub-column's slice with the dropped items, preserving the
+	// order of the other sub-columns (col 0, col 1, …).
+	function handleSubColDnd(courseIdx: number, colIdx: number, e: CustomEvent<DndEvent<Dish>>) {
+		const course = workCourses[courseIdx];
+		if (!course) return;
+		const cols = chunkDishes(course.dishes);
+		cols[colIdx] = e.detail.items;
+		const flat = cols.flat();
+		// de-dupe by id in case the lib momentarily places a shadow item in two zones
+		const seen = new Set<string>();
+		const deduped = flat.filter((d) => (seen.has(d.id) ? false : (seen.add(d.id), true)));
+		workCourses = workCourses.map((c, i) => (i === courseIdx ? { ...c, dishes: deduped } : c));
 	}
 
 	async function confirmSave() {
@@ -963,28 +984,37 @@
 								{/if}
 							</div>
 						{:else}
-							<!-- EDIT view: single column of draggable dish cards. Drag to reorder
-							     within a course or move between courses. Cards keep their
-							     natural vertical-text height; the column scrolls when full. -->
+							<!-- EDIT view: dishes flow into stepped sub-columns (right→left),
+							     each a drop zone. Drag up/down to reorder, left/right to move
+							     a dish into another sub-column, or onto another course. -->
+							{@const subCols = chunkDishes(course.dishes)}
 							<div
-								class="dish-dndzone flex-1 px-2 pt-3 overflow-y-auto overflow-x-hidden flex flex-col items-center gap-1"
+								class="flex-1 px-2 pt-3 overflow-auto flex flex-row-reverse justify-center items-start gap-1"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
-								use:dndzone={{ items: course.dishes, flipDurationMs, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
-								onconsider={(e) => handleDishDnd(idx, e)}
-								onfinalize={(e) => handleDishDnd(idx, e)}
 							>
-								{#each course.dishes as dish (dish.id)}
+								{#each subCols as col, colIdx (colIdx)}
 									<div
-										class="dish-card group/dish relative tategaki font-serif-jp text-xl text-stone-700 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-orange-50/60 transition-colors"
-										animate:flip={{ duration: flipDurationMs }}
+										class="dish-dndzone flex flex-col items-center gap-1 min-w-[2.2em] {colIdx > 0 ? 'mt-[2.5em]' : ''}"
+										use:dndzone={{ items: col, flipDurationMs, dropFromOthersDisabled: false, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
+										onconsider={(e) => handleSubColDnd(idx, colIdx, e)}
+										onfinalize={(e) => handleSubColDnd(idx, colIdx, e)}
 									>
-										{dish.text}
+										{#each col as dish (dish.id)}
+											<div
+												class="dish-card group/dish relative tategaki font-serif-jp text-xl text-stone-700 px-1.5 py-1 rounded cursor-grab active:cursor-grabbing hover:bg-orange-50/60 transition-colors"
+												animate:flip={{ duration: flipDurationMs }}
+											>
+												{dish.text}
+											</div>
+										{/each}
 									</div>
 								{/each}
-								<!-- Add / edit dishes -->
+							</div>
+							<!-- Add / edit dishes -->
+							<div class="flex justify-center flex-shrink-0 pb-1 print:hidden">
 								<button
 									onclick={() => openDescEditor(idx)}
-									class="mt-1 text-[10px] text-stone-400 hover:text-stone-700 transition-colors print:hidden writing-mode-horizontal"
+									class="text-[10px] text-stone-400 hover:text-stone-700 transition-colors"
 									aria-label="料理を編集"
 								>
 									{course.dishes.length === 0 ? '＋ 料理' : '編集'}
