@@ -1006,7 +1006,7 @@
 									</div>
 								{:else if dishCount > 0}
 									{#each groups as group, gIdx}
-										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 3.8}em;">
+										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 2}em;">
 											<div class="dish-ichi-row flex items-center">
 												{#if gIdx === 0}<span class="font-serif-jp text-xl text-stone-800">一</span>{/if}
 											</div>
@@ -1042,7 +1042,7 @@
 								{#each course.cols as col, colIdx (colIdx)}
 									<!-- First/rightmost column sits highest = the "main".
 									     Every other column drops by the SAME single step. -->
-									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : 3.8}em;">
+									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : 2}em;">
 										<div class="dish-ichi-row flex items-center">
 											{#if colIdx === 0}<span class="font-serif-jp text-xl text-stone-800 select-none">一</span>{/if}
 										</div>
