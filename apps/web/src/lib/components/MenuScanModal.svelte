@@ -345,37 +345,30 @@
 		return pdf;
 	}
 
-	async function handlePrint() {
-		// Use the browser's native print. Unlike html2canvas, it renders vertical
-		// Japanese text correctly — including the katakana long-vowel mark (ー),
-		// which html2canvas leaves horizontal. The @media print CSS lays the paper
-		// out for A4; isCapturing switches dishes to the balanced multi-column view.
+	// Native browser print. Unlike html2canvas it renders vertical Japanese text
+	// correctly — including the katakana long-vowel mark (ー). The @media print CSS
+	// lays the paper out for A4; isCapturing switches dishes to the balanced view.
+	// Used for BOTH the PRINT button and the PDF button (PDF = "Save as PDF" in
+	// the print dialog) so the two outputs are identical.
+	async function nativePrint() {
 		isCapturing = true;
-		// let the balanced layout render before printing
 		await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 		const restore = () => { isCapturing = false; window.removeEventListener('afterprint', restore); };
 		window.addEventListener('afterprint', restore);
 		try {
 			window.print();
 		} finally {
-			// Fallback in case afterprint doesn't fire (some browsers)
 			setTimeout(restore, 1000);
 		}
 	}
 
+	async function handlePrint() {
+		await nativePrint();
+	}
+
 	async function handleDownloadPdf() {
-		generatingPdf = true;
-		try {
-			const pdf = await buildPdf();
-			if (pdf) {
-				const title = (menuTitle || selectedGroupName || 'menu').replace(/[\s\/\\]+/g, '_');
-				pdf.save(`${title}.pdf`);
-			}
-		} catch (err) {
-			console.error('PDF download failed:', err);
-		} finally {
-			generatingPdf = false;
-		}
+		// Same native dialog — the chef picks "Save as PDF" as the destination.
+		await nativePrint();
 	}
 
 	// Web Share API — opens native share sheet (AirDrop on iOS/macOS Safari, etc.)
