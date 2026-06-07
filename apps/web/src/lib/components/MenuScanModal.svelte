@@ -1480,6 +1480,29 @@
 			transform: none !important;   /* drop on-screen fit-to-width scaling */
 		}
 
+		/* Make the paper fill the page height (no fixed 794px band) so the whole
+		   menu — including the kids box at the bottom — fits on one A4 page. */
+		:global(.menu-scan-modal .scan-paper-scroll) {
+			height: 100% !important;
+			overflow: visible !important;
+			padding: 0 !important;
+			align-items: stretch !important;
+		}
+		:global(.menu-scan-modal .scan-paper-fit) {
+			width: 100% !important;
+			height: 100% !important;
+			overflow: visible !important;
+		}
+		:global(.menu-scan-modal .scan-paper-columns) {
+			height: 100% !important;
+			width: 100% !important;
+		}
+		/* Let course columns share the page width evenly when printing */
+		:global(.menu-scan-modal .scan-paper-columns > .course-col) {
+			flex: 1 1 0 !important;
+			width: auto !important;
+		}
+
 		/* Print: comfortable line-height for vertical Japanese text */
 		:global(.menu-scan-modal .tategaki) {
 			line-height: 2 !important;
