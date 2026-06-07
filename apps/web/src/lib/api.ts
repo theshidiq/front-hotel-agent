@@ -1440,6 +1440,12 @@ export interface ScannedMenuCourse {
 	description: string | null;
 	category: string;
 	sort_order: number;
+	/**
+	 * Optional sub-column layout for the menu-scan editor: each inner array is a
+	 * sub-column of dish texts. Persisted in drafts so the chef's manual column
+	 * splits survive a refresh. Ignored by menu creation (which uses description).
+	 */
+	cols?: string[][];
 }
 
 export interface MenuScanExtractResult {

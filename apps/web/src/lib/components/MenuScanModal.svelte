@@ -57,19 +57,30 @@
 	}
 
 	// Build the ID'd work model from the serialized courses (called on enter-review).
+	// If the course carries a saved `cols` layout (from a resumed draft), restore
+	// the exact sub-column split; otherwise fall back to the default chunking.
 	function buildWorkCourses(src: ScannedMenuCourse[]): WorkCourse[] {
-		return src.map((c) => ({
-			id: newId('course'),
-			name: c.name,
-			reading: c.reading,
-			category: c.category,
-			sort_order: c.sort_order,
-			cols: defaultCols(splitItems(c.description).map((text) => ({ id: newId('dish'), text }))),
-		}));
+		return src.map((c) => {
+			let cols: Dish[][];
+			if (c.cols && c.cols.length > 0 && c.cols.some((col) => col.length > 0)) {
+				cols = c.cols.map((col) => col.map((text) => ({ id: newId('dish'), text })));
+			} else {
+				cols = defaultCols(splitItems(c.description).map((text) => ({ id: newId('dish'), text })));
+			}
+			return {
+				id: newId('course'),
+				name: c.name,
+				reading: c.reading,
+				category: c.category,
+				sort_order: c.sort_order,
+				cols,
+			};
+		});
 	}
 
 	// Serialize the work model back into `courses`. Dishes are emitted in
 	// column order (col 0 first), joined with ・ — backend stays a flat string.
+	// `cols` carries the sub-column split so drafts can restore it after refresh.
 	function syncCoursesFromWork() {
 		courses = workCourses.map((wc, i) => {
 			const ordered = wc.cols.flat();
@@ -79,6 +90,7 @@
 				category: wc.category,
 				sort_order: i + 1,
 				description: ordered.map((d) => d.text).join('・') || null,
+				cols: wc.cols.map((col) => col.map((d) => d.text)),
 			};
 		});
 	}
