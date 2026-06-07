@@ -1001,7 +1001,7 @@
 							     over that column; the fixed .dish-ichi-row height keeps it aligned
 							     across courses. -->
 							<div
-								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-2'}"
+								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 							>
 								{#if dishCount > 0 && groups.length <= 1}
@@ -1032,7 +1032,7 @@
 							     The 一 sits in a fixed-height row atop the first column so it's
 							     centered over the dish AND aligned across courses. -->
 							<div
-								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-center items-start gap-1.5 cursor-pointer"
+								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
