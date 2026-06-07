@@ -334,20 +334,20 @@
 	}
 
 	async function handlePrint() {
-		generatingPdf = true;
+		// Use the browser's native print. Unlike html2canvas, it renders vertical
+		// Japanese text correctly — including the katakana long-vowel mark (ー),
+		// which html2canvas leaves horizontal. The @media print CSS lays the paper
+		// out for A4; isCapturing switches dishes to the balanced multi-column view.
+		isCapturing = true;
+		// let the balanced layout render before printing
+		await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+		const restore = () => { isCapturing = false; window.removeEventListener('afterprint', restore); };
+		window.addEventListener('afterprint', restore);
 		try {
-			const pdf = await buildPdf();
-			if (pdf) {
-				pdf.autoPrint();
-				// Open the PDF in a new tab/window which triggers the print dialog
-				const blobUrl = pdf.output('bloburl');
-				window.open(blobUrl, '_blank');
-			}
-		} catch (err) {
-			console.error('Print failed:', err);
-			window.print();   // fallback
+			window.print();
 		} finally {
-			generatingPdf = false;
+			// Fallback in case afterprint doesn't fire (some browsers)
+			setTimeout(restore, 1000);
 		}
 	}
 
@@ -1477,6 +1477,7 @@
 			aspect-ratio: auto !important;
 			page-break-inside: avoid;
 			overflow: hidden !important;
+			transform: none !important;   /* drop on-screen fit-to-width scaling */
 		}
 
 		/* Print: comfortable line-height for vertical Japanese text */
