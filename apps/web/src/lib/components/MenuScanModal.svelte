@@ -995,19 +995,18 @@
 						</div>
 
 						{#if isCapturing}
-							<!-- 一 separator — fixed-height row so it aligns across ALL courses.
-							     Right-aligned to sit above the first (rightmost) dish column. -->
-							<div class="flex-shrink-0 flex justify-end pr-[0.6em] dish-ichi-row">
-								{#if dishCount > 0}<span class="font-serif-jp text-xl text-stone-800">一</span>{/if}
-							</div>
 							<!-- PDF/PRINT view: pre-balanced groups, each its own vertical sub-column
-							     (the handwritten-menu look). Static, no drag affordances. -->
+							     (the handwritten-menu look). Static, no drag affordances.
+							     The first column carries the 一 at its top so the mark is centered
+							     over that column; the fixed .dish-ichi-row height keeps it aligned
+							     across courses. -->
 							<div
-								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'block' : 'flex flex-row-reverse justify-center items-start gap-2'}"
+								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-2'}"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 							>
 								{#if dishCount > 0 && groups.length <= 1}
-									<div class="w-full grid place-items-center py-1">
+									<div class="flex flex-col items-center">
+										<div class="dish-ichi-row flex items-center"><span class="font-serif-jp text-xl text-stone-800">一</span></div>
 										<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
 											{groups[0].join('　')}
 										</div>
@@ -1015,6 +1014,9 @@
 								{:else if dishCount > 0}
 									{#each groups as group, gIdx}
 										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 3.8}em;">
+											<div class="dish-ichi-row flex items-center">
+												{#if gIdx === 0}<span class="font-serif-jp text-xl text-stone-800">一</span>{/if}
+											</div>
 											<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
 												{group.join('　')}
 											</div>
@@ -1023,15 +1025,12 @@
 								{/if}
 							</div>
 						{:else}
-							<!-- 一 separator — fixed-height row so it aligns across ALL courses.
-							     Right-aligned to sit above the first (rightmost) dish column. -->
-							<div class="flex-shrink-0 flex justify-end pr-[0.6em] dish-ichi-row">
-								{#if dishCount > 0}<span class="font-serif-jp text-xl text-stone-800 select-none">一</span>{/if}
-							</div>
 							<!-- EDIT view: dishes flow into stepped sub-columns (right→left),
 							     each a drop zone. Drag up/down to reorder, left/right to move
 							     a dish into another sub-column, or onto another course. Drag a
-							     dish into the leftmost dashed zone to start a NEW column. -->
+							     dish into the leftmost dashed zone to start a NEW column.
+							     The 一 sits in a fixed-height row atop the first column so it's
+							     centered over the dish AND aligned across courses. -->
 							<div
 								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-center items-start gap-1.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
@@ -1051,6 +1050,9 @@
 									<!-- First/rightmost column sits highest = the "main".
 									     Every other column drops by the SAME single step. -->
 									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : 3.8}em;">
+										<div class="dish-ichi-row flex items-center">
+											{#if colIdx === 0}<span class="font-serif-jp text-xl text-stone-800 select-none">一</span>{/if}
+										</div>
 										<div
 											class="dish-dndzone flex flex-col items-center gap-1"
 											use:dndzone={{ items: col, flipDurationMs, dropTargetStyle: { outline: '2px dashed #C29E67', 'border-radius': '6px' }, type: 'dish' }}
@@ -1370,11 +1372,12 @@
 		width: max-content;   /* hug the vertical text so columns aren't artificially wide */
 		min-width: 1.4em;     /* but stay droppable even when empty */
 	}
-	/* Fixed-height row for the 一 separator so it lines up across every course. */
+	/* Fixed-height slot for the 一 separator, centered over its column, so the
+	   mark aligns with the dish below AND lines up across every course. */
 	.dish-ichi-row {
-		height: 1.8em;
-		padding-top: 0.5rem;
-		padding-bottom: 0.25rem;
+		height: 2em;
+		justify-content: center;
+		flex-shrink: 0;
 	}
 	/* The drag placeholder/shadow the library inserts — show it faintly so the
 	   chef sees where the dish will land, without it looking like a real dish. */
