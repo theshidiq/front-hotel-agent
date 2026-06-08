@@ -215,16 +215,20 @@
 		drafts.filter(d => d.menu_group_id === selectedGroupId)
 	);
 
-	// Show only the NEWEST draft per menu group. Re-scanning a menu creates a new
-	// session, so a group can have several rows; without deduping the chef would
-	// bounce between an edited and an unedited copy. We never delete the older
-	// rows (no data loss) — they're just hidden from the list.
+	// Show only the NEWEST draft per (menu group + menu title). A single group can
+	// legitimately hold several DIFFERENT menus (e.g. 一般 and 滞在), so we key by
+	// title too — only re-scans of the SAME menu collapse to the newest copy. This
+	// avoids the alternating edited/unedited bug WITHOUT hiding distinct menus. We
+	// never delete older rows (no data loss) — duplicates of the same menu are just
+	// hidden from the list.
 	const visibleDrafts = $derived.by(() => {
+		const key = (d: MenuScanDraft) => `${d.menu_group_id}::${(d.menu_title ?? '').trim()}`;
 		const newest = new Map<string, MenuScanDraft>();
 		for (const d of drafts) {
-			const cur = newest.get(d.menu_group_id);
+			const k = key(d);
+			const cur = newest.get(k);
 			if (!cur || new Date(d.updated_at) > new Date(cur.updated_at)) {
-				newest.set(d.menu_group_id, d);
+				newest.set(k, d);
 			}
 		}
 		return [...newest.values()].sort(
@@ -272,11 +276,15 @@
 		// If a save is already in flight, don't drop this one — mark that another
 		// save is needed and run it after the current finishes (latest state wins).
 		if (savingDraft) { pendingResave = true; return; }
-		// Never mint a NEW draft when one already exists for this group — reuse it,
-		// so autosave UPDATEs the group's single draft instead of inserting a
-		// duplicate (the root cause of edits "reverting" to a stale copy).
+		// Never mint a NEW draft when one already exists for this SAME menu (group +
+		// title) — reuse it so autosave UPDATEs that draft instead of inserting a
+		// duplicate. Match by title too, since one group can hold different menus
+		// (一般 / 滞在) that must each keep their own draft.
 		if (!sessionId) {
-			const existing = drafts.find((d) => d.menu_group_id === selectedGroupId);
+			const title = (menuTitle ?? '').trim();
+			const existing = drafts.find(
+				(d) => d.menu_group_id === selectedGroupId && (d.menu_title ?? '').trim() === title,
+			);
 			if (existing) sessionId = existing.session_id;
 		}
 		savingDraft = true;
