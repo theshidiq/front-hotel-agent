@@ -497,6 +497,17 @@
 		return groups;
 	}
 
+	// Delete every draft in `groupId` except `keepId` — enforces one draft per group.
+	async function pruneOtherDraftsInGroup(groupId: string, keepId: string | null) {
+		try {
+			const all = await menuScanGetDrafts();
+			const stale = all.filter((d) => d.menu_group_id === groupId && d.session_id !== keepId);
+			await Promise.all(stale.map((d) => menuScanDeleteDraft(d.session_id)));
+		} catch {
+			// non-fatal — pruning is best-effort
+		}
+	}
+
 	async function startScan() {
 		if (!selectedFile || !selectedGroupId) return;
 		step = 'loading';
@@ -509,6 +520,10 @@
 			sessionId = result.session_id ?? null;
 			imageUrl = result.image_url;
 			step = 'review';
+			// One draft per menu group: remove any older drafts in this group so the
+			// freshly-scanned session is the single working draft (no duplicates that
+			// make edits look "lost" when the wrong copy is reopened).
+			await pruneOtherDraftsInGroup(selectedGroupId, sessionId);
 			// Refresh drafts list
 			drafts = await menuScanGetDrafts();
 		} catch (err: any) {
