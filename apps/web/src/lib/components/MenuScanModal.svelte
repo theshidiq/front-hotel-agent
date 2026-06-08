@@ -1416,10 +1416,14 @@
 
 	/* Kids box lives INSIDE the menu band, in the lower-right area (over the
 	   前菜 region, offset from the right edge so it isn't flush to the corner). */
+	/* Kids box aligned under the 食前酒 column (the rightmost course): the title
+	   column (110px) + 食前酒 column (130px) are fixed widths, so a fixed offset
+	   keeps it under 食前酒 regardless of how many courses. 180px box centered
+	   under the 130px column that starts ~110px from the right paper edge. */
 	.scan-kids-wrap {
 		position: absolute;
 		bottom: 1.5rem;
-		right: 12%;
+		right: 45px;
 		left: auto;
 	}
 
@@ -1550,6 +1554,16 @@
 		:global(.menu-scan-modal .border-r) { border-right: none !important; }
 
 
+		/* Kids box wrapper — keep it absolutely positioned under 食前酒 in print
+		   too (the on-screen position lives on .scan-kids-wrap, so print must
+		   override it here or the box drifts). */
+		:global(.menu-scan-modal .scan-kids-wrap) {
+			position: absolute !important;
+			bottom: 0.5cm !important;
+			right: 45px !important;
+			left: auto !important;
+		}
+
 		/* Kids box — readable print version */
 		.kids-box {
 			page-break-inside: avoid;
@@ -1557,7 +1571,6 @@
 			padding: 0.6rem 0.8rem !important;
 			gap: 0.4rem !important;
 			border-width: 1.5px !important;
-			bottom: 0.5cm !important;
 		}
 
 		/* Hide all delete buttons & non-essential controls on print */
