@@ -15,11 +15,23 @@ let allergenCache: { data: AllergenShape[]; expiresAt: number } | null = null;
 let allergenPending: Promise<AllergenShape[]> | null = null;
 // ────────────────────────────────────────────────────────────────────────────
 
+// When many calls 401 at once (e.g. the access token just expired), they'd each
+// try to refresh the Supabase token in parallel. Supabase rotates refresh tokens,
+// so racing refreshes invalidate each other and most fail. Share a single
+// in-flight refresh across all callers instead.
+let refreshInFlight: Promise<boolean> | null = null;
+function refreshOnce(): Promise<boolean> {
+	if (!refreshInFlight) {
+		refreshInFlight = refreshAuthToken().finally(() => { refreshInFlight = null; });
+	}
+	return refreshInFlight;
+}
+
 /** Fetch wrapper that retries once on 401 by refreshing the Supabase token. */
 async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
 	const response = await fetch(url, options);
 	if (response.status === 401) {
-		const refreshed = await refreshAuthToken();
+		const refreshed = await refreshOnce();
 		if (refreshed) {
 			return fetch(url, {
 				...options,

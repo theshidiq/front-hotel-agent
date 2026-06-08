@@ -271,8 +271,11 @@
 				session_id: sessionId,
 			});
 			sessionId = result.session_id;
-		} catch {
-			// silent — draft save failure shouldn't block the chef
+		} catch (err) {
+			// Surface save failures (e.g. expired session → 401) instead of silently
+			// losing edits. Shows a non-blocking banner; the chef can re-login.
+			console.error('[menu-scan] draft save failed', err);
+			error = '下書きの保存に失敗しました。再ログインが必要かもしれません。';
 		} finally {
 			savingDraft = false;
 			// A change arrived while saving — persist the latest state now.

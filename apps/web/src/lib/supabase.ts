@@ -7,7 +7,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 	throw new Error('Missing required environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+	auth: {
+		// Persist the session in localStorage and refresh the access token in the
+		// background BEFORE it expires, so API calls don't hit a 401 storm when the
+		// hour-long token lapses. (These are Supabase defaults, set explicitly.)
+		persistSession: true,
+		autoRefreshToken: true,
+		detectSessionInUrl: true,
+	},
+});
 
 export async function compressImage(
 	file: File,
