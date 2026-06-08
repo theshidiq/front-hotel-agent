@@ -215,6 +215,23 @@
 		drafts.filter(d => d.menu_group_id === selectedGroupId)
 	);
 
+	// Show only the NEWEST draft per menu group. Re-scanning a menu creates a new
+	// session, so a group can have several rows; without deduping the chef would
+	// bounce between an edited and an unedited copy. We never delete the older
+	// rows (no data loss) — they're just hidden from the list.
+	const visibleDrafts = $derived.by(() => {
+		const newest = new Map<string, MenuScanDraft>();
+		for (const d of drafts) {
+			const cur = newest.get(d.menu_group_id);
+			if (!cur || new Date(d.updated_at) > new Date(cur.updated_at)) {
+				newest.set(d.menu_group_id, d);
+			}
+		}
+		return [...newest.values()].sort(
+			(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+		);
+	});
+
 	// Load drafts on mount
 	$effect(() => {
 		menuScanGetDrafts().then(d => {
@@ -507,16 +524,6 @@
 		return groups;
 	}
 
-	// Delete every draft in `groupId` except `keepId` — enforces one draft per group.
-	async function pruneOtherDraftsInGroup(groupId: string, keepId: string | null) {
-		try {
-			const all = await menuScanGetDrafts();
-			const stale = all.filter((d) => d.menu_group_id === groupId && d.session_id !== keepId);
-			await Promise.all(stale.map((d) => menuScanDeleteDraft(d.session_id)));
-		} catch {
-			// non-fatal — pruning is best-effort
-		}
-	}
 
 	async function startScan() {
 		if (!selectedFile || !selectedGroupId) return;
@@ -530,11 +537,7 @@
 			sessionId = result.session_id ?? null;
 			imageUrl = result.image_url;
 			step = 'review';
-			// One draft per menu group: remove any older drafts in this group so the
-			// freshly-scanned session is the single working draft (no duplicates that
-			// make edits look "lost" when the wrong copy is reopened).
-			await pruneOtherDraftsInGroup(selectedGroupId, sessionId);
-			// Refresh drafts list
+			// Refresh drafts list (the list is deduped to newest-per-group for display).
 			drafts = await menuScanGetDrafts();
 		} catch (err: any) {
 			if (err.name === 'AbortError') {
@@ -567,12 +570,6 @@
 		imageUrl = draft.image_url;
 		selectedGroupId = draft.menu_group_id;
 		step = 'review';
-		// Enforce one-draft-per-group on resume too: remove any other drafts in
-		// this group so we never bounce between stale duplicate copies.
-		pruneOtherDraftsInGroup(draft.menu_group_id, draft.session_id)
-			.then(() => menuScanGetDrafts())
-			.then((d) => { drafts = d; })
-			.catch(() => {});
 	}
 
 	async function discardDraft(draft: MenuScanDraft, e: MouseEvent) {
@@ -676,10 +673,13 @@
 		onClose();
 	}
 
-	// Back to the upload screen — flush first so review edits persist as a draft.
+	// Back to the upload screen — flush first so review edits persist as a draft,
+	// then RELOAD the drafts list so it reflects the freshest server state (avoids
+	// resuming a stale/duplicate copy that the cached list still showed).
 	async function goBackToUpload() {
 		await flushSave();
 		step = 'upload';
+		try { drafts = await menuScanGetDrafts(); } catch { /* keep cached list */ }
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -896,8 +896,8 @@
 			</button>
 		</div>
 
-		<!-- Right: saved drafts -->
-		{#if !loadingDrafts && drafts.length > 0}
+		<!-- Right: saved drafts (newest per group; older duplicates hidden) -->
+		{#if !loadingDrafts && visibleDrafts.length > 0}
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center gap-2 mb-4">
 				<svg class="w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -906,7 +906,7 @@
 				<h3 class="text-xs font-medium text-stone-600 uppercase tracking-widest">保存済み下書き</h3>
 			</div>
 			<div class="flex flex-col gap-2">
-				{#each drafts as draft}
+				{#each visibleDrafts as draft (draft.session_id)}
 				<div
 					class="bg-white border border-stone-200 px-4 py-3 flex items-center justify-between hover:border-stone-300 cursor-pointer transition-colors group"
 					onclick={() => resumeDraft(draft)}
