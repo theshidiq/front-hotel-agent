@@ -1187,7 +1187,7 @@
 				     bottom-right corner (over the 食前酒 / 前菜 area). -->
 				<div class="scan-kids-wrap" dir="ltr">
 				{#if showKidsBox}
-				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-2.5 py-2 flex flex-col gap-1 group/kids shadow-sm w-[150px]" dir="ltr">
+				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-2.5 py-2 flex flex-col gap-1 group/kids shadow-sm w-[210px]" dir="ltr">
 					<!-- Remove button (only on hover) -->
 					<button
 						onclick={() => { showKidsBox = false; }}
@@ -1520,6 +1520,16 @@
 			margin: 0;
 		}
 
+		/* Print all menu text in near-black for a crisp printed/PDF menu
+		   (on-screen uses warm greys like stone-700, which look faded in print). */
+		:global(.menu-scan-modal .tategaki),
+		:global(.menu-scan-modal .dish-display),
+		:global(.menu-scan-modal .font-serif-jp) {
+			color: #111 !important;
+			-webkit-print-color-adjust: exact;
+			print-color-adjust: exact;
+		}
+
 		/* Hide everything except the modal */
 		:global(html, body) {
 			margin: 0 !important;
@@ -1642,8 +1652,8 @@
 		/* Kids box — readable print version */
 		.kids-box {
 			page-break-inside: avoid;
-			width: 150px !important;
-			padding: 0.4rem 0.55rem !important;
+			width: 210px !important;
+			padding: 0.4rem 0.6rem !important;
 			gap: 0.25rem !important;
 			border-width: 1.5px !important;
 		}
