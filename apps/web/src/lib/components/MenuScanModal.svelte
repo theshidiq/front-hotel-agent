@@ -237,11 +237,24 @@
 		void courses;
 		if (step !== 'review' || courses.length === 0) return;
 		if (saveTimer) clearTimeout(saveTimer);
-		saveTimer = setTimeout(() => autoSaveDraft(), 2000);
+		saveTimer = setTimeout(() => autoSaveDraft(), 800);
 	});
 
+	// Force-save any pending edits immediately (cancels the debounce). Call this
+	// before leaving the review screen so edits are never lost on back/close/escape.
+	async function flushSave() {
+		if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+		if (step === 'review' && courses.length > 0) {
+			await autoSaveDraft();
+		}
+	}
+
+	let pendingResave = false;
 	async function autoSaveDraft() {
-		if (!selectedGroupId || courses.length === 0 || savingDraft) return;
+		if (!selectedGroupId || courses.length === 0) return;
+		// If a save is already in flight, don't drop this one — mark that another
+		// save is needed and run it after the current finishes (latest state wins).
+		if (savingDraft) { pendingResave = true; return; }
 		savingDraft = true;
 		try {
 			// Persist the kids box state as a trailing meta entry in the draft's
@@ -262,6 +275,8 @@
 			// silent — draft save failure shouldn't block the chef
 		} finally {
 			savingDraft = false;
+			// A change arrived while saving — persist the latest state now.
+			if (pendingResave) { pendingResave = false; await autoSaveDraft(); }
 		}
 	}
 
@@ -624,10 +639,22 @@
 		});
 	}
 
+	// Close wrapper — flush pending edits before the modal goes away.
+	async function handleClose() {
+		await flushSave();
+		onClose();
+	}
+
+	// Back to the upload screen — flush first so review edits persist as a draft.
+	async function goBackToUpload() {
+		await flushSave();
+		step = 'upload';
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			if (descEditorIdx !== null) { cancelDescEditor(); return; }
-			if (step !== 'saving') onClose();
+			if (step !== 'saving') handleClose();
 			return;
 		}
 	}
@@ -642,7 +669,7 @@
 		<div class="flex items-center gap-5">
 			{#if step === 'review'}
 			<button
-				onclick={() => { step = 'upload'; }}
+				onclick={goBackToUpload}
 				class="flex items-center gap-1.5 px-2 py-1.5 text-stone-500 hover:text-stone-800 hover:bg-stone-50 transition-colors rounded print:hidden"
 				title="戻る"
 				aria-label="戻る"
@@ -747,7 +774,7 @@
 			{/if}
 			{#if step !== 'saving'}
 			<button
-				onclick={onClose}
+				onclick={handleClose}
 				class="px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden"
 			>
 				Close
