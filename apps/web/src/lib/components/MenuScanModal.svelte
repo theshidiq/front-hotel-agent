@@ -230,8 +230,11 @@
 		syncCoursesFromWork();
 	});
 
-	// Auto-save draft whenever courses change (debounced 2s)
+	// Auto-save draft whenever courses OR the kids box change (debounced 2s)
 	$effect(() => {
+		// touch kids state so editing only the kids box also schedules a save
+		void kidsName; void showKidsBox; JSON.stringify(kidsItems);
+		void courses;
 		if (step !== 'review' || courses.length === 0) return;
 		if (saveTimer) clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => autoSaveDraft(), 2000);
@@ -241,10 +244,16 @@
 		if (!selectedGroupId || courses.length === 0 || savingDraft) return;
 		savingDraft = true;
 		try {
+			// Persist the kids box state as a trailing meta entry in the draft's
+			// courses JSONB (no backend change needed). Stripped on restore; never
+			// sent to confirmSave (which maps to clean name/description/category).
+			const kidsMeta = {
+				__kids: { name: kidsName, items: kidsItems, show: showKidsBox },
+			} as unknown as ScannedMenuCourse;
 			const result = await menuScanSaveDraft({
 				menu_group_id: selectedGroupId,
 				menu_title: menuTitle,
-				courses,
+				courses: [...courses, kidsMeta],
 				image_url: imageUrl,
 				session_id: sessionId,
 			});
@@ -505,7 +514,16 @@
 	function resumeDraft(draft: MenuScanDraft) {
 		sessionId = draft.session_id;
 		menuTitle = draft.menu_title;
-		workCourses = buildWorkCourses(draft.courses);
+		// Extract the trailing kids-box meta entry (if present) and restore it.
+		const raw = draft.courses ?? [];
+		const kidsMeta = raw.find((c) => (c as any).__kids) as any;
+		const realCourses = raw.filter((c) => !(c as any).__kids);
+		if (kidsMeta?.__kids) {
+			kidsName = kidsMeta.__kids.name ?? kidsName;
+			kidsItems = Array.isArray(kidsMeta.__kids.items) ? kidsMeta.__kids.items : kidsItems;
+			showKidsBox = kidsMeta.__kids.show ?? true;
+		}
+		workCourses = buildWorkCourses(realCourses);
 		imageUrl = draft.image_url;
 		selectedGroupId = draft.menu_group_id;
 		step = 'review';
@@ -1423,7 +1441,7 @@
 	.scan-kids-wrap {
 		position: absolute;
 		bottom: 1.5rem;
-		right: 45px;
+		right: 90px;
 		left: auto;
 	}
 
@@ -1560,7 +1578,7 @@
 		:global(.menu-scan-modal .scan-kids-wrap) {
 			position: absolute !important;
 			bottom: 0.5cm !important;
-			right: 45px !important;
+			right: 90px !important;
 			left: auto !important;
 		}
 
@@ -1582,7 +1600,8 @@
 	}
 
 	.paper-title-col {
-		width: clamp(70px, 8%, 120px);
+		width: 115px;   /* fixed (matches TITLE_W) so the kids box sits under 食前酒 consistently */
+		flex: none;
 	}
 
 	/* Fixed header zone — fits 3 vertical kanji.
