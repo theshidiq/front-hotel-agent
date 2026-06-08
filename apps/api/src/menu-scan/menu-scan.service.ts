@@ -106,8 +106,9 @@ export class MenuScanService {
     const supabase = this.supabaseService.getClient();
 
     if (dto.session_id) {
-      // Update existing draft
-      await supabase
+      // Update existing draft. Return the affected row so a failed/no-op update
+      // (e.g. wrong id or org mismatch) surfaces instead of silently "succeeding".
+      const { data, error } = await supabase
         .from('scan_sessions')
         .update({
           draft_courses: dto.courses,
@@ -116,9 +117,17 @@ export class MenuScanService {
           updated_at: new Date().toISOString(),
         })
         .eq('id', dto.session_id)
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId)
+        .select('id')
+        .maybeSingle();
 
-      return { session_id: dto.session_id };
+      if (error) throw new Error(`Failed to update draft: ${error.message}`);
+      if (!data) {
+        // No row matched — the session id is stale/foreign. Fall through to create
+        // a fresh draft so the edit is never lost.
+      } else {
+        return { session_id: dto.session_id };
+      }
     }
 
     // Create new draft session (no image, manual entry)

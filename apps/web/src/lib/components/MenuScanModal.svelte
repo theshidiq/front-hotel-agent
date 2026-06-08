@@ -255,6 +255,13 @@
 		// If a save is already in flight, don't drop this one — mark that another
 		// save is needed and run it after the current finishes (latest state wins).
 		if (savingDraft) { pendingResave = true; return; }
+		// Never mint a NEW draft when one already exists for this group — reuse it,
+		// so autosave UPDATEs the group's single draft instead of inserting a
+		// duplicate (the root cause of edits "reverting" to a stale copy).
+		if (!sessionId) {
+			const existing = drafts.find((d) => d.menu_group_id === selectedGroupId);
+			if (existing) sessionId = existing.session_id;
+		}
 		savingDraft = true;
 		try {
 			// Persist the kids box state as a trailing meta entry in the draft's
@@ -560,6 +567,12 @@
 		imageUrl = draft.image_url;
 		selectedGroupId = draft.menu_group_id;
 		step = 'review';
+		// Enforce one-draft-per-group on resume too: remove any other drafts in
+		// this group so we never bounce between stale duplicate copies.
+		pruneOtherDraftsInGroup(draft.menu_group_id, draft.session_id)
+			.then(() => menuScanGetDrafts())
+			.then((d) => { drafts = d; })
+			.catch(() => {});
 	}
 
 	async function discardDraft(draft: MenuScanDraft, e: MouseEvent) {
@@ -1174,7 +1187,7 @@
 				     bottom-right corner (over the 食前酒 / 前菜 area). -->
 				<div class="scan-kids-wrap" dir="ltr">
 				{#if showKidsBox}
-				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-4 py-3 flex flex-col gap-1.5 group/kids shadow-sm w-[180px]" dir="ltr">
+				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-2.5 py-2 flex flex-col gap-1 group/kids shadow-sm w-[150px]" dir="ltr">
 					<!-- Remove button (only on hover) -->
 					<button
 						onclick={() => { showKidsBox = false; }}
@@ -1221,11 +1234,11 @@
 									class="font-serif-jp text-base text-stone-700 bg-white outline-none border border-stone-300 rounded px-1.5 py-0.5"
 								/>
 							{:else}
-								<div class="group/item flex items-center gap-2">
-									<span class="text-stone-500 text-sm">・</span>
+								<div class="group/item flex items-start gap-1">
+									<span class="text-stone-500 text-base leading-tight font-serif-jp">・</span>
 									<button
 										onclick={() => { editingKidsItemIdx = kidsIdx; }}
-										class="font-serif-jp text-base text-stone-700 hover:bg-stone-50 rounded px-1.5 py-0.5 transition-colors flex-1 text-left tracking-wide"
+										class="font-serif-jp text-base leading-tight text-stone-700 hover:bg-stone-50 rounded px-1 py-0.5 transition-colors flex-1 text-left tracking-wide"
 									>
 										{item}
 									</button>
@@ -1479,14 +1492,13 @@
 
 	/* Kids box lives INSIDE the menu band, in the lower-right area (over the
 	   前菜 region, offset from the right edge so it isn't flush to the corner). */
-	/* Kids box aligned under the 食前酒 column (the rightmost course): the title
-	   column (110px) + 食前酒 column (130px) are fixed widths, so a fixed offset
-	   keeps it under 食前酒 regardless of how many courses. 180px box centered
-	   under the 130px column that starts ~110px from the right paper edge. */
+	/* Kids box sits in the lower-right band, between the menu title column and the
+	   食前酒 column: tucked under the title (115px) and spilling left over 食前酒.
+	   Small right offset pulls it toward the title side. */
 	.scan-kids-wrap {
 		position: absolute;
 		bottom: 1.5rem;
-		right: 90px;
+		right: 10px;
 		left: auto;
 	}
 
@@ -1623,16 +1635,16 @@
 		:global(.menu-scan-modal .scan-kids-wrap) {
 			position: absolute !important;
 			bottom: 0.5cm !important;
-			right: 90px !important;
+			right: 10px !important;
 			left: auto !important;
 		}
 
 		/* Kids box — readable print version */
 		.kids-box {
 			page-break-inside: avoid;
-			width: 180px !important;
-			padding: 0.6rem 0.8rem !important;
-			gap: 0.4rem !important;
+			width: 150px !important;
+			padding: 0.4rem 0.55rem !important;
+			gap: 0.25rem !important;
 			border-width: 1.5px !important;
 		}
 
