@@ -1187,7 +1187,7 @@
 				     bottom-right corner (over the 食前酒 / 前菜 area). -->
 				<div class="scan-kids-wrap" dir="ltr">
 				{#if showKidsBox}
-				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-2.5 py-2 flex flex-col gap-1 group/kids shadow-sm w-[210px]" dir="ltr">
+				<div class="kids-box border-2 border-dashed border-stone-400 bg-white px-2.5 py-2 flex flex-col gap-1 group/kids shadow-sm w-max min-w-[140px] max-w-[260px]" dir="ltr">
 					<!-- Remove button (only on hover) -->
 					<button
 						onclick={() => { showKidsBox = false; }}
@@ -1238,7 +1238,7 @@
 									<span class="text-stone-500 text-base leading-tight font-serif-jp">・</span>
 									<button
 										onclick={() => { editingKidsItemIdx = kidsIdx; }}
-										class="font-serif-jp text-base leading-tight text-stone-700 hover:bg-stone-50 rounded px-1 py-0.5 transition-colors flex-1 text-left tracking-wide"
+										class="font-serif-jp text-base leading-tight text-stone-700 hover:bg-stone-50 rounded px-1 py-0.5 transition-colors text-left tracking-wide whitespace-nowrap"
 									>
 										{item}
 									</button>
@@ -1652,7 +1652,9 @@
 		/* Kids box — readable print version */
 		.kids-box {
 			page-break-inside: avoid;
-			width: 210px !important;
+			width: max-content !important;   /* fit the text, no wrapping */
+			min-width: 140px !important;
+			max-width: 260px !important;
 			padding: 0.4rem 0.6rem !important;
 			gap: 0.25rem !important;
 			border-width: 1.5px !important;
