@@ -1102,7 +1102,7 @@
 									<div class="relative flex flex-col items-center">
 										<div class="cap-course-name">
 											{#each nameLines as line}
-												<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+												<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
 											{/each}
 										</div>
 										<div class="dish-ichi-row flex items-center"><span class="font-serif-jp text-xl text-stone-800">一</span></div>
@@ -1116,7 +1116,7 @@
 											{#if gIdx === 0}
 												<div class="cap-course-name">
 													{#each nameLines as line}
-														<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+														<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
 													{/each}
 												</div>
 											{/if}
@@ -1157,7 +1157,7 @@
 												aria-label="コース名を編集"
 											>
 												{#each nameLines as line}
-													<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+													<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
 												{/each}
 											</div>
 										{/if}
@@ -1185,7 +1185,7 @@
 												aria-label="コース名を編集"
 											>
 												{#each nameLines as line}
-													<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+													<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
 												{/each}
 											</div>
 										{/if}
@@ -1487,13 +1487,12 @@
 		position: absolute;            /* sits ABOVE the column, occupies no layout
 		                                  height — so column 1's 一/dishes stay at the
 		                                  same baseline as every other column. */
-		/* Fixed header zone. The box font-size is set to the NAME size (text-2xl =
-		   1.5rem) so its em units track the actual glyph height — the dishes are a
-		   smaller font (text-xl), and the earlier mismatch (box em vs 1.5rem glyphs)
-		   is what threw the alignment off, worst for the tall split names.
+		/* Fixed header zone. The box font-size matches the NAME size (text-xl =
+		   1.25rem, the SAME as the dishes) so the names and dish text align and the
+		   box's em units track the actual glyph height.
 		   Height = 3 lines tall (the longest split half); names top-align so the
 		   header row is even across courses; bottom sits just above the 一. */
-		font-size: 1.5rem;             /* = text-2xl, the name glyph size */
+		font-size: 1.25rem;            /* = text-xl, same as the dish text */
 		bottom: calc(100% + 0.15em);
 		height: 3.2em;                 /* 3 chars tall at line-height 1, + slack */
 		left: 50%;
