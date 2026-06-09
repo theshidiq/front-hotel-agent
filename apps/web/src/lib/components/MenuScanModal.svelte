@@ -1487,12 +1487,15 @@
 		position: absolute;            /* sits ABOVE the column, occupies no layout
 		                                  height — so column 1's 一/dishes stay at the
 		                                  same baseline as every other column. */
-		/* Fixed header zone: every course name occupies the SAME box (height of the
-		   tallest, ~3-char, line) pinned at a fixed top. Names top-align, so the
-		   header row is perfectly even across courses regardless of name length;
-		   the box bottom sits just above the 一 so dishes stay close. */
-		bottom: calc(100% + 0.25em);
-		height: 4.6em;
+		/* Fixed header zone. The box font-size is set to the NAME size (text-2xl =
+		   1.5rem) so its em units track the actual glyph height — the dishes are a
+		   smaller font (text-xl), and the earlier mismatch (box em vs 1.5rem glyphs)
+		   is what threw the alignment off, worst for the tall split names.
+		   Height = 3 lines tall (the longest split half); names top-align so the
+		   header row is even across courses; bottom sits just above the 一. */
+		font-size: 1.5rem;             /* = text-2xl, the name glyph size */
+		bottom: calc(100% + 0.15em);
+		height: 3.2em;                 /* 3 chars tall at line-height 1, + slack */
 		left: 50%;
 		transform: translateX(-50%);
 		display: flex;
@@ -1503,6 +1506,8 @@
 		white-space: nowrap;
 	}
 	.cap-course-name .cap-name-line {
+		font-size: 1em;                /* inherit the box's 1.5rem — drop the text-2xl
+		                                  utility's own sizing so em math is consistent */
 		line-height: 1;
 	}
 
