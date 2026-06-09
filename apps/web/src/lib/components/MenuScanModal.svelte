@@ -1017,13 +1017,15 @@
 						<div class="flex-1 flex items-start justify-center px-1 pt-[8%]">
 							{#if editingTitle}
 								<div
-									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center outline-none bg-orange-50/40 rounded px-1"
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center outline-none bg-orange-50/40 rounded px-1 whitespace-pre-wrap"
 									contenteditable="plaintext-only"
 									spellcheck="false"
 									use:autoFocusContentEditable
 									onblur={(e) => {
-										const v = (e.target as HTMLElement).innerText.trim();
-										menuTitle = v || null;
+										// Keep the title exactly as typed — including spaces the chef
+										// adds for layout. Only fall back to null when it's blank.
+										const v = (e.target as HTMLElement).innerText.replace(/\n/g, '');
+										menuTitle = v.trim() ? v : null;
 										editingTitle = false;
 									}}
 									role="textbox"
@@ -1032,7 +1034,7 @@
 								>{menuTitle || selectedGroupName}</div>
 							{:else}
 								<div
-									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 print:cursor-default print:hover:bg-transparent"
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 print:cursor-default print:hover:bg-transparent whitespace-pre-wrap"
 									onclick={() => { if (!isCapturing) editingTitle = true; }}
 									role="button"
 									tabindex="0"
