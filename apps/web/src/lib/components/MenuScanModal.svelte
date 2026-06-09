@@ -1051,6 +1051,7 @@
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditingName = editingNameIdx === idx}
 					{@const nameHeightEm = Math.max(...nameLines.map((l) => l.length)) * 1.25 + 0.9}
+					{@const stepEm = 2.5}
 					<div
 						class="flex-1 min-w-0 min-h-0 border-l border-stone-200 flex flex-col relative group course-col overflow-hidden"
 						dir="ltr"
@@ -1112,7 +1113,7 @@
 									</div>
 								{:else if dishCount > 0}
 									{#each groups as group, gIdx}
-										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : nameHeightEm + gIdx * 1.5}em;">
+										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : nameHeightEm + gIdx * stepEm}em;">
 											{#if gIdx === 0}
 												<div class="cap-course-name">
 													{#each nameLines as line}
@@ -1172,7 +1173,7 @@
 									<!-- First/rightmost column sits highest = the "main". Later columns
 									     clear the course name (only the first column carries it) then step
 									     down by an increasing amount, giving the staircase look. -->
-									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : nameHeightEm + colIdx * 1.5}em;">
+									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : nameHeightEm + colIdx * stepEm}em;">
 										{#if colIdx === 0 && !isEditingName}
 											<!-- Aligned course name over the first column (WYSIWYG with print).
 											     Click to edit. Long names split into 2 tight vertical lines. -->
