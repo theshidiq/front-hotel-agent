@@ -1095,7 +1095,7 @@
 							     over that column; the fixed .dish-ichi-row height keeps it aligned
 							     across courses. -->
 							<div
-								class="flex-1 px-2 pt-28 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
+								class="flex-1 px-2 pt-20 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 							>
 								{#if dishCount > 0 && groups.length <= 1}
@@ -1138,7 +1138,7 @@
 							     The 一 sits in a fixed-height row atop the first column so it's
 							     centered over the dish AND aligned across courses. -->
 							<div
-								class="flex-1 px-2 pt-28 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
+								class="flex-1 px-2 pt-20 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
@@ -1487,10 +1487,11 @@
 		position: absolute;            /* sits ABOVE the column, occupies no layout
 		                                  height — so column 1's 一/dishes stay at the
 		                                  same baseline as every other column. */
-		bottom: 100%;                  /* anchor the BOTTOM just above the 一 row… */
-		top: -6.5em;                   /* …and pin the TOP at a fixed distance so every
+		bottom: calc(100% + 0.2em);    /* small gap above the 一 row… */
+		top: -4.6em;                   /* …and pin the TOP at a fixed distance so every
 		                                  course name shares the same top baseline (a
-		                                  clean header row), regardless of length. */
+		                                  clean header row), regardless of length. Kept
+		                                  small so the dishes sit close below the name. */
 		left: 50%;
 		transform: translateX(-50%);
 		display: flex;
