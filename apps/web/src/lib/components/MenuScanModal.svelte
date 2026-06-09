@@ -1100,7 +1100,7 @@
 							>
 								{#if dishCount > 0 && groups.length <= 1}
 									<div class="relative flex flex-col items-center">
-										<div class="cap-course-name">
+										<div class="cap-course-name is-single">
 											{#each nameLines as line}
 												<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
 											{/each}
@@ -1114,7 +1114,7 @@
 									{#each groups as group, gIdx}
 										<div class="relative flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : stepEm}em;">
 											{#if gIdx === 0}
-												<div class="cap-course-name">
+												<div class="cap-course-name" class:is-single={nameLines.length === 1}>
 													{#each nameLines as line}
 														<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
 													{/each}
@@ -1149,7 +1149,7 @@
 									<div class="relative flex flex-col items-center">
 										{#if !isEditingName}
 											<div
-												class="cap-course-name cursor-text hover:bg-stone-50/60 rounded transition-colors"
+												class="cap-course-name is-single cursor-text hover:bg-stone-50/60 rounded transition-colors"
 												onclick={() => { editingNameIdx = idx; }}
 												role="button"
 												tabindex="0"
@@ -1177,7 +1177,7 @@
 											<!-- Aligned course name over the first column (WYSIWYG with print).
 											     Click to edit. Long names split into 2 tight vertical lines. -->
 											<div
-												class="cap-course-name cursor-text hover:bg-stone-50/60 rounded transition-colors"
+												class="cap-course-name cursor-text hover:bg-stone-50/60 rounded transition-colors" class:is-single={nameLines.length === 1 || course.cols.length <= 1}
 												onclick={() => { editingNameIdx = idx; }}
 												role="button"
 												tabindex="0"
@@ -1495,19 +1495,31 @@
 		font-size: 1.25rem;            /* = text-xl, same as the dish text */
 		bottom: calc(100% + 0.15em);
 		height: 3.2em;                 /* 3 chars tall at line-height 1, + slack */
-		left: 50%;
-		transform: translateX(-50%);
+		/* Right-anchor the name to the first dish column's right edge. Each name
+		   half is a 1-char-wide vertical line — the same width as a dish column —
+		   so half 1 sits over dish-col-1 and half 2 over dish-col-2, reading as one
+		   aligned 2-column block (what the chef wants for 本日の肉料理). */
+		right: 0;
 		display: flex;
 		flex-direction: row-reverse;   /* first half on the right */
-		justify-content: center;
+		justify-content: flex-start;
 		align-items: flex-start;       /* names hang from the shared TOP line → even row */
 		gap: 0;                        /* tight — the two halves sit flush */
 		white-space: nowrap;
 	}
+	/* Single-line names (≤3 chars) stay centered over their one column. */
+	.cap-course-name.is-single {
+		right: auto;
+		left: 50%;
+		transform: translateX(-50%);
+		justify-content: center;
+	}
 	.cap-course-name .cap-name-line {
-		font-size: 1em;                /* inherit the box's 1.5rem — drop the text-2xl
+		font-size: 1em;                /* inherit the box font — drop the text-xl
 		                                  utility's own sizing so em math is consistent */
 		line-height: 1;
+		width: 1.25em;                 /* one column width, matching a dish column */
+		text-align: center;
 	}
 
 	.font-serif-jp {
