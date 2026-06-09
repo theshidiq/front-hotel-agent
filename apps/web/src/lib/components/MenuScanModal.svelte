@@ -1487,13 +1487,16 @@
 		position: absolute;            /* sits ABOVE the column, occupies no layout
 		                                  height — so column 1's 一/dishes stay at the
 		                                  same baseline as every other column. */
-		bottom: calc(100% + 0.5em);    /* float just above the 一 row, with a gap */
+		bottom: 100%;                  /* anchor the BOTTOM just above the 一 row… */
+		top: -6.5em;                   /* …and pin the TOP at a fixed distance so every
+		                                  course name shares the same top baseline (a
+		                                  clean header row), regardless of length. */
 		left: 50%;
 		transform: translateX(-50%);
 		display: flex;
 		flex-direction: row-reverse;   /* first half on the right */
 		justify-content: center;
-		align-items: flex-start;
+		align-items: flex-start;       /* names hang from the shared top line */
 		gap: 0;                        /* tight — the two halves sit flush */
 		white-space: nowrap;
 	}
