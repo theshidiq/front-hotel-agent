@@ -1017,7 +1017,7 @@
 						<div class="flex-1 flex items-start justify-center px-1 pt-[8%]">
 							{#if editingTitle}
 								<div
-									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center outline-none bg-orange-50/40 rounded px-1 whitespace-pre-wrap"
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center outline-none bg-orange-50/40 rounded px-1 whitespace-break-spaces"
 									contenteditable="plaintext-only"
 									spellcheck="false"
 									use:autoFocusContentEditable
@@ -1034,7 +1034,7 @@
 								>{menuTitle || selectedGroupName}</div>
 							{:else}
 								<div
-									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 print:cursor-default print:hover:bg-transparent whitespace-pre-wrap"
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 print:cursor-default print:hover:bg-transparent whitespace-break-spaces"
 									onclick={() => { if (!isCapturing) editingTitle = true; }}
 									role="button"
 									tabindex="0"
