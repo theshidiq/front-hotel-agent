@@ -412,8 +412,16 @@
 	// the print dialog) so the two outputs are identical.
 	async function nativePrint() {
 		isCapturing = true;
+		// Add the .capturing class too, so the capture-only CSS (hide the course
+		// header, show the in-column course name aligned over the first dish column)
+		// applies to native print — not just to the html2canvas path.
+		paperEl?.classList.add('capturing');
 		await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-		const restore = () => { isCapturing = false; window.removeEventListener('afterprint', restore); };
+		const restore = () => {
+			isCapturing = false;
+			paperEl?.classList.remove('capturing');
+			window.removeEventListener('afterprint', restore);
+		};
 		window.addEventListener('afterprint', restore);
 		try {
 			window.print();
@@ -1058,14 +1066,13 @@
 							</svg>
 						</button>
 
-						<!-- Course header — the name sits in a fixed-width slot anchored to the
-						     right (over the first/rightmost dish column), with its content
-						     centered, so any name length lines up above the first column.
-						     Long names pre-split into 2 vertical lines (right-to-left). -->
-						<div class="pt-2 pb-1 flex items-start justify-end flex-shrink-0 course-header-box course-header-align">
+						<!-- Course header (edit view): name centered. In print/PDF this header
+						     is hidden and the name renders inside the first dish column so it
+						     aligns over it. Long names pre-split into 2 vertical lines. -->
+						<div class="pt-2 pb-1 flex items-start justify-center flex-shrink-0 course-header-box">
 							{#if isEditingName}
 								<div
-									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center course-name-slot"
+									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center"
 									contenteditable="plaintext-only"
 									spellcheck="false"
 									use:autoFocusContentEditable
@@ -1079,7 +1086,7 @@
 								>{course.name}</div>
 							{:else}
 								<div
-									class="flex flex-row-reverse justify-center gap-1 cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 course-name-slot"
+									class="flex flex-row-reverse gap-1 cursor-text hover:bg-stone-50/60 rounded transition-colors px-1"
 									onclick={() => { editingNameIdx = idx; }}
 									role="button"
 									tabindex="0"
@@ -1102,11 +1109,12 @@
 							     over that column; the fixed .dish-ichi-row height keeps it aligned
 							     across courses. -->
 							<div
-								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-end' : 'flex flex-row-reverse justify-end items-start gap-0'}"
+								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 							>
 								{#if dishCount > 0 && groups.length <= 1}
 									<div class="flex flex-col items-center">
+										<div class="cap-course-name tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{course.name}</div>
 										<div class="dish-ichi-row flex items-center"><span class="font-serif-jp text-xl text-stone-800">一</span></div>
 										<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
 											{groups[0].join('　')}
@@ -1115,6 +1123,9 @@
 								{:else if dishCount > 0}
 									{#each groups as group, gIdx}
 										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 2}em;">
+											{#if gIdx === 0}
+												<div class="cap-course-name tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{course.name}</div>
+											{/if}
 											<div class="dish-ichi-row flex items-center">
 												{#if gIdx === 0}<span class="font-serif-jp text-xl text-stone-800">一</span>{/if}
 											</div>
@@ -1133,7 +1144,7 @@
 							     The 一 sits in a fixed-height row atop the first column so it's
 							     centered over the dish AND aligned across courses. -->
 							<div
-								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-end items-start gap-0.5 cursor-pointer"
+								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
@@ -1440,6 +1451,19 @@
 	:global(.a4-paper.capturing) .border-l {
 		border-left: none !important;
 	}
+	/* In capture/print the course name renders INSIDE the first dish column
+	   (cap-course-name) so it aligns over it — hide the separate header so the
+	   name isn't shown twice. The in-column name only shows during capture. */
+	:global(.a4-paper.capturing) .course-header-box {
+		display: none !important;
+	}
+	.cap-course-name {
+		display: none;        /* only shown in capture/print (rule below) */
+		margin-bottom: 0.4em;
+	}
+	:global(.a4-paper.capturing) .cap-course-name {
+		display: block;
+	}
 
 	.font-serif-jp {
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
@@ -1479,20 +1503,6 @@
 		height: 2em;
 		justify-content: center;
 		flex-shrink: 0;
-	}
-	/* Right-align the course name over the first (rightmost) dish column. The
-	   right padding ≈ the dish area's px-2 (0.5rem) + half a dish column, so the
-	   name sits centered above the first column rather than the column block. */
-	/* The dishes are right-anchored (justify-end), so the first/rightmost dish
-	   column always sits at the same spot. The name slot is one dish-column wide
-	   with centered content and the same right padding, so it lands above the
-	   first column for every course regardless of name length. */
-	.course-header-align {
-		padding-right: 0.5rem;
-	}
-	.course-name-slot {
-		width: 1.9em;       /* ≈ one dish column */
-		justify-content: center;
 	}
 	/* The drag placeholder/shadow the library inserts — show it faintly so the
 	   chef sees where the dish will land, without it looking like a real dish. */
