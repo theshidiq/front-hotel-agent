@@ -1050,7 +1050,6 @@
 					{@const groups = course.cols.map((col) => col.map((d) => d.text))}
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditingName = editingNameIdx === idx}
-					{@const nameHeightEm = Math.max(...nameLines.map((l) => l.length)) * 1.25 + 0.9}
 					{@const stepEm = 2.5}
 					<div
 						class="flex-1 min-w-0 min-h-0 border-l border-stone-200 flex flex-col relative group course-col overflow-hidden"
@@ -1096,11 +1095,11 @@
 							     over that column; the fixed .dish-ichi-row height keeps it aligned
 							     across courses. -->
 							<div
-								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
+								class="flex-1 px-2 pt-16 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 							>
 								{#if dishCount > 0 && groups.length <= 1}
-									<div class="flex flex-col items-center">
+									<div class="relative flex flex-col items-center">
 										<div class="cap-course-name">
 											{#each nameLines as line}
 												<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
@@ -1113,7 +1112,7 @@
 									</div>
 								{:else if dishCount > 0}
 									{#each groups as group, gIdx}
-										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : nameHeightEm + gIdx * stepEm}em;">
+										<div class="relative flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : stepEm}em;">
 											{#if gIdx === 0}
 												<div class="cap-course-name">
 													{#each nameLines as line}
@@ -1139,7 +1138,7 @@
 							     The 一 sits in a fixed-height row atop the first column so it's
 							     centered over the dish AND aligned across courses. -->
 							<div
-								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
+								class="flex-1 px-2 pt-16 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
@@ -1147,7 +1146,7 @@
 								aria-label="料理を編集"
 							>
 								{#if dishCount === 0}
-									<div class="flex flex-col items-center">
+									<div class="relative flex flex-col items-center">
 										{#if !isEditingName}
 											<div
 												class="cap-course-name cursor-text hover:bg-stone-50/60 rounded transition-colors"
@@ -1173,7 +1172,7 @@
 									<!-- First/rightmost column sits highest = the "main". Later columns
 									     clear the course name (only the first column carries it) then step
 									     down by an increasing amount, giving the staircase look. -->
-									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : nameHeightEm + colIdx * stepEm}em;">
+									<div class="relative flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : stepEm}em;">
 										{#if colIdx === 0 && !isEditingName}
 											<!-- Aligned course name over the first column (WYSIWYG with print).
 											     Click to edit. Long names split into 2 tight vertical lines. -->
@@ -1485,12 +1484,18 @@
 	   header is no longer rendered. Long names split into 2 tight side-by-side
 	   vertical lines (Japanese order: first half right, second half left). */
 	.cap-course-name {
+		position: absolute;            /* sits ABOVE the column, occupies no layout
+		                                  height — so column 1's 一/dishes stay at the
+		                                  same baseline as every other column. */
+		bottom: calc(100% + 0.5em);    /* float just above the 一 row, with a gap */
+		left: 50%;
+		transform: translateX(-50%);
 		display: flex;
 		flex-direction: row-reverse;   /* first half on the right */
 		justify-content: center;
 		align-items: flex-start;
 		gap: 0;                        /* tight — the two halves sit flush */
-		margin-bottom: 0.9em;          /* breathing room before 一 / dishes */
+		white-space: nowrap;
 	}
 	.cap-course-name .cap-name-line {
 		line-height: 1;
