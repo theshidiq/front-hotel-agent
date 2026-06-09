@@ -1058,13 +1058,14 @@
 							</svg>
 						</button>
 
-						<!-- Course header — long names pre-split into 2 vertical lines (right-to-left)
-						     so the 一 separator stays at the same height across all columns.
-						     Click → flat edit mode; blur → saves & re-splits. -->
-						<div class="pt-2 pb-1 flex items-start justify-center flex-shrink-0 course-header-box">
+						<!-- Course header — the name sits in a fixed-width slot anchored to the
+						     right (over the first/rightmost dish column), with its content
+						     centered, so any name length lines up above the first column.
+						     Long names pre-split into 2 vertical lines (right-to-left). -->
+						<div class="pt-2 pb-1 flex items-start justify-end flex-shrink-0 course-header-box course-header-align">
 							{#if isEditingName}
 								<div
-									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center"
+									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center course-name-slot"
 									contenteditable="plaintext-only"
 									spellcheck="false"
 									use:autoFocusContentEditable
@@ -1078,7 +1079,7 @@
 								>{course.name}</div>
 							{:else}
 								<div
-									class="flex flex-row-reverse gap-1 cursor-text hover:bg-stone-50/60 rounded transition-colors px-1"
+									class="flex flex-row-reverse justify-center gap-1 cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 course-name-slot"
 									onclick={() => { editingNameIdx = idx; }}
 									role="button"
 									tabindex="0"
@@ -1101,7 +1102,7 @@
 							     over that column; the fixed .dish-ichi-row height keeps it aligned
 							     across courses. -->
 							<div
-								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
+								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-end' : 'flex flex-row-reverse justify-end items-start gap-0'}"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 							>
 								{#if dishCount > 0 && groups.length <= 1}
@@ -1132,7 +1133,7 @@
 							     The 一 sits in a fixed-height row atop the first column so it's
 							     centered over the dish AND aligned across courses. -->
 							<div
-								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
+								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-end items-start gap-0.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
@@ -1478,6 +1479,20 @@
 		height: 2em;
 		justify-content: center;
 		flex-shrink: 0;
+	}
+	/* Right-align the course name over the first (rightmost) dish column. The
+	   right padding ≈ the dish area's px-2 (0.5rem) + half a dish column, so the
+	   name sits centered above the first column rather than the column block. */
+	/* The dishes are right-anchored (justify-end), so the first/rightmost dish
+	   column always sits at the same spot. The name slot is one dish-column wide
+	   with centered content and the same right padding, so it lands above the
+	   first column for every course regardless of name length. */
+	.course-header-align {
+		padding-right: 0.5rem;
+	}
+	.course-name-slot {
+		width: 1.9em;       /* ≈ one dish column */
+		justify-content: center;
 	}
 	/* The drag placeholder/shadow the library inserts — show it faintly so the
 	   chef sees where the dish will land, without it looking like a real dish. */
