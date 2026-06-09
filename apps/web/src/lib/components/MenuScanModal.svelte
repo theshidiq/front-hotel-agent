@@ -1066,11 +1066,11 @@
 							</svg>
 						</button>
 
-						<!-- Course header (edit view): name centered. In print/PDF this header
-						     is hidden and the name renders inside the first dish column so it
-						     aligns over it. Long names pre-split into 2 vertical lines. -->
-						<div class="pt-2 pb-1 flex items-start justify-center flex-shrink-0 course-header-box">
-							{#if isEditingName}
+						<!-- Inline name editor: only shown while actively editing. The static
+						     aligned name lives inside the first dish column (below) so it lines
+						     up over that column in BOTH the on-screen preview and print/PDF. -->
+						{#if isEditingName}
+							<div class="pt-2 pb-1 flex items-start justify-center flex-shrink-0 course-header-box print:hidden">
 								<div
 									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center"
 									contenteditable="plaintext-only"
@@ -1084,23 +1084,8 @@
 									tabindex="0"
 									aria-label="コース名"
 								>{course.name}</div>
-							{:else}
-								<div
-									class="flex flex-row-reverse gap-1 cursor-text hover:bg-stone-50/60 rounded transition-colors px-1"
-									onclick={() => { editingNameIdx = idx; }}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => { if (e.key === 'Enter') editingNameIdx = idx; }}
-									aria-label="コース名を編集"
-								>
-									{#each nameLines as line}
-										<div class="tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">
-											{line}
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</div>
+							</div>
+						{/if}
 
 						{#if isCapturing}
 							<!-- PDF/PRINT view: pre-balanced groups, each its own vertical sub-column
@@ -1114,7 +1099,11 @@
 							>
 								{#if dishCount > 0 && groups.length <= 1}
 									<div class="flex flex-col items-center">
-										<div class="cap-course-name tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{course.name}</div>
+										<div class="cap-course-name">
+											{#each nameLines as line}
+												<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+											{/each}
+										</div>
 										<div class="dish-ichi-row flex items-center"><span class="font-serif-jp text-xl text-stone-800">一</span></div>
 										<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
 											{groups[0].join('　')}
@@ -1124,7 +1113,11 @@
 									{#each groups as group, gIdx}
 										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 2}em;">
 											{#if gIdx === 0}
-												<div class="cap-course-name tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{course.name}</div>
+												<div class="cap-course-name">
+													{#each nameLines as line}
+														<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+													{/each}
+												</div>
 											{/if}
 											<div class="dish-ichi-row flex items-center">
 												{#if gIdx === 0}<span class="font-serif-jp text-xl text-stone-800">一</span>{/if}
@@ -1152,16 +1145,48 @@
 								aria-label="料理を編集"
 							>
 								{#if dishCount === 0}
-									<button
-										onclick={() => openDescEditor(idx)}
-										class="dish-placeholder tategaki font-serif-jp text-base text-stone-300 hover:text-stone-500 transition-colors py-2"
-										aria-label="料理を追加"
-									>料理詳細...</button>
+									<div class="flex flex-col items-center">
+										{#if !isEditingName}
+											<div
+												class="cap-course-name cursor-text hover:bg-stone-50/60 rounded transition-colors"
+												onclick={() => { editingNameIdx = idx; }}
+												role="button"
+												tabindex="0"
+												onkeydown={(e) => { if (e.key === 'Enter') editingNameIdx = idx; }}
+												aria-label="コース名を編集"
+											>
+												{#each nameLines as line}
+													<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+												{/each}
+											</div>
+										{/if}
+										<button
+											onclick={() => openDescEditor(idx)}
+											class="dish-placeholder tategaki font-serif-jp text-base text-stone-300 hover:text-stone-500 transition-colors py-2"
+											aria-label="料理を追加"
+										>料理詳細...</button>
+									</div>
 								{/if}
 								{#each course.cols as col, colIdx (colIdx)}
 									<!-- First/rightmost column sits highest = the "main".
 									     Every other column drops by the SAME single step. -->
 									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : 2}em;">
+										{#if colIdx === 0 && !isEditingName}
+											<!-- Aligned course name over the first column (WYSIWYG with print).
+											     Click to edit. Long names split into 2 tight vertical lines. -->
+											<div
+												class="cap-course-name cursor-text hover:bg-stone-50/60 rounded transition-colors"
+												onclick={() => { editingNameIdx = idx; }}
+												role="button"
+												tabindex="0"
+												onkeydown={(e) => { if (e.key === 'Enter') editingNameIdx = idx; }}
+												aria-label="コース名を編集"
+											>
+												{#each nameLines as line}
+													<div class="cap-name-line tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+												{/each}
+											</div>
+										{/if}
 										<div class="dish-ichi-row flex items-center">
 											{#if colIdx === 0}<span class="font-serif-jp text-xl text-stone-800 select-none">一</span>{/if}
 										</div>
@@ -1451,18 +1476,21 @@
 	:global(.a4-paper.capturing) .border-l {
 		border-left: none !important;
 	}
-	/* In capture/print the course name renders INSIDE the first dish column
-	   (cap-course-name) so it aligns over it — hide the separate header so the
-	   name isn't shown twice. The in-column name only shows during capture. */
-	:global(.a4-paper.capturing) .course-header-box {
-		display: none !important;
-	}
+	/* The course name renders INSIDE the first dish column (cap-course-name) so
+	   it aligns over that column — both on screen (edit) AND in print/PDF. This
+	   keeps WYSIWYG: the preview matches the printed sheet. The old centered
+	   header is no longer rendered. Long names split into 2 tight side-by-side
+	   vertical lines (Japanese order: first half right, second half left). */
 	.cap-course-name {
-		display: none;        /* only shown in capture/print (rule below) */
-		margin-bottom: 0.4em;
+		display: flex;
+		flex-direction: row-reverse;   /* first half on the right */
+		justify-content: center;
+		align-items: flex-start;
+		gap: 0;                        /* tight — the two halves sit flush */
+		margin-bottom: 0.9em;          /* breathing room before 一 / dishes */
 	}
-	:global(.a4-paper.capturing) .cap-course-name {
-		display: block;
+	.cap-course-name .cap-name-line {
+		line-height: 1;
 	}
 
 	.font-serif-jp {
