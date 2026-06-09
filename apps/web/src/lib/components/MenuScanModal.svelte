@@ -102,6 +102,7 @@
 	let fileInput: HTMLInputElement = $state() as HTMLInputElement;
 	let dragOver = $state(false);
 	let editingNameIdx: number | null = $state(null);  // which course's name is being edited
+	let editingTitle = $state(false);                  // whether the menu title is being edited
 
 	// ── Fit-to-width scaling ──
 	// The paper has a fixed natural width so the layout is identical on every
@@ -251,10 +252,10 @@
 		syncCoursesFromWork();
 	});
 
-	// Auto-save draft whenever courses OR the kids box change (debounced 2s)
+	// Auto-save draft whenever courses, the title, OR the kids box change (debounced)
 	$effect(() => {
-		// touch kids state so editing only the kids box also schedules a save
-		void kidsName; void showKidsBox; JSON.stringify(kidsItems);
+		// touch reactive state so editing any of these schedules a save
+		void menuTitle; void kidsName; void showKidsBox; JSON.stringify(kidsItems);
 		void courses;
 		if (step !== 'review' || courses.length === 0) return;
 		if (saveTimer) clearTimeout(saveTimer);
@@ -1003,12 +1004,34 @@
 			<div bind:this={paperEl} class="a4-paper bg-white shadow-lg border border-stone-200 flex flex-col relative pt-6 px-4" style="width: {paperNaturalW ? paperNaturalW + 'px' : 'max-content'}; transform: scale({paperScale}); transform-origin: top left;">
 				<div class="scan-paper-columns flex" dir="rtl">
 
-					<!-- Title column (far right) — top-aligned to match course columns, larger font -->
+					<!-- Title column (far right) — click to edit the menu title. -->
 					<div class="flex-none flex flex-col border-l border-stone-200 paper-title-col" dir="ltr">
 						<div class="flex-1 flex items-start justify-center px-1 pt-[8%]">
-							<div class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center">
-								{displayTitle}
-							</div>
+							{#if editingTitle}
+								<div
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center outline-none bg-orange-50/40 rounded px-1"
+									contenteditable="plaintext-only"
+									spellcheck="false"
+									use:autoFocusContentEditable
+									onblur={(e) => {
+										const v = (e.target as HTMLElement).innerText.trim();
+										menuTitle = v || null;
+										editingTitle = false;
+									}}
+									role="textbox"
+									tabindex="0"
+									aria-label="献立タイトル"
+								>{menuTitle || selectedGroupName}</div>
+							{:else}
+								<div
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 print:cursor-default print:hover:bg-transparent"
+									onclick={() => { if (!isCapturing) editingTitle = true; }}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => { if (e.key === 'Enter') editingTitle = true; }}
+									aria-label="献立タイトルを編集"
+								>{displayTitle}</div>
+							{/if}
 						</div>
 					</div>
 
