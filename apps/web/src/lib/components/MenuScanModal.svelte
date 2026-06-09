@@ -1487,16 +1487,18 @@
 		position: absolute;            /* sits ABOVE the column, occupies no layout
 		                                  height — so column 1's 一/dishes stay at the
 		                                  same baseline as every other column. */
-		bottom: calc(100% + 0.25em);   /* sit tight just above the 一 row. Names are
-		                                  all 2–3 chars tall so bottom-anchoring keeps
-		                                  the header row even AND close to the dishes —
-		                                  including the 2-line 本日の肉料理. */
+		/* Fixed header zone: every course name occupies the SAME box (height of the
+		   tallest, ~3-char, line) pinned at a fixed top. Names top-align, so the
+		   header row is perfectly even across courses regardless of name length;
+		   the box bottom sits just above the 一 so dishes stay close. */
+		bottom: calc(100% + 0.25em);
+		height: 4.6em;
 		left: 50%;
 		transform: translateX(-50%);
 		display: flex;
 		flex-direction: row-reverse;   /* first half on the right */
 		justify-content: center;
-		align-items: flex-end;         /* both halves of a split name share a bottom */
+		align-items: flex-start;       /* names hang from the shared TOP line → even row */
 		gap: 0;                        /* tight — the two halves sit flush */
 		white-space: nowrap;
 	}
