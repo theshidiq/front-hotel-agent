@@ -1052,7 +1052,7 @@
 					{@const groups = course.cols.map((col) => col.map((d) => d.text))}
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditingName = editingNameIdx === idx}
-					{@const stepEm = 2.5}
+					{@const stepEm = 1.5}
 					<div
 						class="flex-1 min-w-0 min-h-0 border-l border-stone-200 flex flex-col relative group course-col overflow-hidden"
 						dir="ltr"
