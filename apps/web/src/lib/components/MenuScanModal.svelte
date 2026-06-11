@@ -6,17 +6,18 @@
 		menuScanDeleteDraft,
 		menuScanGetDrafts,
 	} from '$lib/api';
-	import type { ScannedMenuCourse, MenuGroup, MenuScanDraft } from '$lib/api';
+	import type { ScannedMenuCourse, MenuGroup, MenuScanDraft, SeasonalMenu } from '$lib/api';
 	import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, type DndEvent } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';
 
 	interface Props {
 		menuGroups: MenuGroup[];
+		seasonalMenus?: SeasonalMenu[];
 		onConfirmed: () => void;
 		onClose: () => void;
 	}
 
-	let { menuGroups, onConfirmed, onClose }: Props = $props();
+	let { menuGroups, seasonalMenus = [], onConfirmed, onClose }: Props = $props();
 
 	type Step = 'upload' | 'loading' | 'review' | 'saving';
 
@@ -95,6 +96,22 @@
 		});
 	}
 	let selectedGroupId: string = $state(menuGroups[0]?.id ?? '');
+
+	// Season is inferred from the menu title the chef hand-wrote (e.g. "令和八年 夏の
+	// 献立 一般" → 夏), not picked. The chef already writes it; making him choose again
+	// is redundant friction. If the title names a season that doesn't exist yet, the
+	// backend auto-creates it on confirm. Group stays an explicit pick (the title's
+	// variant word doesn't reliably map to a group name).
+	const SEASON_KANJI = ['春', '夏', '秋', '冬'];
+	const inferredSeasonName = $derived(
+		SEASON_KANJI.find((s) => (menuTitle ?? '').includes(s)) ?? null
+	);
+	// Resolve the inferred name to an existing season id (empty if it must be created).
+	const selectedSeasonId = $derived(
+		inferredSeasonName
+			? (seasonalMenus.find((s) => s.name === inferredSeasonName)?.id ?? '')
+			: ''
+	);
 	let sessionId: string | null = $state(null);
 	let imageUrl: string = $state('');
 	let error: string | null = $state(null);
@@ -210,6 +227,28 @@
 	}
 
 	const displayTitle = $derived(toFullWidthDigits(menuTitle || selectedGroupName));
+
+	// Split text into segments so Latin/romaji words (e.g. "OIL") can render
+	// horizontally upright (tate-chu-yoko, 縦中横) inside vertical Japanese text,
+	// while everything else (kana, kanji, ー, punctuation) keeps the default
+	// vertical 'mixed' orientation. Only runs of up to 4 Latin chars are combined
+	// upright; longer runs would squash, so they fall back to normal flow.
+	type TextSeg = { t: string; tcy: boolean };
+	function tateChuYoko(text: string): TextSeg[] {
+		const segs: TextSeg[] = [];
+		// Match runs of ASCII letters/digits (a romaji word or abbreviation).
+		const re = /[A-Za-z0-9][A-Za-z0-9.&'-]*/g;
+		let last = 0;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(text)) !== null) {
+			if (m.index > last) segs.push({ t: text.slice(last, m.index), tcy: false });
+			// Combine upright only if short enough to fit one slot; else leave inline.
+			segs.push({ t: m[0], tcy: m[0].length <= 4 });
+			last = m.index + m[0].length;
+		}
+		if (last < text.length) segs.push({ t: text.slice(last), tcy: false });
+		return segs;
+	}
 
 	// Drafts for the currently selected group
 	const groupDrafts = $derived(
@@ -412,8 +451,16 @@
 	// the print dialog) so the two outputs are identical.
 	async function nativePrint() {
 		isCapturing = true;
+		// Add the .capturing class too, so the capture-only CSS (hide the course
+		// header, show the in-column course name aligned over the first dish column)
+		// applies to native print — not just to the html2canvas path.
+		paperEl?.classList.add('capturing');
 		await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-		const restore = () => { isCapturing = false; window.removeEventListener('afterprint', restore); };
+		const restore = () => {
+			isCapturing = false;
+			paperEl?.classList.remove('capturing');
+			window.removeEventListener('afterprint', restore);
+		};
 		window.addEventListener('afterprint', restore);
 		try {
 			window.print();
@@ -660,7 +707,9 @@
 					category: c.category,
 				})),
 				menu_group_id: selectedGroupId,
-				seasonal_menu_id: null,
+				seasonal_menu_id: selectedSeasonId || null,
+				season_name: inferredSeasonName,
+				menu_title: menuTitle,
 				draft_session_id: sessionId,
 			});
 			onConfirmed();
@@ -702,6 +751,10 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
+<!-- Render vertical text with short romaji/Latin runs kept horizontal & upright
+     (tate-chu-yoko). Japanese chars, ー, and punctuation render normally. -->
+{#snippet vtext(text: string)}{#each tateChuYoko(text) as seg}{#if seg.tcy}<span class="tcy">{seg.t}</span>{:else}{seg.t}{/if}{/each}{/snippet}
+
 <div class="menu-scan-modal fixed inset-0 bg-stone-100 z-[60] flex flex-col overflow-hidden font-sans">
 
 	<!-- ── Header ── -->
@@ -740,6 +793,13 @@
 					{/each}
 				</select>
 			</div>
+			{#if inferredSeasonName}
+			<div class="h-6 w-px bg-stone-200"></div>
+			<div class="flex flex-col gap-0.5">
+				<span class="text-[8px] uppercase tracking-widest text-stone-400">季節（自動）</span>
+				<span class="text-xs font-medium text-stone-700">{inferredSeasonName}</span>
+			</div>
+			{/if}
 			{#if savingDraft}
 			<span class="text-[9px] text-stone-400 tracking-wide animate-pulse">下書き保存中...</span>
 			{:else if sessionId}
@@ -846,6 +906,7 @@
 					{/each}
 				</select>
 			</div>
+
 
 			<!-- Drop zone -->
 			<div
@@ -1009,13 +1070,15 @@
 						<div class="flex-1 flex items-start justify-center px-1 pt-[8%]">
 							{#if editingTitle}
 								<div
-									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center outline-none bg-orange-50/40 rounded px-1"
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center outline-none bg-orange-50/40 rounded px-1 whitespace-break-spaces"
 									contenteditable="plaintext-only"
 									spellcheck="false"
 									use:autoFocusContentEditable
 									onblur={(e) => {
-										const v = (e.target as HTMLElement).innerText.trim();
-										menuTitle = v || null;
+										// Keep the title exactly as typed — including spaces the chef
+										// adds for layout. Only fall back to null when it's blank.
+										const v = (e.target as HTMLElement).innerText.replace(/\n/g, '');
+										menuTitle = v.trim() ? v : null;
 										editingTitle = false;
 									}}
 									role="textbox"
@@ -1024,7 +1087,7 @@
 								>{menuTitle || selectedGroupName}</div>
 							{:else}
 								<div
-									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 print:cursor-default print:hover:bg-transparent"
+									class="tategaki font-serif-jp text-4xl font-light text-stone-800 leading-loose tracking-[0.25em] text-center cursor-text hover:bg-stone-50/60 rounded transition-colors px-1 print:cursor-default print:hover:bg-transparent whitespace-break-spaces"
 									onclick={() => { if (!isCapturing) editingTitle = true; }}
 									role="button"
 									tabindex="0"
@@ -1042,6 +1105,7 @@
 					{@const groups = course.cols.map((col) => col.map((d) => d.text))}
 					{@const nameLines = splitCourseName(course.name)}
 					{@const isEditingName = editingNameIdx === idx}
+					{@const stepEm = 1.5}
 					<div
 						class="flex-1 min-w-0 min-h-0 border-l border-stone-200 flex flex-col relative group course-col overflow-hidden"
 						dir="ltr"
@@ -1058,11 +1122,11 @@
 							</svg>
 						</button>
 
-						<!-- Course header — long names pre-split into 2 vertical lines (right-to-left)
-						     so the 一 separator stays at the same height across all columns.
-						     Click → flat edit mode; blur → saves & re-splits. -->
-						<div class="pt-2 pb-1 flex items-start justify-center flex-shrink-0 course-header-box">
-							{#if isEditingName}
+						<!-- Inline name editor: only shown while actively editing. The static
+						     aligned name lives inside the first dish column (below) so it lines
+						     up over that column in BOTH the on-screen preview and print/PDF. -->
+						{#if isEditingName}
+							<div class="pt-2 pb-1 flex items-start justify-center flex-shrink-0 course-header-box print:hidden">
 								<div
 									class="tategaki font-serif-jp text-2xl font-normal text-stone-900 outline-none bg-orange-50/40 rounded px-1 tracking-[0.15em] text-center"
 									contenteditable="plaintext-only"
@@ -1076,23 +1140,8 @@
 									tabindex="0"
 									aria-label="コース名"
 								>{course.name}</div>
-							{:else}
-								<div
-									class="flex flex-row-reverse gap-1 cursor-text hover:bg-stone-50/60 rounded transition-colors px-1"
-									onclick={() => { editingNameIdx = idx; }}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => { if (e.key === 'Enter') editingNameIdx = idx; }}
-									aria-label="コース名を編集"
-								>
-									{#each nameLines as line}
-										<div class="tategaki font-serif-jp text-2xl font-normal text-stone-900 tracking-[0.15em]">
-											{line}
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</div>
+							</div>
+						{/if}
 
 						{#if isCapturing}
 							<!-- PDF/PRINT view: pre-balanced groups, each its own vertical sub-column
@@ -1101,24 +1150,36 @@
 							     over that column; the fixed .dish-ichi-row height keeps it aligned
 							     across courses. -->
 							<div
-								class="flex-1 px-2 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
+								class="flex-1 px-2 pt-20 overflow-hidden {groups.length <= 1 ? 'flex justify-center' : 'flex flex-row-reverse justify-center items-start gap-0'}"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 							>
 								{#if dishCount > 0 && groups.length <= 1}
-									<div class="flex flex-col items-center">
+									<div class="relative flex flex-col items-center">
+										<div class="cap-course-name is-single">
+											{#each nameLines as line}
+												<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+											{/each}
+										</div>
 										<div class="dish-ichi-row flex items-center"><span class="font-serif-jp text-xl text-stone-800">一</span></div>
 										<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
-											{groups[0].join('　')}
+											{@render vtext(groups[0].join('　'))}
 										</div>
 									</div>
 								{:else if dishCount > 0}
 									{#each groups as group, gIdx}
-										<div class="flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : 2}em;">
+										<div class="relative flex flex-col items-center" style="margin-top: {gIdx === 0 ? 0 : stepEm}em;">
+											{#if gIdx === 0}
+												<div class="cap-course-name" class:is-single={nameLines.length === 1}>
+													{#each nameLines as line}
+														<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+													{/each}
+												</div>
+											{/if}
 											<div class="dish-ichi-row flex items-center">
 												{#if gIdx === 0}<span class="font-serif-jp text-xl text-stone-800">一</span>{/if}
 											</div>
 											<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
-												{group.join('　')}
+												{@render vtext(group.join('　'))}
 											</div>
 										</div>
 									{/each}
@@ -1132,7 +1193,7 @@
 							     The 一 sits in a fixed-height row atop the first column so it's
 							     centered over the dish AND aligned across courses. -->
 							<div
-								class="flex-1 px-2 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
+								class="flex-1 px-2 pt-20 overflow-auto flex flex-row-reverse justify-center items-start gap-0.5 cursor-pointer"
 								style="padding-bottom: {isUnderKidsBox ? '30%' : '1rem'}"
 								onclick={(e) => { if (e.target === e.currentTarget) openDescEditor(idx); }}
 								role="button"
@@ -1140,16 +1201,49 @@
 								aria-label="料理を編集"
 							>
 								{#if dishCount === 0}
-									<button
-										onclick={() => openDescEditor(idx)}
-										class="dish-placeholder tategaki font-serif-jp text-base text-stone-300 hover:text-stone-500 transition-colors py-2"
-										aria-label="料理を追加"
-									>料理詳細...</button>
+									<div class="relative flex flex-col items-center">
+										{#if !isEditingName}
+											<div
+												class="cap-course-name is-single cursor-text hover:bg-stone-50/60 rounded transition-colors"
+												onclick={() => { editingNameIdx = idx; }}
+												role="button"
+												tabindex="0"
+												onkeydown={(e) => { if (e.key === 'Enter') editingNameIdx = idx; }}
+												aria-label="コース名を編集"
+											>
+												{#each nameLines as line}
+													<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+												{/each}
+											</div>
+										{/if}
+										<button
+											onclick={() => openDescEditor(idx)}
+											class="dish-placeholder tategaki font-serif-jp text-base text-stone-300 hover:text-stone-500 transition-colors py-2"
+											aria-label="料理を追加"
+										>料理詳細...</button>
+									</div>
 								{/if}
 								{#each course.cols as col, colIdx (colIdx)}
-									<!-- First/rightmost column sits highest = the "main".
-									     Every other column drops by the SAME single step. -->
-									<div class="flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : 2}em;">
+									<!-- First/rightmost column sits highest = the "main". Later columns
+									     clear the course name (only the first column carries it) then step
+									     down by an increasing amount, giving the staircase look. -->
+									<div class="relative flex flex-col items-center" style="margin-top: {colIdx === 0 ? 0 : stepEm}em;">
+										{#if colIdx === 0 && !isEditingName}
+											<!-- Aligned course name over the first column (WYSIWYG with print).
+											     Click to edit. Long names split into 2 tight vertical lines. -->
+											<div
+												class="cap-course-name cursor-text hover:bg-stone-50/60 rounded transition-colors" class:is-single={nameLines.length === 1 || course.cols.length <= 1}
+												onclick={() => { editingNameIdx = idx; }}
+												role="button"
+												tabindex="0"
+												onkeydown={(e) => { if (e.key === 'Enter') editingNameIdx = idx; }}
+												aria-label="コース名を編集"
+											>
+												{#each nameLines as line}
+													<div class="cap-name-line tategaki font-serif-jp text-xl font-normal text-stone-900 tracking-[0.15em]">{line}</div>
+												{/each}
+											</div>
+										{/if}
 										<div class="dish-ichi-row flex items-center">
 											{#if colIdx === 0}<span class="font-serif-jp text-xl text-stone-800 select-none">一</span>{/if}
 										</div>
@@ -1170,7 +1264,7 @@
 												tabindex="0"
 												aria-label="{dish.text} を編集"
 											>
-												{dish.text}
+												{@render vtext(dish.text)}
 											</div>
 										{/each}
 									</div>
@@ -1259,19 +1353,26 @@
 								<input
 									type="text"
 									bind:value={kidsItems[kidsIdx]}
-									onblur={() => { editingKidsItemIdx = null; }}
-									onkeydown={(e) => { if (e.key === 'Enter') editingKidsItemIdx = null; }}
+									placeholder="メニュー名を入力"
+									onblur={() => {
+										// Drop the item if left blank, so empty bullets don't linger.
+										if (!kidsItems[kidsIdx].trim()) {
+											kidsItems = kidsItems.filter((_, i) => i !== kidsIdx);
+										}
+										editingKidsItemIdx = null;
+									}}
+									onkeydown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur(); }}
 									use:autoFocusInput
-									class="font-serif-jp text-base text-stone-700 bg-white outline-none border border-stone-300 rounded px-1.5 py-0.5"
+									class="font-serif-jp text-base text-stone-700 bg-white outline-none border border-stone-300 rounded px-2 py-1 w-full min-w-[160px] placeholder:text-stone-300"
 								/>
 							{:else}
 								<div class="group/item flex items-start gap-1">
 									<span class="text-stone-500 text-base leading-tight font-serif-jp">・</span>
 									<button
 										onclick={() => { editingKidsItemIdx = kidsIdx; }}
-										class="font-serif-jp text-base leading-tight text-stone-700 hover:bg-stone-50 rounded px-1 py-0.5 transition-colors text-left tracking-wide whitespace-nowrap"
+										class="font-serif-jp text-base leading-tight hover:bg-stone-50 rounded px-1 py-0.5 transition-colors text-left tracking-wide whitespace-nowrap {item.trim() ? 'text-stone-700' : 'text-stone-300'}"
 									>
-										{item}
+										{item.trim() ? item : 'メニュー名を入力'}
 									</button>
 									<button
 										onclick={() => { kidsItems = kidsItems.filter((_, i) => i !== kidsIdx); }}
@@ -1439,6 +1540,49 @@
 	:global(.a4-paper.capturing) .border-l {
 		border-left: none !important;
 	}
+	/* The course name renders INSIDE the first dish column (cap-course-name) so
+	   it aligns over that column — both on screen (edit) AND in print/PDF. This
+	   keeps WYSIWYG: the preview matches the printed sheet. The old centered
+	   header is no longer rendered. Long names split into 2 tight side-by-side
+	   vertical lines (Japanese order: first half right, second half left). */
+	.cap-course-name {
+		position: absolute;            /* sits ABOVE the column, occupies no layout
+		                                  height — so column 1's 一/dishes stay at the
+		                                  same baseline as every other column. */
+		/* Fixed header zone. The box font-size matches the NAME size (text-xl =
+		   1.25rem, the SAME as the dishes) so the names and dish text align and the
+		   box's em units track the actual glyph height.
+		   Height = 3 lines tall (the longest split half); names top-align so the
+		   header row is even across courses; bottom sits just above the 一. */
+		font-size: 1.25rem;            /* = text-xl, same as the dish text */
+		bottom: calc(100% + 0.15em);
+		height: 3.2em;                 /* 3 chars tall at line-height 1, + slack */
+		/* Right-anchor the name to the first dish column's right edge. Each name
+		   half is a 1-char-wide vertical line — the same width as a dish column —
+		   so half 1 sits over dish-col-1 and half 2 over dish-col-2, reading as one
+		   aligned 2-column block (what the chef wants for 本日の肉料理). */
+		right: 0;
+		display: flex;
+		flex-direction: row-reverse;   /* first half on the right */
+		justify-content: flex-start;
+		align-items: flex-start;       /* names hang from the shared TOP line → even row */
+		gap: 0;                        /* tight — the two halves sit flush */
+		white-space: nowrap;
+	}
+	/* Single-line names (≤3 chars) stay centered over their one column. */
+	.cap-course-name.is-single {
+		right: auto;
+		left: 50%;
+		transform: translateX(-50%);
+		justify-content: center;
+	}
+	.cap-course-name .cap-name-line {
+		font-size: 1em;                /* inherit the box font — drop the text-xl
+		                                  utility's own sizing so em math is consistent */
+		line-height: 1;
+		width: 1.25em;                 /* one column width, matching a dish column */
+		text-align: center;
+	}
 
 	.font-serif-jp {
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
@@ -1448,6 +1592,15 @@
 		writing-mode: vertical-rl;
 		text-orientation: mixed;
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
+	}
+
+	/* tate-chu-yoko: a short romaji/Latin run rendered horizontal & upright in one
+	   vertical slot, so e.g. "OIL" reads left-to-right instead of rotated. Only
+	   applied to Latin runs (see tateChuYoko()); the rest of the line is unaffected,
+	   so kana, kanji, ー and punctuation keep their normal vertical orientation. */
+	:global(.tategaki .tcy) {
+		text-combine-upright: all;
+		-webkit-text-combine: horizontal;   /* Safari */
 	}
 
 	/* Horizontal text (e.g. the small edit button under a vertical dish list) */
