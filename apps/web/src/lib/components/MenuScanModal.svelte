@@ -1370,9 +1370,9 @@
 									<span class="text-stone-500 text-base leading-tight font-serif-jp">・</span>
 									<button
 										onclick={() => { editingKidsItemIdx = kidsIdx; }}
-										class="font-serif-jp text-base leading-tight text-stone-700 hover:bg-stone-50 rounded px-1 py-0.5 transition-colors text-left tracking-wide whitespace-nowrap"
+										class="font-serif-jp text-base leading-tight hover:bg-stone-50 rounded px-1 py-0.5 transition-colors text-left tracking-wide whitespace-nowrap {item.trim() ? 'text-stone-700' : 'text-stone-300'}"
 									>
-										{item}
+										{item.trim() ? item : 'メニュー名を入力'}
 									</button>
 									<button
 										onclick={() => { kidsItems = kidsItems.filter((_, i) => i !== kidsIdx); }}
