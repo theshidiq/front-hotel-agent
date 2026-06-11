@@ -6,17 +6,18 @@
 		menuScanDeleteDraft,
 		menuScanGetDrafts,
 	} from '$lib/api';
-	import type { ScannedMenuCourse, MenuGroup, MenuScanDraft } from '$lib/api';
+	import type { ScannedMenuCourse, MenuGroup, MenuScanDraft, SeasonalMenu } from '$lib/api';
 	import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, type DndEvent } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';
 
 	interface Props {
 		menuGroups: MenuGroup[];
+		seasonalMenus?: SeasonalMenu[];
 		onConfirmed: () => void;
 		onClose: () => void;
 	}
 
-	let { menuGroups, onConfirmed, onClose }: Props = $props();
+	let { menuGroups, seasonalMenus = [], onConfirmed, onClose }: Props = $props();
 
 	type Step = 'upload' | 'loading' | 'review' | 'saving';
 
@@ -95,6 +96,22 @@
 		});
 	}
 	let selectedGroupId: string = $state(menuGroups[0]?.id ?? '');
+
+	// Season is inferred from the menu title the chef hand-wrote (e.g. "令和八年 夏の
+	// 献立 一般" → 夏), not picked. The chef already writes it; making him choose again
+	// is redundant friction. If the title names a season that doesn't exist yet, the
+	// backend auto-creates it on confirm. Group stays an explicit pick (the title's
+	// variant word doesn't reliably map to a group name).
+	const SEASON_KANJI = ['春', '夏', '秋', '冬'];
+	const inferredSeasonName = $derived(
+		SEASON_KANJI.find((s) => (menuTitle ?? '').includes(s)) ?? null
+	);
+	// Resolve the inferred name to an existing season id (empty if it must be created).
+	const selectedSeasonId = $derived(
+		inferredSeasonName
+			? (seasonalMenus.find((s) => s.name === inferredSeasonName)?.id ?? '')
+			: ''
+	);
 	let sessionId: string | null = $state(null);
 	let imageUrl: string = $state('');
 	let error: string | null = $state(null);
@@ -210,6 +227,28 @@
 	}
 
 	const displayTitle = $derived(toFullWidthDigits(menuTitle || selectedGroupName));
+
+	// Split text into segments so Latin/romaji words (e.g. "OIL") can render
+	// horizontally upright (tate-chu-yoko, 縦中横) inside vertical Japanese text,
+	// while everything else (kana, kanji, ー, punctuation) keeps the default
+	// vertical 'mixed' orientation. Only runs of up to 4 Latin chars are combined
+	// upright; longer runs would squash, so they fall back to normal flow.
+	type TextSeg = { t: string; tcy: boolean };
+	function tateChuYoko(text: string): TextSeg[] {
+		const segs: TextSeg[] = [];
+		// Match runs of ASCII letters/digits (a romaji word or abbreviation).
+		const re = /[A-Za-z0-9][A-Za-z0-9.&'-]*/g;
+		let last = 0;
+		let m: RegExpExecArray | null;
+		while ((m = re.exec(text)) !== null) {
+			if (m.index > last) segs.push({ t: text.slice(last, m.index), tcy: false });
+			// Combine upright only if short enough to fit one slot; else leave inline.
+			segs.push({ t: m[0], tcy: m[0].length <= 4 });
+			last = m.index + m[0].length;
+		}
+		if (last < text.length) segs.push({ t: text.slice(last), tcy: false });
+		return segs;
+	}
 
 	// Drafts for the currently selected group
 	const groupDrafts = $derived(
@@ -668,7 +707,9 @@
 					category: c.category,
 				})),
 				menu_group_id: selectedGroupId,
-				seasonal_menu_id: null,
+				seasonal_menu_id: selectedSeasonId || null,
+				season_name: inferredSeasonName,
+				menu_title: menuTitle,
 				draft_session_id: sessionId,
 			});
 			onConfirmed();
@@ -710,6 +751,10 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
+<!-- Render vertical text with short romaji/Latin runs kept horizontal & upright
+     (tate-chu-yoko). Japanese chars, ー, and punctuation render normally. -->
+{#snippet vtext(text: string)}{#each tateChuYoko(text) as seg}{#if seg.tcy}<span class="tcy">{seg.t}</span>{:else}{seg.t}{/if}{/each}{/snippet}
+
 <div class="menu-scan-modal fixed inset-0 bg-stone-100 z-[60] flex flex-col overflow-hidden font-sans">
 
 	<!-- ── Header ── -->
@@ -748,6 +793,13 @@
 					{/each}
 				</select>
 			</div>
+			{#if inferredSeasonName}
+			<div class="h-6 w-px bg-stone-200"></div>
+			<div class="flex flex-col gap-0.5">
+				<span class="text-[8px] uppercase tracking-widest text-stone-400">季節（自動）</span>
+				<span class="text-xs font-medium text-stone-700">{inferredSeasonName}</span>
+			</div>
+			{/if}
 			{#if savingDraft}
 			<span class="text-[9px] text-stone-400 tracking-wide animate-pulse">下書き保存中...</span>
 			{:else if sessionId}
@@ -854,6 +906,7 @@
 					{/each}
 				</select>
 			</div>
+
 
 			<!-- Drop zone -->
 			<div
@@ -1109,7 +1162,7 @@
 										</div>
 										<div class="dish-ichi-row flex items-center"><span class="font-serif-jp text-xl text-stone-800">一</span></div>
 										<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
-											{groups[0].join('　')}
+											{@render vtext(groups[0].join('　'))}
 										</div>
 									</div>
 								{:else if dishCount > 0}
@@ -1126,7 +1179,7 @@
 												{#if gIdx === 0}<span class="font-serif-jp text-xl text-stone-800">一</span>{/if}
 											</div>
 											<div class="dish-display tategaki font-serif-jp text-xl text-stone-700 h-fit">
-												{group.join('　')}
+												{@render vtext(group.join('　'))}
 											</div>
 										</div>
 									{/each}
@@ -1211,7 +1264,7 @@
 												tabindex="0"
 												aria-label="{dish.text} を編集"
 											>
-												{dish.text}
+												{@render vtext(dish.text)}
 											</div>
 										{/each}
 									</div>
@@ -1532,6 +1585,15 @@
 		writing-mode: vertical-rl;
 		text-orientation: mixed;
 		font-family: 'Noto Serif JP', 'YuMincho', 'Hiragino Mincho Pro', Georgia, serif;
+	}
+
+	/* tate-chu-yoko: a short romaji/Latin run rendered horizontal & upright in one
+	   vertical slot, so e.g. "OIL" reads left-to-right instead of rotated. Only
+	   applied to Latin runs (see tateChuYoko()); the rest of the line is unaffected,
+	   so kana, kanji, ー and punctuation keep their normal vertical orientation. */
+	:global(.tategaki .tcy) {
+		text-combine-upright: all;
+		-webkit-text-combine: horizontal;   /* Safari */
 	}
 
 	/* Horizontal text (e.g. the small edit button under a vertical dish list) */
