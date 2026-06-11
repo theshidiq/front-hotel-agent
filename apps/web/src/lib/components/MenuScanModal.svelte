@@ -1353,10 +1353,17 @@
 								<input
 									type="text"
 									bind:value={kidsItems[kidsIdx]}
-									onblur={() => { editingKidsItemIdx = null; }}
-									onkeydown={(e) => { if (e.key === 'Enter') editingKidsItemIdx = null; }}
+									placeholder="メニュー名を入力"
+									onblur={() => {
+										// Drop the item if left blank, so empty bullets don't linger.
+										if (!kidsItems[kidsIdx].trim()) {
+											kidsItems = kidsItems.filter((_, i) => i !== kidsIdx);
+										}
+										editingKidsItemIdx = null;
+									}}
+									onkeydown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur(); }}
 									use:autoFocusInput
-									class="font-serif-jp text-base text-stone-700 bg-white outline-none border border-stone-300 rounded px-1.5 py-0.5"
+									class="font-serif-jp text-base text-stone-700 bg-white outline-none border border-stone-300 rounded px-2 py-1 w-full min-w-[160px] placeholder:text-stone-300"
 								/>
 							{:else}
 								<div class="group/item flex items-start gap-1">
