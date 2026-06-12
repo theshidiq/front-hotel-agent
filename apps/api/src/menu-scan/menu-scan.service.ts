@@ -352,6 +352,49 @@ export class MenuScanService {
     );
     const keptCategories = new Set<string>();
 
+    // ─── ANTI-WIPE FLOOR ───────────────────────────────────────────────────
+    // Defense in depth against data loss: a NON-prune sync must never shrink an
+    // existing course's dish count to a small fraction of what's stored. A stale
+    // / half-loaded / racing payload that suddenly reports far fewer dishes is a
+    // bug, not an intentional edit — reject the WHOLE sync and keep the data.
+    // (Explicit removals come through prune=true, which bypasses this floor.)
+    if (!prune && (existingMenus?.length ?? 0) > 0) {
+      const existingIds = (existingMenus ?? []).map((m) => m.id);
+      const { data: counts } = await supabase
+        .from('menu_dishes')
+        .select('menu_id')
+        .in('menu_id', existingIds);
+      const haveByMenu = new Map<string, number>();
+      for (const r of counts ?? []) {
+        haveByMenu.set(r.menu_id, (haveByMenu.get(r.menu_id) ?? 0) + 1);
+      }
+      const incomingByCategory = new Map<string, number>();
+      for (const c of courseList) {
+        const cat = catByName.get(c.name) ?? c.name;
+        const n = (c.cols ?? []).reduce(
+          (s, col) => s + (col ?? []).filter((d) => (d?.text ?? '').trim()).length,
+          0,
+        );
+        incomingByCategory.set(cat, (incomingByCategory.get(cat) ?? 0) + n);
+      }
+      for (const m of existingMenus ?? []) {
+        const have = haveByMenu.get(m.id) ?? 0;
+        if (have < 3) continue; // tiny courses: nothing meaningful to protect
+        const incoming = incomingByCategory.get(m.category as string) ?? 0;
+        // Block if the payload would drop this course to <50% of stored dishes.
+        // Treat as a no-op (NOT an error): a stale/racing sync shouldn't show the
+        // chef an error, and the next good sync will persist real edits. Existing
+        // data is left untouched.
+        if (incoming < have * 0.5) {
+          this.logger.warn(
+            `ANTI-WIPE: skipping sync for group ${groupId} — course '${m.category}' ` +
+              `would drop ${have}→${incoming} dishes (non-prune). Existing data preserved.`,
+          );
+          return { group_id: groupId, season_id: seasonId, courses: [], skipped: true };
+        }
+      }
+    }
+
     const results: any[] = [];
     let sortOrder = 0;
     for (const course of courseList) {
