@@ -1,14 +1,16 @@
 <script lang="ts">
 	import {
 		menuScanExtract,
-		menuScanConfirm,
-		menuScanSaveDraft,
-		menuScanDeleteDraft,
-		menuScanGetDrafts,
+		menuScanSync,
+		menuScanGetMenus,
+		menuScanGetMenu,
+		menuScanSetDishProduct,
+		getProducts,
 	} from '$lib/api';
-	import type { ScannedMenuCourse, MenuGroup, MenuScanDraft, SeasonalMenu } from '$lib/api';
+	import type { MenuGroup, SeasonalMenu, SavedMenuSummary, Product } from '$lib/api';
 	import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, type DndEvent } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';
+	import { tick } from 'svelte';
 
 	interface Props {
 		menuGroups: MenuGroup[];
@@ -25,16 +27,31 @@
 	let selectedFile: File | null = $state(null);
 	let previewUrl: string | null = $state(null);
 	let menuTitle: string | null = $state(null);
-	let courses: ScannedMenuCourse[] = $state([]);
+	// Serialized print/PDF form of the menu (flat description + string cols).
+	// The rows-backed source of truth is the menu_dishes the sync writes; this
+	// stays only for the on-screen layout, share image, and PDF generation.
+	type PrintCourse = {
+		name: string;
+		reading: string | null;
+		category: string;
+		sort_order: number;
+		description: string | null;
+		cols: string[][];
+	};
+	let courses: PrintCourse[] = $state([]);
 
 	// ── Editable dish model (drag-and-drop source of truth) ──
 	// Each course holds its dishes as STABLE sub-column arrays (cols: Dish[][]).
 	// svelte-dnd-action mutates each column array directly, so the arrays must be
 	// real state (not derived on the fly) — otherwise the drag shadow gets stuck.
 	// `courses` (above) stays the serialized form consumed by save/draft/share/PDF.
-	type Dish = { id: string; text: string };
+	// A dish's `id` is a STABLE UUID — it is the menu_dishes primary key. The
+	// backend diff-upserts by this id, so the id must persist across edits for a
+	// dish's product link (allergens) to survive. New dishes mint a fresh UUID.
+	type Dish = { id: string; text: string; product_id?: string | null };
 	type WorkCourse = {
-		id: string;
+		id: string;            // local-only work id
+		menuId: string | null; // menus.id once the course row exists (null = new)
 		name: string;
 		reading: string | null;
 		category: string;
@@ -42,8 +59,10 @@
 		cols: Dish[][];   // sub-columns, col 0 = first/rightmost
 	};
 	let workCourses: WorkCourse[] = $state([]);
-	let dishIdSeq = 0;
-	const newId = (p: string) => `${p}-${Date.now().toString(36)}-${(dishIdSeq++).toString(36)}`;
+	const uuid = () =>
+		(globalThis.crypto?.randomUUID?.() ??
+			`${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`);
+	const newId = (_p: string) => uuid();
 
 	const DEFAULT_PER_COL = 3;   // default split: 3 dishes per column
 
@@ -57,19 +76,29 @@
 		return cols;
 	}
 
-	// Build the ID'd work model from the serialized courses (called on enter-review).
-	// If the course carries a saved `cols` layout (from a resumed draft), restore
-	// the exact sub-column split; otherwise fall back to the default chunking.
-	function buildWorkCourses(src: ScannedMenuCourse[]): WorkCourse[] {
+	// Build the id'd work model from courses (called on enter-review / re-open).
+	// Accepts both shapes:
+	//  • OCR/extract & saved-menu rows: cols as {id,text}[][] — ids are PRESERVED
+	//    (they are real menu_dishes ids; keeping them is what makes links survive).
+	//  • Legacy draft: cols as string[][] or just a description — ids are minted.
+	function buildWorkCourses(src: any[]): WorkCourse[] {
 		return src.map((c) => {
 			let cols: Dish[][];
-			if (c.cols && c.cols.length > 0 && c.cols.some((col) => col.length > 0)) {
-				cols = c.cols.map((col) => col.map((text) => ({ id: newId('dish'), text })));
+			const hasIdCols =
+				Array.isArray(c.cols) &&
+				c.cols.some((col: any[]) => Array.isArray(col) && col.some((d) => d && typeof d === 'object'));
+			if (hasIdCols) {
+				cols = c.cols.map((col: any[]) =>
+					(col ?? []).map((d) => ({ id: d.id ?? uuid(), text: d.text, product_id: d.product_id ?? null })),
+				);
+			} else if (Array.isArray(c.cols) && c.cols.length > 0 && c.cols.some((col: any[]) => col.length > 0)) {
+				cols = c.cols.map((col: string[]) => (col ?? []).map((text) => ({ id: uuid(), text })));
 			} else {
-				cols = defaultCols(splitItems(c.description).map((text) => ({ id: newId('dish'), text })));
+				cols = defaultCols(splitItems(c.description).map((text) => ({ id: uuid(), text })));
 			}
 			return {
 				id: newId('course'),
+				menuId: c.id ?? null,
 				name: c.name,
 				reading: c.reading,
 				category: c.category,
@@ -95,23 +124,52 @@
 			};
 		});
 	}
+
+	// Rich payload for the rows-as-source-of-truth sync (cols keep {id,text}).
+	// Empty dishes are dropped so they don't become blank rows; the __kids meta
+	// course is excluded here (handled separately, still draft-only).
+	function buildSyncCourses() {
+		return workCourses.map((wc, i) => ({
+			id: wc.menuId ?? undefined,
+			name: wc.name,
+			reading: wc.reading,
+			category: wc.category,
+			sort_order: i + 1,
+			cols: wc.cols.map((col) =>
+				col
+					.filter((d) => (d.text ?? '').trim())
+					.map((d) => ({ id: d.id, text: d.text.trim() })),
+			),
+		}));
+	}
 	let selectedGroupId: string = $state(menuGroups[0]?.id ?? '');
+	let groupTouched = $state(false);  // chef manually changed the group → stop auto-selecting
 
 	// Season is inferred from the menu title the chef hand-wrote (e.g. "令和八年 夏の
 	// 献立 一般" → 夏), not picked. The chef already writes it; making him choose again
 	// is redundant friction. If the title names a season that doesn't exist yet, the
-	// backend auto-creates it on confirm. Group stays an explicit pick (the title's
-	// variant word doesn't reliably map to a group name).
+	// backend auto-creates it on confirm.
 	const SEASON_KANJI = ['春', '夏', '秋', '冬'];
 	const inferredSeasonName = $derived(
 		SEASON_KANJI.find((s) => (menuTitle ?? '').includes(s)) ?? null
 	);
-	// Resolve the inferred name to an existing season id (empty if it must be created).
-	const selectedSeasonId = $derived(
-		inferredSeasonName
-			? (seasonalMenus.find((s) => s.name === inferredSeasonName)?.id ?? '')
-			: ''
-	);
+
+	// Group is also inferred from the title: the chef writes the variant after 献立
+	// (e.g. "…夏の献立 滞在" → 滞在). Space-normalize both sides so messy OCR spacing
+	// ("献立　　滞在", "子供 A  CK70") still matches. If a group with that name exists
+	// we auto-select it; if not, the backend auto-creates it on confirm.
+	const norm = (s: string) => s.replace(/[　\s]+/g, ' ').trim();
+	const inferredGroupName = $derived.by(() => {
+		const t = norm(menuTitle ?? '');
+		const m = t.match(/献立\s*(.+)$/);   // everything after 献立
+		return m ? norm(m[1]) : null;
+	});
+	// Auto-select the matching group when the chef hasn't manually overridden.
+	$effect(() => {
+		if (groupTouched || !inferredGroupName) return;
+		const match = selectableGroups.find((g) => norm(g.name) === inferredGroupName);
+		if (match) selectedGroupId = match.id;
+	});
 	let sessionId: string | null = $state(null);
 	let imageUrl: string = $state('');
 	let error: string | null = $state(null);
@@ -162,20 +220,53 @@
 		return { destroy() { ro.disconnect(); } };
 	}
 
-	// Dish-detail editor popup
-	let descEditorIdx: number | null = $state(null);   // which course's description is open in the editor
-	let descEditorItems: string[] = $state([]);        // working list of dish items
+	// Dish-detail editor popup.
+	// Holds dishes as {id,text,product_id} so ids are PRESERVED on save — a dish's
+	// product link (allergens) must survive editing its sibling rows. New rows get
+	// a fresh UUID; existing rows keep their id (= menu_dishes PK).
+	type EditDish = { id: string; text: string; product_id: string | null };
+	let descEditorIdx: number | null = $state(null);   // which course's dishes are open
+	let descEditorItems: EditDish[] = $state([]);
 	let descEditorItemFocus: number | null = $state(null);  // which item input to autofocus
 
 	function openDescEditor(idx: number) {
-		descEditorItems = workCourses[idx].cols.flat().map((d) => d.text);
-		if (descEditorItems.length === 0) descEditorItems = [''];
+		descEditorItems = workCourses[idx].cols.flat().map((d) => ({
+			id: d.id,
+			text: d.text,
+			product_id: (d as any).product_id ?? null,
+		}));
+		if (descEditorItems.length === 0) {
+			descEditorItems = [{ id: uuid(), text: '', product_id: null }];
+		}
 		descEditorIdx = idx;
 		descEditorItemFocus = descEditorItems.length - 1;
+		linkSearchForDish = null;
+		// Resolve display info for already-linked dishes (product name + allergens).
+		seedDishLinks();
+	}
+
+	// Populate dishLinks for dishes that already carry a product_id, so the popup
+	// shows the linked product + allergens without needing a re-link.
+	async function seedDishLinks() {
+		const linkedIds = descEditorItems.filter((d) => d.product_id);
+		if (linkedIds.length === 0) return;
+		await ensureProducts();
+		const byId = new Map(allProducts.map((p) => [p.id, p]));
+		const next = { ...dishLinks };
+		for (const d of linkedIds) {
+			const p = d.product_id ? byId.get(d.product_id) : null;
+			if (p && !next[d.id]) {
+				next[d.id] = {
+					name: p.name,
+					allergens: p.allergens.map((a) => ({ id: a.id, name: a.name })),
+				};
+			}
+		}
+		dishLinks = next;
 	}
 
 	function addDescItem() {
-		descEditorItems = [...descEditorItems, ''];
+		descEditorItems = [...descEditorItems, { id: uuid(), text: '', product_id: null }];
 		descEditorItemFocus = descEditorItems.length - 1;
 	}
 
@@ -185,19 +276,111 @@
 
 	function saveDescEditor() {
 		if (descEditorIdx === null) return;
-		// The editor is a flat text list; re-apply the default column split.
-		// (Fine column arrangement is done by dragging dishes between columns.)
+		// Keep each dish's id (and product link); re-apply the default column split.
+		// Fine column arrangement is still done by dragging dishes between columns.
 		const dishes = descEditorItems
-			.map((s) => s.trim())
-			.filter(Boolean)
-			.map((text) => ({ id: newId('dish'), text }));
-		const cols = defaultCols(dishes);
+			.filter((d) => d.text.trim())
+			.map((d) => ({ id: d.id, text: d.text.trim(), product_id: d.product_id }));
+		const cols = defaultCols(dishes as any);
 		workCourses = workCourses.map((c, i) => (i === descEditorIdx ? { ...c, cols } : c));
 		descEditorIdx = null;
+		// Saving the dish editor may have REMOVED dishes — allow this sync to prune.
+		requestPrune();
 	}
 
 	function cancelDescEditor() {
 		descEditorIdx = null;
+		linkSearchForDish = null;
+	}
+
+	// ── Dish → product linking (allergen source) ──
+	let allProducts: Product[] = $state([]);
+	let productsLoaded = $state(false);
+	let linkSearchForDish: string | null = $state(null);  // dish id whose link search is open
+	let linkSearchTerm = $state('');
+	let linkingDishId: string | null = $state(null);       // dish id with a link request in flight
+	// dish id → linked product (name + allergens) for display in the popup
+	let dishLinks: Record<string, { name: string; allergens: { id: string; name: string }[] }> = $state({});
+
+	// A dish can only be linked once it exists as a menu_dishes row — i.e. it's in
+	// the work-model (loaded from rows or synced). Brand-new popup rows must be
+	// saved (popup 保存 → debounced sync) before the link button is usable.
+	const persistedDishIds = $derived(
+		new Set(workCourses.flatMap((wc) => wc.cols.flat().map((d) => d.id))),
+	);
+
+	async function ensureProducts() {
+		if (productsLoaded) return;
+		try {
+			allProducts = await getProducts();
+			productsLoaded = true;
+		} catch (e) {
+			console.error('[menu-scan] failed to load products', e);
+		}
+	}
+
+	async function openLinkSearch(dishId: string) {
+		if (linkSearchForDish === dishId) { linkSearchForDish = null; return; }
+		// The dish must exist as a menu_dishes row before it can be linked. Persist
+		// any pending edits (including a just-typed dish) first so the PATCH targets
+		// a real row rather than 404-ing.
+		await flushSave();
+		linkSearchForDish = dishId;
+		linkSearchTerm = '';
+		ensureProducts();
+	}
+
+	const linkSearchResults = $derived.by(() => {
+		const q = linkSearchTerm.trim().toLowerCase();
+		const list = q
+			? allProducts.filter((p) => p.name.toLowerCase().includes(q))
+			: allProducts;
+		return list.slice(0, 8);
+	});
+
+	async function linkDishToProduct(dishId: string, product: Product) {
+		linkingDishId = dishId;
+		try {
+			const res = await menuScanSetDishProduct(dishId, product.id);
+			// reflect in the popup row, the work-model, and the link display map
+			descEditorItems = descEditorItems.map((d) =>
+				d.id === dishId ? { ...d, product_id: res.product_id } : d,
+			);
+			applyDishProductToWork(dishId, res.product_id);
+			dishLinks = { ...dishLinks, [dishId]: { name: product.name, allergens: res.allergens } };
+			linkSearchForDish = null;
+		} catch (e: any) {
+			error = e.message || '商品の紐付けに失敗しました';
+		} finally {
+			linkingDishId = null;
+		}
+	}
+
+	async function unlinkDish(dishId: string) {
+		linkingDishId = dishId;
+		try {
+			await menuScanSetDishProduct(dishId, null);
+			descEditorItems = descEditorItems.map((d) =>
+				d.id === dishId ? { ...d, product_id: null } : d,
+			);
+			applyDishProductToWork(dishId, null);
+			const { [dishId]: _drop, ...rest } = dishLinks;
+			dishLinks = rest;
+		} catch (e: any) {
+			error = e.message || '紐付け解除に失敗しました';
+		} finally {
+			linkingDishId = null;
+		}
+	}
+
+	// Keep the work-model's dish in sync so re-opening the popup shows the link.
+	function applyDishProductToWork(dishId: string, productId: string | null) {
+		workCourses = workCourses.map((wc) => ({
+			...wc,
+			cols: wc.cols.map((col) =>
+				col.map((d) => (d.id === dishId ? { ...d, product_id: productId } : d)),
+			),
+		}));
 	}
 
 	// Kids menu callout box (overlay on the お品書き paper)
@@ -206,10 +389,11 @@
 	let showKidsBox: boolean = $state(true);
 	let editingKidsName = $state(false);
 	let editingKidsItemIdx: number | null = $state(null);
-	let drafts: MenuScanDraft[] = $state([]);
+	let savedMenus: SavedMenuSummary[] = $state([]);
 	let loadingDrafts = $state(true);
 	let savingDraft = $state(false);
 	let saveTimer: ReturnType<typeof setTimeout> | null = null;
+	let suppressSync = $state(false);  // true while loading a menu — blocks load-time syncs
 
 	// Only show non-kids groups (groups with allowed_courses defined)
 	const selectableGroups = $derived(
@@ -250,38 +434,15 @@
 		return segs;
 	}
 
-	// Drafts for the currently selected group
-	const groupDrafts = $derived(
-		drafts.filter(d => d.menu_group_id === selectedGroupId)
-	);
+	// Saved scanned menus (already one entry per menu group from the backend).
+	const visibleDrafts = $derived(savedMenus);
 
-	// Show only the NEWEST draft per (menu group + menu title). A single group can
-	// legitimately hold several DIFFERENT menus (e.g. 一般 and 滞在), so we key by
-	// title too — only re-scans of the SAME menu collapse to the newest copy. This
-	// avoids the alternating edited/unedited bug WITHOUT hiding distinct menus. We
-	// never delete older rows (no data loss) — duplicates of the same menu are just
-	// hidden from the list.
-	const visibleDrafts = $derived.by(() => {
-		const key = (d: MenuScanDraft) => `${d.menu_group_id}::${(d.menu_title ?? '').trim()}`;
-		const newest = new Map<string, MenuScanDraft>();
-		for (const d of drafts) {
-			const k = key(d);
-			const cur = newest.get(k);
-			if (!cur || new Date(d.updated_at) > new Date(cur.updated_at)) {
-				newest.set(k, d);
-			}
-		}
-		return [...newest.values()].sort(
-			(a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-		);
-	});
-
-	// Load drafts on mount
+	// Load saved menus on mount
 	$effect(() => {
-		menuScanGetDrafts().then(d => {
-			drafts = d;
+		menuScanGetMenus().then(d => {
+			savedMenus = d;
 			loadingDrafts = false;
-		});
+		}).catch(() => { loadingDrafts = false; });
 	});
 
 	// Keep the serialized `courses` in sync with the editable work model.
@@ -296,62 +457,85 @@
 		// touch reactive state so editing any of these schedules a save
 		void menuTitle; void kidsName; void showKidsBox; JSON.stringify(kidsItems);
 		void courses;
-		if (step !== 'review' || courses.length === 0) return;
+		if (suppressSync || step !== 'review' || courses.length === 0) return;
 		if (saveTimer) clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => autoSaveDraft(), 800);
 	});
 
-	// Force-save any pending edits immediately (cancels the debounce). Call this
-	// before leaving the review screen so edits are never lost on back/close/escape.
+	// Force-save any pending edits immediately (cancels the debounce). Awaits the
+	// REAL completion (including a queued re-save) so callers — link, close, back —
+	// never race a still-in-flight sync. Call before leaving the review screen.
 	async function flushSave() {
 		if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-		if (step === 'review' && courses.length > 0) {
+		if (step === 'review' && workCourses.length > 0) {
 			await autoSaveDraft();
 		}
 	}
 
-	let pendingResave = false;
-	async function autoSaveDraft() {
-		if (!selectedGroupId || courses.length === 0) return;
-		// If a save is already in flight, don't drop this one — mark that another
-		// save is needed and run it after the current finishes (latest state wins).
-		if (savingDraft) { pendingResave = true; return; }
-		// Never mint a NEW draft when one already exists for this SAME menu (group +
-		// title) — reuse it so autosave UPDATEs that draft instead of inserting a
-		// duplicate. Match by title too, since one group can hold different menus
-		// (一般 / 滞在) that must each keep their own draft.
-		if (!sessionId) {
-			const title = (menuTitle ?? '').trim();
-			const existing = drafts.find(
-				(d) => d.menu_group_id === selectedGroupId && (d.menu_title ?? '').trim() === title,
-			);
-			if (existing) sessionId = existing.session_id;
+	// Syncs are SERIALIZED: only one /sync runs at a time. A request arriving mid-
+	// flight is coalesced into a single trailing re-save (latest state wins). This
+	// prevents overlapping syncs from racing on menu_dishes (the dup-key crash).
+	let savePromise: Promise<void> | null = null;
+	let saveQueued = false;
+	// Set true by explicit user removals (delete dish/course) so the NEXT sync is
+	// allowed to prune (delete) on the backend. Cleared once consumed. Autosync
+	// otherwise never prunes — it can only add/update, never wipe.
+	let pendingPrune = false;
+	function requestPrune() { pendingPrune = true; autoSaveDraft(); }
+	function autoSaveDraft(): Promise<void> {
+		if (suppressSync || !selectedGroupId || workCourses.length === 0) return Promise.resolve();
+		// Never sync a menu whose courses all have empty cols — that's stale/loading
+		// state and the backend would (correctly) refuse, but skip the round-trip.
+		const hasAnyDish = workCourses.some((wc) => wc.cols.some((col) => col.length > 0));
+		if (!hasAnyDish) return Promise.resolve();
+		if (savePromise) {
+			// A save is running — ensure exactly one more runs after it, and return a
+			// promise that resolves when the whole chain (incl. the trailing run) ends.
+			saveQueued = true;
+			return savePromise;
 		}
+		savePromise = runSync().finally(() => {
+			savePromise = null;
+			if (saveQueued) { saveQueued = false; autoSaveDraft(); }
+		});
+		return savePromise;
+	}
+
+	// Persist the editing menu directly into relational rows (menus + menu_dishes).
+	// The backend diff-upserts; dishes keep their stable ids so product links survive.
+	async function runSync(): Promise<void> {
 		savingDraft = true;
+		const prune = pendingPrune;
+		pendingPrune = false;  // consume — deletes apply only on this run
 		try {
-			// Persist the kids box state as a trailing meta entry in the draft's
-			// courses JSONB (no backend change needed). Stripped on restore; never
-			// sent to confirmSave (which maps to clean name/description/category).
-			const kidsMeta = {
-				__kids: { name: kidsName, items: kidsItems, show: showKidsBox },
-			} as unknown as ScannedMenuCourse;
-			const result = await menuScanSaveDraft({
+			const result = await menuScanSync({
 				menu_group_id: selectedGroupId,
+				group_name: groupTouched ? null : inferredGroupName,
+				season_name: inferredSeasonName,
 				menu_title: menuTitle,
-				courses: [...courses, kidsMeta],
-				image_url: imageUrl,
 				session_id: sessionId,
+				courses: buildSyncCourses(),
+				prune,
 			});
-			sessionId = result.session_id;
+			// Reconcile: adopt the resolved group + any newly-created course ids so
+			// subsequent saves update in place. Once the group is resolved server-
+			// side, stop title-inference from re-selecting.
+			if (result?.group_id) { selectedGroupId = result.group_id; groupTouched = true; }
+			if (Array.isArray(result?.courses)) {
+				const idByName = new Map<string, string>(
+					result.courses.map((c: any) => [c.name, c.id]),
+				);
+				workCourses = workCourses.map((wc) => {
+					if (wc.menuId) return wc;
+					const id = idByName.get(wc.name);
+					return id ? { ...wc, menuId: id } : wc;
+				});
+			}
 		} catch (err) {
-			// Surface save failures (e.g. expired session → 401) instead of silently
-			// losing edits. Shows a non-blocking banner; the chef can re-login.
-			console.error('[menu-scan] draft save failed', err);
-			error = '下書きの保存に失敗しました。再ログインが必要かもしれません。';
+			console.error('[menu-scan] menu sync failed', err);
+			error = '保存に失敗しました。再ログインが必要かもしれません。';
 		} finally {
 			savingDraft = false;
-			// A change arrived while saving — persist the latest state now.
-			if (pendingResave) { pendingResave = false; await autoSaveDraft(); }
 		}
 	}
 
@@ -589,12 +773,14 @@
 		try {
 			const result = await menuScanExtract(selectedFile, selectedGroupId, abortController.signal);
 			menuTitle = result.menu_title;
-			workCourses = buildWorkCourses(result.courses);
+			// extract now returns row-backed courses (cols of {id,text}); ids are
+			// preserved so the editor and DB share dish ids from the first save.
+			workCourses = buildWorkCourses(result.courses as any[]);
 			sessionId = result.session_id ?? null;
 			imageUrl = result.image_url;
 			step = 'review';
-			// Refresh drafts list (the list is deduped to newest-per-group for display).
-			drafts = await menuScanGetDrafts();
+			// Refresh the saved-menus list.
+			savedMenus = await menuScanGetMenus();
 		} catch (err: any) {
 			if (err.name === 'AbortError') {
 				step = 'upload';
@@ -610,31 +796,26 @@
 		step = 'upload';
 	}
 
-	function resumeDraft(draft: MenuScanDraft) {
-		sessionId = draft.session_id;
-		menuTitle = draft.menu_title;
-		// Extract the trailing kids-box meta entry (if present) and restore it.
-		const raw = draft.courses ?? [];
-		const kidsMeta = raw.find((c) => (c as any).__kids) as any;
-		const realCourses = raw.filter((c) => !(c as any).__kids);
-		if (kidsMeta?.__kids) {
-			kidsName = kidsMeta.__kids.name ?? kidsName;
-			kidsItems = Array.isArray(kidsMeta.__kids.items) ? kidsMeta.__kids.items : kidsItems;
-			showKidsBox = kidsMeta.__kids.show ?? true;
-		}
-		workCourses = buildWorkCourses(realCourses);
-		imageUrl = draft.image_url;
-		selectedGroupId = draft.menu_group_id;
-		step = 'review';
-	}
-
-	async function discardDraft(draft: MenuScanDraft, e: MouseEvent) {
-		e.stopPropagation();
-		await menuScanDeleteDraft(draft.session_id);
-		drafts = drafts.filter(d => d.session_id !== draft.session_id);
-		if (sessionId === draft.session_id) {
-			sessionId = null;
-			step = 'upload';
+	// Re-open a saved menu: load its full courses + dishes (rows) into the editor.
+	// Dish ids are preserved so subsequent syncs update in place (links survive).
+	async function openSavedMenu(summary: SavedMenuSummary) {
+		try {
+			suppressSync = true;  // don't let load-time state changes trigger a sync
+			const full = await menuScanGetMenu(summary.menu_group_id);
+			selectedGroupId = full.menu_group_id;
+			groupTouched = true;  // group is already resolved; don't re-infer
+			sessionId = null;     // no scan session needed; sync targets the group
+			imageUrl = summary.image_url ?? '';
+			menuTitle = full.menu_title;
+			workCourses = buildWorkCourses(full.courses as any[]);
+			step = 'review';
+			// Release the suppression after the reactive effects settle, so genuine
+			// edits still sync but the load itself never does.
+			await tick();
+			suppressSync = false;
+		} catch (err: any) {
+			suppressSync = false;
+			error = err.message || 'メニューの読み込みに失敗しました';
 		}
 	}
 
@@ -647,12 +828,14 @@
 	function addCourse() {
 		workCourses = [
 			...workCourses,
-			{ id: newId('course'), name: '', reading: null, category: 'other', sort_order: workCourses.length + 1, cols: [[]] },
+			{ id: newId('course'), menuId: null, name: '', reading: null, category: 'other', sort_order: workCourses.length + 1, cols: [[]] },
 		];
 	}
 
 	function removeCourse(idx: number) {
 		workCourses = workCourses.filter((_, i) => i !== idx);
+		// Explicit course removal — allow this sync to prune the deleted course.
+		requestPrune();
 	}
 
 	// ── Dish drag-and-drop (svelte-dnd-action) ──
@@ -693,36 +876,18 @@
 
 	async function confirmSave() {
 		if (!selectedGroupId) return;
-		// Save latest draft state first
-		if (saveTimer) clearTimeout(saveTimer);
-		await autoSaveDraft();
-
+		// Saving is continuous (every edit syncs to rows). "Confirm" just flushes
+		// any pending edit and closes — there is no separate write step anymore.
 		step = 'saving';
 		error = null;
 		try {
-			await menuScanConfirm({
-				courses: courses.map(c => ({
-					name: c.name,
-					description: c.description,
-					category: c.category,
-				})),
-				menu_group_id: selectedGroupId,
-				seasonal_menu_id: selectedSeasonId || null,
-				season_name: inferredSeasonName,
-				menu_title: menuTitle,
-				draft_session_id: sessionId,
-			});
+			if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+			await autoSaveDraft();
 			onConfirmed();
 		} catch (err: any) {
 			error = err.message || '保存に失敗しました';
 			step = 'review';
 		}
-	}
-
-	function formatDate(iso: string) {
-		return new Date(iso).toLocaleString('ja-JP', {
-			month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-		});
 	}
 
 	// Close wrapper — flush pending edits before the modal goes away.
@@ -737,7 +902,7 @@
 	async function goBackToUpload() {
 		await flushSave();
 		step = 'upload';
-		try { drafts = await menuScanGetDrafts(); } catch { /* keep cached list */ }
+		try { savedMenus = await menuScanGetMenus(); } catch { /* keep cached list */ }
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -785,6 +950,7 @@
 				<span class="text-[8px] uppercase tracking-widest text-stone-400">保存先グループ</span>
 				<select
 					bind:value={selectedGroupId}
+					onchange={() => groupTouched = true}
 					disabled={step === 'saving'}
 					class="text-xs font-medium text-stone-700 bg-transparent border-none outline-none cursor-pointer hover:text-stone-900 pr-4"
 				>
@@ -899,6 +1065,7 @@
 				<label class="text-[9px] uppercase tracking-widest text-stone-400">保存先グループ</label>
 				<select
 					bind:value={selectedGroupId}
+					onchange={() => groupTouched = true}
 					class="w-full text-sm text-stone-700 border border-stone-200 px-3 py-2 outline-none focus:border-stone-400 bg-white"
 				>
 					{#each selectableGroups as group}
@@ -973,16 +1140,16 @@
 				<svg class="w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
 				</svg>
-				<h3 class="text-xs font-medium text-stone-600 uppercase tracking-widest">保存済み下書き</h3>
+				<h3 class="text-xs font-medium text-stone-600 uppercase tracking-widest">保存済みメニュー</h3>
 			</div>
 			<div class="flex flex-col gap-2">
-				{#each visibleDrafts as draft (draft.session_id)}
+				{#each visibleDrafts as draft (draft.menu_group_id)}
 				<div
 					class="bg-white border border-stone-200 px-4 py-3 flex items-center justify-between hover:border-stone-300 cursor-pointer transition-colors group"
-					onclick={() => resumeDraft(draft)}
+					onclick={() => openSavedMenu(draft)}
 					role="button"
 					tabindex="0"
-					onkeypress={(e) => e.key === 'Enter' && resumeDraft(draft)}
+					onkeypress={(e) => e.key === 'Enter' && openSavedMenu(draft)}
 				>
 					<div class="flex items-center gap-4 min-w-0">
 						{#if draft.image_url}
@@ -990,29 +1157,19 @@
 						{/if}
 						<div class="min-w-0">
 							<p class="font-serif-jp text-sm tracking-[0.1em] text-stone-700 truncate">
-								{draft.menu_title ?? '無題のメニュー'}
+								{draft.menu_title || '無題のメニュー'}
 							</p>
 							<p class="text-[10px] text-stone-400 mt-0.5">
-								{selectableGroups.find(g => g.id === draft.menu_group_id)?.name ?? ''}
-								· {draft.courses.length} コース
-								· {formatDate(draft.updated_at)}
+								{draft.group_name}
+								· {draft.course_count} コース
+								· {draft.dish_count} 品
 							</p>
 						</div>
 					</div>
 					<div class="flex items-center gap-2 flex-shrink-0">
 						<span class="text-[9px] uppercase tracking-widest text-stone-400 group-hover:text-stone-600 transition-colors">
-							再開 →
+							開く →
 						</span>
-						<button
-							onclick={(e) => discardDraft(draft, e)}
-							class="text-stone-300 hover:text-red-400 transition-colors p-1"
-							title="下書きを削除"
-							aria-label="下書きを削除"
-						>
-							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
-						</button>
 					</div>
 				</div>
 				{/each}
@@ -1455,28 +1612,90 @@
 
 			<!-- Item list -->
 			<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-				{#each descEditorItems as item, i (i)}
-					<div class="flex items-center gap-2">
-						<span class="text-stone-400 text-sm w-4 text-center">{i + 1}</span>
-						<input
-							type="text"
-							bind:value={descEditorItems[i]}
-							use:autoFocusInput={descEditorItemFocus === i}
-							onkeydown={(e) => {
-								if (e.key === 'Enter') { e.preventDefault(); addDescItem(); }
-							}}
-							placeholder="料理名を入力..."
-							class="flex-1 font-serif-jp text-sm text-stone-700 border border-stone-200 rounded px-3 py-2 outline-none focus:border-stone-400"
-						/>
-						<button
-							onclick={() => removeDescItem(i)}
-							class="p-1.5 text-stone-300 hover:text-red-500 transition-colors"
-							aria-label="削除"
-						>
-							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-							</svg>
-						</button>
+				{#each descEditorItems as item, i (item.id)}
+					{@const linked = item.product_id != null}
+					<div class="flex flex-col gap-1.5">
+						<div class="flex items-center gap-2">
+							<span class="text-stone-400 text-sm w-4 text-center">{i + 1}</span>
+							<input
+								type="text"
+								bind:value={descEditorItems[i].text}
+								use:autoFocusInput={descEditorItemFocus === i}
+								onkeydown={(e) => {
+									if (e.key === 'Enter') { e.preventDefault(); addDescItem(); }
+								}}
+								placeholder="料理名を入力..."
+								class="flex-1 font-serif-jp text-sm text-stone-700 border border-stone-200 rounded px-3 py-2 outline-none focus:border-stone-400"
+							/>
+							<!-- Link product (allergen source) — only once the dish is persisted -->
+							<button
+								onclick={() => openLinkSearch(item.id)}
+								disabled={!persistedDishIds.has(item.id)}
+								class="p-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed {linked ? 'text-emerald-600 hover:text-emerald-700' : 'text-stone-300 hover:text-stone-600'}"
+								title={!persistedDishIds.has(item.id) ? '保存後に紐付けできます' : (linked ? '紐付け済み — 変更' : '商品を紐付け（アレルギー）')}
+								aria-label="商品を紐付け"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m6.656-2.828a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5" />
+								</svg>
+							</button>
+							<button
+								onclick={() => removeDescItem(i)}
+								class="p-1.5 text-stone-300 hover:text-red-500 transition-colors"
+								aria-label="削除"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+								</svg>
+							</button>
+						</div>
+
+						<!-- Linked product chip + allergens -->
+						{#if linked && dishLinks[item.id]}
+							<div class="ml-6 flex items-center flex-wrap gap-1.5">
+								<span class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+									{dishLinks[item.id].name}
+								</span>
+								{#each dishLinks[item.id].allergens as a (a.id)}
+									<span class="text-[10px] text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">{a.name}</span>
+								{/each}
+								<button onclick={() => unlinkDish(item.id)} class="text-[10px] text-stone-400 hover:text-red-500 underline">解除</button>
+							</div>
+						{:else if linked}
+							<div class="ml-6 text-[11px] text-emerald-700">紐付け済み</div>
+						{/if}
+
+						<!-- Product search dropdown -->
+						{#if linkSearchForDish === item.id}
+							<div class="ml-6 border border-stone-200 rounded p-2 bg-stone-50">
+								<input
+									type="text"
+									bind:value={linkSearchTerm}
+									placeholder="商品を検索..."
+									class="w-full text-sm border border-stone-200 rounded px-2 py-1.5 outline-none focus:border-stone-400 mb-1.5"
+								/>
+								<div class="flex flex-col gap-1 max-h-40 overflow-y-auto">
+									{#if !productsLoaded}
+										<span class="text-[11px] text-stone-400 px-1">読み込み中...</span>
+									{:else}
+										{#each linkSearchResults as p (p.id)}
+											<button
+												onclick={() => linkDishToProduct(item.id, p)}
+												disabled={linkingDishId === item.id}
+												class="text-left text-sm px-2 py-1.5 rounded hover:bg-white border border-transparent hover:border-stone-200 flex items-center justify-between gap-2 disabled:opacity-50"
+											>
+												<span class="text-stone-700 truncate">{p.name}</span>
+												{#if p.allergens.length}
+													<span class="text-[10px] text-amber-600 flex-shrink-0">{p.allergens.length} アレルゲン</span>
+												{/if}
+											</button>
+										{:else}
+											<span class="text-[11px] text-stone-400 px-1">該当する商品なし</span>
+										{/each}
+									{/if}
+								</div>
+							</div>
+						{/if}
 					</div>
 				{/each}
 

@@ -35,7 +35,24 @@ export class MenuScanConfirmDto {
   @IsOptional()
   seasonal_menu_id?: string | null;
 
-  @ApiPropertyOptional({ description: 'Draft scan session ID to mark as completed', nullable: true })
+  @ApiPropertyOptional({ description: 'Season name inferred from the title (春/夏/秋/冬). Auto-created if no matching season exists.', nullable: true })
+  @ValidateIf((o) => o.season_name !== null)
+  @IsString()
+  @IsOptional()
+  season_name?: string | null;
+
+  @ApiPropertyOptional({ description: 'Group name inferred from the title (variant after 献立). Find-or-create; overrides menu_group_id when set.', nullable: true })
+  @ValidateIf((o) => o.group_name !== null)
+  @IsString()
+  @IsOptional()
+  group_name?: string | null;
+
+  @ApiPropertyOptional({ description: 'Menu title — stored on the menu group display_title', nullable: true })
+  @IsString()
+  @IsOptional()
+  menu_title?: string | null;
+
+  @ApiPropertyOptional({ description: 'Draft scan session ID — source of the rich dish layout (cols)', nullable: true })
   @IsString()
   @IsOptional()
   draft_session_id?: string | null;

@@ -1532,6 +1532,9 @@ export interface MenuScanConfirmData {
 	courses: { name: string; description?: string | null; category?: string | null }[];
 	menu_group_id: string;
 	seasonal_menu_id?: string | null;
+	season_name?: string | null;   // inferred from title; backend auto-creates if missing
+	group_name?: string | null;    // inferred from title; find-or-create, overrides menu_group_id when set
+	menu_title?: string | null;
 	draft_session_id?: string | null;
 }
 
@@ -1544,6 +1547,104 @@ export async function menuScanConfirm(data: MenuScanConfirmData): Promise<Menu[]
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.message || 'Menu scan confirm failed');
+	}
+	return response.json();
+}
+
+// ── Rows-as-source-of-truth: sync + saved-menu loading ──────────────────────
+// A scanned menu IS relational rows from the moment of scan. The editor syncs
+// (debounced) the full current state; the backend diff-upserts menus + dishes.
+// Each dish carries a stable client UUID so its product_id link survives edits.
+
+export interface SyncDish {
+	id: string;        // stable client UUID = menu_dishes.id
+	text: string;
+	product_id?: string | null;  // present when loading; never sent to mutate
+}
+
+export interface SyncCourse {
+	id?: string;       // menus.id when known (loaded); omitted for brand-new
+	name: string;
+	reading?: string | null;
+	category?: string | null;
+	sort_order: number;
+	cols: SyncDish[][];
+}
+
+export interface MenuSyncData {
+	menu_group_id: string;
+	group_name?: string | null;
+	season_name?: string | null;
+	menu_title?: string | null;
+	session_id?: string | null;
+	courses: SyncCourse[];
+	// true ONLY for explicit user removals (delete dish/course). Autosync omits it,
+	// so a background/stale sync can never delete data.
+	prune?: boolean;
+}
+
+// List entry (one per menu group) for the saved-menus list.
+export interface SavedMenuSummary {
+	menu_group_id: string;
+	group_name: string;
+	menu_title: string;
+	seasonal_menu_id: string | null;
+	image_url: string | null;
+	course_count: number;
+	dish_count: number;
+}
+
+// Full saved menu (courses + dishes) for re-opening in the editor.
+export interface SavedMenu {
+	menu_group_id: string;
+	group_name: string;
+	menu_title: string;
+	seasonal_menu_id: string | null;
+	courses: SyncCourse[];
+}
+
+export async function menuScanSync(data: MenuSyncData): Promise<{ group_id: string; season_id: string | null; courses: any[] }> {
+	const response = await apiFetch(`${API_URL}/menu-scan/sync`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Menu sync failed');
+	}
+	return response.json();
+}
+
+export async function menuScanGetMenus(): Promise<SavedMenuSummary[]> {
+	const response = await apiFetch(`${API_URL}/menu-scan/menus`, { headers: authHeaders() });
+	if (!response.ok) return [];
+	return response.json();
+}
+
+export async function menuScanGetMenu(groupId: string): Promise<SavedMenu> {
+	const response = await apiFetch(`${API_URL}/menu-scan/menus/${groupId}`, { headers: authHeaders() });
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to load saved menu');
+	}
+	return response.json();
+}
+
+// Link (or unlink with product_id=null) a scanned dish to a product. The dish's
+// allergens are derived from the linked product and returned for display.
+export async function menuScanSetDishProduct(
+	dishId: string,
+	productId: string | null,
+): Promise<{ id: string; text: string; product_id: string | null; allergens: { id: string; name: string }[] }> {
+	const response = await apiFetch(`${API_URL}/menu-scan/dishes/${dishId}/product`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ product_id: productId }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to link dish');
 	}
 	return response.json();
 }
