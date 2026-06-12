@@ -377,6 +377,25 @@ export class MenuScanService {
         );
         incomingByCategory.set(cat, (incomingByCategory.get(cat) ?? 0) + n);
       }
+
+      // ─── MISROUTE GUARD ──────────────────────────────────────────────────
+      // Catch group bleed: a sync whose course set barely overlaps the group's
+      // existing courses is a DIFFERENT menu mistakenly targeting this group
+      // (e.g. 一般's 前菜/椀変り… written onto 滞在's 先付/八寸…). On a non-prune
+      // sync this is never legitimate — reject and keep the data.
+      const existingCats = new Set((existingMenus ?? []).map((m) => m.category as string));
+      const incomingCats = new Set(incomingByCategory.keys());
+      const overlap = [...incomingCats].filter((c) => existingCats.has(c)).length;
+      if (existingCats.size >= 3 && overlap < existingCats.size * 0.5) {
+        this.logger.warn(
+          `MISROUTE: skipping sync for group ${groupId} — incoming courses ` +
+            `[${[...incomingCats].join(',')}] barely overlap existing ` +
+            `[${[...existingCats].join(',')}] (overlap ${overlap}/${existingCats.size}). ` +
+            `Likely wrong-group bleed; existing data preserved.`,
+        );
+        return { group_id: groupId, season_id: seasonId, courses: [], skipped: true };
+      }
+
       for (const m of existingMenus ?? []) {
         const have = haveByMenu.get(m.id) ?? 0;
         if (have < 3) continue; // tiny courses: nothing meaningful to protect

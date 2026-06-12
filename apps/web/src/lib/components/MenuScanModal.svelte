@@ -818,6 +818,13 @@
 		// NOT enter review with stale/empty work-model and we must NOT re-enable
 		// sync — otherwise the next reactive tick would push garbage and wipe data.
 		suppressSync = true;
+		// CRITICAL: cancel any pending/in-flight sync from the PREVIOUS menu before
+		// switching groups. Otherwise a queued save fires after selectedGroupId flips
+		// and writes the old menu's courses onto the new group (group bleed → wipe).
+		if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+		saveQueued = false;
+		pendingPrune = false;
+		if (savePromise) { try { await savePromise; } catch { /* ignore */ } }
 		try {
 			const full = await menuScanGetMenu(summary.menu_group_id);
 			// Only commit state once the load fully succeeded.
