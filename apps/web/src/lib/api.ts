@@ -27,17 +27,32 @@ function refreshOnce(): Promise<boolean> {
 	return refreshInFlight;
 }
 
-/** Fetch wrapper that retries once on 401 by refreshing the Supabase token. */
+/** Thrown when a request is unauthorized and the token refresh failed. Callers
+ *  can catch this to distinguish "session is dead" from "request failed" — and
+ *  in particular MUST NOT treat it as "the server returned empty data". */
+export class AuthExpiredError extends Error {
+	constructor() {
+		super('セッションの有効期限が切れました。再ログインしてください。');
+		this.name = 'AuthExpiredError';
+	}
+}
+
+/** Fetch wrapper that retries once on 401 by refreshing the Supabase token.
+ *  If the refresh fails, throws AuthExpiredError instead of returning a 401 body
+ *  — so no caller can accidentally parse an auth failure into usable data. */
 async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
 	const response = await fetch(url, options);
 	if (response.status === 401) {
 		const refreshed = await refreshOnce();
 		if (refreshed) {
-			return fetch(url, {
+			const retry = await fetch(url, {
 				...options,
 				headers: { ...(options.headers as Record<string, string>), ...getAuthHeaders() },
 			});
+			if (retry.status === 401) throw new AuthExpiredError();
+			return retry;
 		}
+		throw new AuthExpiredError();
 	}
 	return response;
 }

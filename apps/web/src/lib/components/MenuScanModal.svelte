@@ -6,6 +6,7 @@
 		menuScanGetMenu,
 		menuScanSetDishProduct,
 		getProducts,
+		AuthExpiredError,
 	} from '$lib/api';
 	import type { MenuGroup, SeasonalMenu, SavedMenuSummary, Product } from '$lib/api';
 	import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, type DndEvent } from 'svelte-dnd-action';
@@ -442,7 +443,12 @@
 		menuScanGetMenus().then(d => {
 			savedMenus = d;
 			loadingDrafts = false;
-		}).catch(() => { loadingDrafts = false; });
+		}).catch((err) => {
+			loadingDrafts = false;
+			if (err instanceof AuthExpiredError) {
+				error = 'セッションが切れました。再ログインしてください。';
+			}
+		});
 	});
 
 	// Keep the serialized `courses` in sync with the editable work model.
@@ -533,7 +539,16 @@
 			}
 		} catch (err) {
 			console.error('[menu-scan] menu sync failed', err);
-			error = '保存に失敗しました。再ログインが必要かもしれません。';
+			// Re-arm a pending prune so an explicit delete isn't lost to a failed save.
+			if (prune) pendingPrune = true;
+			if (err instanceof AuthExpiredError) {
+				// Session died mid-edit. STOP auto-syncing — re-login reloads fresh data;
+				// syncing now would push stale state. The work-model is untouched.
+				suppressSync = true;
+				error = 'セッションが切れました。再ログインしてください。';
+			} else {
+				error = '保存に失敗しました。再ログインが必要かもしれません。';
+			}
 		} finally {
 			savingDraft = false;
 		}
@@ -799,9 +814,13 @@
 	// Re-open a saved menu: load its full courses + dishes (rows) into the editor.
 	// Dish ids are preserved so subsequent syncs update in place (links survive).
 	async function openSavedMenu(summary: SavedMenuSummary) {
+		// Suppress sync for the WHOLE load. If anything fails (esp. a 401), we must
+		// NOT enter review with stale/empty work-model and we must NOT re-enable
+		// sync — otherwise the next reactive tick would push garbage and wipe data.
+		suppressSync = true;
 		try {
-			suppressSync = true;  // don't let load-time state changes trigger a sync
 			const full = await menuScanGetMenu(summary.menu_group_id);
+			// Only commit state once the load fully succeeded.
 			selectedGroupId = full.menu_group_id;
 			groupTouched = true;  // group is already resolved; don't re-infer
 			sessionId = null;     // no scan session needed; sync targets the group
@@ -809,13 +828,18 @@
 			menuTitle = full.menu_title;
 			workCourses = buildWorkCourses(full.courses as any[]);
 			step = 'review';
-			// Release the suppression after the reactive effects settle, so genuine
-			// edits still sync but the load itself never does.
+			// Release suppression only after a clean load + settled effects, so
+			// genuine edits sync but the load itself never does.
 			await tick();
 			suppressSync = false;
 		} catch (err: any) {
-			suppressSync = false;
-			error = err.message || 'メニューの読み込みに失敗しました';
+			// Load failed — stay on the list, keep sync OFF, leave existing data alone.
+			// (suppressSync stays true so no sync fires against stale work-model.)
+			if (err instanceof AuthExpiredError) {
+				error = 'セッションが切れました。再ログインしてください。';
+			} else {
+				error = err.message || 'メニューの読み込みに失敗しました';
+			}
 		}
 	}
 
