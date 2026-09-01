@@ -10,6 +10,7 @@
 		AuthExpiredError,
 	} from '$lib/api';
 	import type { MenuGroup, SeasonalMenu, SavedMenuSummary, Product } from '$lib/api';
+	import MenuImportModal from './MenuImportModal.svelte';
 	import { dndzone, SHADOW_ITEM_MARKER_PROPERTY_NAME, type DndEvent } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';
 	import { tick } from 'svelte';
@@ -611,6 +612,9 @@
 	let paperEl: HTMLDivElement | null = $state(null);   // the お品書き A4 paper element
 	let generatingPdf = $state(false);
 	let isCapturing = $state(false);   // true only while rendering for PDF/print → dishes auto-balance
+
+	// Excel round-trip import (preview-gated; see MenuImportModal).
+	let showImport = $state(false);
 
 	// Excel archive download (all menus). Read-only: never touches menu data.
 	let exportingExcel = $state(false);
@@ -1237,6 +1241,17 @@
 					</svg>
 					{exportingExcel ? '書き出し中…' : 'Excel'}
 				</button>
+				<!-- Round-trip: bring an edited workbook back in (preview-gated). -->
+				<button
+					onclick={() => { showImport = true; }}
+					class="flex items-center gap-1.5 px-2.5 py-1 border border-stone-300 text-[10px] tracking-widest uppercase text-stone-600 hover:text-stone-900 hover:border-stone-400 transition-colors"
+					title="編集したExcelファイルを読み込む"
+				>
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+					</svg>
+					読込
+				</button>
 			</div>
 			<div class="flex flex-col gap-2">
 				{#each visibleDrafts as draft (draft.menu_group_id)}
@@ -1826,6 +1841,17 @@
 	{/if}
 
 </div>
+
+{#if showImport}
+	<MenuImportModal
+		onClose={() => { showImport = false; }}
+		onApplied={async () => {
+			// Rows changed underneath us — reload the saved-menu list so counts and
+			// any reopened menu reflect what the import actually wrote.
+			try { savedMenus = await menuScanGetMenus(); } catch { /* keep cached list */ }
+		}}
+	/>
+{/if}
 
 <style>
 	.bg-accent { background-color: #C2410C; }

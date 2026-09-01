@@ -1714,3 +1714,68 @@ export async function downloadMenuExcel(groupId?: string): Promise<void> {
 	// Revoke on the next tick so the download has certainly started.
 	setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
+
+// ── Excel import (round-trip) ──────────────────────────────────────────────
+// Two-phase by design: preview computes the diff and returns a token; apply
+// only performs the change set that token fingerprints. Deleting dishes needs
+// a further explicit opt-in, so it can never happen as a side effect.
+
+export interface MenuImportChange {
+	kind: 'update' | 'insert' | 'delete';
+	group_id: string;
+	course_name: string;
+	dish_id: string;
+	before?: string;
+	after?: string;
+}
+
+export interface MenuImportPreview {
+	token: string;
+	summary: { updates: number; inserts: number; deletes: number; unchanged: number };
+	changes: MenuImportChange[];
+	warnings: string[];
+	requires_attention: boolean;
+}
+
+async function importError(response: Response, fallback: string): Promise<never> {
+	let message = fallback;
+	try {
+		const body = await response.json();
+		message = body.message || fallback;
+	} catch {
+		/* non-JSON body — keep the fallback */
+	}
+	throw new Error(message);
+}
+
+/** Phase 1: diff an edited workbook against the DB. Writes nothing. */
+export async function previewMenuImport(file: File): Promise<MenuImportPreview> {
+	const form = new FormData();
+	form.append('file', file);
+	const response = await apiFetch(`${API_URL}/menu-export/preview`, {
+		method: 'POST',
+		headers: authHeaders(), // no Content-Type: the browser sets the multipart boundary
+		body: form,
+	});
+	if (!response.ok) return importError(response, 'ファイルの確認に失敗しました');
+	return response.json();
+}
+
+/** Phase 2: apply exactly the previewed change set. */
+export async function applyMenuImport(
+	file: File,
+	token: string,
+	allowDeletes: boolean,
+): Promise<{ applied: MenuImportPreview['summary']; skipped_deletes: number }> {
+	const form = new FormData();
+	form.append('file', file);
+	form.append('token', token);
+	form.append('allow_deletes', allowDeletes ? 'true' : 'false');
+	const response = await apiFetch(`${API_URL}/menu-export/apply`, {
+		method: 'POST',
+		headers: authHeaders(),
+		body: form,
+	});
+	if (!response.ok) return importError(response, 'インポートに失敗しました');
+	return response.json();
+}
