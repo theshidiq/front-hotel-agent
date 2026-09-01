@@ -502,6 +502,104 @@ export class MenuExportService {
         });
       });
     }
+
+    await this.applyEditingAids(sheet, menu);
+  }
+
+  /**
+   * Guided-editing aids for the data sheet — the safe half of "make it editable
+   * in Excel". Deliberately NO macros: validation, protection and conditional
+   * formatting are plain spreadsheet features, so they survive in Excel, Google
+   * Sheets and LibreOffice, and leave the file a normal .xlsx that no security
+   * policy blocks. (A macro-driven form would be the opposite: Windows-mostly,
+   * frequently quarantined, and harder to hand on than the app it replaces.)
+   */
+  private async applyEditingAids(sheet: ExcelJS.Worksheet, menu: ExportMenu) {
+    const lastRow = sheet.rowCount;
+    if (lastRow < 2) return;
+
+    // Course dropdown, drawn from the courses actually present in THIS menu, so
+    // the list stays short and correct rather than offering every category the
+    // OCR has ever invented.
+    const courseNames = [
+      ...new Set([
+        ...menu.courses.map((c) => c.name).filter(Boolean),
+        ...menu.kids.map((k) => k.name).filter(Boolean),
+      ]),
+    ];
+    // Excel caps an inline list at 255 characters; fall back to no dropdown
+    // rather than writing a formula Excel will reject as corrupt.
+    const inlineList = `"${courseNames.join(',')}"`;
+    const courseListFits = courseNames.length > 0 && inlineList.length <= 255;
+
+    for (let r = 2; r <= lastRow; r++) {
+      if (courseListFits) {
+        sheet.getCell(`E${r}`).dataValidation = {
+          type: 'list',
+          allowBlank: false,
+          formulae: [inlineList],
+          showErrorMessage: true,
+          errorTitle: 'コース名',
+          error: 'このメニューに存在するコース名を選んでください。',
+        };
+      }
+      // column / sort_order must stay non-negative integers: they ARE the layout.
+      for (const col of ['G', 'H']) {
+        sheet.getCell(`${col}${r}`).dataValidation = {
+          type: 'whole',
+          operator: 'greaterThanOrEqual',
+          formulae: [0],
+          allowBlank: false,
+          showErrorMessage: true,
+          errorTitle: '数値',
+          error: '0以上の整数を入力してください。',
+        };
+      }
+    }
+
+    // Flag rows whose dish_text is blank — import ignores them, and a chef
+    // clearing a cell to "delete" a dish is the likeliest mistake.
+    sheet.addConditionalFormatting({
+      ref: `I2:I${lastRow}`,
+      rules: [
+        {
+          type: 'expression',
+          priority: 1,
+          formulae: [`TRIM(I2)=""`],
+          style: {
+            fill: {
+              type: 'pattern',
+              pattern: 'solid',
+              bgColor: { argb: 'FFFEE2E2' },
+            },
+          },
+        } as any,
+      ],
+    });
+
+    // Lock the machine keys, leave the editable columns unlocked. Protection is
+    // advisory (anyone can unprotect) but it blocks the common accident: a fill
+    // handle dragged across dish_id, silently rewriting the keys import matches
+    // on. No password — this is a guardrail, not a lock.
+    for (let r = 1; r <= lastRow; r++) {
+      for (const col of ['A', 'B', 'C', 'D', 'F', 'J', 'K', 'L', 'M', 'N']) {
+        sheet.getCell(`${col}${r}`).protection = { locked: true };
+      }
+      for (const col of ['E', 'G', 'H', 'I']) {
+        sheet.getCell(`${col}${r}`).protection = { locked: false };
+      }
+    }
+    await sheet.protect('', {
+      selectLockedCells: true,
+      selectUnlockedCells: true,
+      formatCells: false,
+      insertRows: true,
+      deleteRows: true,
+      sort: false,
+      autoFilter: false,
+    });
+
+    sheet.autoFilter = { from: 'A1', to: `N${lastRow}` };
   }
 
   // ── Naming helpers ────────────────────────────────────────────────────────
