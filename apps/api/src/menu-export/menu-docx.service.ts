@@ -3,12 +3,13 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  HeightRule,
   Packer,
   PageOrientation,
-  PageTextDirectionType,
   Paragraph,
   Table,
   TableCell,
+  TableLayoutType,
   TableRow,
   TextDirection,
   TextRun,
@@ -77,9 +78,15 @@ export class MenuDocxService {
     const subs = course.cols.filter((s) => s.some((d) => (d.text ?? '').trim()));
     const groups = subs.length > 0 ? subs : [[]];
 
-    const subCells = groups.map((sub, idx) => {
+    // Reversed for the same reason as the courses: the page is left-to-right, so
+    // the chef's rightmost sub-column must be emitted last.
+    const ordered = [...groups].reverse();
+
+    const subCells = ordered.map((sub, idx) => {
       const dishes = sub.map((d) => (d.text ?? '').trim()).filter(Boolean);
-      const isLead = idx === 0; // tbRl renders the first cell rightmost
+      // The course's first sub-column is now the LAST cell (rightmost on page),
+      // and it carries the name and the 一 mark.
+      const isLead = idx === ordered.length - 1;
       const paragraphs: Paragraph[] = [];
       if (isLead) {
         paragraphs.push(this.line(course.name, 14, true));
@@ -99,9 +106,17 @@ export class MenuDocxService {
 
     // Nest the sub-columns in a borderless table so they align at the top.
     const inner = new Table({
-      rows: [new TableRow({ children: subCells })],
+      rows: [
+        new TableRow({
+          children: subCells,
+          // Match the outer row: without an explicit height the nested row
+          // collapses and the vertical text overlaps.
+          height: { value: 8400, rule: HeightRule.ATLEAST },
+        }),
+      ],
       width: { size: 100, type: WidthType.PERCENTAGE },
       borders: this.noBorders(),
+      layout: TableLayoutType.AUTOFIT,
     });
 
     return new TableCell({
@@ -111,9 +126,10 @@ export class MenuDocxService {
       borders: {
         top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
         bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-        // A hairline between courses, matching the editor's vertical rules.
-        left: { style: BorderStyle.SINGLE, size: 2, color: 'D6D3D1' },
-        right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        // A hairline on the right edge separates this course from the one read
+        // before it, matching the editor's vertical rules.
+        right: { style: BorderStyle.SINGLE, size: 2, color: 'D6D3D1' },
       },
     });
   }
@@ -134,13 +150,27 @@ export class MenuDocxService {
       borders: this.noBorders(),
     });
 
-    const cells = [titleCell, ...menu.courses.map((c) => this.courseCell(c))];
+    // Right-to-left reading order, produced by reversing the cells (the page is
+    // left-to-right; only the cells are vertical). The title ends up rightmost,
+    // then the courses run leftwards, as in the editor.
+    const cells = [...menu.courses.map((c) => this.courseCell(c)).reverse(), titleCell];
+
+    // An explicit row height is what gives the vertical text somewhere to flow;
+    // without it Word collapses the row to the height of one line and the
+    // characters pile up on top of each other. ~15cm in twentieths of a point.
+    const ROW_HEIGHT = 8500;
 
     const body: (Table | Paragraph)[] = [
       new Table({
-        rows: [new TableRow({ children: cells })],
+        rows: [
+          new TableRow({
+            children: cells,
+            height: { value: ROW_HEIGHT, rule: HeightRule.ATLEAST },
+          }),
+        ],
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: this.noBorders(),
+        layout: TableLayoutType.AUTOFIT,
       }),
     ];
 
@@ -183,9 +213,13 @@ export class MenuDocxService {
             page: {
               size: { orientation: PageOrientation.LANDSCAPE },
               margin: { top: 720, right: 720, bottom: 720, left: 720 },
-              // The whole page flows vertically right-to-left: Word then places
-              // the columns in お品書き order without any manual reversing.
-              textDirection: PageTextDirectionType.TOP_TO_BOTTOM_RIGHT_TO_LEFT,
+              // NOTE: the page textDirection is deliberately NOT set to tbRl.
+              // Setting it here AND on the cells rotates twice: Word turns the
+              // page, then turns each cell again inside it, leaving the vertical
+              // text no room to flow and crushing every column into one
+              // overlapping line. The cells carry the vertical direction; the
+              // right-to-left order is produced by emitting the columns
+              // reversed (see build()).
             },
           },
           children: body,
