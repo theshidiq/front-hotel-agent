@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { SupabaseService } from '../supabase/supabase.service';
+import { MenuDocxService } from './menu-docx.service';
 
 // One course as loaded for export: the menus row plus its dishes arranged back
 // into the chef's visual cols[col][row] layout.
@@ -46,7 +47,10 @@ interface ExportMenu {
 export class MenuExportService {
   private readonly logger = new Logger(MenuExportService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly menuDocxService: MenuDocxService,
+  ) {}
 
   // ── Loading ───────────────────────────────────────────────────────────────
 
@@ -194,6 +198,30 @@ export class MenuExportService {
     const workbook = this.newWorkbook();
     await this.addMenuSheets(workbook, menu);
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    return { buffer, filename: this.safeFilename(menu.menu_title || menu.group_name) };
+  }
+
+  /**
+   * Build a .docx for one menu group — the editable presentation copy.
+   * Word supports real vertical Japanese, so this reproduces the お品書き far
+   * more closely than a spreadsheet can while remaining editable by staff.
+   */
+  async exportMenuDocx(
+    organizationId: string,
+    groupId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const menu = await this.loadMenu(organizationId, groupId);
+    const buffer = await this.menuDocxService.build({
+      menu_title: menu.menu_title,
+      courses: menu.courses.map((c) => ({
+        name: c.name,
+        cols: c.cols.map((sub) => sub.map((d) => ({ text: d.text }))),
+      })),
+      kids: menu.kids.map((k) => ({
+        name: k.name,
+        items: k.items.map((i) => ({ text: i.text })),
+      })),
+    });
     return { buffer, filename: this.safeFilename(menu.menu_title || menu.group_name) };
   }
 

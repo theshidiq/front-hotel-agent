@@ -22,6 +22,8 @@ import { StaffAuthGuard } from '../auth/auth.guard';
 
 const XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const DOCX_MIME =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 /**
  * Menu → Excel archive endpoints.
@@ -65,6 +67,24 @@ export class MenuExportController {
       groupId,
     );
     this.send(res, buffer, filename);
+  }
+
+  @Get('menus/:groupId.docx')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('menus.create')
+  @ApiOperation({
+    summary: 'Export one menu as .docx — the editable presentation copy (real vertical Japanese)',
+  })
+  async exportOneDocx(
+    @Req() req: any,
+    @Param('groupId') groupId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.menuExportService.exportMenuDocx(
+      req.user.organization_id,
+      groupId,
+    );
+    this.send(res, buffer, filename, DOCX_MIME, 'docx');
   }
 
   // ── Import (round-trip): two-phase, never writes without confirmation ──────
@@ -129,11 +149,17 @@ export class MenuExportController {
    * Write the workbook. The filename is sent twice: a plain ASCII `filename` for
    * older clients and RFC 5987 `filename*` so Japanese menu titles survive.
    */
-  private send(res: Response, buffer: Buffer, filename: string) {
+  private send(
+    res: Response,
+    buffer: Buffer,
+    filename: string,
+    mime: string = XLSX_MIME,
+    ext: string = 'xlsx',
+  ) {
     const stamp = new Date().toISOString().slice(0, 10);
-    const full = `${filename}-${stamp}.xlsx`;
+    const full = `${filename}-${stamp}.${ext}`;
     const ascii = full.replace(/[^\x20-\x7E]/g, '_');
-    res.setHeader('Content-Type', XLSX_MIME);
+    res.setHeader('Content-Type', mime);
     res.setHeader('Content-Length', buffer.length);
     res.setHeader(
       'Content-Disposition',

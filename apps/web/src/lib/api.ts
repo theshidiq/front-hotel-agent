@@ -1683,9 +1683,23 @@ export async function downloadMenuExcel(groupId?: string): Promise<void> {
 	const url = groupId
 		? `${API_URL}/menu-export/menus/${groupId}.xlsx`
 		: `${API_URL}/menu-export/menus.xlsx`;
+	return downloadFile(url, 'menus.xlsx', 'Excelの書き出しに失敗しました');
+}
+
+/** Word (.docx) export of ONE menu — the editable presentation copy. */
+export async function downloadMenuWord(groupId: string): Promise<void> {
+	return downloadFile(
+		`${API_URL}/menu-export/menus/${groupId}.docx`,
+		'menu.docx',
+		'Wordの書き出しに失敗しました',
+	);
+}
+
+/** Shared: fetch with auth (a plain link can't send the header), then save. */
+async function downloadFile(url: string, fallbackName: string, errorMessage: string): Promise<void> {
 	const response = await apiFetch(url, { headers: authHeaders() });
 	if (!response.ok) {
-		let message = 'Excelの書き出しに失敗しました';
+		let message = errorMessage;
 		try {
 			const error = await response.json();
 			message = error.message || message;
@@ -1701,7 +1715,7 @@ export async function downloadMenuExcel(groupId?: string): Promise<void> {
 	const asciiMatch = disposition.match(/filename="([^"]+)"/i);
 	const filename = utf8Match
 		? decodeURIComponent(utf8Match[1])
-		: asciiMatch?.[1] || 'menus.xlsx';
+		: asciiMatch?.[1] || fallbackName;
 
 	const blob = await response.blob();
 	const objectUrl = URL.createObjectURL(blob);
