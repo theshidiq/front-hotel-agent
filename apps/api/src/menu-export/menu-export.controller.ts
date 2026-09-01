@@ -1,15 +1,22 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
+  Post,
   Req,
   Res,
   Header,
+  UploadedFile,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { MenuExportService } from './menu-export.service';
+import { MenuImportService } from './menu-import.service';
 import { RequirePermission } from '../auth/permission.decorator';
 import { StaffAuthGuard } from '../auth/auth.guard';
 
@@ -28,7 +35,10 @@ const XLSX_MIME =
 @UseGuards(StaffAuthGuard)
 @ApiBearerAuth()
 export class MenuExportController {
-  constructor(private readonly menuExportService: MenuExportService) {}
+  constructor(
+    private readonly menuExportService: MenuExportService,
+    private readonly menuImportService: MenuImportService,
+  ) {}
 
   @Get('menus.xlsx')
   @Header('Cache-Control', 'no-store')
@@ -55,6 +65,64 @@ export class MenuExportController {
       groupId,
     );
     this.send(res, buffer, filename);
+  }
+
+  // ── Import (round-trip): two-phase, never writes without confirmation ──────
+
+  @Post('preview')
+  @RequirePermission('menus.create')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 15 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+      required: ['file'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Phase 1: diff an edited export against the DB. Read-only — writes nothing.',
+  })
+  async previewImport(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('An .xlsx file is required');
+    return this.menuImportService.preview(req.user.organization_id, file.buffer);
+  }
+
+  @Post('apply')
+  @RequirePermission('menus.create')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 15 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        token: { type: 'string', description: 'Token from the matching preview' },
+        allow_deletes: { type: 'string', description: 'Pass "true" to also remove dishes absent from the sheet' },
+      },
+      required: ['file', 'token'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Phase 2: apply an import, but only the exact change set that was previewed',
+  })
+  async applyImport(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { token?: string; allow_deletes?: string | boolean },
+  ) {
+    if (!file) throw new BadRequestException('An .xlsx file is required');
+    if (!body?.token) {
+      throw new BadRequestException('A preview token is required — preview the file first.');
+    }
+    // Deletions must be opted into explicitly, separately from the token.
+    const allowDeletes = body.allow_deletes === true || body.allow_deletes === 'true';
+    return this.menuImportService.apply(
+      req.user.organization_id,
+      file.buffer,
+      body.token,
+      allowDeletes,
+    );
   }
 
   /**

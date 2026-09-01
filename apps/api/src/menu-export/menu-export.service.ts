@@ -430,9 +430,19 @@ export class MenuExportService {
       { header: 'dish_id', key: 'dish_id', width: 38 },
       { header: 'course_id', key: 'course_id', width: 38 },
       { header: 'product_id', key: 'product_id', width: 38 },
+      { header: 'menu_group_id', key: 'menu_group_id', width: 38 },
     ];
     sheet.getRow(1).font = { bold: true };
     sheet.getRow(1).alignment = { vertical: 'middle' };
+
+    // EDITABLE columns are the plain-text ones; the id columns are machine keys.
+    // Sheet protection is advisory (Excel lets anyone unprotect it) but it stops
+    // the common accident: dragging a fill handle across dish_id and silently
+    // rewriting the keys that import matches on.
+    const idCols = ['K', 'L', 'M', 'N']; // dish_id, course_id, product_id, menu_group_id
+    for (const c of idCols) {
+      sheet.getColumn(c).font = { color: { argb: 'FF9CA3AF' }, size: 9 };
+    }
 
     // Resolve allergens for every linked dish in one pass.
     const productIds = [
@@ -464,12 +474,14 @@ export class MenuExportService {
             dish_id: dish.id,
             course_id: course.id,
             product_id: dish.product_id ?? '',
+            menu_group_id: menu.group_id,
           });
         });
       });
     }
 
-    // Kids menus share the sheet, tagged by their group name as the course.
+    // Kids menus share the sheet, tagged by their group name as the course and
+    // carrying their OWN group id so import routes them to the right group.
     for (const kids of menu.kids) {
       kids.items.forEach((item, idx) => {
         sheet.addRow({
@@ -486,6 +498,7 @@ export class MenuExportService {
           dish_id: item.id,
           course_id: '',
           product_id: '',
+          menu_group_id: kids.group_id,
         });
       });
     }
