@@ -270,19 +270,22 @@ export class MenuExportService {
   /**
    * The visual sheet: a landscape お品書き mirroring the editor.
    *
-   * Layout, matching the on-screen preview:
-   *   • courses run RIGHT TO LEFT — via the sheet's native right-to-left view,
-   *     so the underlying cells stay in natural left-to-right order
-   *   • each sub-column of a course is ONE cell holding its dishes joined by an
-   *     ideographic space, exactly like the editor's `group.join('　')`. A cell
-   *     per dish (the earlier approach) fragmented a course into disconnected
-   *     stacks and left ragged gaps; one flowing string per sub-column is what
-   *     actually reproduces the handwritten look.
-   *   • row 2 is the course name, row 3 the 一 mark, row 4 the dish text
+   * Structure, matching the on-screen preview exactly:
+   *   • ONE Excel column per sub-column of dishes; courses run RIGHT TO LEFT via
+   *     the sheet's native RTL view. Because RTL flips every column, the
+   *     sub-columns within a course are emitted reversed so they flip back into
+   *     the chef's reading order.
+   *   • the course name, the 一 mark and the dishes live in the SAME cell as one
+   *     vertical string ("食前酒　一　白桃霙酒"), so the text starts at the top of
+   *     the column and flows down — exactly as on screen. Splitting them across
+   *     separate rows (an earlier attempt) detached the names from their dishes
+   *     and pushed everything down the page.
+   *   • a left border on each course's outermost column draws the vertical rule
+   *     the editor shows between courses.
    *
-   * Heights are derived from the longest string on each row rather than fixed,
-   * because vertical text needs height proportional to character count — a fixed
-   * height truncates long course names and strands short entries far apart.
+   * One row holds everything, its height derived from the longest column's
+   * character count: vertical text clips rather than wraps, so the estimate
+   * deliberately over-allocates.
    *
    * Japanese uses textRotation 'vertical' (Excel's stacked mode, which keeps
    * kanji upright) rather than a 90° rotation that lays them on their side.
@@ -298,7 +301,7 @@ export class MenuExportService {
         fitToPage: true,
         fitToWidth: 1,
         fitToHeight: 1,
-        margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+        margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0.3, footer: 0.3 },
       },
     });
 
@@ -309,108 +312,70 @@ export class MenuExportService {
       wrapText: false,
     };
 
-    const NAME_ROW = 2;
-    const ICHI_ROW = 3;
-    const DISH_ROW = 4;
-    // Points of row height per CJK character, plus padding. Tuned so a long
-    // dish string gets a tall enough row to render without clipping.
-    const PT_PER_CHAR = 13.5;
+    const BODY_ROW = 2;      // everything below the title lives on this row
+    const PT_PER_CHAR = 13.2;
 
-    // Build the columns first so the title can span exactly the used width.
-    const columns: {
-      col: number;
-      courseName: string | null;
-      span: number;
-      text: string;
-    }[] = [];
-    let col = 1;
+    // Column 1 is the title (rightmost under RTL), then the courses.
+    let col = 2;
+    let maxChars = 0;
+    const courseStarts: number[] = [];
+
     for (const course of menu.courses) {
       const subs = course.cols.filter((s) => s.some((d) => (d.text ?? '').trim()));
       const groups = subs.length > 0 ? subs : [[]];
-      // The sheet is rendered right-to-left, which flips EVERY column — courses
-      // (wanted) but also the sub-columns inside a course (not wanted, it would
-      // reverse the chef's reading order). Reversing the sub-columns here means
-      // RTL flips them back, so within a course they read right-to-left exactly
-      // as they do in the editor.
+      // Reversed so the RTL view flips them back into reading order.
       const ordered = [...groups].reverse();
+      const firstCol = col;
+
       ordered.forEach((sub, idx) => {
-        columns.push({
-          col,
-          // The course name is merged across the whole course; anchor it on the
-          // LAST written column, which RTL renders as the course's rightmost —
-          // where the editor puts it.
-          courseName: idx === ordered.length - 1 ? course.name : null,
-          span: ordered.length,
-          text: sub
-            .map((d) => (d.text ?? '').trim())
-            .filter(Boolean)
-            .join('　'),
-        });
+        const dishes = sub.map((d) => (d.text ?? '').trim()).filter(Boolean);
+        // The course's FIRST sub-column (last written, rightmost on screen)
+        // carries the name and the 一 mark above its dishes.
+        const isLead = idx === ordered.length - 1;
+        const text = isLead
+          ? [course.name, '一', ...dishes].join('　')
+          : dishes.join('　');
+
+        const cell = sheet.getCell(BODY_ROW, col);
+        cell.value = text;
+        cell.font = { name: 'Yu Mincho', size: 12 };
+        cell.alignment = vertical;
+        maxChars = Math.max(maxChars, text.length);
+
+        sheet.getColumn(col).width = 4.2;
         col += 1;
       });
-    }
-    const totalCols = Math.max(1, col - 1);
 
-    // Row 1: the menu title, spanning the used width.
-    sheet.mergeCells(1, 1, 1, totalCols);
-    const titleCell = sheet.getCell(1, 1);
+      courseStarts.push(firstCol);
+    }
+
+    const lastCol = col - 1;
+
+    // Title in column 1 — rightmost on screen, as in the editor.
+    const titleCell = sheet.getCell(BODY_ROW, 1);
     titleCell.value = menu.menu_title;
-    titleCell.font = { name: 'Yu Mincho', size: 20 };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    sheet.getRow(1).height = 44;
+    titleCell.font = { name: 'Yu Mincho', size: 18 };
+    titleCell.alignment = { ...vertical, vertical: 'top' };
+    sheet.getColumn(1).width = 6.5;
+    maxChars = Math.max(maxChars, menu.menu_title.length + 4);
 
-    // Course names (merged across each course's sub-columns), 一 mark, dishes.
-    let maxNameChars = 0;
-    let maxDishChars = 0;
-    for (const entry of columns) {
-      if (entry.courseName) {
-        // The name anchors the course's LAST written column, so merge backwards
-        // across the span to cover the whole course.
-        const first = entry.col - entry.span + 1;
-        if (entry.span > 1) {
-          sheet.mergeCells(NAME_ROW, first, NAME_ROW, entry.col);
-        }
-        const nameCell = sheet.getCell(NAME_ROW, first);
-        nameCell.value = entry.courseName;
-        nameCell.font = { name: 'Yu Mincho', size: 14, bold: true };
-        nameCell.alignment = vertical;
-        maxNameChars = Math.max(maxNameChars, entry.courseName.length);
-
-        // The 一 mark sits above the course's rightmost column (RTL), matching
-        // the editor, where it caps the first sub-column read.
-        const ichi = sheet.getCell(ICHI_ROW, entry.col);
-        ichi.value = '一';
-        ichi.font = { name: 'Yu Mincho', size: 12 };
-        ichi.alignment = { horizontal: 'center', vertical: 'middle' };
-      }
-
-      if (entry.text) {
-        const dishCell = sheet.getCell(DISH_ROW, entry.col);
-        dishCell.value = entry.text;
-        dishCell.font = { name: 'Yu Mincho', size: 12 };
-        dishCell.alignment = vertical;
-        maxDishChars = Math.max(maxDishChars, entry.text.length);
-      }
-
-      sheet.getColumn(entry.col).width = 3.6;
+    // Vertical rules between courses: a left border on each course's outermost
+    // (lowest-numbered) column, which RTL renders on the course's left edge.
+    for (const start of courseStarts) {
+      const cell = sheet.getCell(BODY_ROW, start);
+      cell.border = { left: { style: 'hair', color: { argb: 'FFD6D3D1' } } };
     }
 
-    // Heights sized to the longest text on each row, generously — a row that is
-    // even slightly short clips the last character of vertical text rather than
-    // wrapping it, so these factors deliberately over-allocate.
-    sheet.getRow(NAME_ROW).height = Math.max(64, maxNameChars * 21 + 20);
-    sheet.getRow(ICHI_ROW).height = 20;
-    sheet.getRow(DISH_ROW).height = Math.max(180, maxDishChars * PT_PER_CHAR + 24);
+    sheet.getRow(BODY_ROW).height = Math.max(300, maxChars * PT_PER_CHAR + 30);
 
-    // Kids menus: a bordered callout beneath the courses, echoing the dashed box
-    // the editor overlays on the paper. Anchored to the right-hand (first) columns
-    // so RTL places it under the opening courses, as on screen.
-    let row = DISH_ROW + 2;
+    // Kids menus: a dashed callout under the opening courses (bottom-right on
+    // screen), echoing the box the editor overlays on the paper.
+    let row = BODY_ROW + 2;
     for (const kids of menu.kids) {
       const items = kids.items.map((i) => (i.text ?? '').trim()).filter(Boolean);
       if (items.length === 0) continue;
 
-      const boxEnd = Math.min(totalCols, 6);
+      const boxEnd = Math.min(lastCol, 5);
       const border: Partial<ExcelJS.Borders> = {
         top: { style: 'dashed', color: { argb: 'FF78716C' } },
         bottom: { style: 'dashed', color: { argb: 'FF78716C' } },
@@ -418,7 +383,6 @@ export class MenuExportService {
         right: { style: 'dashed', color: { argb: 'FF78716C' } },
       };
 
-      // Title row of the box.
       sheet.mergeCells(row, 1, row, boxEnd);
       const head = sheet.getCell(row, 1);
       head.value = kids.name;
@@ -427,18 +391,18 @@ export class MenuExportService {
       for (let c = 1; c <= boxEnd; c++) sheet.getCell(row, c).border = border;
       sheet.getRow(row).height = 24;
 
-      // Items row.
       sheet.mergeCells(row + 1, 1, row + 1, boxEnd);
       const body = sheet.getCell(row + 1, 1);
       body.value = items.map((t) => `・${t}`).join('　');
       body.font = { name: 'Yu Mincho', size: 11 };
       body.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       for (let c = 1; c <= boxEnd; c++) sheet.getCell(row + 1, c).border = border;
-      sheet.getRow(row + 1).height = 26;
+      sheet.getRow(row + 1).height = 28;
 
       row += 3;
     }
   }
+
 
   /**
    * The data sheet: flat, machine-readable rows.
