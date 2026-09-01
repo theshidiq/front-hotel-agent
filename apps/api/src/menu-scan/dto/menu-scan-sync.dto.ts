@@ -15,6 +15,27 @@ export class SyncDishDto {
   text: string;
 }
 
+// The kids callout box on a parent menu, persisted as its OWN kids menu_group
+// (linked into the parent's kids_group_ids[]). Items carry stable ids like dishes
+// so the backend diff-upserts them — no delete-all-then-insert wipe window.
+export class SyncKidsDto {
+  @ApiPropertyOptional({ description: 'Resolved kids menu_group id (when known). Keyed on FIRST so a rename updates this group instead of creating a new one.', nullable: true })
+  @ValidateIf((o) => o.id !== null && o.id !== undefined)
+  @IsString()
+  @IsOptional()
+  id?: string | null;
+
+  @ApiProperty({ description: 'Kids group name (e.g. 子供 CT70) — find-or-create when no id' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ type: [SyncDishDto], description: 'Kids menu items (one flat list)' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SyncDishDto)
+  items: SyncDishDto[];
+}
+
 export class SyncCourseDto {
   @ApiPropertyOptional({ description: 'menus.id when known (existing course); omitted for new', nullable: true })
   @ValidateIf((o) => o.id !== null && o.id !== undefined)
@@ -87,6 +108,17 @@ export class MenuSyncDto {
   @ValidateNested({ each: true })
   @Type(() => SyncCourseDto)
   courses: SyncCourseDto[];
+
+  @ApiPropertyOptional({
+    description: 'Kids callout box → persisted as a linked kids menu_group. Null/omitted = no kids menu (box hidden).',
+    type: SyncKidsDto,
+    nullable: true,
+  })
+  @ValidateIf((o) => o.kids !== null && o.kids !== undefined)
+  @ValidateNested()
+  @Type(() => SyncKidsDto)
+  @IsOptional()
+  kids?: SyncKidsDto | null;
 
   @ApiPropertyOptional({ description: 'When true, also DELETE dishes/courses absent from this payload (explicit user save). Autosync must omit/false this so it can never wipe data.', nullable: true })
   @IsOptional()

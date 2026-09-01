@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Req,
+  Header,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -68,6 +69,7 @@ export class MenuScanController {
   // ── Draft CRUD ────────────────────────────────────────────────────────────
 
   @Get('drafts')
+  @Header('Cache-Control', 'no-store')
   @RequirePermission('menus.create')
   @ApiOperation({ summary: 'List all menu scan drafts for this org' })
   async getDrafts(@Req() req: any): Promise<MenuScanDraft[]> {
@@ -106,6 +108,7 @@ export class MenuScanController {
   // ── Saved scanned menus (rows-backed; replaces draft list) ────────────────
 
   @Get('menus')
+  @Header('Cache-Control', 'no-store')
   @RequirePermission('menus.create')
   @ApiOperation({ summary: 'List saved scanned menus (grouped by menu group)' })
   async getScannedMenus(@Req() req: any) {
@@ -113,6 +116,7 @@ export class MenuScanController {
   }
 
   @Get('menus/:groupId')
+  @Header('Cache-Control', 'no-store')
   @RequirePermission('menus.create')
   @ApiOperation({ summary: 'Load one saved scanned menu (full courses + dishes) for editing' })
   async getScannedMenu(@Req() req: any, @Param('groupId') groupId: string) {

@@ -1586,6 +1586,14 @@ export interface SyncCourse {
 	cols: SyncDish[][];
 }
 
+// Kids callout box → persisted as a linked kids menu_group. Items carry stable
+// ids (like dishes) so the backend diff-upserts them safely.
+export interface SyncKids {
+	id?: string | null;   // resolved kids menu_group id; keyed on FIRST so rename updates it
+	name: string;
+	items: SyncDish[];
+}
+
 export interface MenuSyncData {
 	menu_group_id: string;
 	group_name?: string | null;
@@ -1593,6 +1601,8 @@ export interface MenuSyncData {
 	menu_title?: string | null;
 	session_id?: string | null;
 	courses: SyncCourse[];
+	// Kids box, or null/omitted when hidden. Persisted as a linked kids group.
+	kids?: SyncKids | null;
 	// true ONLY for explicit user removals (delete dish/course). Autosync omits it,
 	// so a background/stale sync can never delete data.
 	prune?: boolean;
@@ -1616,9 +1626,10 @@ export interface SavedMenu {
 	menu_title: string;
 	seasonal_menu_id: string | null;
 	courses: SyncCourse[];
+	kids?: SyncKids | null;
 }
 
-export async function menuScanSync(data: MenuSyncData): Promise<{ group_id: string; season_id: string | null; courses: any[] }> {
+export async function menuScanSync(data: MenuSyncData): Promise<{ group_id: string; season_id: string | null; courses: any[]; kids_group_id?: string | null }> {
 	const response = await apiFetch(`${API_URL}/menu-scan/sync`, {
 		method: 'POST',
 		headers: authHeaders({ 'Content-Type': 'application/json' }),

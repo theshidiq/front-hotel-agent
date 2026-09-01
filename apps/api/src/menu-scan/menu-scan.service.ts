@@ -285,8 +285,33 @@ export class MenuScanService {
       }
     }
 
-    // 2. Resolve group (find/create by inferred name, else the given id).
+    // 2. Resolve group.
+    //
+    // GUARD AGAINST DUPLICATE-GROUP WIPE: name-based find-or-CREATE is only safe
+    // when there is NO authoritative group yet (the OCR-extract path / a brand-new
+    // menu). On a continuous autosave the FE passes a real `menu_group_id` AND, on
+    // a fresh mount/re-login, re-sends `group_name` (its suppress flag resets). If
+    // we let name-resolution run there, a title/OCR spacing drift that fails to
+    // match the existing group would INSERT a new `menu_groups` row — orphaning the
+    // real menu, and the anti-wipe/misroute guards (which run per-resolved-group)
+    // can't protect a group they were never pointed at. This is the duplicate-then-
+    // wipe-on-relogin bug. So: if `menu_group_id` already names a real group, that
+    // group is authoritative — never create from `group_name`, and only *switch* to
+    // another group when the name matches an EXISTING group exactly.
     let groupId: string = input.menu_group_id;
+
+    // Is the supplied id already a real group for this org?
+    let suppliedGroupExists = false;
+    if (input.menu_group_id) {
+      const { data: cur } = await supabase
+        .from('menu_groups')
+        .select('id')
+        .eq('id', input.menu_group_id)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+      suppliedGroupExists = !!cur;
+    }
+
     if (input.group_name) {
       const name = input.group_name.trim();
       const { data: existing } = await supabase
@@ -296,8 +321,19 @@ export class MenuScanService {
         .eq('name', name)
         .maybeSingle();
       if (existing) {
+        // A group with this name exists — adopt it (legit when the chef renames the
+        // title to an existing group). Safe: no new row created.
         groupId = existing.id;
+      } else if (suppliedGroupExists) {
+        // Authoritative id present but the name matches nothing → DO NOT create a
+        // new group. Keep writing to the real group. (Renaming a group via the
+        // title isn't supported here; that's an explicit group edit, not autosave.)
+        this.logger.warn(
+          `Group name '${name}' not found; keeping authoritative group ${input.menu_group_id} ` +
+            `(refusing to auto-create a duplicate during sync).`,
+        );
       } else {
+        // No authoritative group yet (extract / brand-new menu) → create by name.
         const { data: created, error } = await supabase
           .from('menu_groups')
           .insert({ organization_id: organizationId, name, seasonal_menu_id: seasonId })
@@ -645,7 +681,7 @@ export class MenuScanService {
 
     const { data: group } = await supabase
       .from('menu_groups')
-      .select('id, name, display_title, seasonal_menu_id')
+      .select('id, name, display_title, seasonal_menu_id, kids_group_ids')
       .eq('id', groupId)
       .eq('organization_id', organizationId)
       .maybeSingle();
@@ -693,12 +729,47 @@ export class MenuScanService {
       };
     });
 
+    // Load the linked kids menu (first kids_group_ids entry) so reopening the
+    // editor rehydrates the kids box. One flat list of {id,text} items.
+    let kids: { name: string; items: { id: string; text: string }[] } | null = null;
+    const kidsGroupId = (group?.kids_group_ids ?? [])[0];
+    if (kidsGroupId) {
+      const { data: kidsGroup } = await supabase
+        .from('menu_groups')
+        .select('id, name')
+        .eq('id', kidsGroupId)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+      if (kidsGroup) {
+        const { data: kidsMenus } = await supabase
+          .from('menus')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('menu_group_id', kidsGroupId)
+          .order('sort_order', { ascending: true });
+        const kidsMenuIds = (kidsMenus ?? []).map((m) => m.id);
+        const { data: kidsDishes } = kidsMenuIds.length
+          ? await supabase
+              .from('menu_dishes')
+              .select('id, text, column, sort_order')
+              .in('menu_id', kidsMenuIds)
+              .order('column', { ascending: true })
+              .order('sort_order', { ascending: true })
+          : { data: [] as any[] };
+        kids = {
+          name: kidsGroup.name,
+          items: (kidsDishes ?? []).map((d) => ({ id: d.id, text: d.text })),
+        };
+      }
+    }
+
     return {
       menu_group_id: groupId,
       group_name: group?.name ?? '',
       menu_title: group?.display_title ?? group?.name ?? '',
       seasonal_menu_id: group?.seasonal_menu_id ?? null,
       courses,
+      kids,
     };
   }
 
@@ -750,6 +821,131 @@ export class MenuScanService {
     return { ...dish, allergens };
   }
 
+  // ── Kids menu: persist the parent's kids box as a linked kids menu_group ───
+  //
+  // The kids callout box on a parent menu is its OWN menu_group (one course holding
+  // the box items as dishes), linked into parent.kids_group_ids[]. Items carry
+  // stable client ids so we diff-upsert them via the same safe path as dishes —
+  // no delete-all-then-insert wipe window. Non-destructive on autosync (prune=false).
+  private async writeKidsGroup(
+    organizationId: string,
+    parentGroupId: string,
+    seasonId: string | null,
+    kids: { id?: string | null; name: string; items: { id: string; text: string }[] },
+    prune: boolean,
+  ): Promise<string | null> {
+    const supabase = this.supabaseService.getClient();
+    const name = (kids.name ?? '').trim();
+    if (!name) return null;
+
+    // Empty items carry no information — never let an empty payload wipe the kids
+    // menu (mirror of the writeMenuRows empty-payload no-op guard).
+    const items = (kids.items ?? []).filter((i) => i?.id && (i.text ?? '').trim());
+    if (items.length === 0) {
+      this.logger.warn(`writeKidsGroup: no items for '${name}' — skipping (no-op) to avoid data loss`);
+      // Still ensure the (possibly pre-existing) link is intact below if the group exists.
+    }
+
+    // 1. Resolve the kids group. Prefer the supplied id (rename → UPDATE the same
+    //    group, never spawn a duplicate). Else find-by-name, else create.
+    let kidsGroupId: string | null = null;
+    if (kids.id) {
+      const { data: byId } = await supabase
+        .from('menu_groups')
+        .select('id')
+        .eq('id', kids.id)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+      if (byId) {
+        kidsGroupId = byId.id;
+        // Keep the name in sync on rename.
+        await supabase.from('menu_groups').update({ name }).eq('id', kidsGroupId);
+      }
+    }
+    if (!kidsGroupId) {
+      const { data: existing } = await supabase
+        .from('menu_groups')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('name', name)
+        .maybeSingle();
+      if (existing) {
+        kidsGroupId = existing.id;
+      } else {
+        const { data: created, error } = await supabase
+          .from('menu_groups')
+          .insert({ organization_id: organizationId, name, seasonal_menu_id: seasonId })
+          .select('id')
+          .single();
+        if (error || !created) {
+          this.logger.warn(`Could not create kids group '${name}': ${error?.message}`);
+          return null;
+        }
+        kidsGroupId = created.id;
+      }
+    }
+
+    // Past resolution kidsGroupId is guaranteed set (every branch assigns or returns).
+    if (!kidsGroupId) return null;
+
+    // 2. One course row for the kids list (category = the kids group name).
+    if (items.length > 0) {
+      const category = name;
+      const { data: existingMenu } = await supabase
+        .from('menus')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('menu_group_id', kidsGroupId)
+        .maybeSingle();
+      const courseRow = {
+        organization_id: organizationId,
+        name,
+        description: items.map((i) => i.text.trim()).join('・') || null,
+        category,
+        sort_order: 1,
+        menu_group_id: kidsGroupId,
+        seasonal_menu_id: seasonId,
+        is_available: true,
+      };
+      let kidsMenuId: string;
+      if (existingMenu) {
+        await supabase.from('menus').update(courseRow).eq('id', existingMenu.id);
+        kidsMenuId = existingMenu.id;
+      } else {
+        const { data: m, error } = await supabase
+          .from('menus')
+          .insert(courseRow)
+          .select('id')
+          .single();
+        if (error || !m) {
+          this.logger.warn(`Could not create kids course for '${name}': ${error?.message}`);
+          return kidsGroupId;
+        }
+        kidsMenuId = m.id;
+      }
+      // Items as a single column → reuse the safe dish diff-upsert.
+      await this.diffDishes(organizationId, kidsMenuId, [items], prune);
+    }
+
+    // 3. Link the kids group into the parent's kids_group_ids[] (append if missing).
+    const { data: parent } = await supabase
+      .from('menu_groups')
+      .select('kids_group_ids')
+      .eq('id', parentGroupId)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+    const linked: string[] = parent?.kids_group_ids ?? [];
+    if (!linked.includes(kidsGroupId)) {
+      await supabase
+        .from('menu_groups')
+        .update({ kids_group_ids: [...linked, kidsGroupId] })
+        .eq('id', parentGroupId)
+        .eq('organization_id', organizationId);
+    }
+
+    return kidsGroupId;
+  }
+
   // ── Sync: continuous save of the editing menu into rows ───────────────────
   async syncMenu(organizationId: string, dto: MenuSyncDto) {
     const result = await this.writeMenuRows(
@@ -763,6 +959,24 @@ export class MenuScanService {
       },
       dto.prune === true, // autosync sends false/omitted → never deletes
     );
+
+    // Persist the kids box (if present) as a linked kids menu_group. Skipped on a
+    // misroute/anti-wipe skip of the parent (result.skipped) so we never write kids
+    // data against a wrong/half-loaded parent.
+    let kidsGroupId: string | null = null;
+    if (dto.kids && !(result as any).skipped) {
+      try {
+        kidsGroupId = await this.writeKidsGroup(
+          organizationId,
+          result.group_id,
+          result.season_id,
+          dto.kids,
+          dto.prune === true,
+        );
+      } catch (e: any) {
+        this.logger.warn(`Kids group write failed (will retry on next sync): ${e.message}`);
+      }
+    }
 
     // Keep the scan session pointed at the resolved group (provenance/image).
     if (dto.session_id) {
@@ -778,7 +992,7 @@ export class MenuScanService {
         .eq('id', dto.session_id)
         .eq('organization_id', organizationId);
     }
-    return result;
+    return { ...result, kids_group_id: kidsGroupId };
   }
 
   // ── Confirm (legacy alias) — kept so in-flight clients don't break ────────

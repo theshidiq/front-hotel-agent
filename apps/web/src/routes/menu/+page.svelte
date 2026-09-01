@@ -943,6 +943,12 @@ ${coursesHtml}
 			window.location.href = '/login';
 			return;
 		}
+		// Wait for the Supabase session (access token) to actually be restored before
+		// firing API calls. On a cached/optimistic render `loading` flips false BEFORE
+		// getSession() resolves, so the token can still be null here — firing now sends
+		// no Authorization header and every call 401s (the console wall). Gating on the
+		// session means we fetch once, authenticated, instead of 401-then-retry.
+		if (!authState.session?.access_token) return;
 		dataLoaded = true;
 		Promise.all([loadProducts(), loadAllergens(), loadMenus(), loadCategories(), loadAlternates()]);
 	});

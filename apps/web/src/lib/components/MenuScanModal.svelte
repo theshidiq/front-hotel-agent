@@ -384,10 +384,17 @@
 		}));
 	}
 
-	// Kids menu callout box (overlay on the お品書き paper)
+	// Kids menu callout box (overlay on the お品書き paper). Items carry stable ids
+	// so the backend diff-upserts them safely (persisted as a linked kids group).
+	// NO default seed: a hardcoded list with mount-time ids gets re-minted across
+	// renders, so the backend sees "new" ids for the same text and DUPLICATES the
+	// rows. The box starts hidden/empty and is populated only by hydration (opening
+	// a saved menu) or explicit user entry. kidsGroupId tracks the resolved kids
+	// group so a rename UPDATES it instead of spawning a new linked group.
 	let kidsName: string = $state('子供 CK70');
-	let kidsItems: string[] = $state(['造里', '本日の肉料理', '香物', '香物']);
-	let showKidsBox: boolean = $state(true);
+	let kidsItems: { id: string; text: string }[] = $state([]);
+	let kidsGroupId: string | null = $state(null);
+	let showKidsBox: boolean = $state(false);
 	let editingKidsName = $state(false);
 	let editingKidsItemIdx: number | null = $state(null);
 	let savedMenus: SavedMenuSummary[] = $state([]);
@@ -521,21 +528,40 @@
 				menu_title: menuTitle,
 				session_id: sessionId,
 				courses: buildSyncCourses(),
+				// Kids box → linked kids menu_group. Only sent when shown AND has a name;
+				// null/omitted leaves any existing kids menu untouched (non-destructive).
+				kids:
+					showKidsBox && kidsName.trim()
+						? { id: kidsGroupId, name: kidsName.trim(), items: kidsItems.filter((i) => i.text.trim()) }
+						: null,
 				prune,
 			});
 			// Reconcile: adopt the resolved group + any newly-created course ids so
 			// subsequent saves update in place. Once the group is resolved server-
 			// side, stop title-inference from re-selecting.
 			if (result?.group_id) { selectedGroupId = result.group_id; groupTouched = true; }
+			// Adopt the resolved kids group id so a later rename UPDATES it (keyed by id)
+			// instead of spawning a new linked group.
+			if (result?.kids_group_id && !kidsGroupId) kidsGroupId = result.kids_group_id;
 			if (Array.isArray(result?.courses)) {
 				const idByName = new Map<string, string>(
 					result.courses.map((c: any) => [c.name, c.id]),
 				);
-				workCourses = workCourses.map((wc) => {
+				// Only reassign workCourses if a menuId was ACTUALLY newly filled in.
+				// `.map()` always returns a fresh array, so an unconditional assignment
+				// changes the reference every sync → the serialize effect re-runs →
+				// `courses` rebuilds → the autosave effect reschedules → an endless
+				// self-perpetuating sync loop with no user edit. Guarding on a real
+				// change breaks that feedback loop (idempotent: a sync that fills in
+				// no new ids leaves workCourses untouched).
+				let changed = false;
+				const next = workCourses.map((wc) => {
 					if (wc.menuId) return wc;
 					const id = idByName.get(wc.name);
-					return id ? { ...wc, menuId: id } : wc;
+					if (id) { changed = true; return { ...wc, menuId: id }; }
+					return wc;
 				});
+				if (changed) workCourses = next;
 			}
 		} catch (err) {
 			console.error('[menu-scan] menu sync failed', err);
@@ -708,7 +734,7 @@
 					...courses.map(c => `【${c.name}】\n${c.description ?? ''}`),
 				];
 				if (showKidsBox) {
-					lines.push('', `【${kidsName}】`, ...kidsItems.map(i => `・${i}`));
+					lines.push('', `【${kidsName}】`, ...kidsItems.map(i => `・${i.text}`));
 				}
 				await navigator.share({ title, text: lines.join('\n') });
 			}
@@ -834,6 +860,17 @@
 			imageUrl = summary.image_url ?? '';
 			menuTitle = full.menu_title;
 			workCourses = buildWorkCourses(full.courses as any[]);
+			// Rehydrate the kids box from the linked kids group (if any).
+			if (full.kids && full.kids.items.length > 0) {
+				kidsGroupId = full.kids.id ?? null;
+				kidsName = full.kids.name;
+				kidsItems = full.kids.items.map((i) => ({ id: i.id, text: i.text }));
+				showKidsBox = true;
+			} else {
+				kidsGroupId = null;
+				kidsItems = [];
+				showKidsBox = false;
+			}
 			step = 'review';
 			// Release suppression only after a clean load + settled effects, so
 			// genuine edits sync but the load itself never does.
@@ -1536,15 +1573,15 @@
 
 					<!-- Items -->
 					<div class="flex flex-col gap-1">
-						{#each kidsItems as item, kidsIdx}
+						{#each kidsItems as item, kidsIdx (item.id)}
 							{#if editingKidsItemIdx === kidsIdx}
 								<input
 									type="text"
-									bind:value={kidsItems[kidsIdx]}
+									bind:value={kidsItems[kidsIdx].text}
 									placeholder="メニュー名を入力"
 									onblur={() => {
 										// Drop the item if left blank, so empty bullets don't linger.
-										if (!kidsItems[kidsIdx].trim()) {
+										if (!kidsItems[kidsIdx].text.trim()) {
 											kidsItems = kidsItems.filter((_, i) => i !== kidsIdx);
 										}
 										editingKidsItemIdx = null;
@@ -1558,9 +1595,9 @@
 									<span class="text-stone-500 text-base leading-tight font-serif-jp">・</span>
 									<button
 										onclick={() => { editingKidsItemIdx = kidsIdx; }}
-										class="font-serif-jp text-base leading-tight hover:bg-stone-50 rounded px-1 py-0.5 transition-colors text-left tracking-wide whitespace-nowrap {item.trim() ? 'text-stone-700' : 'text-stone-300'}"
+										class="font-serif-jp text-base leading-tight hover:bg-stone-50 rounded px-1 py-0.5 transition-colors text-left tracking-wide whitespace-nowrap {item.text.trim() ? 'text-stone-700' : 'text-stone-300'}"
 									>
-										{item.trim() ? item : 'メニュー名を入力'}
+										{item.text.trim() ? item.text : 'メニュー名を入力'}
 									</button>
 									<button
 										onclick={() => { kidsItems = kidsItems.filter((_, i) => i !== kidsIdx); }}
@@ -1577,7 +1614,7 @@
 
 						<!-- Add item button (hidden on print) -->
 						<button
-							onclick={() => { kidsItems = [...kidsItems, '']; editingKidsItemIdx = kidsItems.length; }}
+							onclick={() => { kidsItems = [...kidsItems, { id: newId('kid'), text: '' }]; editingKidsItemIdx = kidsItems.length; }}
 							class="flex items-center gap-1 text-xs text-stone-500 hover:text-stone-700 mt-1.5 transition-colors print:hidden"
 						>
 							<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1590,7 +1627,7 @@
 				{:else}
 				<!-- Show "Add kids menu" button when hidden -->
 				<button
-					onclick={() => { showKidsBox = true; }}
+					onclick={() => { showKidsBox = true; if (kidsItems.length === 0) kidsItems = [{ id: newId('kid'), text: '' }]; }}
 					class="scan-add-kids flex items-center gap-1 px-2 py-1 border border-dashed border-stone-300 text-[10px] text-stone-400 hover:text-stone-600 hover:border-stone-400 transition-colors print:hidden"
 				>
 					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
