@@ -5,6 +5,7 @@
 		menuScanGetMenus,
 		menuScanGetMenu,
 		menuScanSetDishProduct,
+		downloadMenuExcel,
 		getProducts,
 		AuthExpiredError,
 	} from '$lib/api';
@@ -611,6 +612,21 @@
 	let generatingPdf = $state(false);
 	let isCapturing = $state(false);   // true only while rendering for PDF/print → dishes auto-balance
 
+	// Excel archive download (all menus). Read-only: never touches menu data.
+	let exportingExcel = $state(false);
+	async function exportAllExcel() {
+		if (exportingExcel) return;
+		exportingExcel = true;
+		error = null;
+		try {
+			await downloadMenuExcel();
+		} catch (err: any) {
+			error = err?.message || 'Excelの書き出しに失敗しました';
+		} finally {
+			exportingExcel = false;
+		}
+	}
+
 	// Render the on-screen paper to an A4 landscape PDF (looks exactly like the screen).
 	async function buildPdf(): Promise<import('jspdf').jsPDF | null> {
 		if (!paperEl) return null;
@@ -1209,6 +1225,18 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
 				</svg>
 				<h3 class="text-xs font-medium text-stone-600 uppercase tracking-widest">保存済みメニュー</h3>
+				<!-- Excel archive: all menus in one workbook (layout + data sheets). -->
+				<button
+					onclick={exportAllExcel}
+					disabled={exportingExcel}
+					class="ml-auto flex items-center gap-1.5 px-2.5 py-1 border border-stone-300 text-[10px] tracking-widest uppercase text-stone-600 hover:text-stone-900 hover:border-stone-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+					title="全メニューをExcelファイルに書き出す"
+				>
+					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+					</svg>
+					{exportingExcel ? '書き出し中…' : 'Excel'}
+				</button>
 			</div>
 			<div class="flex flex-col gap-2">
 				{#each visibleDrafts as draft (draft.menu_group_id)}

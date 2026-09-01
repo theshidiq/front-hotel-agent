@@ -1674,3 +1674,43 @@ export async function menuScanSetDishProduct(
 	}
 	return response.json();
 }
+
+// ── Excel export (archive / portability) ───────────────────────────────────
+// Downloads the .xlsx through apiFetch so the auth token is attached (a plain
+// link/navigation can't send an Authorization header), then hands the blob to
+// the browser as a file save. Pass a groupId for one menu, or omit for all.
+export async function downloadMenuExcel(groupId?: string): Promise<void> {
+	const url = groupId
+		? `${API_URL}/menu-export/menus/${groupId}.xlsx`
+		: `${API_URL}/menu-export/menus.xlsx`;
+	const response = await apiFetch(url, { headers: authHeaders() });
+	if (!response.ok) {
+		let message = 'Excelの書き出しに失敗しました';
+		try {
+			const error = await response.json();
+			message = error.message || message;
+		} catch {
+			/* non-JSON error body — keep the default message */
+		}
+		throw new Error(message);
+	}
+
+	// Prefer the server's filename (it carries the Japanese menu title + date).
+	const disposition = response.headers.get('Content-Disposition') ?? '';
+	const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+	const asciiMatch = disposition.match(/filename="([^"]+)"/i);
+	const filename = utf8Match
+		? decodeURIComponent(utf8Match[1])
+		: asciiMatch?.[1] || 'menus.xlsx';
+
+	const blob = await response.blob();
+	const objectUrl = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = objectUrl;
+	a.download = filename;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	// Revoke on the next tick so the download has certainly started.
+	setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
