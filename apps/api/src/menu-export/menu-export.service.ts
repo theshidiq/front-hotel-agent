@@ -327,13 +327,20 @@ export class MenuExportService {
     for (const course of menu.courses) {
       const subs = course.cols.filter((s) => s.some((d) => (d.text ?? '').trim()));
       const groups = subs.length > 0 ? subs : [[]];
-      groups.forEach((sub, idx) => {
+      // The sheet is rendered right-to-left, which flips EVERY column — courses
+      // (wanted) but also the sub-columns inside a course (not wanted, it would
+      // reverse the chef's reading order). Reversing the sub-columns here means
+      // RTL flips them back, so within a course they read right-to-left exactly
+      // as they do in the editor.
+      const ordered = [...groups].reverse();
+      ordered.forEach((sub, idx) => {
         columns.push({
           col,
-          // Only the first sub-column carries the course name; it is merged
-          // across the whole course below.
-          courseName: idx === 0 ? course.name : null,
-          span: groups.length,
+          // The course name is merged across the whole course; anchor it on the
+          // LAST written column, which RTL renders as the course's rightmost —
+          // where the editor puts it.
+          courseName: idx === ordered.length - 1 ? course.name : null,
+          span: ordered.length,
           text: sub
             .map((d) => (d.text ?? '').trim())
             .filter(Boolean)
@@ -357,16 +364,20 @@ export class MenuExportService {
     let maxDishChars = 0;
     for (const entry of columns) {
       if (entry.courseName) {
+        // The name anchors the course's LAST written column, so merge backwards
+        // across the span to cover the whole course.
+        const first = entry.col - entry.span + 1;
         if (entry.span > 1) {
-          sheet.mergeCells(NAME_ROW, entry.col, NAME_ROW, entry.col + entry.span - 1);
+          sheet.mergeCells(NAME_ROW, first, NAME_ROW, entry.col);
         }
-        const nameCell = sheet.getCell(NAME_ROW, entry.col);
+        const nameCell = sheet.getCell(NAME_ROW, first);
         nameCell.value = entry.courseName;
         nameCell.font = { name: 'Yu Mincho', size: 14, bold: true };
         nameCell.alignment = vertical;
         maxNameChars = Math.max(maxNameChars, entry.courseName.length);
 
-        // The 一 mark sits atop the course's first sub-column, as in the editor.
+        // The 一 mark sits above the course's rightmost column (RTL), matching
+        // the editor, where it caps the first sub-column read.
         const ichi = sheet.getCell(ICHI_ROW, entry.col);
         ichi.value = '一';
         ichi.font = { name: 'Yu Mincho', size: 12 };
@@ -384,23 +395,48 @@ export class MenuExportService {
       sheet.getColumn(entry.col).width = 3.6;
     }
 
-    // Heights sized to the longest text on each row (the fix for truncation).
-    sheet.getRow(NAME_ROW).height = Math.max(48, maxNameChars * 16 + 12);
+    // Heights sized to the longest text on each row, generously — a row that is
+    // even slightly short clips the last character of vertical text rather than
+    // wrapping it, so these factors deliberately over-allocate.
+    sheet.getRow(NAME_ROW).height = Math.max(64, maxNameChars * 21 + 20);
     sheet.getRow(ICHI_ROW).height = 20;
-    sheet.getRow(DISH_ROW).height = Math.max(160, maxDishChars * PT_PER_CHAR + 16);
+    sheet.getRow(DISH_ROW).height = Math.max(180, maxDishChars * PT_PER_CHAR + 24);
 
-    // Kids menus as a labelled block beneath the courses, in reading order.
+    // Kids menus: a bordered callout beneath the courses, echoing the dashed box
+    // the editor overlays on the paper. Anchored to the right-hand (first) columns
+    // so RTL places it under the opening courses, as on screen.
     let row = DISH_ROW + 2;
     for (const kids of menu.kids) {
       const items = kids.items.map((i) => (i.text ?? '').trim()).filter(Boolean);
       if (items.length === 0) continue;
-      sheet.mergeCells(row, 1, row, Math.min(totalCols, 8));
-      const cell = sheet.getCell(row, 1);
-      cell.value = `【${kids.name}】　${items.join('・')}`;
-      cell.font = { name: 'Yu Mincho', size: 11 };
-      cell.alignment = { horizontal: 'right', vertical: 'middle' };
-      sheet.getRow(row).height = 22;
-      row += 1;
+
+      const boxEnd = Math.min(totalCols, 6);
+      const border: Partial<ExcelJS.Borders> = {
+        top: { style: 'dashed', color: { argb: 'FF78716C' } },
+        bottom: { style: 'dashed', color: { argb: 'FF78716C' } },
+        left: { style: 'dashed', color: { argb: 'FF78716C' } },
+        right: { style: 'dashed', color: { argb: 'FF78716C' } },
+      };
+
+      // Title row of the box.
+      sheet.mergeCells(row, 1, row, boxEnd);
+      const head = sheet.getCell(row, 1);
+      head.value = kids.name;
+      head.font = { name: 'Yu Mincho', size: 12, bold: true };
+      head.alignment = { horizontal: 'center', vertical: 'middle' };
+      for (let c = 1; c <= boxEnd; c++) sheet.getCell(row, c).border = border;
+      sheet.getRow(row).height = 24;
+
+      // Items row.
+      sheet.mergeCells(row + 1, 1, row + 1, boxEnd);
+      const body = sheet.getCell(row + 1, 1);
+      body.value = items.map((t) => `・${t}`).join('　');
+      body.font = { name: 'Yu Mincho', size: 11 };
+      body.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      for (let c = 1; c <= boxEnd; c++) sheet.getCell(row + 1, c).border = border;
+      sheet.getRow(row + 1).height = 26;
+
+      row += 3;
     }
   }
 
