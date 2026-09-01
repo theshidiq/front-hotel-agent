@@ -54,8 +54,11 @@ export class MenuDocxService {
   /** One vertical line of text inside a cell. */
   private line(text: string, size: number, bold = false): Paragraph {
     return new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 0, line: 288 }, // ~1.2× for comfortable CJK spacing
+      // LEFT, not CENTER: under tbRl the alignment axis rotates with the text,
+      // so "left" is the top of the column. Centering is what left every course
+      // floating in the middle of the page instead of starting at the top.
+      alignment: AlignmentType.LEFT,
+      spacing: { after: 0, line: 240 },
       children: [
         new TextRun({
           text,
@@ -68,13 +71,51 @@ export class MenuDocxService {
   }
 
   /**
+   * A course name plus its dishes as ONE paragraph.
+   *
+   * Under tbRl each paragraph becomes its own vertical line, so a paragraph per
+   * dish renders the dishes as separate thin strips beside the course name
+   * instead of flowing beneath it. Joining them into a single run makes the
+   * column read as one continuous line, as it does on screen.
+   */
+  private columnParagraph(
+    lead: string | null,
+    dishes: string[],
+    size: number,
+  ): Paragraph {
+    const runs: TextRun[] = [];
+    if (lead) {
+      runs.push(
+        new TextRun({
+          text: `${lead}　一　`,
+          font: { name: this.FONT, eastAsia: this.FONT },
+          size: (size + 2) * 2,
+          bold: true,
+        }),
+      );
+    }
+    runs.push(
+      new TextRun({
+        text: dishes.join('　'),
+        font: { name: this.FONT, eastAsia: this.FONT },
+        size: size * 2,
+      }),
+    );
+    return new Paragraph({
+      alignment: AlignmentType.LEFT,
+      spacing: { after: 0, line: 240 },
+      children: runs,
+    });
+  }
+
+  /**
    * One course = one table cell holding its sub-columns.
    *
    * Each sub-column becomes its own nested cell so the dishes sit side by side
    * exactly as in the editor, with the course name and the 一 mark leading the
    * course's first (rightmost, under tbRl) sub-column.
    */
-  private courseCell(course: DocxCourse): TableCell {
+  private courseCells(course: DocxCourse): TableCell[] {
     const subs = course.cols.filter((s) => s.some((d) => (d.text ?? '').trim()));
     const groups = subs.length > 0 ? subs : [[]];
 
@@ -82,55 +123,33 @@ export class MenuDocxService {
     // the chef's rightmost sub-column must be emitted last.
     const ordered = [...groups].reverse();
 
-    const subCells = ordered.map((sub, idx) => {
+    const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } as const;
+    const rule = { style: BorderStyle.SINGLE, size: 2, color: 'D6D3D1' } as const;
+
+    // Sub-columns become cells of the OUTER table directly. An earlier version
+    // nested a table per course, which made Word size each course to a share of
+    // the page width and spread eleven courses across it with large gaps.
+    return ordered.map((sub, idx) => {
       const dishes = sub.map((d) => (d.text ?? '').trim()).filter(Boolean);
-      // The course's first sub-column is now the LAST cell (rightmost on page),
-      // and it carries the name and the 一 mark.
       const isLead = idx === ordered.length - 1;
-      const paragraphs: Paragraph[] = [];
-      if (isLead) {
-        paragraphs.push(this.line(course.name, 14, true));
-        paragraphs.push(this.line('一', 11));
-      }
-      for (const dish of dishes) paragraphs.push(this.line(dish, 11));
-      if (paragraphs.length === 0) paragraphs.push(this.line('', 11));
 
       return new TableCell({
-        children: paragraphs,
+        children: [this.columnParagraph(isLead ? course.name : null, dishes, 11)],
         textDirection: TextDirection.TOP_TO_BOTTOM_RIGHT_TO_LEFT,
-        verticalAlign: VerticalAlign.TOP,
-        margins: { top: 60, bottom: 60, left: 40, right: 40 },
-        borders: this.noBorders(),
+        // Under tbRl the vertical axis rotates: BOTTOM anchors the text to the
+        // start (top) of the column. TOP pushed everything to the far side.
+        verticalAlign: VerticalAlign.BOTTOM,
+        margins: { top: 30, bottom: 30, left: 10, right: 10 },
+        width: { size: 460, type: WidthType.DXA },
+        borders: {
+          top: none,
+          bottom: none,
+          left: none,
+          // Hairline only on the course's leading (rightmost) column, so one
+          // rule falls between courses rather than between every sub-column.
+          right: isLead ? rule : none,
+        },
       });
-    });
-
-    // Nest the sub-columns in a borderless table so they align at the top.
-    const inner = new Table({
-      rows: [
-        new TableRow({
-          children: subCells,
-          // Match the outer row: without an explicit height the nested row
-          // collapses and the vertical text overlaps.
-          height: { value: 8400, rule: HeightRule.ATLEAST },
-        }),
-      ],
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      borders: this.noBorders(),
-      layout: TableLayoutType.AUTOFIT,
-    });
-
-    return new TableCell({
-      children: [inner],
-      verticalAlign: VerticalAlign.TOP,
-      margins: { top: 0, bottom: 0, left: 60, right: 60 },
-      borders: {
-        top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-        bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-        left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-        // A hairline on the right edge separates this course from the one read
-        // before it, matching the editor's vertical rules.
-        right: { style: BorderStyle.SINGLE, size: 2, color: 'D6D3D1' },
-      },
     });
   }
 
@@ -143,17 +162,19 @@ export class MenuDocxService {
   async build(menu: DocxMenu): Promise<Buffer> {
     // Title cell: stands alone, rendered rightmost by tbRl — as on screen.
     const titleCell = new TableCell({
-      children: [this.line(menu.menu_title, 20)],
+      children: [this.line(menu.menu_title, 18)],
       textDirection: TextDirection.TOP_TO_BOTTOM_RIGHT_TO_LEFT,
-      verticalAlign: VerticalAlign.TOP,
-      margins: { top: 60, bottom: 60, left: 120, right: 120 },
+      verticalAlign: VerticalAlign.BOTTOM, // = top of the column under tbRl
+      margins: { top: 60, bottom: 60, left: 40, right: 40 },
+      width: { size: 900, type: WidthType.DXA },
       borders: this.noBorders(),
     });
 
     // Right-to-left reading order, produced by reversing the cells (the page is
     // left-to-right; only the cells are vertical). The title ends up rightmost,
     // then the courses run leftwards, as in the editor.
-    const cells = [...menu.courses.map((c) => this.courseCell(c)).reverse(), titleCell];
+    const courseCells = menu.courses.flatMap((c) => this.courseCells(c));
+    const cells = [...courseCells.reverse(), titleCell];
 
     // An explicit row height is what gives the vertical text somewhere to flow;
     // without it Word collapses the row to the height of one line and the
@@ -168,9 +189,11 @@ export class MenuDocxService {
             height: { value: ROW_HEIGHT, rule: HeightRule.ATLEAST },
           }),
         ],
-        width: { size: 100, type: WidthType.PERCENTAGE },
+        // FIXED so the per-cell widths above are honoured. With AUTOFIT Word
+        // divides the page between the columns instead, which is what spread
+        // eleven courses across the sheet with large gaps between them.
+        layout: TableLayoutType.FIXED,
         borders: this.noBorders(),
-        layout: TableLayoutType.AUTOFIT,
       }),
     ];
 
