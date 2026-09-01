@@ -268,18 +268,26 @@ export class MenuExportService {
   }
 
   /**
-   * The visual sheet: a landscape お品書き.
+   * The visual sheet: a landscape お品書き mirroring the editor.
    *
-   * Mirrors the editor: each course occupies a block of Excel columns (one per
-   * sub-column of dishes) and courses run RIGHT TO LEFT, which is achieved with
-   * the sheet's native right-to-left view rather than by reversing the data —
-   * so the underlying cells stay in natural order.
+   * Layout, matching the on-screen preview:
+   *   • courses run RIGHT TO LEFT — via the sheet's native right-to-left view,
+   *     so the underlying cells stay in natural left-to-right order
+   *   • each sub-column of a course is ONE cell holding its dishes joined by an
+   *     ideographic space, exactly like the editor's `group.join('　')`. A cell
+   *     per dish (the earlier approach) fragmented a course into disconnected
+   *     stacks and left ragged gaps; one flowing string per sub-column is what
+   *     actually reproduces the handwritten look.
+   *   • row 2 is the course name, row 3 the 一 mark, row 4 the dish text
    *
-   * Japanese text uses textRotation 'vertical' (Excel's stacked-text mode, which
-   * keeps kanji upright) rather than a 90° rotation (which lays them on their
-   * side). Note: vertical text renders best in Excel; Google Sheets and
-   * LibreOffice may fall back to horizontal. The data sheet is the reliable
-   * machine-readable copy.
+   * Heights are derived from the longest string on each row rather than fixed,
+   * because vertical text needs height proportional to character count — a fixed
+   * height truncates long course names and strands short entries far apart.
+   *
+   * Japanese uses textRotation 'vertical' (Excel's stacked mode, which keeps
+   * kanji upright) rather than a 90° rotation that lays them on their side.
+   * Vertical text renders best in Excel; other suites may fall back to
+   * horizontal, which is why the data sheet is the reliable machine copy.
    */
   private addLayoutSheet(workbook: ExcelJS.Workbook, menu: ExportMenu, name: string) {
     const sheet = workbook.addWorksheet(name, {
@@ -301,61 +309,97 @@ export class MenuExportService {
       wrapText: false,
     };
 
-    // Row 1: the menu title, spanning the sheet.
-    const totalCols = Math.max(
-      1,
-      menu.courses.reduce((n, c) => n + Math.max(1, c.cols.length), 0),
-    );
+    const NAME_ROW = 2;
+    const ICHI_ROW = 3;
+    const DISH_ROW = 4;
+    // Points of row height per CJK character, plus padding. Tuned so a long
+    // dish string gets a tall enough row to render without clipping.
+    const PT_PER_CHAR = 13.5;
+
+    // Build the columns first so the title can span exactly the used width.
+    const columns: {
+      col: number;
+      courseName: string | null;
+      span: number;
+      text: string;
+    }[] = [];
+    let col = 1;
+    for (const course of menu.courses) {
+      const subs = course.cols.filter((s) => s.some((d) => (d.text ?? '').trim()));
+      const groups = subs.length > 0 ? subs : [[]];
+      groups.forEach((sub, idx) => {
+        columns.push({
+          col,
+          // Only the first sub-column carries the course name; it is merged
+          // across the whole course below.
+          courseName: idx === 0 ? course.name : null,
+          span: groups.length,
+          text: sub
+            .map((d) => (d.text ?? '').trim())
+            .filter(Boolean)
+            .join('　'),
+        });
+        col += 1;
+      });
+    }
+    const totalCols = Math.max(1, col - 1);
+
+    // Row 1: the menu title, spanning the used width.
     sheet.mergeCells(1, 1, 1, totalCols);
     const titleCell = sheet.getCell(1, 1);
     titleCell.value = menu.menu_title;
-    titleCell.font = { name: 'Yu Mincho', size: 20, bold: false };
+    titleCell.font = { name: 'Yu Mincho', size: 20 };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    sheet.getRow(1).height = 42;
+    sheet.getRow(1).height = 44;
 
-    // Row 2: course names. Row 3+: dishes stacked downward.
-    let col = 1;
-    let maxDishRows = 0;
-    for (const course of menu.courses) {
-      const span = Math.max(1, course.cols.length);
+    // Course names (merged across each course's sub-columns), 一 mark, dishes.
+    let maxNameChars = 0;
+    let maxDishChars = 0;
+    for (const entry of columns) {
+      if (entry.courseName) {
+        if (entry.span > 1) {
+          sheet.mergeCells(NAME_ROW, entry.col, NAME_ROW, entry.col + entry.span - 1);
+        }
+        const nameCell = sheet.getCell(NAME_ROW, entry.col);
+        nameCell.value = entry.courseName;
+        nameCell.font = { name: 'Yu Mincho', size: 14, bold: true };
+        nameCell.alignment = vertical;
+        maxNameChars = Math.max(maxNameChars, entry.courseName.length);
 
-      // Course name across its sub-columns.
-      if (span > 1) sheet.mergeCells(2, col, 2, col + span - 1);
-      const nameCell = sheet.getCell(2, col);
-      nameCell.value = course.name;
-      nameCell.font = { name: 'Yu Mincho', size: 14, bold: true };
-      nameCell.alignment = vertical;
-      nameCell.border = { bottom: { style: 'thin', color: { argb: 'FFD6D3D1' } } };
+        // The 一 mark sits atop the course's first sub-column, as in the editor.
+        const ichi = sheet.getCell(ICHI_ROW, entry.col);
+        ichi.value = '一';
+        ichi.font = { name: 'Yu Mincho', size: 12 };
+        ichi.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
 
-      // Dishes: one Excel column per sub-column, preserving the chef's grouping.
-      course.cols.forEach((sub, subIdx) => {
-        sub.forEach((dish, rowIdx) => {
-          const cell = sheet.getCell(3 + rowIdx, col + subIdx);
-          cell.value = dish.text;
-          cell.font = { name: 'Yu Mincho', size: 11 };
-          cell.alignment = vertical;
-        });
-        maxDishRows = Math.max(maxDishRows, sub.length);
-      });
+      if (entry.text) {
+        const dishCell = sheet.getCell(DISH_ROW, entry.col);
+        dishCell.value = entry.text;
+        dishCell.font = { name: 'Yu Mincho', size: 12 };
+        dishCell.alignment = vertical;
+        maxDishChars = Math.max(maxDishChars, entry.text.length);
+      }
 
-      for (let i = 0; i < span; i++) sheet.getColumn(col + i).width = 4.5;
-      col += span;
+      sheet.getColumn(entry.col).width = 3.6;
     }
 
-    sheet.getRow(2).height = 90;
-    for (let r = 3; r < 3 + maxDishRows; r++) sheet.getRow(r).height = 110;
+    // Heights sized to the longest text on each row (the fix for truncation).
+    sheet.getRow(NAME_ROW).height = Math.max(48, maxNameChars * 16 + 12);
+    sheet.getRow(ICHI_ROW).height = 20;
+    sheet.getRow(DISH_ROW).height = Math.max(160, maxDishChars * PT_PER_CHAR + 16);
 
-    // Kids menus as a labelled block beneath the courses.
-    let row = 3 + maxDishRows + 1;
+    // Kids menus as a labelled block beneath the courses, in reading order.
+    let row = DISH_ROW + 2;
     for (const kids of menu.kids) {
-      if (kids.items.length === 0) continue;
-      const label = sheet.getCell(row, 1);
-      label.value = `【${kids.name}】`;
-      label.font = { name: 'Yu Mincho', size: 11, bold: true };
-      const textCell = sheet.getCell(row, 2);
-      textCell.value = kids.items.map((i) => i.text).join('・');
-      textCell.font = { name: 'Yu Mincho', size: 11 };
-      sheet.getRow(row).height = 20;
+      const items = kids.items.map((i) => (i.text ?? '').trim()).filter(Boolean);
+      if (items.length === 0) continue;
+      sheet.mergeCells(row, 1, row, Math.min(totalCols, 8));
+      const cell = sheet.getCell(row, 1);
+      cell.value = `【${kids.name}】　${items.join('・')}`;
+      cell.font = { name: 'Yu Mincho', size: 11 };
+      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      sheet.getRow(row).height = 22;
       row += 1;
     }
   }
