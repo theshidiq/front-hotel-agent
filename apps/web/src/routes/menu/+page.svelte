@@ -650,6 +650,7 @@
 			productAlternates = map;
 		} catch (e) {
 			console.error('Failed to load alternates:', e);
+			throw e;
 		}
 	}
 
@@ -917,12 +918,15 @@ ${coursesHtml}
 			menus = await getMenus();
 		} catch (e) {
 			console.error('Failed to load menus:', e);
+			throw e;
 		} finally {
 			isLoadingMenus = false;
 		}
 	}
 
 	let dataLoaded = $state(false);
+	let loadAttempts = $state(0);
+	let loadError: string | null = $state(null);
 
 	onMount(() => {
 		const params = $page.url.searchParams;
@@ -950,7 +954,26 @@ ${coursesHtml}
 		// session means we fetch once, authenticated, instead of 401-then-retry.
 		if (!authState.session?.access_token) return;
 		dataLoaded = true;
-		Promise.all([loadProducts(), loadAllergens(), loadMenus(), loadCategories(), loadAlternates()]);
+		// If the load fails (e.g. the API is down and every call hits
+		// ERR_CONNECTION_REFUSED), clear the flag so the page can try again —
+		// leaving it set latches the page into a permanently empty state, since
+		// the guard above blocks every retry and only a hard reload recovers.
+		// Retry on a delay, and give up after a few attempts rather than
+		// hammering a dead server forever.
+		Promise.all([
+			loadProducts(),
+			loadAllergens(),
+			loadMenus(),
+			loadCategories(),
+			loadAlternates(),
+		]).catch(() => {
+			if (loadAttempts >= 3) {
+				loadError = 'データを読み込めませんでした。サーバーに接続できません。';
+				return;
+			}
+			loadAttempts += 1;
+			setTimeout(() => { dataLoaded = false; }, 2000);
+		});
 	});
 
 	async function loadCategories() {
@@ -967,6 +990,9 @@ ${coursesHtml}
 			seasonalMenus = seasons;
 		} catch (e) {
 			console.error('Failed to load categories:', e);
+			// Rethrow so the caller can clear dataLoaded and allow a retry —
+			// swallowing here would latch the page into an empty state.
+			throw e;
 		}
 	}
 
@@ -975,6 +1001,7 @@ ${coursesHtml}
 			allergens = await getAllergens();
 		} catch (e) {
 			console.error('Failed to load allergens:', e);
+			throw e;
 		}
 	}
 
@@ -984,6 +1011,7 @@ ${coursesHtml}
 			products = await getProducts();
 		} catch (e) {
 			console.error('Failed to load products:', e);
+			throw e;
 		} finally {
 			isLoading = false;
 		}
@@ -1187,6 +1215,19 @@ ${coursesHtml}
 		rel="stylesheet"
 	/>
 </svelte:head>
+
+{#if loadError}
+	<!-- The page would otherwise sit silently empty when the API is unreachable. -->
+	<div class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-red-50 border border-red-300 text-red-800 px-4 py-2.5 text-xs shadow-sm flex items-center gap-3">
+		<span>{loadError}</span>
+		<button
+			onclick={() => { loadError = null; loadAttempts = 0; dataLoaded = false; }}
+			class="underline hover:no-underline whitespace-nowrap"
+		>
+			再試行
+		</button>
+	</div>
+{/if}
 
 <div class="flex h-screen bg-gray-100 font-['Noto_Sans_JP',sans-serif]">
 	<Sidebar sections={sidebarSections} bind:collapsed={sidebarCollapsed} bind:mobileOpen={sidebarMobileOpen} />
