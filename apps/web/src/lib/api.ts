@@ -1686,13 +1686,17 @@ export async function downloadMenuExcel(groupId?: string): Promise<void> {
 	return downloadFile(url, 'menus.xlsx', 'Excelの書き出しに失敗しました');
 }
 
-/** Word (.docx) export of ONE menu — the editable presentation copy. */
-export async function downloadMenuWord(groupId: string): Promise<void> {
-	return downloadFile(
-		`${API_URL}/menu-export/menus/${groupId}.docx`,
-		'menu.docx',
-		'Wordの書き出しに失敗しました',
-	);
+/**
+ * Word (.docx) export — the editable presentation copy.
+ *
+ * With a groupId, exports that one menu. Without one, exports EVERY menu into a
+ * single document, one menu per page.
+ */
+export async function downloadMenuWord(groupId?: string): Promise<void> {
+	const url = groupId
+		? `${API_URL}/menu-export/menus/${groupId}.docx`
+		: `${API_URL}/menu-export/menus.docx`;
+	return downloadFile(url, 'menus.docx', 'Wordの書き出しに失敗しました');
 }
 
 /** Shared: fetch with auth (a plain link can't send the header), then save. */

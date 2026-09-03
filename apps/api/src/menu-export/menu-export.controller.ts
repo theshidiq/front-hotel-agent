@@ -53,6 +53,19 @@ export class MenuExportController {
     this.send(res, buffer, filename);
   }
 
+  @Get('menus.docx')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('menus.create')
+  @ApiOperation({
+    summary: 'Export ALL menus as one .docx — one menu per page, real vertical Japanese',
+  })
+  async exportAllDocx(@Req() req: any, @Res() res: Response) {
+    const { buffer, filename } = await this.menuExportService.exportAllDocx(
+      req.user.organization_id,
+    );
+    this.send(res, buffer, filename, DOCX_MIME, 'docx');
+  }
+
   @Get('menus/:groupId.xlsx')
   @Header('Cache-Control', 'no-store')
   @RequirePermission('menus.create')

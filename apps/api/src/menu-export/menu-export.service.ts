@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { SupabaseService } from '../supabase/supabase.service';
-import { MenuDocxService } from './menu-docx.service';
+import { MenuDocxService, DocxMenu } from './menu-docx.service';
 
 // One course as loaded for export: the menus row plus its dishes arranged back
 // into the chef's visual cols[col][row] layout.
@@ -223,6 +223,64 @@ export class MenuExportService {
       })),
     });
     return { buffer, filename: this.safeFilename(menu.menu_title || menu.group_name) };
+  }
+
+  /**
+   * Build ONE .docx containing every menu in the organization, one per page.
+   *
+   * Mirrors exportAll()'s selection rules: groups with no courses are skipped,
+   * and groups linked as someone's kids menu are skipped because they are
+   * rendered inside their parent's page rather than as a menu of their own.
+   */
+  async exportAllDocx(
+    organizationId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const supabase = this.supabaseService.getClient();
+
+    const { data: groups, error } = await supabase
+      .from('menu_groups')
+      .select('id, name, kids_group_ids')
+      .eq('organization_id', organizationId);
+
+    // Fail LOUDLY, as exportAll does: quietly handing back a one-page document
+    // when the query failed would look like a successful export of one menu.
+    if (error) {
+      throw new InternalServerErrorException(
+        `Failed to load menu groups for export: ${error.message}`,
+      );
+    }
+
+    const kidsIds = new Set<string>();
+    for (const g of groups ?? []) {
+      for (const k of (g.kids_group_ids ?? []) as string[]) kidsIds.add(k);
+    }
+
+    const menus: DocxMenu[] = [];
+    for (const g of groups ?? []) {
+      if (kidsIds.has(g.id)) continue;
+      const menu = await this.loadMenu(organizationId, g.id);
+      if (menu.courses.length === 0) continue;
+      menus.push({
+        menu_title: menu.menu_title,
+        courses: menu.courses.map((c) => ({
+          name: c.name,
+          cols: c.cols.map((sub) => sub.map((d) => ({ text: d.text }))),
+        })),
+        kids: menu.kids.map((k) => ({
+          name: k.name,
+          items: k.items.map((i) => ({ text: i.text })),
+        })),
+      });
+    }
+
+    if (menus.length === 0) {
+      throw new NotFoundException(
+        'No menus with courses were found for this organization.',
+      );
+    }
+
+    const buffer = await this.menuDocxService.buildMany(menus);
+    return { buffer, filename: this.safeFilename('menus') };
   }
 
   /** Build one .xlsx containing every menu in the organization. */

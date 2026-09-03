@@ -602,6 +602,47 @@ export class MenuDocxService {
 
   /** Build a .docx for one menu. */
   async build(menu: DocxMenu): Promise<Buffer> {
+    return this.buildMany([menu]);
+  }
+
+  /**
+   * Build ONE .docx holding several menus, each on its own page.
+   *
+   * Every menu becomes its own section: a section break is a page break, and
+   * each section carries its own page setup, so 滞在 and 一般 are laid out
+   * independently rather than one flowing into the other.
+   */
+  async buildMany(menus: DocxMenu[]): Promise<Buffer> {
+    const sections = menus.map((menu) => ({
+      properties: {
+        page: {
+          size: { orientation: PageOrientation.LANDSCAPE },
+          // The top margin is deliberately larger than the others: under a
+          // vertical flow the course names begin at the very top of their
+          // column, so a 20pt margin left them sitting on the page edge.
+          // PAGE_H is reduced by the same amount so the sheet still fits.
+          margin: { top: 700, right: 400, bottom: 400, left: 400 },
+          // NOTE: the page textDirection is deliberately NOT set to tbRl.
+          // Setting it here AND on the cells rotates twice: Word turns the
+          // page, then turns each cell again inside it, leaving the vertical
+          // text no room to flow and crushing every column into one
+          // overlapping line. The cells carry the vertical direction; the
+          // right-to-left order is produced by emitting the columns reversed.
+        },
+      },
+      children: this.menuBody(menu),
+    }));
+
+    const doc = new Document({
+      sections: sections.length > 0 ? sections : [{ children: [] }],
+    });
+
+    const packed = Buffer.from(await Packer.toBuffer(doc));
+    return await this.postProcess(packed);
+  }
+
+  /** The body (table + floating kids boxes) for a single menu. */
+  private menuBody(menu: DocxMenu): (Table | Paragraph | Textbox)[] {
     const n = menu.courses.length;
 
     // Which kids menus actually have content — needed before the width scaling,
@@ -750,33 +791,7 @@ export class MenuDocxService {
       }
     }
 
-    const doc = new Document({
-      sections: [
-        {
-          properties: {
-            page: {
-              size: { orientation: PageOrientation.LANDSCAPE },
-              // The top margin is deliberately larger than the others: under a
-              // vertical flow the course names begin at the very top of their
-              // column, so a 20pt margin left them sitting on the page edge.
-              // PAGE_H is reduced by the same amount so the sheet still fits.
-              margin: { top: 700, right: 400, bottom: 400, left: 400 },
-              // NOTE: the page textDirection is deliberately NOT set to tbRl.
-              // Setting it here AND on the cells rotates twice: Word turns the
-              // page, then turns each cell again inside it, leaving the vertical
-              // text no room to flow and crushing every column into one
-              // overlapping line. The cells carry the vertical direction; the
-              // right-to-left order is produced by emitting the columns
-              // reversed (see build()).
-            },
-          },
-          children: body,
-        },
-      ],
-    });
-
-    const packed = Buffer.from(await Packer.toBuffer(doc));
-    return await this.postProcess(packed);
+    return body;
   }
 
   /**
