@@ -255,8 +255,21 @@ export class MenuExportService {
       for (const k of (g.kids_group_ids ?? []) as string[]) kidsIds.add(k);
     }
 
+    // Explicit running order for the printed set. Without this the pages come
+    // out in whatever order Postgres returns the rows — in practice creation
+    // date, which put 滞在 first purely because it was made four months before
+    // 一般. Anything not named here keeps its natural order behind the ones
+    // that are, so a new menu simply appears at the end rather than silently
+    // jumping to the front.
+    const MENU_ORDER = ['一般', '滞在'];
+    const rank = (name: string) => {
+      const i = MENU_ORDER.indexOf((name ?? '').trim());
+      return i === -1 ? MENU_ORDER.length : i;
+    };
+    const ordered = [...(groups ?? [])].sort((a, b) => rank(a.name) - rank(b.name));
+
     const menus: DocxMenu[] = [];
-    for (const g of groups ?? []) {
+    for (const g of ordered) {
       if (kidsIds.has(g.id)) continue;
       const menu = await this.loadMenu(organizationId, g.id);
       if (menu.courses.length === 0) continue;

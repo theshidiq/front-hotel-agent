@@ -617,36 +617,25 @@
 	// Excel round-trip import (preview-gated; see MenuImportModal).
 	let showImport = $state(false);
 
-	// Word download of the CURRENT menu — editable presentation copy. Flushes any
-	// pending edit first so the document matches what's on screen.
+	// Word download — the editable presentation copy of EVERY menu, one per
+	// page (滞在, 一般, and any others), not just the one currently open. Staff
+	// hand the whole set around together, so a single button producing the
+	// whole document is what they actually want.
+	//
+	// Pending edits to the open menu are flushed first, so the page for THIS
+	// menu matches what is on screen rather than the last autosave.
 	let exportingWord = $state(false);
 	async function handleDownloadWord() {
-		if (exportingWord || !selectedGroupId) return;
+		if (exportingWord) return;
 		exportingWord = true;
 		error = null;
 		try {
 			await flushSave();
-			await downloadMenuWord(selectedGroupId);
-		} catch (err: any) {
-			error = err?.message || 'Wordの書き出しに失敗しました';
-		} finally {
-			exportingWord = false;
-		}
-	}
-
-	// Word download of ALL menus, one per page. Read-only, like the Excel
-	// archive: this is the presentation copy of every menu in one document.
-	let exportingWordAll = $state(false);
-	async function exportAllWord() {
-		if (exportingWordAll) return;
-		exportingWordAll = true;
-		error = null;
-		try {
 			await downloadMenuWord();
 		} catch (err: any) {
 			error = err?.message || 'Wordの書き出しに失敗しました';
 		} finally {
-			exportingWordAll = false;
+			exportingWord = false;
 		}
 	}
 
@@ -1137,9 +1126,9 @@
 			     staff who need to change wording without the app. -->
 			<button
 				onclick={handleDownloadWord}
-				disabled={exportingWord || !selectedGroupId}
+				disabled={exportingWord}
 				class="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 text-[9px] tracking-[0.12em] hover:bg-stone-50 transition-colors uppercase font-medium print:hidden disabled:opacity-40"
-				title="Word保存（編集可能）"
+				title="全メニューをWord保存（編集可能・1ページ1メニュー）"
 			>
 				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1288,18 +1277,6 @@
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 					</svg>
 					{exportingExcel ? '書き出し中…' : 'Excel'}
-				</button>
-				<!-- All menus as one Word document, a page each. -->
-				<button
-					onclick={exportAllWord}
-					disabled={exportingWordAll}
-					class="flex items-center gap-1.5 px-2.5 py-1 border border-stone-300 text-[10px] tracking-widest uppercase text-stone-600 hover:text-stone-900 hover:border-stone-400 transition-colors disabled:opacity-40"
-					title="全メニューを1つのWord文書に書き出す（1ページ1メニュー）"
-				>
-					<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-					</svg>
-					{exportingWordAll ? '書き出し中…' : 'Word'}
 				</button>
 				<!-- Round-trip: bring an edited workbook back in (preview-gated). -->
 				<button
