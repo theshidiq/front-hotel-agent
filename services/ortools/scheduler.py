@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import functools
+import hmac
 
 # Load .env from repo root (two levels up from services/ortools/)
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
@@ -36,7 +37,7 @@ def require_internal_secret(f):
     def decorated(*args, **kwargs):
         if _INTERNAL_SECRET:
             token = request.headers.get('X-Internal-Token', '')
-            if token != _INTERNAL_SECRET:
+            if not hmac.compare_digest(token.encode(), _INTERNAL_SECRET.encode()):
                 return jsonify({'success': False, 'error': 'Unauthorized'}), 401
         return f(*args, **kwargs)
     return decorated
@@ -303,6 +304,18 @@ class ShiftScheduleOptimizer:
             self.num_workers = solver_settings['numWorkers']
         else:
             self.num_workers = 4  # Default
+
+        # CP-SAT parameters are strictly typed; a "30" string or null would raise inside Solve()
+        try:
+            timeout_seconds = float(timeout_seconds)
+        except (TypeError, ValueError):
+            timeout_seconds = 30.0
+        if timeout_seconds <= 0:
+            timeout_seconds = 30.0
+        try:
+            self.num_workers = max(1, int(self.num_workers))
+        except (TypeError, ValueError):
+            self.num_workers = 4
 
         logger.info(f"[OR-TOOLS] Using penalty weights: {self.PENALTY_WEIGHTS}")
         logger.info(f"[OR-TOOLS] Solver settings: timeout={timeout_seconds}s, workers={self.num_workers}")
@@ -2405,8 +2418,10 @@ class ShiftScheduleOptimizer:
                 # Create scaled sum: off × 2 + early × 1 + prefilled_star (already scaled)
                 combined_scaled = sum(var * 2 for var in off_vars) + sum(var * 1 for var in early_vars) + prefilled_star_scaled
 
-                # Upper bound for violation variables (scaled) - based on staff's working days
-                max_possible = len(staff_flex_dates) * 3
+                # Upper bound for violation variables (scaled). Must be able to hold the full
+                # shortfall (min with zero assigned) and ★ surplus, or the "soft" limit becomes
+                # hard / INFEASIBLE for staff with few (or no) employed days in the period.
+                max_possible = len(staff_flex_dates) * 3 + prefilled_star_scaled + max(staff_min_scaled, 0)
 
                 if staff_monthly_limit_is_hard:
                     # HARD CONSTRAINT: Strictly enforce PRORATED limits
@@ -2451,7 +2466,8 @@ class ShiftScheduleOptimizer:
                 prefilled_star_scaled = self.prefilled_star_equiv_by_staff.get(staff_id, 0)
 
                 combined_scaled = sum(var * 2 for var in off_vars) + sum(var * 1 for var in early_vars) + prefilled_star_scaled
-                max_possible = len(staff_all_dates) * 3
+                # See flex-dates branch: bound must cover the whole shortfall / ★ surplus
+                max_possible = len(staff_all_dates) * 3 + prefilled_star_scaled + max(staff_min_scaled, 0)
 
                 if staff_monthly_limit_is_hard:
                     # HARD CONSTRAINT: Strictly enforce PRORATED limits
@@ -3555,7 +3571,7 @@ class ShiftScheduleOptimizer:
                 rest_equiv = sum(v * 2 for v in off_vars) + sum(v * 1 for v in early_vars)
 
                 # SOFT constraint: penalize if below minimum rest equivalent
-                max_possible = len(all_working_dates) * 3  # Upper bound
+                max_possible = max(len(all_working_dates) * 3, min_rest_equiv)  # Upper bound (must cover full shortfall)
                 under_rest_var = self.model.NewIntVar(0, max_possible, f'under_rest_{staff_id}')
                 self.model.Add(under_rest_var >= min_rest_equiv - rest_equiv)
                 self.model.Add(under_rest_var >= 0)
@@ -4084,13 +4100,31 @@ def optimize():
                 'error': f'Missing required fields: {missing}'
             }), 400
 
+        if not isinstance(data['staffMembers'], list) or not isinstance(data['dateRange'], list) \
+                or not isinstance(data['constraints'], dict):
+            return jsonify({
+                'success': False,
+                'error': 'staffMembers and dateRange must be arrays, constraints must be an object'
+            }), 400
+
+        if any(not isinstance(s, dict) or not s.get('id') for s in data['staffMembers']):
+            return jsonify({
+                'success': False,
+                'error': 'Every staff member must be an object with an id'
+            }), 400
+
+        try:
+            timeout = float(data.get('timeout', 30))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'timeout must be a number'}), 400
+
         # Run optimization
         optimizer = ShiftScheduleOptimizer()
         result = optimizer.optimize_schedule(
             staff_members=data['staffMembers'],
             date_range=data['dateRange'],
             constraints=data['constraints'],
-            timeout_seconds=data.get('timeout', 30)
+            timeout_seconds=timeout
         )
 
         return jsonify(result)
