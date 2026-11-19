@@ -141,19 +141,22 @@ export class GeminiVisionService {
 
     try {
       const parsed: GeminiMenuResponse = JSON.parse(jsonString);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('OCR response is not a JSON object');
+      }
 
-      const courses: ExtractedCourse[] = (parsed.courses || [])
-        .filter((c) => c.name && typeof c.name === 'string')
+      const courses: ExtractedCourse[] = (Array.isArray(parsed.courses) ? parsed.courses : [])
+        .filter((c) => c && c.name && typeof c.name === 'string')
         .map((c, idx) => ({
           name: c.name!,
-          reading: c.reading || null,
+          reading: typeof c.reading === 'string' && c.reading ? c.reading : null,
           description: this.cleanDescription(c.description),
           category: this.resolveCategory(c.category),
           sort_order: typeof c.sort_order === 'number' ? c.sort_order : idx + 1,
         }));
 
       return {
-        menu_title: parsed.menu_title || null,
+        menu_title: typeof parsed.menu_title === 'string' && parsed.menu_title ? parsed.menu_title : null,
         courses,
       };
     } catch (error) {
@@ -164,7 +167,7 @@ export class GeminiVisionService {
 
   /** Strip leading 一 dash separators that slip through (defensive cleaning). */
   private cleanDescription(raw: string | null | undefined): string | null {
-    if (!raw) return null;
+    if (!raw || typeof raw !== 'string') return null;
     // Remove leading 一 (with optional whitespace) and 一 + bullets
     return raw
       .replace(/^[一\s・、]+/, '')

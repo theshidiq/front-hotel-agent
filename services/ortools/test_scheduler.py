@@ -376,9 +376,12 @@ class TestFlaskAPI:
 
     @pytest.fixture
     def client(self):
-        from scheduler import app
+        from scheduler import app, _INTERNAL_SECRET
         app.config['TESTING'] = True
         with app.test_client() as client:
+            # The repo .env may set ORTOOLS_SECRET; send it like the NestJS client does
+            if _INTERNAL_SECRET:
+                client.environ_base['HTTP_X_INTERNAL_TOKEN'] = _INTERNAL_SECRET
             yield client
 
     def test_health_endpoint(self, client):

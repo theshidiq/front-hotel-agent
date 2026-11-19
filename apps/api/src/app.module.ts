@@ -23,6 +23,7 @@ import { RolesModule } from './roles/roles.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { MenuScanModule } from './menu-scan/menu-scan.module';
+import { MenuExportModule } from './menu-export/menu-export.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { MenuScanModule } from './menu-scan/menu-scan.module';
     ShiftsModule,
     DepartmentsModule,
     MenuScanModule,
+    MenuExportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

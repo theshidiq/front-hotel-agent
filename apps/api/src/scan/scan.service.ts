@@ -35,6 +35,7 @@ export class ScanService {
 
     this.logger.log(`Created scan session: ${scanSession.id}`);
 
+    let createdProductId: string | null = null;
     try {
       // 2. Update status to processing
       await supabase
@@ -78,6 +79,7 @@ export class ScanService {
       }
 
       const product = productResult.data;
+      createdProductId = product.id;
       this.logger.log(`Created product: ${product.id}`);
 
       // 6. Check duplicate + link allergens in parallel
@@ -88,7 +90,7 @@ export class ScanService {
               .from('products')
               .select('id, name, brand, image_url')
               .eq('organization_id', organizationId)
-              .ilike('name', productName)
+              .ilike('name', productName.replace(/[\\%_]/g, '\\$&'))
               .neq('id', product.id)
               .limit(1)
           : Promise.resolve({ data: null }),
@@ -125,6 +127,12 @@ export class ScanService {
         ...(existingProduct && { existing_product: existingProduct }),
       };
     } catch (error) {
+      // Don't leave a half-built product behind (e.g. created but allergen links failed)
+      if (createdProductId) {
+        await supabase.from('product_allergens').delete().eq('product_id', createdProductId);
+        await supabase.from('products').delete().eq('id', createdProductId);
+      }
+
       // Update scan session with failed status
       await supabase
         .from('scan_sessions')
@@ -191,7 +199,10 @@ export class ScanService {
         allergen_id: l.id,
         source: l.source,
       }));
-      await supabase.from('product_allergens').insert(rows);
+      const { error } = await supabase.from('product_allergens').insert(rows);
+      if (error) {
+        throw new Error(`Failed to link allergens: ${error.message}`);
+      }
     }
 
     return links;
@@ -277,9 +288,8 @@ export class ScanService {
     }
   }
 
-  async extractFromFile(file: Express.Multer.File): Promise<ScanExtractResponse> {
+  async extractFromFile(organizationId: string, file: Express.Multer.File): Promise<ScanExtractResponse> {
     const supabase = this.supabaseService.getClient();
-    const restaurantId = this.supabaseService.getRestaurantId();
 
     // 1. Upload to Supabase Storage (backend → Supabase is fast, server-to-server)
     const ext = file.originalname.split('.').pop() || 'jpg';
@@ -303,7 +313,7 @@ export class ScanService {
     const { data: scanSession, error: scanError } = await supabase
       .from('scan_sessions')
       .insert({
-        restaurant_id: restaurantId,
+        organization_id: organizationId,
         image_url: imageUrl,
         status: 'processing',
       })
@@ -416,13 +426,14 @@ export class ScanService {
     return matches;
   }
 
-  async findOne(id: string): Promise<ScanResultResponse> {
+  async findOne(organizationId: string, id: string): Promise<ScanResultResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { data: scanSession, error } = await supabase
       .from('scan_sessions')
       .select('*')
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .single();
 
     if (error || !scanSession) {
@@ -438,6 +449,7 @@ export class ScanService {
           .from('products')
           .select('*')
           .eq('id', scanSession.product_id)
+          .eq('organization_id', organizationId)
           .single(),
         supabase
           .from('product_allergens')

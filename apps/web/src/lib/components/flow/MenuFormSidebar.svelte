@@ -60,17 +60,18 @@
 		showAlternatesFor ? products.find((p) => p.id === showAlternatesFor) : null
 	);
 
-	const availableAlternates = $derived(
-		showAlternatesFor
+	const availableAlternates = $derived.by(() => {
+		const forId = showAlternatesFor;
+		return forId
 			? products.filter(
 					(p) =>
-						p.id !== showAlternatesFor &&
-						!(productAlternates[showAlternatesFor] || []).includes(p.id) &&
+						p.id !== forId &&
+						!(productAlternates[forId] || []).includes(p.id) &&
 						(alternateSearchTerm === '' ||
 							p.name.toLowerCase().includes(alternateSearchTerm.toLowerCase()))
 				)
-			: []
-	);
+			: [];
+	});
 
 	const selectedAlternates = $derived(
 		showAlternatesFor

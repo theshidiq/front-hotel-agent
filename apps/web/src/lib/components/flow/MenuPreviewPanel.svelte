@@ -434,6 +434,29 @@
 					{/if}
 				</div>
 
+				<!-- Kids group box — first after the title column so in RTL reading order
+				     it sits between the title and the first course (食前酒) -->
+				{#if kidsGroup}
+					<div class="kids-col flex-none flex flex-col justify-end items-center border-l border-stone-100" dir="ltr">
+						<div class="kids-box border border-dashed border-stone-400 bg-white p-3 m-3">
+							<div class="font-serif-jp text-xs font-medium text-stone-800 text-center border-b border-stone-300 pb-1.5 mb-2">
+								{kidsGroup.name}
+							</div>
+							{#if kidsGroup.courseNames.length > 0}
+								<div class="flex flex-col items-center gap-0.5">
+									{#each kidsGroup.courseNames as name}
+										<span class="font-serif-jp text-[11px] text-stone-700">・{name}</span>
+									{/each}
+								</div>
+							{:else}
+								<div class="font-serif-jp text-[10px] text-stone-300 text-center py-2">
+									コース未設定
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
 				<!-- Course columns (reversed: first course = rightmost) -->
 				{#each reversedCourses as course, i}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -503,28 +526,6 @@
 				{/if}
 			</div>
 
-			<!-- Kids group box — its own block below the menu (screen),
-			     pinned to bottom-right corner only when printing -->
-			{#if kidsGroup}
-				<div class="kids-box-wrap flex justify-end px-3 pb-3 pt-2 print:p-0" dir="ltr">
-					<div class="kids-box border border-dashed border-stone-400 bg-white p-3 print:absolute print:bottom-3 print:right-3">
-						<div class="font-serif-jp text-xs font-medium text-stone-800 text-center border-b border-stone-300 pb-1.5 mb-2">
-							{kidsGroup.name}
-						</div>
-						{#if kidsGroup.courseNames.length > 0}
-							<div class="flex flex-col items-center gap-0.5">
-								{#each kidsGroup.courseNames as name}
-									<span class="font-serif-jp text-[11px] text-stone-700">・{name}</span>
-								{/each}
-							</div>
-						{:else}
-							<div class="font-serif-jp text-[10px] text-stone-300 text-center py-2">
-								コース未設定
-							</div>
-						{/if}
-					</div>
-				</div>
-			{/if}
 
 		</div>
 	</div>
@@ -576,23 +577,15 @@
 		justify-content: center;
 	}
 
-	/* Kids area sits below the menu on screen with a clear separating space */
-	.kids-box-wrap {
-		border-top: 1px dashed #e7e5e4;
-		margin-top: 8px;
+	/* Kids column sits between title and first course column, full height */
+	.kids-col {
+		width: 160px;
+		align-self: stretch;
 	}
 
 	.kids-box {
-		width: 240px;
+		width: 140px;
 		overflow: hidden;
-	}
-
-	/* No separator line / top margin when printing (kids box floats to corner) */
-	@media print {
-		.kids-box-wrap {
-			border-top: 0 !important;
-			margin-top: 0 !important;
-		}
 	}
 
 	.menu-items-column {
@@ -647,8 +640,8 @@
 		:global([data-print-area] .paper-title-col) {
 			width: clamp(60px, 7%, 120px) !important;
 		}
-		:global([data-print-area] .kids-box-wrap) {
-			padding: 0 !important;
+		:global([data-print-area] .kids-col) {
+			width: clamp(80px, 10%, 140px) !important;
 		}
 
 		/* Hide interactive buttons (delete, dropdown, etc.) but NOT the title column button */

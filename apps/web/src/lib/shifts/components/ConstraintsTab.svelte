@@ -74,8 +74,10 @@
 		}
 	};
 
-	// Local state
-	let localConfig = $state<ORToolsSolverConfig>({
+	// Local state: only the editable parts of the stored config
+	type EditableSolverConfig = Pick<ORToolsSolverConfig, 'penalty_weights' | 'hard_constraints' | 'solver_settings'>;
+
+	let localConfig = $state<EditableSolverConfig>({
 		penalty_weights: {
 			staffGroup: 100,
 			fiveDayRest: 200,
@@ -196,13 +198,6 @@
 		};
 
 		return `${baseClasses} ${colorClasses[preset.color as keyof typeof colorClasses]}`;
-	}
-
-	function getSliderColor(value: number, max: number) {
-		const percentage = (value / max) * 100;
-		if (percentage < 33) return 'bg-green-500';
-		if (percentage < 66) return 'bg-yellow-500';
-		return 'bg-red-500';
 	}
 </script>
 

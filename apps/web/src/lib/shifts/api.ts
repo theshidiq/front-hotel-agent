@@ -23,11 +23,6 @@ interface CacheEntry<T> {
 	expiresAt: number;
 }
 
-interface CacheConfig {
-	ttl: number; // Time to live in ms
-	staleWhileRevalidate?: boolean;
-}
-
 const DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
 const SCHEDULE_TTL = 2 * 60 * 1000; // 2 minutes for schedule data
 const STATIC_TTL = 10 * 60 * 1000; // 10 minutes for static data like settings
@@ -35,7 +30,6 @@ const STATIC_TTL = 10 * 60 * 1000; // 10 minutes for static data like settings
 class APICache {
 	private cache = new Map<string, CacheEntry<unknown>>();
 	private pendingRequests = new Map<string, Promise<unknown>>();
-	private prefetchQueue: string[] = [];
 
 	get<T>(key: string): T | null {
 		const entry = this.cache.get(key);

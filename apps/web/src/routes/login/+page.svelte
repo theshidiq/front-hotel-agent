@@ -34,8 +34,11 @@
 
 	async function handleOneTapCredential(credential: string) {
 		signingIn = true;
-		await signInWithGoogleIdToken(credential);
-		signingIn = false;
+		try {
+			await signInWithGoogleIdToken(credential);
+		} finally {
+			signingIn = false;
+		}
 	}
 
 	function initOneTap() {

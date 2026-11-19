@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsArray, IsUUID, Matches, IsInt, Min, Max, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsUUID, Matches, IsInt, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AllergenWithCount {

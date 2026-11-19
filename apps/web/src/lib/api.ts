@@ -27,17 +27,32 @@ function refreshOnce(): Promise<boolean> {
 	return refreshInFlight;
 }
 
-/** Fetch wrapper that retries once on 401 by refreshing the Supabase token. */
+/** Thrown when a request is unauthorized and the token refresh failed. Callers
+ *  can catch this to distinguish "session is dead" from "request failed" — and
+ *  in particular MUST NOT treat it as "the server returned empty data". */
+export class AuthExpiredError extends Error {
+	constructor() {
+		super('セッションの有効期限が切れました。再ログインしてください。');
+		this.name = 'AuthExpiredError';
+	}
+}
+
+/** Fetch wrapper that retries once on 401 by refreshing the Supabase token.
+ *  If the refresh fails, throws AuthExpiredError instead of returning a 401 body
+ *  — so no caller can accidentally parse an auth failure into usable data. */
 async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
 	const response = await fetch(url, options);
 	if (response.status === 401) {
 		const refreshed = await refreshOnce();
 		if (refreshed) {
-			return fetch(url, {
+			const retry = await fetch(url, {
 				...options,
 				headers: { ...(options.headers as Record<string, string>), ...getAuthHeaders() },
 			});
+			if (retry.status === 401) throw new AuthExpiredError();
+			return retry;
 		}
+		throw new AuthExpiredError();
 	}
 	return response;
 }
@@ -473,7 +488,8 @@ export interface UpdateMenuGroupData {
 	name?: string;
 	display_title?: string | null;
 	seasonal_menu_id?: string | null;
-	kids_group_id?: string | null;
+	kids_group_ids?: string[];
+	stay_period_nights?: number[] | null;
 	course_ids?: string[];
 }
 
@@ -1532,6 +1548,9 @@ export interface MenuScanConfirmData {
 	courses: { name: string; description?: string | null; category?: string | null }[];
 	menu_group_id: string;
 	seasonal_menu_id?: string | null;
+	season_name?: string | null;   // inferred from title; backend auto-creates if missing
+	group_name?: string | null;    // inferred from title; find-or-create, overrides menu_group_id when set
+	menu_title?: string | null;
 	draft_session_id?: string | null;
 }
 
@@ -1545,5 +1564,237 @@ export async function menuScanConfirm(data: MenuScanConfirmData): Promise<Menu[]
 		const error = await response.json();
 		throw new Error(error.message || 'Menu scan confirm failed');
 	}
+	return response.json();
+}
+
+// ── Rows-as-source-of-truth: sync + saved-menu loading ──────────────────────
+// A scanned menu IS relational rows from the moment of scan. The editor syncs
+// (debounced) the full current state; the backend diff-upserts menus + dishes.
+// Each dish carries a stable client UUID so its product_id link survives edits.
+
+export interface SyncDish {
+	id: string;        // stable client UUID = menu_dishes.id
+	text: string;
+	product_id?: string | null;  // present when loading; never sent to mutate
+}
+
+export interface SyncCourse {
+	id?: string;       // menus.id when known (loaded); omitted for brand-new
+	name: string;
+	reading?: string | null;
+	category?: string | null;
+	sort_order: number;
+	cols: SyncDish[][];
+}
+
+// Kids callout box → persisted as a linked kids menu_group. Items carry stable
+// ids (like dishes) so the backend diff-upserts them safely.
+export interface SyncKids {
+	id?: string | null;   // resolved kids menu_group id; keyed on FIRST so rename updates it
+	name: string;
+	items: SyncDish[];
+}
+
+export interface MenuSyncData {
+	menu_group_id: string;
+	group_name?: string | null;
+	season_name?: string | null;
+	menu_title?: string | null;
+	session_id?: string | null;
+	courses: SyncCourse[];
+	// Kids box, or null/omitted when hidden. Persisted as a linked kids group.
+	kids?: SyncKids | null;
+	// true ONLY for explicit user removals (delete dish/course). Autosync omits it,
+	// so a background/stale sync can never delete data.
+	prune?: boolean;
+}
+
+// List entry (one per menu group) for the saved-menus list.
+export interface SavedMenuSummary {
+	menu_group_id: string;
+	group_name: string;
+	menu_title: string;
+	seasonal_menu_id: string | null;
+	image_url: string | null;
+	course_count: number;
+	dish_count: number;
+}
+
+// Full saved menu (courses + dishes) for re-opening in the editor.
+export interface SavedMenu {
+	menu_group_id: string;
+	group_name: string;
+	menu_title: string;
+	seasonal_menu_id: string | null;
+	courses: SyncCourse[];
+	kids?: SyncKids | null;
+}
+
+export async function menuScanSync(data: MenuSyncData): Promise<{ group_id: string; season_id: string | null; courses: any[]; kids_group_id?: string | null }> {
+	const response = await apiFetch(`${API_URL}/menu-scan/sync`, {
+		method: 'POST',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify(data),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Menu sync failed');
+	}
+	return response.json();
+}
+
+export async function menuScanGetMenus(): Promise<SavedMenuSummary[]> {
+	const response = await apiFetch(`${API_URL}/menu-scan/menus`, { headers: authHeaders() });
+	if (!response.ok) return [];
+	return response.json();
+}
+
+export async function menuScanGetMenu(groupId: string): Promise<SavedMenu> {
+	const response = await apiFetch(`${API_URL}/menu-scan/menus/${groupId}`, { headers: authHeaders() });
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to load saved menu');
+	}
+	return response.json();
+}
+
+// Link (or unlink with product_id=null) a scanned dish to a product. The dish's
+// allergens are derived from the linked product and returned for display.
+export async function menuScanSetDishProduct(
+	dishId: string,
+	productId: string | null,
+): Promise<{ id: string; text: string; product_id: string | null; allergens: { id: string; name: string }[] }> {
+	const response = await apiFetch(`${API_URL}/menu-scan/dishes/${dishId}/product`, {
+		method: 'PATCH',
+		headers: authHeaders({ 'Content-Type': 'application/json' }),
+		body: JSON.stringify({ product_id: productId }),
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to link dish');
+	}
+	return response.json();
+}
+
+// ── Excel export (archive / portability) ───────────────────────────────────
+// Downloads the .xlsx through apiFetch so the auth token is attached (a plain
+// link/navigation can't send an Authorization header), then hands the blob to
+// the browser as a file save. Pass a groupId for one menu, or omit for all.
+export async function downloadMenuExcel(groupId?: string): Promise<void> {
+	const url = groupId
+		? `${API_URL}/menu-export/menus/${groupId}.xlsx`
+		: `${API_URL}/menu-export/menus.xlsx`;
+	return downloadFile(url, 'menus.xlsx', 'Excelの書き出しに失敗しました');
+}
+
+/**
+ * Word (.docx) export — the editable presentation copy.
+ *
+ * With a groupId, exports that one menu. Without one, exports EVERY menu into a
+ * single document, one menu per page.
+ */
+export async function downloadMenuWord(groupId?: string): Promise<void> {
+	const url = groupId
+		? `${API_URL}/menu-export/menus/${groupId}.docx`
+		: `${API_URL}/menu-export/menus.docx`;
+	return downloadFile(url, 'menus.docx', 'Wordの書き出しに失敗しました');
+}
+
+/** Shared: fetch with auth (a plain link can't send the header), then save. */
+async function downloadFile(url: string, fallbackName: string, errorMessage: string): Promise<void> {
+	const response = await apiFetch(url, { headers: authHeaders() });
+	if (!response.ok) {
+		let message = errorMessage;
+		try {
+			const error = await response.json();
+			message = error.message || message;
+		} catch {
+			/* non-JSON error body — keep the default message */
+		}
+		throw new Error(message);
+	}
+
+	// Prefer the server's filename (it carries the Japanese menu title + date).
+	const disposition = response.headers.get('Content-Disposition') ?? '';
+	const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+	const asciiMatch = disposition.match(/filename="([^"]+)"/i);
+	const filename = utf8Match
+		? decodeURIComponent(utf8Match[1])
+		: asciiMatch?.[1] || fallbackName;
+
+	const blob = await response.blob();
+	const objectUrl = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = objectUrl;
+	a.download = filename;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	// Revoke on the next tick so the download has certainly started.
+	setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+// ── Excel import (round-trip) ──────────────────────────────────────────────
+// Two-phase by design: preview computes the diff and returns a token; apply
+// only performs the change set that token fingerprints. Deleting dishes needs
+// a further explicit opt-in, so it can never happen as a side effect.
+
+export interface MenuImportChange {
+	kind: 'update' | 'insert' | 'delete';
+	group_id: string;
+	course_name: string;
+	dish_id: string;
+	before?: string;
+	after?: string;
+}
+
+export interface MenuImportPreview {
+	token: string;
+	summary: { updates: number; inserts: number; deletes: number; unchanged: number };
+	changes: MenuImportChange[];
+	warnings: string[];
+	requires_attention: boolean;
+}
+
+async function importError(response: Response, fallback: string): Promise<never> {
+	let message = fallback;
+	try {
+		const body = await response.json();
+		message = body.message || fallback;
+	} catch {
+		/* non-JSON body — keep the fallback */
+	}
+	throw new Error(message);
+}
+
+/** Phase 1: diff an edited workbook against the DB. Writes nothing. */
+export async function previewMenuImport(file: File): Promise<MenuImportPreview> {
+	const form = new FormData();
+	form.append('file', file);
+	const response = await apiFetch(`${API_URL}/menu-export/preview`, {
+		method: 'POST',
+		headers: authHeaders(), // no Content-Type: the browser sets the multipart boundary
+		body: form,
+	});
+	if (!response.ok) return importError(response, 'ファイルの確認に失敗しました');
+	return response.json();
+}
+
+/** Phase 2: apply exactly the previewed change set. */
+export async function applyMenuImport(
+	file: File,
+	token: string,
+	allowDeletes: boolean,
+): Promise<{ applied: MenuImportPreview['summary']; skipped_deletes: number }> {
+	const form = new FormData();
+	form.append('file', file);
+	form.append('token', token);
+	form.append('allow_deletes', allowDeletes ? 'true' : 'false');
+	const response = await apiFetch(`${API_URL}/menu-export/apply`, {
+		method: 'POST',
+		headers: authHeaders(),
+		body: form,
+	});
+	if (!response.ok) return importError(response, 'インポートに失敗しました');
 	return response.json();
 }

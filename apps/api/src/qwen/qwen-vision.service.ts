@@ -212,23 +212,42 @@ export class QwenVisionService {
 
     jsonString = jsonString.trim();
 
+    // Tolerate prose around the JSON object (e.g. "以下が結果です: {...}")
+    const start = jsonString.indexOf('{');
+    const end = jsonString.lastIndexOf('}');
+    if (start > 0 && end > start) {
+      jsonString = jsonString.slice(start, end + 1);
+    }
+
     try {
       const parsed = JSON.parse(jsonString);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('OCR response is not a JSON object');
+      }
+
+      // Only accept non-empty strings — the model sometimes returns numbers/arrays/objects
+      const str = (v: unknown): string | null =>
+        typeof v === 'string' && v.trim() ? v : null;
 
       // Ensure defaults for boolean fields
       return {
-        product_name: parsed.product_name || null,
-        brand: parsed.brand || null,
-        ingredients_raw: parsed.ingredients_raw || null,
-        allergens: Array.isArray(parsed.allergens) ? parsed.allergens : [],
-        nutrition_per_100g: parsed.nutrition_per_100g || null,
-        storage_instructions: parsed.storage_instructions || null,
-        preparation_instructions: parsed.preparation_instructions || null,
+        product_name: str(parsed.product_name),
+        brand: str(parsed.brand),
+        ingredients_raw: str(parsed.ingredients_raw),
+        allergens: Array.isArray(parsed.allergens)
+          ? parsed.allergens.filter((a: unknown): a is string => typeof a === 'string' && a.trim() !== '')
+          : [],
+        nutrition_per_100g:
+          parsed.nutrition_per_100g && typeof parsed.nutrition_per_100g === 'object' && !Array.isArray(parsed.nutrition_per_100g)
+            ? parsed.nutrition_per_100g
+            : null,
+        storage_instructions: str(parsed.storage_instructions),
+        preparation_instructions: str(parsed.preparation_instructions),
         is_vegetarian: parsed.is_vegetarian === true,
         is_vegan: parsed.is_vegan === true,
         is_halal: parsed.is_halal === true,
         is_gluten_free: parsed.is_gluten_free === true,
-        category: parsed.category || null,
+        category: str(parsed.category) as OcrExtractedData['category'],
       };
     } catch (error) {
       this.logger.error(`Failed to parse JSON: ${jsonString}`);

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export interface SeasonalMenu {
@@ -84,11 +84,15 @@ export class SeasonalMenusService {
       .eq('id', id)
       .eq('organization_id', organizationId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       this.logger.error(`Failed to update seasonal menu: ${error.message}`);
       throw new InternalServerErrorException(`Failed to update seasonal menu: ${error.message}`);
+    }
+
+    if (!updated) {
+      throw new NotFoundException(`Seasonal menu ${id} not found`);
     }
 
     return updated;

@@ -19,7 +19,7 @@
 		type CheckInData,
 
 	} from "$lib/api";
-	import { onMount, onDestroy } from "svelte";
+	import { untrack } from "svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import { authState, can } from "$lib/auth.svelte";
 	import { supabase } from "$lib/supabase";
@@ -204,7 +204,8 @@
 		filter: DateFilter,
 	): { startDate: string; endDate: string } | null {
 		const today = new Date();
-		const formatDate = (d: Date) => d.toISOString().split("T")[0];
+		// Local calendar date: toISOString() gives the UTC date (yesterday before 09:00 JST)
+		const formatDate = formatDateISO;
 
 		switch (filter) {
 			case "today":
@@ -544,13 +545,10 @@
 
 			// Filter by date range on client side for multi-day ranges
 			if (dateRange && dateFilter !== "today") {
-				const startDate = new Date(dateRange.startDate);
-				startDate.setHours(0, 0, 0, 0);
-				const endDate = new Date(dateRange.endDate);
-				endDate.setHours(23, 59, 59, 999);
+				// Compare YYYY-MM-DD strings to avoid UTC-vs-local parsing skew
 				reservations = reservationsData.filter((r) => {
-					const checkInDate = new Date(r.check_in_date);
-					return checkInDate >= startDate && checkInDate <= endDate;
+					const checkInDate = r.check_in_date.slice(0, 10);
+					return checkInDate >= dateRange.startDate && checkInDate <= dateRange.endDate;
 				});
 			} else {
 				reservations = reservationsData;
@@ -567,12 +565,6 @@
 		} finally {
 			loading = false;
 		}
-	}
-
-	// Change date filter and reload
-	function changeDateFilter(filter: DateFilter) {
-		dateFilter = filter;
-		loadData();
 	}
 
 	// Open check-in wizard
@@ -866,7 +858,6 @@
 
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
-		const formatDateISO = (date: Date) => date.toISOString().split("T")[0];
 		const addDays = (date: Date, days: number): Date => {
 			const result = new Date(date);
 			result.setDate(result.getDate() + days);
@@ -1116,9 +1107,7 @@
 	let realtimeChannel: any = null;
 	let realtimeStatus = $state<"connecting" | "connected" | "error" | "closed">("connecting");
 
-	function setupRealtimeSubscriptions() {
-		// Use the authenticated user's org ID — never a hardcoded env var
-		const organizationId = authState.organizationId;
+	function setupRealtimeSubscriptions(organizationId: string) {
 
 		// Clean up any existing channel first to avoid CLOSED status from duplicate channel names
 		if (realtimeChannel) {
@@ -1248,19 +1237,18 @@
 		console.log("🔄 Reloading reservations...");
 		try {
 			const dateRange = getDateRange(dateFilter);
+			// Keep a specifically picked date, same as loadData()
 			const dateParam =
-				dateFilter === "today" ? dateRange?.startDate : undefined;
+				selectedDate ||
+				(dateFilter === "today" ? dateRange?.startDate : undefined);
 			const reservationsData = await getReservations(dateParam);
 
 			// Filter by date range on client side for multi-day ranges
 			if (dateRange && dateFilter !== "today") {
-				const startDate = new Date(dateRange.startDate);
-				startDate.setHours(0, 0, 0, 0);
-				const endDate = new Date(dateRange.endDate);
-				endDate.setHours(23, 59, 59, 999);
+				// Compare YYYY-MM-DD strings to avoid UTC-vs-local parsing skew
 				reservations = reservationsData.filter((r) => {
-					const checkInDate = new Date(r.check_in_date);
-					return checkInDate >= startDate && checkInDate <= endDate;
+					const checkInDate = r.check_in_date.slice(0, 10);
+					return checkInDate >= dateRange.startDate && checkInDate <= dateRange.endDate;
 				});
 			} else {
 				reservations = reservationsData;
@@ -1278,13 +1266,22 @@
 		}
 	}
 
-	onMount(() => {
-		loadData();
-		setupRealtimeSubscriptions();
+	// Child onMount runs before the root layout's initAuth(), so wait for auth
+	// (org ID + session) before the first load instead of loading on mount.
+	let dataInitialized = false;
+	$effect(() => {
+		if (authState.loading || dataInitialized) return;
+		dataInitialized = true;
+		untrack(() => loadData());
 	});
 
-	onDestroy(() => {
-		cleanupRealtimeSubscriptions();
+	// Subscribe once the org ID is known (otherwise the filter would be
+	// `organization_id=eq.null`), and re-subscribe if it changes.
+	$effect(() => {
+		const organizationId = authState.organizationId;
+		if (!organizationId) return;
+		untrack(() => setupRealtimeSubscriptions(organizationId));
+		return () => cleanupRealtimeSubscriptions();
 	});
 </script>
 

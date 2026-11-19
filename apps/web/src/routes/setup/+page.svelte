@@ -44,14 +44,6 @@
     let countryOpen = $state(false);
     let countrySearch = $state("");
 
-    let hoursOpen = $state("09:00");
-    let hoursClose = $state("22:00");
-    let shiftDuration = $state(8);
-    let minStaff = $state(2);
-    let maxConsecutiveDays = $state(6);
-    let periodStartDay = $state(21);
-    let periodEndDay = $state(20);
-
     // ─── UI state ─────────────────────────────────────────────────────────────
     let submitting = $state(false);
     let submitError = $state<string | null>(null);

@@ -35,3 +35,12 @@ coverage
 # Misc
 *.tsbuildinfo
 .turbo
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Personal workspace files
+*.code-workspace

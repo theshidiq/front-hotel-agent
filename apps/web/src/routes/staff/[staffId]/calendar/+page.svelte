@@ -112,7 +112,7 @@
 			const idx = findCurrentPeriodIndex(periodsData);
 			currentPeriodIdx = idx;
 
-			await loadShifts(periodsData[idx]);
+			if (idx >= 0) await loadShifts(periodsData[idx]);
 		} catch (err: unknown) {
 			error = err instanceof Error ? err.message : 'データの取得に失敗しました';
 		} finally {
@@ -120,19 +120,24 @@
 		}
 	}
 
+	// Guards against out-of-order responses when paging periods quickly
+	let shiftsRequestSeq = 0;
+
 	async function loadShifts(period: Period) {
 		if (!staff) return;
+		const requestSeq = ++shiftsRequestSeq;
 		loadingShifts = true;
 		tappedDate = null;
 		try {
 			const data = await fetchStaffShifts(staff.id, period, staff.department_id);
+			if (requestSeq !== shiftsRequestSeq) return;
 			shifts = data;
 			stats = calculateStats(data);
 		} catch {
 			shifts = {};
 			stats = { off: 0, early: 0, normal: 0, late: 0, special: 0, work: 0, custom: 0, total: 0 };
 		} finally {
-			loadingShifts = false;
+			if (requestSeq === shiftsRequestSeq) loadingShifts = false;
 		}
 	}
 

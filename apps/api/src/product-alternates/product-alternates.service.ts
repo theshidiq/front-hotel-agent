@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export interface ProductAlternate {
@@ -29,24 +29,22 @@ export class ProductAlternatesService {
     return data || [];
   }
 
-  async findByProduct(organizationId: string, productId: string): Promise<ProductAlternate[]> {
-    const supabase = this.supabaseService.getClient();
-
-    const { data, error } = await supabase
-      .from('product_alternates')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('product_id', productId);
-
-    if (error) {
-      throw new Error(`Failed to fetch alternates: ${error.message}`);
-    }
-
-    return data || [];
-  }
-
   async create(organizationId: string, productId: string, alternateProductId: string): Promise<ProductAlternate> {
     const supabase = this.supabaseService.getClient();
+
+    // Both products must belong to this organization
+    const ids = [...new Set([productId, alternateProductId])];
+    const { data: owned, error: ownedError } = await supabase
+      .from('products')
+      .select('id')
+      .in('id', ids)
+      .eq('organization_id', organizationId);
+    if (ownedError) {
+      throw new Error(`Failed to verify products: ${ownedError.message}`);
+    }
+    if ((owned || []).length !== ids.length) {
+      throw new BadRequestException('Product not found');
+    }
 
     const { data, error } = await supabase
       .from('product_alternates')

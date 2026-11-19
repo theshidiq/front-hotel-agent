@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Patch, Delete, Param, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { StaffsService, Staff } from './staffs.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
@@ -29,12 +29,17 @@ export class StaffsController {
   @Patch(':id/email')
   @UseGuards(StaffAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update staff email address' })
+  @ApiOperation({ summary: 'Update staff email address (own record, or any record with staff.manage)' })
   async updateEmail(
     @Param('id') id: string,
     @Body() dto: UpdateStaffEmailDto,
     @Req() req: any,
   ): Promise<Staff> {
+    // Auth resolves staff by email, so re-pointing another member's email is an account takeover.
+    const canManage = req.user.isAdmin || (req.user.permissions || []).includes('staff.manage');
+    if (id !== req.user.staffId && !canManage) {
+      throw new ForbiddenException('You can only change your own email address');
+    }
     return this.staffsService.updateEmail(id, dto.email, req.user.organization_id);
   }
 
@@ -89,6 +94,9 @@ export class StaffsController {
     @Body() body: { is_admin: boolean },
     @Req() req: any,
   ): Promise<Staff> {
+    if (typeof body?.is_admin !== 'boolean') {
+      throw new BadRequestException('is_admin must be a boolean');
+    }
     return this.staffsService.updateAdmin(id, body.is_admin, req.user.staffId, req.user.organization_id);
   }
 }

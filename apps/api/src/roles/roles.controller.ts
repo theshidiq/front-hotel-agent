@@ -1,19 +1,14 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Req, UseGuards, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Req, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { RolesService, Role, ALL_PERMISSIONS } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto, UpdateRolePermissionsDto } from './dto/update-role-permissions.dto';
 import { RequirePermission, SkipAuth } from '../auth/permission.decorator';
-import { StaffAuthGuard } from '../auth/auth.guard';
-import { SupabaseService } from '../supabase/supabase.service';
 
 @ApiTags('roles')
 @Controller('roles')
 export class RolesController {
-  constructor(
-    private readonly rolesService: RolesService,
-    private readonly supabaseService: SupabaseService,
-  ) {}
+  constructor(private readonly rolesService: RolesService) {}
 
   // Public endpoint — no auth required; caller must supply organizationId
   @Get('default')
@@ -57,10 +52,11 @@ export class RolesController {
   @RequirePermission('staff.manage')
   @ApiOperation({ summary: 'Set permissions for a role (full replace)' })
   async updatePermissions(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() dto: UpdateRolePermissionsDto,
   ): Promise<Role> {
-    return this.rolesService.updatePermissions(id, dto.permissions);
+    return this.rolesService.updatePermissions(req.user.organization_id, id, dto.permissions);
   }
 
   @Patch(':id/default')

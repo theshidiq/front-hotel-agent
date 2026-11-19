@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { RoomsService } from '../rooms/rooms.service';
 import { AllergensService } from '../allergens/allergens.service';
@@ -8,8 +8,26 @@ import { SearchReservationDto } from './dto/search-reservation.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { GuestUpdateDto } from './dto/guest-update.dto';
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+/**
+ * Today's calendar date (YYYY-MM-DD) at the hotel. The API runs in UTC, so
+ * `new Date().toISOString()` would report yesterday between 00:00 and 09:00 JST.
+ */
+function hotelToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date());
+}
+
+/** Parse a YYYY-MM-DD (or ISO) date to a UTC-midnight timestamp for whole-day arithmetic. */
+function dayStamp(date: string): number {
+  const [y, m, d] = String(date).slice(0, 10).split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
 @Injectable()
 export class ReservationsService {
+  private readonly logger = new Logger(ReservationsService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly roomsService: RoomsService,
@@ -49,7 +67,7 @@ export class ReservationsService {
   }
 
   async findToday(organizationId: string): Promise<ReservationResponse[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = hotelToday();
     return this.findAll(organizationId, today);
   }
 
@@ -94,8 +112,7 @@ export class ReservationsService {
   }
 
   async search(organizationId: string, dto: SearchReservationDto): Promise<ReservationResponse[]> {
-    const today = new Date().toISOString().split('T')[0];
-    const targetDate = dto.date || today;
+    const targetDate = dto.date || hotelToday();
     let query = this.supabaseService
       .getClient()
       .from('reservations')
@@ -127,6 +144,10 @@ export class ReservationsService {
   }
 
   async create(organizationId: string, dto: CreateReservationDto): Promise<ReservationResponse> {
+    if (dayStamp(dto.check_out_date) < dayStamp(dto.check_in_date)) {
+      throw new BadRequestException('check_out_date must be on or after check_in_date');
+    }
+
     // Extract allergen_ids for backward compatibility
     const allergenIds = dto.allergen_details?.map(a => a.allergen_id) || [];
 
@@ -134,8 +155,8 @@ export class ReservationsService {
       .getClient()
       .from('reservations')
       .insert({
-        organization_id: organizationId,
         ...dto,
+        organization_id: organizationId,
         allergen_ids: allergenIds,
         allergen_details: dto.allergen_details || [],
       })
@@ -205,11 +226,16 @@ export class ReservationsService {
       .from('reservations')
       .update(updateData)
       .eq('id', id)
+      .eq('organization_id', organizationId)
+      .eq('status', 'confirmed') // guard against a concurrent double check-in
       .select()
       .single();
 
-    if (error) {
-      throw new InternalServerErrorException(error.message);
+    if (error || !data) {
+      if (error?.code === 'PGRST116') {
+        throw new BadRequestException('Reservation is no longer awaiting check-in');
+      }
+      throw new InternalServerErrorException(error?.message ?? 'Failed to check in');
     }
 
     // Update room status + create alert in parallel
@@ -247,7 +273,7 @@ export class ReservationsService {
     }
 
     // Update reservation + room in parallel
-    const [updateResult] = await Promise.all([
+    const [updateResult, roomResult] = await Promise.all([
       this.supabaseService
         .getClient()
         .from('reservations')
@@ -257,6 +283,7 @@ export class ReservationsService {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('organization_id', organizationId)
         .select()
         .single(),
       this.supabaseService
@@ -274,6 +301,9 @@ export class ReservationsService {
     if (updateResult.error) {
       throw new InternalServerErrorException(updateResult.error.message);
     }
+    if (roomResult.error) {
+      this.logger.error(`Checked out reservation ${id} but failed to release room ${reservation.room_number}: ${roomResult.error.message}`);
+    }
 
     return updateResult.data;
   }
@@ -289,6 +319,12 @@ export class ReservationsService {
 
     if (dto.allergen_ids !== undefined) {
       updateData.allergen_ids = dto.allergen_ids;
+      // allergen_details takes precedence when reading, so keep it in sync or the
+      // guest's change is hidden behind the stale check-in data.
+      updateData.allergen_details = dto.allergen_ids.map((allergen_id) => ({
+        allergen_id,
+        person_count: reservation.party_size,
+      }));
     }
 
     if (dto.dietary_notes !== undefined) {
@@ -329,38 +365,18 @@ export class ReservationsService {
           message: 'ゲストがアレルギー情報を更新しました',
           status: 'new',
         })
-        .then(() => { });
+        .then(({ error: alertError }) => {
+          if (alertError) {
+            this.logger.error(`Failed to create allergy_update alert for reservation ${reservation.id}: ${alertError.message}`);
+          }
+        });
     }
 
     return this.enrichWithAllergens(data);
   }
 
-  async deleteAllReservations(organizationId: string): Promise<{ deleted: number }> {
-    // First, clear any current_reservation_id references in rooms table
-    await this.supabaseService
-      .getClient()
-      .from('rooms')
-      .update({ current_reservation_id: null })
-      .eq('organization_id', organizationId)
-      .not('current_reservation_id', 'is', null);
-
-    // Now delete all reservations
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('reservations')
-      .delete()
-      .eq('organization_id', organizationId)
-      .select();
-
-    if (error) {
-      throw new InternalServerErrorException(error.message);
-    }
-
-    return { deleted: data?.length || 0 };
-  }
-
   private async createCheckInAlert(organizationId: string, reservation: any, allergenDetails: any[]): Promise<void> {
-    await this.supabaseService
+    const { error } = await this.supabaseService
       .getClient()
       .from('guest_alerts')
       .insert({
@@ -377,21 +393,21 @@ export class ReservationsService {
         message: null,
         status: 'new',
       });
+
+    if (error) {
+      // The check-in itself has already been committed; surface the missing kitchen alert loudly.
+      this.logger.error(`Failed to create check_in alert for reservation ${reservation.id}: ${error.message}`);
+    }
   }
 
   private async enrichWithAllergens(reservation: any): Promise<ReservationResponse> {
-    // Calculate stay period metrics
-    const checkInDate = new Date(reservation.check_in_date);
-    const checkOutDate = new Date(reservation.check_out_date);
-    const today = new Date();
-
-    // Set all dates to start of day for accurate day counting
-    checkInDate.setHours(0, 0, 0, 0);
-    checkOutDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
+    // Calculate stay period metrics on calendar dates (UTC-midnight stamps, hotel-local "today")
+    const checkInDate = dayStamp(reservation.check_in_date);
+    const checkOutDate = dayStamp(reservation.check_out_date);
+    const today = dayStamp(hotelToday());
 
     // Calculate total nights
-    const total_nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+    const total_nights = Math.round((checkOutDate - checkInDate) / MS_PER_DAY);
 
     // Calculate current stay night (1-indexed)
     // If today is before check-in, it's 0 (not yet arrived)
@@ -399,7 +415,7 @@ export class ReservationsService {
     // If today is after check-out, cap at total_nights
     let current_stay_night = 0;
     if (today >= checkInDate) {
-      current_stay_night = Math.ceil((today.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      current_stay_night = Math.round((today - checkInDate) / MS_PER_DAY) + 1;
       // Cap at total nights
       if (current_stay_night > total_nights) {
         current_stay_night = total_nights;

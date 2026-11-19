@@ -21,7 +21,7 @@
 		SchedulePeriod,
 		ShiftSymbol,
 	} from "$lib/shifts/types";
-	import { SHIFT_SYMBOLS, SHIFT_LABELS } from "$lib/shifts/types";
+	import { SHIFT_LABELS } from "$lib/shifts/types";
 	import ScheduleTable from "$lib/shifts/components/ScheduleTable.svelte";
 	import PeriodPicker from "$lib/shifts/components/PeriodPicker.svelte";
 	import ScheduleSkeleton from "$lib/shifts/components/ScheduleSkeleton.svelte";
@@ -237,12 +237,6 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 		periods.find((p) => p.id === selectedPeriodId) || null,
 	);
 
-	// Format period label with year for disambiguation
-	function formatPeriodLabel(period: SchedulePeriod): string {
-		const year = period.start_date.split("-")[0];
-		return `${period.label} (${year})`;
-	}
-
 	// Default symbol colors used when no custom config is loaded yet
 	const DEFAULT_SYMBOL_COLORS: Record<string, string> = {
 		'':  '#4b5563',
@@ -327,7 +321,7 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 
 				if (wasHiddenMs >= RELOAD_AFTER_HIDDEN_MS) {
 					// Clear cache so we get fresh data, not stale cached data
-					apiCache.clear();
+					apiCache.invalidate();
 					reconnecting = true;
 					loadInitialData().finally(() => { reconnecting = false; });
 				}
@@ -343,10 +337,17 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 
 	// Collect cleanup callbacks from effects
 	const onDestroyCallbacks: (() => void)[] = [];
-	onDestroy(() => onDestroyCallbacks.forEach((fn) => fn()));
+	// Auto-retry timer for a failed initial load; cleared on unmount
+	let retryTimer: ReturnType<typeof setTimeout> | null = null;
+	onDestroy(() => {
+		onDestroyCallbacks.forEach((fn) => fn());
+		if (retryTimer) clearTimeout(retryTimer);
+		stopOptimizeProgress();
+	});
 
 	// ── Data Loading ──
 	async function loadInitialData() {
+		if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
 		// Only show the skeleton if we have no cached data to show
 		const hasCachedData = staff.length > 0 || periods.length > 0;
 		try {
@@ -426,7 +427,9 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 			// Then auto-retry after 10s (Supabase free tier takes ~5-10s to wake).
 			if (staff.length === 0) {
 				loadFailed = true;
-				setTimeout(() => {
+				if (retryTimer) clearTimeout(retryTimer);
+				retryTimer = setTimeout(() => {
+					retryTimer = null;
 					loadFailed = false;
 					loadInitialData();
 				}, 10_000);
@@ -514,14 +517,20 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 		return remappedData;
 	}
 
+	// Incremented per loadSchedule call so a slow response for a period/department
+	// the user already navigated away from can't overwrite the current one.
+	let scheduleRequestSeq = 0;
+
 	async function loadSchedule(periodId: string, deptId?: string | null) {
 		const effectiveDeptId = deptId !== undefined ? deptId : activeDepartmentId;
+		const requestSeq = ++scheduleRequestSeq;
 		try {
 			loadingSchedule = true;
 			const [response, deptStaff] = await Promise.all([
 				getSchedule(periodId, effectiveDeptId ?? undefined),
 				getShiftStaff(effectiveDeptId ?? undefined),
 			]);
+			if (requestSeq !== scheduleRequestSeq) return;
 			staff = deptStaff;
 
 			// Generate date range from period
@@ -543,10 +552,11 @@ import Sidebar from "$lib/components/Sidebar.svelte";
 				scheduleData = response.schedule?.schedule_data || {};
 			}
 		} catch (e) {
+			if (requestSeq !== scheduleRequestSeq) return;
 			console.error("Failed to load schedule:", e);
 			error = e instanceof Error ? e.message : "Failed to load schedule";
 		} finally {
-			loadingSchedule = false;
+			if (requestSeq === scheduleRequestSeq) loadingSchedule = false;
 		}
 	}
 
@@ -801,25 +811,6 @@ async function _commitSchedule(schedule: Record<string, Record<string, string>>)
 		setTimeout(() => {
 			successMessage = "";
 		}, 3000);
-	}
-
-	function getSymbolClass(symbol: string): string {
-		switch (symbol) {
-			case "×":
-				return "text-red-600 bg-red-50";
-			case "△":
-				return "text-slate-800 bg-blue-50";
-			case "◇":
-				return "text-purple-600 bg-purple-50";
-			case "★":
-				return "text-yellow-600 bg-yellow-50";
-			case "●":
-				return "text-green-600 bg-green-50";
-			case "◎":
-				return "text-orange-600 bg-orange-50";
-			default:
-				return "";
-		}
 	}
 </script>
 

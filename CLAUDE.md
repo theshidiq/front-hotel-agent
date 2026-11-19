@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-Hotel allergen management system with AI-powered OCR scanning. Scan product labels (Japanese text), extract ingredient/allergen data via Qwen VL-OCR, manage products, and compose menu items with auto-derived allergens.
+Hotel operations platform ("Sinara"). It started as allergen management with AI-powered OCR (scan Japanese product labels via Qwen VL-OCR, compose menus with auto-derived allergens). It now also covers menu groups/courses with scan + Excel/Word export, kitchen production, front desk (rooms, reservations, guest alerts, guest mobile form), staff shifts with an OR-Tools optimizer (`services/ortools`), multi-tenancy by `organization_id`, and RBAC. See README.md for the current overview.
+
+> Note: the sections below describe the original allergen MVP and are partly out of date. The frontend is no longer a single page: each feature has its own route under `apps/web/src/routes/` (menu, kitchen-production, front-desk, shifts, staff, admin, setup, docs, ...). The API base URL comes from `VITE_API_URL` (fallback `http://localhost:3002`), and CORS comes from `CORS_ORIGINS`.
 
 ## Tech Stack
 
@@ -20,7 +22,9 @@ front-hotel-agent/
 ├── apps/
 │   ├── web/          # SvelteKit frontend (port 5173)
 │   └── api/          # NestJS backend (port 3002)
-├── packages/         # Shared libraries (reserved)
+├── services/ortools/ # Python OR-Tools shift optimizer (port 5000)
+├── supabase/         # SQL migrations (numbered) + seed data
+├── docs/             # Design notes and handoffs
 ├── .env              # Environment variables (shared)
 └── pnpm-workspace.yaml
 ```

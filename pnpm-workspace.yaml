@@ -1,3 +1,13 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+allowBuilds:
+  '@google/genai': true
+  '@nestjs/core': true
+  # Telemetry/analytics only — no functional need to run its install script.
+  '@scarf/scarf': false
+  core-js: true
+  esbuild: true
+  protobufjs: true
+  sharp: true
+  workerd: true

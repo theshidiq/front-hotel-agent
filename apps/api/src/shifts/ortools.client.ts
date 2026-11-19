@@ -189,6 +189,10 @@ export class ORToolsClient implements OnModuleInit {
       type: staff.type || 'regular',
       status: staff.status || '社員',
       staff_order: staff.staff_order || 0,
+      // scheduler.py uses these to leave cells empty before hire / after leaving
+      ...(staff.start_period && { start_period: staff.start_period }),
+      ...(staff.end_period && { end_period: staff.end_period }),
+      ...(staff.metadata && { metadata: staff.metadata }),
     }));
 
     return {

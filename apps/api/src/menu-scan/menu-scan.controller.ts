@@ -2,10 +2,12 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Delete,
   Body,
   Param,
   Req,
+  Header,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -22,6 +24,7 @@ import {
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { MenuScanService } from './menu-scan.service';
 import { MenuScanConfirmDto, SaveDraftDto } from './dto/menu-scan-confirm.dto';
+import { MenuSyncDto } from './dto/menu-scan-sync.dto';
 import { MenuScanExtractResponse, MenuScanDraft } from './dto/menu-scan-response.dto';
 import { RequirePermission } from '../auth/permission.decorator';
 import { StaffAuthGuard } from '../auth/auth.guard';
@@ -66,6 +69,7 @@ export class MenuScanController {
   // ── Draft CRUD ────────────────────────────────────────────────────────────
 
   @Get('drafts')
+  @Header('Cache-Control', 'no-store')
   @RequirePermission('menus.create')
   @ApiOperation({ summary: 'List all menu scan drafts for this org' })
   async getDrafts(@Req() req: any): Promise<MenuScanDraft[]> {
@@ -92,11 +96,55 @@ export class MenuScanController {
     return this.menuScanService.deleteDraft(req.user.organization_id, id);
   }
 
-  // ── Confirm ───────────────────────────────────────────────────────────────
+  // ── Sync: continuous save of the editing menu into relational rows ────────
+
+  @Post('sync')
+  @RequirePermission('menus.create')
+  @ApiOperation({ summary: 'Sync the editing menu into menus + menu_dishes rows (diff-upsert)' })
+  async syncMenu(@Req() req: any, @Body() dto: MenuSyncDto) {
+    return this.menuScanService.syncMenu(req.user.organization_id, dto);
+  }
+
+  // ── Saved scanned menus (rows-backed; replaces draft list) ────────────────
+
+  @Get('menus')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('menus.create')
+  @ApiOperation({ summary: 'List saved scanned menus (grouped by menu group)' })
+  async getScannedMenus(@Req() req: any) {
+    return this.menuScanService.getScannedMenus(req.user.organization_id);
+  }
+
+  @Get('menus/:groupId')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermission('menus.create')
+  @ApiOperation({ summary: 'Load one saved scanned menu (full courses + dishes) for editing' })
+  async getScannedMenu(@Req() req: any, @Param('groupId') groupId: string) {
+    return this.menuScanService.getScannedMenu(req.user.organization_id, groupId);
+  }
+
+  // ── Link a dish to a product (allergen source) ────────────────────────────
+
+  @Patch('dishes/:id/product')
+  @RequirePermission('menus.create')
+  @ApiOperation({ summary: 'Link/unlink a scanned dish to a product (sets menu_dishes.product_id)' })
+  async setDishProduct(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { product_id: string | null },
+  ) {
+    return this.menuScanService.setDishProduct(
+      req.user.organization_id,
+      id,
+      body?.product_id ?? null,
+    );
+  }
+
+  // ── Confirm (legacy alias to sync; kept for in-flight clients) ────────────
 
   @Post('confirm')
   @RequirePermission('menus.create')
-  @ApiOperation({ summary: 'Confirm and save scanned menu courses, marks draft completed' })
+  @ApiOperation({ summary: 'Legacy: confirm scanned menu (now an alias that writes rows)' })
   async confirmAndCreate(
     @Req() req: any,
     @Body() dto: MenuScanConfirmDto,

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import type { ScheduleStaff, ShiftSymbol } from "$lib/shifts/types";
-	import { SHIFT_SYMBOLS, SHIFT_LABELS } from "$lib/shifts/types";
+	import type { ScheduleStaff } from "$lib/shifts/types";
 	import type { ShiftSymbolConfig } from "$lib/shifts/api";
 	import {
 		createSelectionStore,
@@ -11,7 +10,7 @@
 		isDateWithinStaffWorkPeriod,
 		getStaffPeriodLabel,
 	} from "../staffUtils";
-	import { Copy, Clipboard, X, Check, Trash2, Edit } from "lucide-svelte";
+	import { Copy, Clipboard, X, Check } from "lucide-svelte";
 
 	interface Props {
 		staff: ScheduleStaff[];
