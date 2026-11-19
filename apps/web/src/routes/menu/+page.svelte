@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { uploadImage, compressImage, compressImageForOCR } from '$lib/supabase';
-	import { scanProduct, scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type CreateMenuData, type UpdateMenuData, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
+	import { scanExtract, getProducts, updateProduct, deleteProduct, createProduct, getAllergens, createAllergen, deleteAllergen, getMenus, createMenu, updateMenu, deleteMenu, getCategories, createCategoryApi, updateCategoryApi, deleteCategoryApi, getMenuGroups, createMenuGroup, updateMenuGroup, deleteMenuGroup, getSeasonalMenus, createSeasonalMenu, updateSeasonalMenu, deleteSeasonalMenu, getProductAlternates, addProductAlternate, removeProductAlternate, type Product, type UpdateProductData, type CreateProductData, type Allergen, type Menu, type Category, type MenuGroup, type SeasonalMenu, type UpdateCategoryData, type ScanExtractResult } from '$lib/api';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 	import MenuStructurePanel from '$lib/components/MenuStructurePanel.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -522,7 +522,7 @@
 
 	async function treeCreateCourse(name: string) {
 		const created = await createCategoryApi(name, 'menu');
-		menuCategories = [...menuCategories, { value: created.value, label: created.name, id: created.id }];
+		menuCategories = [...menuCategories, toMenuCategory(created)];
 	}
 
 	async function treeUpdateCourse(id: string, name: string) {
@@ -530,14 +530,20 @@
 		menuCategories = menuCategories.map(c => c.id === id ? { ...c, label: name } : c);
 		try {
 			const updated = await updateCategoryApi(id, { name });
-			menuCategories = menuCategories.map(c => c.id === id ? { value: updated.value, label: updated.name, id: updated.id } : c);
+			menuCategories = menuCategories.map(c => c.id === id ? toMenuCategory(updated) : c);
 		} catch {
 			menuCategories = prev;
 		}
 	}
 
 	async function treeUpdateCourseDetails(id: string, data: UpdateCategoryData) {
-		await updateCategoryApi(id, data);
+		const updated = await updateCategoryApi(id, data);
+		// Keep local state in step, or reopening the course shows the pre-save values.
+		menuCategories = menuCategories.map(c => c.id === id ? toMenuCategory(updated) : c);
+	}
+
+	function toMenuCategory(c: Category) {
+		return { value: c.value, label: c.name, id: c.id, image_url: c.image_url, description: c.description, price: c.price };
 	}
 
 	async function treeDeleteCourse(id: string) {
@@ -562,77 +568,6 @@
 
 	// Alternate Ingredients State (maps product_id -> array of alternate product_ids)
 	let productAlternates: Record<string, string[]> = $state({});
-	let showAlternatesModal = $state(false);
-	let alternatesForProductId: string | null = $state(null);
-	let alternateSearchTerm = $state('');
-	let alternateSearchFocused = $state(false);
-
-	// Get the product being configured for alternates
-	const alternatesProduct = $derived(
-		alternatesForProductId ? products.find(p => p.id === alternatesForProductId) : null
-	);
-
-	// Get available products for alternates (exclude the main product and already selected alternates)
-	const availableAlternates = $derived(() => {
-		if (!alternatesForProductId) return [];
-		const currentAlternates = productAlternates[alternatesForProductId] || [];
-		return products.filter(p =>
-			p.id !== alternatesForProductId &&
-			!currentAlternates.includes(p.id) &&
-			(alternateSearchTerm === '' || p.name.toLowerCase().includes(alternateSearchTerm.toLowerCase()))
-		);
-	});
-
-	// Get selected alternates for current product
-	const selectedAlternates = $derived(() => {
-		if (!alternatesForProductId) return [];
-		const alternateIds = productAlternates[alternatesForProductId] || [];
-		return products.filter(p => alternateIds.includes(p.id));
-	});
-
-	function openAlternatesModal(productId: string) {
-		alternatesForProductId = productId;
-		alternateSearchTerm = '';
-		alternateSearchFocused = false;
-		showAlternatesModal = true;
-	}
-
-	function closeAlternatesModal() {
-		showAlternatesModal = false;
-		alternatesForProductId = null;
-		alternateSearchTerm = '';
-	}
-
-	async function addAlternate(productId: string) {
-		if (!alternatesForProductId) return;
-		const current = productAlternates[alternatesForProductId] || [];
-		if (!current.includes(productId)) {
-			productAlternates[alternatesForProductId] = [...current, productId];
-			try {
-				await addProductAlternate(alternatesForProductId, productId);
-			} catch (e) {
-				console.error('Failed to save alternate:', e);
-				productAlternates[alternatesForProductId] = current;
-			}
-		}
-		alternateSearchTerm = '';
-	}
-
-	async function removeAlternate(productId: string) {
-		if (!alternatesForProductId) return;
-		const prev = productAlternates[alternatesForProductId] || [];
-		productAlternates[alternatesForProductId] = prev.filter(id => id !== productId);
-		try {
-			await removeProductAlternate(alternatesForProductId, productId);
-		} catch (e) {
-			console.error('Failed to remove alternate:', e);
-			productAlternates[alternatesForProductId] = prev;
-		}
-	}
-
-	function getAlternatesCount(productId: string): number {
-		return (productAlternates[productId] || []).length;
-	}
 
 	function getAlternatesForProduct(productId: string): typeof products {
 		const alternateIds = productAlternates[productId] || [];
@@ -650,7 +585,7 @@
 			productAlternates = map;
 		} catch (e) {
 			console.error('Failed to load alternates:', e);
-			throw e;
+			throw e; // caught per-loader by allSettled; never aborts the others
 		}
 	}
 
@@ -738,7 +673,6 @@
 		return Array.from(courseMap.values());
 	});
 
-	let showAllergenReport = $state(false);
 	let isExporting = $state(false);
 	let isPrinting = $state(false);
 	let allergenReportSearch = $state('');
@@ -925,8 +859,47 @@ ${coursesHtml}
 	}
 
 	let dataLoaded = $state(false);
-	let loadAttempts = $state(0);
 	let loadError: string | null = $state(null);
+	// Deliberately NOT $state: this is bookkeeping for the retry timer, never read
+	// during render. Making it reactive would tie it into the load effect's
+	// dependency graph, which is exactly how the retry loop below used to wedge.
+	let loadAttempts = 0;
+	let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/**
+	 * Run every loader independently and report whether anything failed.
+	 * allSettled (not all) is the load-bearing part: one dead endpoint must never
+	 * stop the other four from populating the page.
+	 */
+	async function loadAllData(): Promise<boolean> {
+		const results = await Promise.allSettled([
+			loadProducts(),
+			loadAllergens(),
+			loadMenus(),
+			loadCategories(),
+			loadAlternates(),
+		]);
+		return results.some(r => r.status === 'rejected');
+	}
+
+	function runInitialLoad() {
+		loadError = null;
+		loadAllData().then(hadFailure => {
+			if (!hadFailure) {
+				loadAttempts = 0;
+				return;
+			}
+			// Something failed. Whatever succeeded is already on screen; retry in the
+			// background WITHOUT touching dataLoaded, so the effect never re-runs.
+			if (loadAttempts >= 3) {
+				loadError = 'データを読み込めませんでした。サーバーに接続できません。';
+				return;
+			}
+			loadAttempts += 1;
+			if (retryTimer) clearTimeout(retryTimer);
+			retryTimer = setTimeout(runInitialLoad, 2000);
+		});
+	}
 
 	onMount(() => {
 		const params = $page.url.searchParams;
@@ -939,6 +912,11 @@ ${coursesHtml}
 		if (params.get('structure') === '1' || wantsScan) {
 			openMenuStructure(wantsScan);
 		}
+
+		// Don't let a pending retry fire into a destroyed component.
+		return () => {
+			if (retryTimer) clearTimeout(retryTimer);
+		};
 	});
 
 	$effect(() => {
@@ -953,27 +931,12 @@ ${coursesHtml}
 		// no Authorization header and every call 401s (the console wall). Gating on the
 		// session means we fetch once, authenticated, instead of 401-then-retry.
 		if (!authState.session?.access_token) return;
+		// Set once and never cleared. Retries are driven by the timer inside
+		// runInitialLoad, not by re-entering this effect: dataLoaded is a tracked
+		// dependency, so writing it back to false here re-runs the whole effect and
+		// restarts every loader, which is how a single failure turned into a loop.
 		dataLoaded = true;
-		// If the load fails (e.g. the API is down and every call hits
-		// ERR_CONNECTION_REFUSED), clear the flag so the page can try again —
-		// leaving it set latches the page into a permanently empty state, since
-		// the guard above blocks every retry and only a hard reload recovers.
-		// Retry on a delay, and give up after a few attempts rather than
-		// hammering a dead server forever.
-		Promise.all([
-			loadProducts(),
-			loadAllergens(),
-			loadMenus(),
-			loadCategories(),
-			loadAlternates(),
-		]).catch(() => {
-			if (loadAttempts >= 3) {
-				loadError = 'データを読み込めませんでした。サーバーに接続できません。';
-				return;
-			}
-			loadAttempts += 1;
-			setTimeout(() => { dataLoaded = false; }, 2000);
-		});
+		runInitialLoad();
 	});
 
 	async function loadCategories() {
@@ -985,13 +948,13 @@ ${coursesHtml}
 				getSeasonalMenus(),
 			]);
 			productCategories = productCats.map(c => ({ value: c.value, label: c.name, id: c.id }));
-			menuCategories = menuCats.map(c => ({ value: c.value, label: c.name, id: c.id, image_url: c.image_url, description: c.description, price: c.price }));
+			menuCategories = menuCats.map(toMenuCategory);
 			menuGroups = groups;
 			seasonalMenus = seasons;
 		} catch (e) {
 			console.error('Failed to load categories:', e);
-			// Rethrow so the caller can clear dataLoaded and allow a retry —
-			// swallowing here would latch the page into an empty state.
+			// Rethrow so allSettled can report the failure and schedule a retry.
+			// Isolation is preserved: allSettled never short-circuits its siblings.
 			throw e;
 		}
 	}
@@ -1116,12 +1079,15 @@ ${coursesHtml}
 
 	// Wire up camera stream to video element when both are ready
 	$effect(() => {
-		if (videoEl && cameraStream) {
-			videoEl.srcObject = cameraStream;
+		// Capture the stream this run saw, so the teardown stops THAT stream rather
+		// than whatever cameraStream holds by the time the effect re-runs.
+		const stream = cameraStream;
+		if (videoEl && stream) {
+			videoEl.srcObject = stream;
 		}
 		return () => {
-			if (cameraStream) {
-				cameraStream.getTracks().forEach(track => track.stop());
+			if (stream) {
+				stream.getTracks().forEach(track => track.stop());
 			}
 		};
 	});
@@ -1221,7 +1187,7 @@ ${coursesHtml}
 	<div class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-red-50 border border-red-300 text-red-800 px-4 py-2.5 text-xs shadow-sm flex items-center gap-3">
 		<span>{loadError}</span>
 		<button
-			onclick={() => { loadError = null; loadAttempts = 0; dataLoaded = false; }}
+			onclick={() => { loadAttempts = 0; runInitialLoad(); }}
 			class="underline hover:no-underline whitespace-nowrap"
 		>
 			再試行
@@ -2480,158 +2446,6 @@ ${coursesHtml}
 	{/if}
 
 
-	<!-- Alternate Ingredients Modal -->
-	{#if showAlternatesModal && alternatesProduct}
-		<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick={closeAlternatesModal}>
-			<div
-				class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden"
-				onclick={(e) => e.stopPropagation()}
-			>
-				<!-- Modal Header -->
-				<div class="px-6 py-4 border-b border-gray-200 bg-orange-50">
-					<div class="flex items-center gap-3">
-						<div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-							<svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-							</svg>
-						</div>
-						<div>
-							<h3 class="text-lg font-semibold text-gray-900">Alternate Ingredients</h3>
-							<p class="text-sm text-gray-500">for <span class="font-medium text-orange-700">{alternatesProduct.name}</span></p>
-						</div>
-					</div>
-				</div>
-
-				<!-- Modal Body -->
-				<div class="px-6 py-4 space-y-4">
-					<!-- Info Banner -->
-					<div class="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-slate-800">
-						<svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-						</svg>
-						<p>Add products that can substitute <strong>{alternatesProduct.name}</strong> when a guest has allergies or dietary restrictions.</p>
-					</div>
-
-					<!-- Main Product Allergens -->
-					{#if alternatesProduct.allergens && alternatesProduct.allergens.length > 0}
-						<div class="p-3 bg-red-50 rounded-lg">
-							<p class="text-xs font-medium text-red-700 mb-1.5">Current Allergens:</p>
-							<div class="flex flex-wrap gap-1">
-								{#each alternatesProduct.allergens as allergen}
-									<span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">{allergen.name}</span>
-								{/each}
-							</div>
-						</div>
-					{/if}
-
-					<!-- Search Alternates -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Add Alternate Product</label>
-						<div class="relative">
-							<input
-								type="text"
-								bind:value={alternateSearchTerm}
-								onfocus={() => alternateSearchFocused = true}
-								onblur={() => setTimeout(() => alternateSearchFocused = false, 200)}
-								placeholder="Search for alternate products..."
-								class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-							/>
-							{#if alternateSearchFocused && availableAlternates().length > 0}
-								<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-									{#each availableAlternates().slice(0, 8) as product}
-										<button
-											onclick={() => addAlternate(product.id)}
-											class="w-full px-3 py-2 text-left hover:bg-orange-50 transition-colors flex items-center justify-between gap-2"
-										>
-											<div class="flex items-center gap-2 min-w-0">
-												{#if product.image_url}
-													<img src={product.image_url} alt="" class="w-8 h-8 object-cover rounded" loading="lazy" />
-												{:else}
-													<div class="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-gray-400">
-														<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-														</svg>
-													</div>
-												{/if}
-												<span class="truncate text-sm">{product.name}</span>
-											</div>
-											{#if product.allergens && product.allergens.length > 0}
-												<div class="flex gap-1 flex-shrink-0">
-													{#each product.allergens.slice(0, 2) as allergen}
-														<span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs">{allergen.name}</span>
-													{/each}
-													{#if product.allergens.length > 2}
-														<span class="text-xs text-gray-400">+{product.allergens.length - 2}</span>
-													{/if}
-												</div>
-											{:else}
-												<span class="px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs">No allergens</span>
-											{/if}
-										</button>
-									{/each}
-								</div>
-							{:else if alternateSearchFocused && availableAlternates().length === 0}
-								<div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500 text-center">
-									No more products available
-								</div>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Selected Alternates -->
-					<div>
-						<label class="block text-sm font-medium text-gray-700 mb-2">Selected Alternates ({selectedAlternates().length})</label>
-						{#if selectedAlternates().length > 0}
-							<div class="space-y-2 max-h-40 overflow-y-auto">
-								{#each selectedAlternates() as product}
-									<div class="flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-										<div class="flex items-center gap-2 min-w-0">
-											<span class="text-sm text-gray-700 truncate">{product.name}</span>
-											{#if product.allergens && product.allergens.length > 0}
-												<div class="flex gap-1 flex-shrink-0">
-													{#each product.allergens.slice(0, 2) as allergen}
-														<span class="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs">{allergen.name}</span>
-													{/each}
-													{#if product.allergens.length > 2}
-														<span class="text-xs text-gray-400">+{product.allergens.length - 2}</span>
-													{/if}
-												</div>
-											{:else}
-												<span class="px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-xs">No allergens</span>
-											{/if}
-										</div>
-										<button
-											onclick={() => removeAlternate(product.id)}
-											class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-											title="Remove alternate"
-										>
-											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-											</svg>
-										</button>
-									</div>
-								{/each}
-							</div>
-						{:else}
-							<div class="p-3 bg-gray-50 rounded-lg text-center text-gray-400 text-sm">
-								No alternates configured. Add products above that can substitute this ingredient.
-							</div>
-						{/if}
-					</div>
-				</div>
-
-				<!-- Modal Footer -->
-				<div class="px-6 py-4 bg-gray-50 flex justify-end">
-					<button
-						onclick={closeAlternatesModal}
-						class="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
-					>
-						Done
-					</button>
-				</div>
-			</div>
-		</div>
-	{/if}
 
 	{#if expandedImageUrl}
 		<div

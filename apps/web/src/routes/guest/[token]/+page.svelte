@@ -11,7 +11,7 @@
 	} from '$lib/api';
 
 	// Get token from URL
-	let token = $derived($page.params.token);
+	let token = $derived($page.params.token ?? '');
 
 	// State
 	let reservation = $state<Reservation | null>(null);
@@ -108,7 +108,10 @@
 
 	// Format date
 	function formatDate(dateStr: string): string {
-		const date = new Date(dateStr);
+		// Date-only strings ("YYYY-MM-DD") parse as UTC midnight; read them as
+		// local calendar dates so guests outside JST don't see the previous day.
+		const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+		const date = ymd ? new Date(+ymd[1], +ymd[2] - 1, +ymd[3]) : new Date(dateStr);
 		const days = ['日', '月', '火', '水', '木', '金', '土'];
 		return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日（${days[date.getDay()]}）`;
 	}

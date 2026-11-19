@@ -6,10 +6,12 @@
 	interface Props {
 		calendarRules: CalendarRule[];
 		onRulesChange: () => Promise<void>;
+		// Calendar rules are org-wide on the API (CreateCalendarRuleDto has no
+		// department_id and forbidNonWhitelisted rejects it), so this is unused.
 		departmentId?: string;
 	}
 
-	let { calendarRules, onRulesChange, departmentId }: Props = $props();
+	let { calendarRules, onRulesChange }: Props = $props();
 
 	// State
 	let loading = $state(false);
@@ -122,10 +124,10 @@
 
 		try {
 			if (!existing) {
-				await createCalendarRule({ date: dateStr, rule_type: 'must_work', reason: '', ...(departmentId ? { department_id: departmentId } : {}) });
+				await createCalendarRule({ date: dateStr, rule_type: 'must_work', reason: '' });
 			} else if (existing.rule_type === 'must_work') {
 				await deleteCalendarRule(existing.id);
-				await createCalendarRule({ date: dateStr, rule_type: 'must_day_off', reason: existing.reason || '', ...(departmentId ? { department_id: departmentId } : {}) });
+				await createCalendarRule({ date: dateStr, rule_type: 'must_day_off', reason: existing.reason || '' });
 			} else {
 				await deleteCalendarRule(existing.id);
 			}
@@ -184,7 +186,7 @@
 		loading = true;
 		feedbackMessage = null;
 		try {
-			await createCalendarRule({ ...ruleForm, ...(departmentId ? { department_id: departmentId } : {}) });
+			await createCalendarRule({ ...ruleForm });
 			await onRulesChange();
 			showModal = false;
 			feedbackMessage = { type: 'success', text: 'カレンダールールを追加しました' };
@@ -245,7 +247,7 @@
 		loading = true;
 		feedbackMessage = null;
 		try {
-			await createCalendarRule({ date, rule_type: 'must_day_off', reason: holiday.label, ...(departmentId ? { department_id: departmentId } : {}) });
+			await createCalendarRule({ date, rule_type: 'must_day_off', reason: holiday.label });
 			await onRulesChange();
 			feedbackMessage = { type: 'success', text: `${holiday.label}を追加しました` };
 			setTimeout(() => { feedbackMessage = null; }, 3000);

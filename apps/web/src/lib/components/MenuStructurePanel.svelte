@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { SeasonalMenu, MenuGroup, Menu, Product, CreateSeasonalMenuData, CreateMenuGroupData, UpdateMenuGroupData, UpdateSeasonalMenuData, CreateMenuData, UpdateMenuData, UpdateCategoryData } from '$lib/api';
 	import MenuPreviewPanel from './flow/MenuPreviewPanel.svelte';
 	import MenuFormSidebar from './flow/MenuFormSidebar.svelte';
@@ -69,13 +70,15 @@
 	// Accordion: which seasons are expanded (all expanded by default)
 	let expandedSeasons: Set<string> = $state(new Set(seasonalMenus.map(s => s.id)));
 
-	// Keep expanded set in sync when new seasons are added
+	// Keep expanded set in sync when new seasons are added. Only seasons never seen
+	// before are auto-expanded; reading expandedSeasons untracked keeps a user's
+	// collapse from re-triggering this effect and immediately re-expanding it.
+	const knownSeasonIds = new Set(seasonalMenus.map(s => s.id));
 	$effect(() => {
-		for (const s of seasonalMenus) {
-			if (!expandedSeasons.has(s.id)) {
-				expandedSeasons = new Set([...expandedSeasons, s.id]);
-			}
-		}
+		const added = seasonalMenus.filter(s => !knownSeasonIds.has(s.id)).map(s => s.id);
+		if (added.length === 0) return;
+		for (const id of added) knownSeasonIds.add(id);
+		expandedSeasons = new Set([...untrack(() => expandedSeasons), ...added]);
 	});
 
 	// Course toggle dropdown

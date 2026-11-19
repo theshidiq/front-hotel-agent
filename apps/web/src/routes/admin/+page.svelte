@@ -134,12 +134,6 @@
 		},
 	};
 
-	function getRoleName(roleId: string | null): string {
-		if (!roleId) return '-';
-		const role = roles.find((r) => r.id === roleId);
-		return role ? role.name : '-';
-	}
-
 	// ── Load data ──
 	async function loadRolesData() {
 		loading = true;

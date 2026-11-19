@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Menu, Product, UpdateCategoryData, CreateMenuData, Allergen } from '$lib/api';
+	import type { Menu, Product, UpdateCategoryData, CreateMenuData } from '$lib/api';
 	import { uploadImage, compressImage } from '$lib/supabase';
 
 	interface Props {
@@ -84,11 +84,13 @@
 	const courseProducts = $derived.by(() => {
 		const list: { product: { id: string; name: string; image_url: string | null; allergens: { id: string; name: string; category: string }[] }; menuId: string }[] = [];
 		const seen = new Set<string>();
+		// Menu products from the API carry no image_url; take it from the full product list.
+		const imageById = new Map(products.map((p) => [p.id, p.image_url]));
 		for (const menu of menus) {
 			for (const product of menu.products || []) {
 				if (!seen.has(product.id)) {
 					seen.add(product.id);
-					list.push({ product, menuId: menu.id });
+					list.push({ product: { ...product, image_url: imageById.get(product.id) ?? null }, menuId: menu.id });
 				}
 			}
 		}
@@ -124,17 +126,18 @@
 		showAlternatesFor ? products.find((p) => p.id === showAlternatesFor) : null
 	);
 
-	const availableAlternates = $derived(
-		showAlternatesFor
+	const availableAlternates = $derived.by(() => {
+		const forId = showAlternatesFor;
+		return forId
 			? products.filter(
 					(p) =>
-						p.id !== showAlternatesFor &&
-						!(productAlternates[showAlternatesFor] || []).includes(p.id) &&
+						p.id !== forId &&
+						!(productAlternates[forId] || []).includes(p.id) &&
 						(alternateSearchTerm === '' ||
 							p.name.toLowerCase().includes(alternateSearchTerm.toLowerCase()))
 				)
-			: []
-	);
+			: [];
+	});
 
 	const selectedAlternates = $derived(
 		showAlternatesFor

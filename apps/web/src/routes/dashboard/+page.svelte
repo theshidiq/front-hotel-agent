@@ -1,10 +1,7 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { authState } from "$lib/auth.svelte";
     import AppHeader from "$lib/components/AppHeader.svelte";
-
-    const isStaff = $derived(authState.isStaff);
 
     // Time-aware greeting
     function getGreeting(): string {

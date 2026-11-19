@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createPriorityRule, updatePriorityRule, deletePriorityRule } from '$lib/shifts/api';
-	import type { PriorityRule } from '$lib/shifts/api';
+	import type { PriorityRule, CreatePriorityRuleData } from '$lib/shifts/api';
 	import type { ScheduleStaff } from '$lib/shifts/types';
 
 	interface Props {
@@ -22,7 +22,10 @@
 	let formSuccess = $state<string | null>(null);
 
 	// Form state
-	let formData = $state<Partial<PriorityRule>>({
+	// is_active is only accepted by the update endpoint, not by create
+	type PriorityRuleForm = CreatePriorityRuleData & { is_active: boolean };
+
+	let formData = $state<PriorityRuleForm>({
 		name: '',
 		description: '',
 		staff_ids: [],
@@ -90,10 +93,6 @@
 			: priorityRules
 	);
 
-	const activeRule = $derived(
-		editingRuleId ? priorityRules.find((r) => r.id === editingRuleId) : null
-	);
-
 	const showExceptionShifts = $derived(formData.rule_type === 'avoid_shift_with_exceptions');
 
 	// Helper functions
@@ -103,10 +102,6 @@
 
 	function getShiftTypeConfig(type: string) {
 		return shiftTypes.find((t) => t.value === type) || shiftTypes[3];
-	}
-
-	function getStaffName(staffId: string) {
-		return allStaff.find((s) => s.id === staffId)?.name || '不明';
 	}
 
 	function resetForm() {
@@ -208,14 +203,16 @@
 		formError = null;
 		formSuccess = null;
 		try {
+			const wasEditing = !!editingRuleId;
 			if (editingRuleId) {
 				await updatePriorityRule(editingRuleId, formData);
 			} else {
-				await createPriorityRule(formData, departmentId);
+				const { is_active: _isActive, ...createData } = formData;
+				await createPriorityRule(createData, departmentId);
 			}
 			await onRulesChange();
 			resetForm();
-			formSuccess = editingRuleId ? 'ルールを更新しました' : 'ルールを追加しました';
+			formSuccess = wasEditing ? 'ルールを更新しました' : 'ルールを追加しました';
 			setTimeout(() => { formSuccess = null; }, 3000);
 		} catch (err) {
 			console.error('Failed to save priority rule:', err);

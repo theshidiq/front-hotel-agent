@@ -52,7 +52,7 @@
 	// A dish's `id` is a STABLE UUID — it is the menu_dishes primary key. The
 	// backend diff-upserts by this id, so the id must persist across edits for a
 	// dish's product link (allergens) to survive. New dishes mint a fresh UUID.
-	type Dish = { id: string; text: string; product_id?: string | null };
+	type Dish = { id: string; text: string; product_id?: string | null; [SHADOW_ITEM_MARKER_PROPERTY_NAME]?: boolean };
 	type WorkCourse = {
 		id: string;            // local-only work id
 		menuId: string | null; // menus.id once the course row exists (null = new)
@@ -818,36 +818,6 @@
 		if (!description) return [];
 		return description.trim().split(/[・、,，\n]+/).map(s => s.trim()).filter(Boolean);
 	}
-
-	// Group items into balanced sub-columns based on total character length.
-	// `targetPerCol` defaults to 14 chars per visual column. For columns sitting
-	// next to the kids box overlay, pass a smaller value (e.g. 8) so the text
-	// stays shorter vertically and wraps into more sub-columns horizontally.
-	function balanceByLength(items: string[], targetPerCol = 14): string[][] {
-		if (items.length === 0) return [];
-		if (items.length <= 3 && targetPerCol >= 10) return [items];
-
-		const totalChars = items.reduce((s, i) => s + i.length, 0);
-		const numCols = Math.max(1, Math.ceil(totalChars / targetPerCol));
-		const targetActual = totalChars / numCols;
-
-		const groups: string[][] = [];
-		let current: string[] = [];
-		let currentLen = 0;
-
-		for (const item of items) {
-			current.push(item);
-			currentLen += item.length + 1;
-			if (currentLen >= targetActual && groups.length < numCols - 1) {
-				groups.push(current);
-				current = [];
-				currentLen = 0;
-			}
-		}
-		if (current.length > 0) groups.push(current);
-		return groups;
-	}
-
 
 	async function startScan() {
 		if (!selectedFile || !selectedGroupId) return;
@@ -1981,11 +1951,6 @@
 		-webkit-text-combine: horizontal;   /* Safari */
 	}
 
-	/* Horizontal text (e.g. the small edit button under a vertical dish list) */
-	.writing-mode-horizontal {
-		writing-mode: horizontal-tb;
-	}
-
 	/* Draggable dish cards — vertical text, comfortable hit area for touch.
 	   Must NOT shrink (flex parent would otherwise squish the height and force
 	   the vertical text to wrap sideways). Width hugs the text. */
@@ -2247,25 +2212,11 @@
 		min-width: 60px;
 	}
 
-	/* Dish details — editing mode (single contenteditable line) */
-	.dish-details {
-		max-height: 100%;
-		max-width: 100%;
-		word-break: break-all;
-	}
-
 	/* Dish details — display mode. Each sub-column flows naturally; groups
 	   are pre-calculated in JS for balanced length. */
 	.dish-display {
 		max-height: 100%;
 		word-break: keep-all;
 		line-height: 1.9;
-	}
-
-	/* Placeholder for empty contenteditable */
-	[contenteditable][data-placeholder]:empty::before {
-		content: attr(data-placeholder);
-		color: rgb(214 211 209);
-		writing-mode: vertical-rl;
 	}
 </style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from "svelte";
+	import { onDestroy, untrack } from "svelte";
 	import { authState } from "$lib/auth.svelte";
 	import {
 		getReservations,
@@ -164,7 +164,6 @@
 		花: "か",
 		生: "なま",
 		蕎: "そ",
-		麦: "ばく",
 		海: "かい",
 		老: "えび",
 		蟹: "かに",
@@ -196,7 +195,6 @@
 		牡: "かき",
 		蛎: "れい",
 		赤: "あか",
-		貝: "がい",
 		松: "まつ",
 		茸: "たけ",
 		山: "やま",
@@ -212,7 +210,6 @@
 		麻: "ま",
 		蜂: "はち",
 		蜜: "みつ",
-		海: "かい",
 		苔: "たい",
 		若: "わか",
 		芽: "め",
@@ -573,16 +570,27 @@
 	// Real-time subscription
 	let realtimeChannel: RealtimeChannel | null = null;
 
-	onMount(() => {
+	// Wait for auth to settle before deciding. The root layout calls initAuth() in
+	// its own onMount, which runs AFTER this page's onMount, so checking isStaff at
+	// mount always saw the initial `false` and bounced a hard refresh to /login.
+	let initialized = false;
+	$effect(() => {
+		if (authState.loading || initialized) return;
 		if (!isStaff) {
 			window.location.href = "/login";
 			return;
 		}
-		// Set today's date by default
-		const now = new Date();
-		selectedDate = formatDateISO(now);
-		loadData();
+		if (!authState.session?.access_token) return;
+		initialized = true;
+		untrack(() => {
+			// Set today's date by default
+			selectedDate = formatDateISO(new Date());
+			loadData();
+			subscribeRealtime();
+		});
+	});
 
+	function subscribeRealtime() {
 		// Subscribe to real-time changes on reservations and menu_groups tables
 		realtimeChannel = supabase
 			.channel("kitchen-production-changes")
@@ -634,7 +642,7 @@
 					);
 				}
 			});
-	});
+	}
 
 	onDestroy(() => {
 		if (realtimeChannel) {

@@ -12,7 +12,6 @@
     const PANELS = ["hero", "shift", "allergen", "stella"] as const;
     const PANEL_COUNT = PANELS.length;
     let currentPanel = $state(0);
-    let activeSection = $derived(PANELS[currentPanel]);
 
     let wrapperEl: HTMLElement;
     let trackEl: HTMLElement;

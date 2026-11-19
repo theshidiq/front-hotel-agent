@@ -279,15 +279,24 @@ async function loadRolePermissions(roleId: string): Promise<{ role: StaffRole | 
 	};
 }
 
+/** Drop staff identity and privileges (incl. isAdmin, which can() checks first). */
+function clearStaffAuthState(): void {
+	authState.staff = null;
+	authState.isStaff = false;
+	authState.isAdmin = false;
+	authState.role = null;
+	authState.permissions = [];
+	clearStaffCache();
+}
+
 let signingInProgress = false;
 export let authInitialized = false;
 
 async function handleSignedIn(email: string, authUserId?: string): Promise<void> {
 	// Guard against concurrent calls (getSession + onAuthStateChange both fire on OAuth redirect)
-	if (signingInProgress) {
-		authState.loading = false;
-		return;
-	}
+	// The in-flight call clears `loading` itself; clearing it here would let pages
+	// see loading=false/isStaff=false mid-verification and redirect to /login.
+	if (signingInProgress) return;
 	signingInProgress = true;
 	// Only show loading spinner on first auth, not on subsequent token refreshes
 	if (!authInitialized) authState.loading = true;
@@ -300,8 +309,7 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 		if (pendingEmail) {
 			if (email.toLowerCase() !== pendingEmail.toLowerCase()) {
 				authState.error = `${pendingEmail} のGoogleアカウントでログインしてください（現在: ${email}）`;
-				authState.isStaff = false;
-				authState.staff = null;
+				clearStaffAuthState();
 				authState.loading = false;
 				setTimeout(async () => {
 					await supabase.auth.signOut();
@@ -324,8 +332,7 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 
 			if (!membership) {
 				// New user — let them proceed to setup without signing out
-				authState.isStaff = false;
-				authState.staff = null;
+				clearStaffAuthState();
 				authState.error = null;
 				authState.loading = false;
 				authInitialized = true;
@@ -333,8 +340,7 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 			}
 
 			authState.error = 'このアカウントはスタッフとして登録されていません';
-			authState.isStaff = false;
-			authState.staff = null;
+			clearStaffAuthState();
 			authState.loading = false;
 			setTimeout(async () => {
 				await supabase.auth.signOut();
@@ -345,8 +351,7 @@ async function handleSignedIn(email: string, authUserId?: string): Promise<void>
 		// Check if within active period
 		if (!isWithinActivePeriod(staff.start_period, staff.end_period)) {
 			authState.error = '勤務期間外です。管理者にお問い合わせください。';
-			authState.isStaff = false;
-			authState.staff = null;
+			clearStaffAuthState();
 			authState.loading = false;
 			clearStaffPeriod();
 			setTimeout(async () => {
@@ -466,45 +471,48 @@ export async function initAuth(): Promise<void> {
 	if (session?.user?.email) {
 		authState.user = session.user;
 		authState.session = session;
-		await handleSignedIn(session.user.email, session.user.id);
+		try {
+			await handleSignedIn(session.user.email, session.user.id);
+		} catch (err) {
+			console.error('Failed to verify staff session:', err);
+		}
 	} else {
 		// No active session — clear stale cache and show as logged out
-		if (cached) {
-			clearStaffCache();
-			authState.staff = null;
-			authState.isStaff = false;
-			authState.isAdmin = false;
-			authState.role = null;
-			authState.permissions = [];
-		}
+		if (cached) clearStaffAuthState();
 		authState.loading = false;
 	}
 
 	// Listen for auth changes
-	supabase.auth.onAuthStateChange(async (event, session) => {
+	// The callback must not await other supabase calls (supabase-js can deadlock on
+	// its auth lock), so async follow-up work is deferred with setTimeout.
+	supabase.auth.onAuthStateChange((event, session) => {
 		authState.session = session;
 		authState.user = session?.user ?? null;
 
 		if (event === 'SIGNED_IN' && session?.user?.email) {
 			// Skip if already authenticated as the same user — avoids re-running on tab focus
 			if (authState.isStaff && authState.staff?.email === session.user.email) {
-				authState.session = session; // still update the session token
 				return;
 			}
-			await handleSignedIn(session.user.email, session.user.id);
+			const { email, id } = session.user;
+			setTimeout(() => {
+				handleSignedIn(email, id).catch((err) => console.error('Failed to verify staff session:', err));
+			}, 0);
 		} else if (event === 'TOKEN_REFRESHED' && session?.user?.email) {
 			// On token refresh, re-verify staff is still in active period
 			if (isStoredPeriodExpired()) {
 				authState.error = '勤務期間が終了しました。';
-				authState.isStaff = false;
-				authState.staff = null;
+				clearStaffAuthState();
 				clearStaffPeriod();
 				clearOrgId();
-				await supabase.auth.signOut();
+				setTimeout(() => { supabase.auth.signOut(); }, 0);
 			}
 		} else if (event === 'SIGNED_OUT') {
 			authState.staff = null;
 			authState.isStaff = false;
+			authState.isAdmin = false;
+			authState.role = null;
+			authState.permissions = [];
 			authState.error = null;
 			authState.organizationId = null;
 			authState.organization = null;

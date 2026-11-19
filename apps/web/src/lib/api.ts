@@ -488,7 +488,8 @@ export interface UpdateMenuGroupData {
 	name?: string;
 	display_title?: string | null;
 	seasonal_menu_id?: string | null;
-	kids_group_id?: string | null;
+	kids_group_ids?: string[];
+	stay_period_nights?: number[] | null;
 	course_ids?: string[];
 }
 

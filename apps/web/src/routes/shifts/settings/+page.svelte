@@ -98,8 +98,12 @@
 
 		initialized = true;
 		loadAllSettings(activeDepartmentId);
+	});
 
-		// Proactively refresh the token when the page becomes visible again
+	// Proactively refresh the token when the page becomes visible again.
+	// Kept in its own effect: the load effect above re-runs when `initialized`
+	// flips, which would immediately tear this listener down.
+	$effect(() => {
 		function handleVisibilityChange() {
 			if (document.visibilityState === 'visible' && authState.session) {
 				if (isTokenExpiringSoon(300)) {
@@ -164,22 +168,27 @@
 	async function handleDepartmentChange(deptId: string) {
 		activeDepartmentId = deptId;
 		const deptParam = deptId;
-		const [daily, monthly, groups, staff, priority, early, rules] = await Promise.all([
-			getDailyLimits(deptParam),
-			getMonthlyLimits(deptParam),
-			getStaffGroups(deptParam),
-			getShiftStaff(deptParam),
-			getPriorityRules(deptParam),
-			getEarlyShiftPreferences(deptParam),
-			getCalendarRules(deptParam),
-		]);
-		dailyLimits = daily;
-		monthlyLimits = monthly;
-		staffGroups = groups;
-		allStaff = staff.map(s => ({ ...s, staff_status: s.status }));
-		priorityRules = priority;
-		earlyShiftPreferences = early;
-		calendarRules = rules;
+		try {
+			error = '';
+			const [daily, monthly, groups, staff, priority, early, rules] = await Promise.all([
+				getDailyLimits(deptParam),
+				getMonthlyLimits(deptParam),
+				getStaffGroups(deptParam),
+				getShiftStaff(deptParam),
+				getPriorityRules(deptParam),
+				getEarlyShiftPreferences(deptParam),
+				getCalendarRules(deptParam),
+			]);
+			dailyLimits = daily;
+			monthlyLimits = monthly;
+			staffGroups = groups;
+			allStaff = staff.map(s => ({ ...s, staff_status: s.status }));
+			priorityRules = priority;
+			earlyShiftPreferences = early;
+			calendarRules = rules;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load settings';
+		}
 	}
 
 	// ── Callback Functions for Components ──
