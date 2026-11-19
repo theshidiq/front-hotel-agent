@@ -49,12 +49,16 @@ export class ScanController {
       'Accepts image file directly, uploads to storage, runs OCR, and returns extracted data for review',
   })
   async extractFromUpload(
+    @Req() req: any,
     @UploadedFile() file: Express.Multer.File,
   ): Promise<ScanExtractResponse> {
     if (!file) {
       throw new BadRequestException('Image file is required');
     }
-    return this.scanService.extractFromFile(file);
+    if (!file.mimetype?.startsWith('image/')) {
+      throw new BadRequestException('Uploaded file must be an image');
+    }
+    return this.scanService.extractFromFile(req.user.organization_id, file);
   }
 
   @Get()
@@ -70,7 +74,7 @@ export class ScanController {
   @UseGuards(StaffAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get scan session by ID with product details' })
-  async findOne(@Param('id') id: string): Promise<ScanResultResponse> {
-    return this.scanService.findOne(id);
+  async findOne(@Req() req: any, @Param('id') id: string): Promise<ScanResultResponse> {
+    return this.scanService.findOne(req.user.organization_id, id);
   }
 }

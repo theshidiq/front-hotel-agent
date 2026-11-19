@@ -72,6 +72,7 @@ export class MenuExportService {
         .from('seasonal_menus')
         .select('name')
         .eq('id', group.seasonal_menu_id)
+        .eq('organization_id', organizationId)
         .maybeSingle();
       seasonName = season?.name ?? null;
     }
@@ -629,7 +630,12 @@ export class MenuExportService {
     // Excel caps an inline list at 255 characters; fall back to no dropdown
     // rather than writing a formula Excel will reject as corrupt.
     const inlineList = `"${courseNames.join(',')}"`;
-    const courseListFits = courseNames.length > 0 && inlineList.length <= 255;
+    // A comma splits a list item and a quote ends the formula string, so either
+    // in a course name would also make Excel reject the file.
+    const courseListFits =
+      courseNames.length > 0 &&
+      inlineList.length <= 255 &&
+      !courseNames.some((n) => /[",]/.test(n));
 
     for (let r = 2; r <= lastRow; r++) {
       if (courseListFits) {

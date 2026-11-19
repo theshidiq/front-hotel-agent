@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as JSZip from 'jszip';
 import {
   AlignmentType,
@@ -89,8 +89,6 @@ export interface DocxMenu {
  */
 @Injectable()
 export class MenuDocxService {
-  private readonly logger = new Logger(MenuDocxService.name);
-
   private readonly FONT = 'Yu Mincho';
 
   // ── Geometry, in twips (1/20 pt). 1 CSS px = 15 twips at 96dpi. ──────────
@@ -382,7 +380,6 @@ export class MenuDocxService {
   }
 
   private subColumn(
-    header: string | null,
     dishes: string[],
     stepDown: number,
     withIchi: boolean,
@@ -514,7 +511,7 @@ export class MenuDocxService {
       // at a different height and nothing lined up. Every sub-column now starts
       // on the same line, directly below the course name, as the reference
       // お品書き does.
-      return this.subColumn(null, dishes, 0, isLead);
+      return this.subColumn(dishes, 0, isLead);
     });
 
     const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } as const;

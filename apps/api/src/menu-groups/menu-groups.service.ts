@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 export interface AllowedCourse {
@@ -87,8 +87,30 @@ export class MenuGroupsService {
     }));
   }
 
-  async create(organizationId: string, data: { name: string; seasonal_menu_id?: string; course_ids?: string[] }): Promise<MenuGroup> {
+  /** Reject category IDs that don't belong to this organization. */
+  private async assertCategoriesOwned(organizationId: string, categoryIds: string[]): Promise<void> {
+    const uniqueIds = [...new Set(categoryIds)];
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('categories')
+      .select('id')
+      .in('id', uniqueIds)
+      .eq('organization_id', organizationId);
+
+    if (error) {
+      throw new InternalServerErrorException(`Failed to verify courses: ${error.message}`);
+    }
+    if ((data || []).length !== uniqueIds.length) {
+      throw new BadRequestException('One or more courses were not found');
+    }
+  }
+
+  async create(organizationId: string, data: { name: string; display_title?: string; seasonal_menu_id?: string; course_ids?: string[]; kids_group_ids?: string[]; stay_period_nights?: number[] }): Promise<MenuGroup> {
     const supabase = this.supabaseService.getClient();
+
+    if (data.course_ids && data.course_ids.length > 0) {
+      await this.assertCategoriesOwned(organizationId, data.course_ids);
+    }
 
     // Get max sort_order for auto-increment
     const { data: existing } = await supabase
@@ -105,7 +127,10 @@ export class MenuGroupsService {
       .insert({
         organization_id: organizationId,
         name: data.name.trim(),
+        display_title: data.display_title || null,
         seasonal_menu_id: data.seasonal_menu_id || null,
+        ...(data.kids_group_ids !== undefined && { kids_group_ids: data.kids_group_ids }),
+        ...(data.stay_period_nights !== undefined && { stay_period_nights: data.stay_period_nights }),
         sort_order: nextOrder,
       })
       .select()
@@ -123,7 +148,11 @@ export class MenuGroupsService {
         category_id: cid,
         sort_order: idx,
       }));
-      await supabase.from('menu_group_courses').insert(rows);
+      const { error: coursesError } = await supabase.from('menu_group_courses').insert(rows);
+      if (coursesError) {
+        this.logger.error(`Failed to insert menu group courses: ${coursesError.message}`);
+        throw new InternalServerErrorException(`Failed to save menu group courses: ${coursesError.message}`);
+      }
     }
 
     // Re-fetch with courses
@@ -141,6 +170,24 @@ export class MenuGroupsService {
     if (data.kids_group_ids !== undefined) updateData.kids_group_ids = data.kids_group_ids;
     if (data.stay_period_nights !== undefined) updateData.stay_period_nights = data.stay_period_nights;
 
+    // Verify ownership first so course links of another org's group are never touched
+    const { data: owned, error: ownedError } = await supabase
+      .from('menu_groups')
+      .select('id')
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+    if (ownedError) {
+      throw new InternalServerErrorException(`Failed to fetch menu group: ${ownedError.message}`);
+    }
+    if (!owned) {
+      throw new NotFoundException(`Menu group ${id} not found`);
+    }
+
+    if (data.course_ids && data.course_ids.length > 0) {
+      await this.assertCategoriesOwned(organizationId, data.course_ids);
+    }
+
     if (Object.keys(updateData).length > 0) {
       const { error } = await supabase
         .from('menu_groups')
@@ -156,7 +203,10 @@ export class MenuGroupsService {
 
     // Replace allowed courses if provided
     if (data.course_ids !== undefined) {
-      await supabase.from('menu_group_courses').delete().eq('menu_group_id', id);
+      const { error: deleteError } = await supabase.from('menu_group_courses').delete().eq('menu_group_id', id);
+      if (deleteError) {
+        throw new InternalServerErrorException(`Failed to update menu group courses: ${deleteError.message}`);
+      }
 
       if (data.course_ids.length > 0) {
         const rows = data.course_ids.map((cid, idx) => ({
@@ -164,7 +214,10 @@ export class MenuGroupsService {
           category_id: cid,
           sort_order: idx,
         }));
-        await supabase.from('menu_group_courses').insert(rows);
+        const { error: insertError } = await supabase.from('menu_group_courses').insert(rows);
+        if (insertError) {
+          throw new InternalServerErrorException(`Failed to update menu group courses: ${insertError.message}`);
+        }
       }
     }
 
@@ -173,6 +226,7 @@ export class MenuGroupsService {
       .from('menu_groups')
       .select('*')
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .single();
 
     if (fetchError) {

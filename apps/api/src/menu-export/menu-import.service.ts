@@ -339,6 +339,24 @@ export class MenuImportService {
       ),
     );
 
+    // Dish ids come from the spreadsheet, so an upsert by id could otherwise
+    // overwrite (and re-parent) another organization's dish row.
+    const writeIds = [...new Set(toWrite.map((r) => r.dish_id).filter(Boolean))];
+    if (writeIds.length > 0) {
+      const { data: foreign, error: foreignError } = await supabase
+        .from('menu_dishes')
+        .select('id')
+        .in('id', writeIds)
+        .neq('organization_id', organizationId)
+        .limit(1);
+      if (foreignError) {
+        throw new InternalServerErrorException(`Failed to verify dishes: ${foreignError.message}`);
+      }
+      if (foreign && foreign.length > 0) {
+        throw new BadRequestException(`The file contains an invalid dish_id (${foreign[0].id}).`);
+      }
+    }
+
     for (const row of toWrite) {
       const menuId = await this.resolveMenuId(organizationId, row);
       if (!menuId) continue;

@@ -71,6 +71,7 @@ export class DepartmentsService {
       .single();
 
     if (error) {
+      if (error.code === 'PGRST116') throw new NotFoundException('Department not found');
       if (error.code === '23505') throw new ConflictException('Department name already exists');
       throw new InternalServerErrorException(error.message);
     }
@@ -104,6 +105,17 @@ export class DepartmentsService {
   }
 
   async createPosition(departmentId: string, name: string, sortOrder: number, organizationId: string): Promise<Position> {
+    // The parent department must belong to the caller's organization
+    const { data: dept, error: deptError } = await this.db
+      .from('departments')
+      .select('id')
+      .eq('id', departmentId)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (deptError) throw new InternalServerErrorException(deptError.message);
+    if (!dept) throw new NotFoundException('Department not found');
+
     const { data, error } = await this.db
       .from('positions')
       .insert({ organization_id: organizationId, department_id: departmentId, name: name.trim(), sort_order: sortOrder })
@@ -127,6 +139,7 @@ export class DepartmentsService {
       .single();
 
     if (error) {
+      if (error.code === 'PGRST116') throw new NotFoundException('Position not found');
       if (error.code === '23505') throw new ConflictException('Position name already exists in this department');
       throw new InternalServerErrorException(error.message);
     }

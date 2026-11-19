@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsHexColor, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsNotEmpty } from 'class-validator';
 import { DepartmentsService, Department, Position } from './departments.service';
 import { RequirePermission } from '../auth/permission.decorator';
 import { StaffAuthGuard } from '../auth/auth.guard';

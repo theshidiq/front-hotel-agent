@@ -243,6 +243,7 @@ export class ShiftsService {
     let scheduleQuery = this.supabase
       .from('schedules')
       .select('*, schedule_metadata!inner(*)')
+      .eq('organization_id', organizationId)
       .eq('schedule_metadata.schedule_period_start', period.start_date)
       .eq('schedule_metadata.schedule_period_end', period.end_date);
 
@@ -265,6 +266,7 @@ export class ShiftsService {
       const { data: legacySchedules, error: legacyError } = await this.supabase
         .from('schedules')
         .select('*')
+        .eq('organization_id', organizationId)
         .is('metadata_id', null);
 
       if (!legacyError && legacySchedules && legacySchedules.length > 0) {
@@ -352,7 +354,8 @@ export class ShiftsService {
         schedule_data: scheduleData,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', schedule.id);
+      .eq('id', schedule.id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to update cell', error);
@@ -382,7 +385,8 @@ export class ShiftsService {
         schedule_data: scheduleData,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', schedule.id);
+      .eq('id', schedule.id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to bulk update cells', error);
@@ -397,6 +401,7 @@ export class ShiftsService {
     let existingQuery = this.supabase
       .from('schedules')
       .select('*, schedule_metadata!inner(*)')
+      .eq('organization_id', organizationId)
       .eq('schedule_metadata.schedule_period_start', period.start_date)
       .eq('schedule_metadata.schedule_period_end', period.end_date);
 
@@ -419,6 +424,7 @@ export class ShiftsService {
         .from('departments')
         .select('name')
         .eq('id', departmentId)
+        .eq('organization_id', organizationId)
         .single();
       if (dept) scheduleName = `${period.label} - ${dept.name}`;
     }
@@ -452,6 +458,8 @@ export class ShiftsService {
       .single();
 
     if (error) {
+      // Don't leave an orphaned metadata row behind
+      await this.supabase.from('schedule_metadata').delete().eq('id', metadata.id);
       throw new BadRequestException('Failed to create schedule');
     }
 
@@ -694,7 +702,8 @@ export class ShiftsService {
     const { error } = await this.supabase
       .from('schedules')
       .update({ schedule_data: {}, updated_at: new Date().toISOString() })
-      .eq('id', schedule.id);
+      .eq('id', schedule.id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       this.logger.error('Failed to clear schedule', error);
@@ -712,12 +721,13 @@ export class ShiftsService {
 
   private generateDateRange(startDate: string, endDate: string): string[] {
     const dates: string[] = [];
+    // YYYY-MM-DD parses as UTC midnight, so step in UTC too (local setDate drifts across DST/offsets)
     const current = new Date(startDate);
     const end = new Date(endDate);
 
     while (current <= end) {
       dates.push(current.toISOString().split('T')[0]);
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     return dates;
@@ -1621,6 +1631,7 @@ export class ShiftsService {
   async createEarlyShiftPreference(
     organizationId: string,
     dto: CreateEarlyShiftPreferenceDto,
+    departmentId?: string,
   ): Promise<any> {
     const { data, error } = await this.supabase
       .from('staff_early_shift_preferences')
@@ -1630,6 +1641,7 @@ export class ShiftsService {
         can_do_early_shift: dto.can_do_early_shift,
         applies_to_date: dto.applies_to_date,
         preference_source: dto.preference_source || 'individual',
+        department_id: departmentId ?? null,
       })
       .select()
       .single();
@@ -1687,7 +1699,12 @@ export class ShiftsService {
       deleteQuery = deleteQuery.is('department_id', null);
     }
 
-    await deleteQuery;
+    const { error: deleteError } = await deleteQuery;
+
+    if (deleteError) {
+      this.logger.error('Failed to clear early shift preferences', deleteError);
+      throw new BadRequestException('Failed to bulk upsert early shift preferences');
+    }
 
     // Insert new preferences
     const inserts = dto.preferences.map((p) => ({
@@ -1810,13 +1827,24 @@ export class ShiftsService {
 
       periods.push({
         label,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        // Format from local fields: toISOString() shifts local midnight to the previous
+        // day on servers east of UTC (e.g. JST), producing 20th→19th periods.
+        start_date: this.formatLocalDate(startDate),
+        end_date: this.formatLocalDate(endDate),
       });
     }
 
-    // Delete existing periods for this org and insert new ones
-    await this.supabase.from('periods').delete().eq('organization_id', organizationId);
+    // Insert the new periods first, then remove the old ones, so a failed insert
+    // never leaves the organization with no periods at all.
+    const { data: oldPeriods, error: oldError } = await this.supabase
+      .from('periods')
+      .select('id')
+      .eq('organization_id', organizationId);
+
+    if (oldError) {
+      this.logger.error('Failed to load existing periods', oldError);
+      throw new BadRequestException('Failed to regenerate periods');
+    }
 
     const { data, error } = await this.supabase
       .from('periods')
@@ -1826,6 +1854,20 @@ export class ShiftsService {
     if (error) {
       this.logger.error('Failed to regenerate periods', error);
       throw new BadRequestException('Failed to regenerate periods');
+    }
+
+    const oldIds = (oldPeriods || []).map((p: any) => p.id);
+    if (oldIds.length > 0) {
+      const { error: deleteError } = await this.supabase
+        .from('periods')
+        .delete()
+        .eq('organization_id', organizationId)
+        .in('id', oldIds);
+
+      if (deleteError) {
+        this.logger.error('Failed to delete old periods', deleteError);
+        throw new BadRequestException('Failed to remove old periods');
+      }
     }
 
     return data || [];
@@ -2045,6 +2087,13 @@ export class ShiftsService {
   }
 
   // ==================== HELPERS ====================
+
+  private formatLocalDate(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
 
   private async getOrCreateConfigVersion(organizationId: string): Promise<string> {
     // Try to find existing active version

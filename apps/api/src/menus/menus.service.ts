@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
@@ -13,6 +13,10 @@ export class MenusService {
     const supabase = this.supabaseService.getClient();
 
     const { product_ids, ...menuData } = createMenuDto;
+
+    if (product_ids && product_ids.length > 0) {
+      await this.assertProductsOwned(organizationId, product_ids);
+    }
 
     // Create menu
     const { data: menu, error } = await supabase
@@ -31,11 +35,14 @@ export class MenusService {
 
     // Link products if provided — batch insert
     if (product_ids && product_ids.length > 0) {
-      const rows = product_ids.map((pid) => ({
+      const rows = [...new Set(product_ids)].map((pid) => ({
         menu_id: menu.id,
         product_id: pid,
       }));
-      await supabase.from('menu_products').insert(rows);
+      const { error: linkError } = await supabase.from('menu_products').insert(rows);
+      if (linkError) {
+        throw new Error(`Failed to link products: ${linkError.message}`);
+      }
     }
 
     // Return complete menu with products and derived allergens
@@ -82,7 +89,7 @@ export class MenusService {
 
     // Parallel fetch: products + allergen links
     const [{ data: products }, { data: allergenLinks }] = await Promise.all([
-      supabase.from('products').select('*').in('id', productIds),
+      supabase.from('products').select('*').in('id', productIds).eq('organization_id', organizationId),
       supabase
         .from('product_allergens')
         .select('*, allergens(*)')
@@ -169,7 +176,7 @@ export class MenusService {
       // Parallel fetch: products + allergen links
       const [{ data: productData }, { data: allergenLinks }] =
         await Promise.all([
-          supabase.from('products').select('*').in('id', productIds),
+          supabase.from('products').select('*').in('id', productIds).eq('organization_id', organizationId),
           supabase
             .from('product_allergens')
             .select('*, allergens(*)')
@@ -215,30 +222,44 @@ export class MenusService {
 
     const { product_ids, ...menuData } = updateMenuDto;
 
+    if (product_ids && product_ids.length > 0) {
+      await this.assertProductsOwned(organizationId, product_ids);
+    }
+
     // Update menu — also serves as existence check
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('menus')
       .update({
         ...menuData,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('organization_id', organizationId);
+      .eq('organization_id', organizationId)
+      .select('id');
 
     if (error) {
       throw new Error(`Failed to update menu: ${error.message}`);
     }
+    if (!updated || updated.length === 0) {
+      throw new NotFoundException(`Menu ${id} not found`);
+    }
 
     // Update products if provided — batch delete + batch insert
     if (product_ids !== undefined) {
-      await supabase.from('menu_products').delete().eq('menu_id', id);
+      const { error: deleteError } = await supabase.from('menu_products').delete().eq('menu_id', id);
+      if (deleteError) {
+        throw new Error(`Failed to update menu products: ${deleteError.message}`);
+      }
 
       if (product_ids.length > 0) {
-        const rows = product_ids.map((pid) => ({
+        const rows = [...new Set(product_ids)].map((pid) => ({
           menu_id: id,
           product_id: pid,
         }));
-        await supabase.from('menu_products').insert(rows);
+        const { error: insertError } = await supabase.from('menu_products').insert(rows);
+        if (insertError) {
+          throw new Error(`Failed to update menu products: ${insertError.message}`);
+        }
       }
     }
 
@@ -247,6 +268,20 @@ export class MenusService {
 
   async remove(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
+
+    // Verify ownership before deleting links, so another org's links are never touched
+    const { data: owned, error: ownedError } = await supabase
+      .from('menus')
+      .select('id')
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+    if (ownedError) {
+      throw new Error(`Failed to fetch menu: ${ownedError.message}`);
+    }
+    if (!owned) {
+      throw new NotFoundException(`Menu ${id} not found`);
+    }
 
     // Delete product links first
     await supabase.from('menu_products').delete().eq('menu_id', id);
@@ -265,6 +300,27 @@ export class MenusService {
 
     if (!deleted || deleted.length === 0) {
       throw new NotFoundException(`Menu ${id} not found`);
+    }
+  }
+
+  /**
+   * Reject product IDs that don't exist in this organization, so a menu can
+   * never link (and then expose) another organization's products.
+   */
+  private async assertProductsOwned(organizationId: string, productIds: string[]): Promise<void> {
+    const uniqueIds = [...new Set(productIds)];
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('products')
+      .select('id')
+      .in('id', uniqueIds)
+      .eq('organization_id', organizationId);
+
+    if (error) {
+      throw new Error(`Failed to verify products: ${error.message}`);
+    }
+    if ((data || []).length !== uniqueIds.length) {
+      throw new BadRequestException('One or more products were not found');
     }
   }
 

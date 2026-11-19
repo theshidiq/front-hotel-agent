@@ -460,7 +460,7 @@ export class ShiftsController {
     @Body() createDto: CreateEarlyShiftPreferenceDto,
     @Query('department_id') departmentId?: string,
   ) {
-    return this.shiftsService.createEarlyShiftPreference(user.organization_id, createDto);
+    return this.shiftsService.createEarlyShiftPreference(user.organization_id, createDto, departmentId);
   }
 
   @Put('settings/early-shift-preferences/bulk')

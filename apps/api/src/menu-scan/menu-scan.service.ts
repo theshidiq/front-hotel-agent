@@ -1,7 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseService } from '../supabase/supabase.service';
-import { ClaudeVisionService } from './claude-vision.service';
 import { GeminiVisionService } from './gemini-vision.service';
 import { MenuScanConfirmDto, SaveDraftDto } from './dto/menu-scan-confirm.dto';
 import { MenuSyncDto } from './dto/menu-scan-sync.dto';
@@ -13,7 +12,6 @@ export class MenuScanService {
 
   constructor(
     private readonly supabaseService: SupabaseService,
-    private readonly claudeVisionService: ClaudeVisionService,
     private readonly geminiVisionService: GeminiVisionService,
   ) {}
 
@@ -207,12 +205,13 @@ export class MenuScanService {
 
   async deleteDraft(organizationId: string, sessionId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    await supabase
+    const { error } = await supabase
       .from('scan_sessions')
       .delete()
       .eq('id', sessionId)
       .eq('organization_id', organizationId)
       .eq('scan_type', 'menu');
+    if (error) throw new Error(`Failed to delete draft: ${error.message}`);
   }
 
   // ── Core: write a scanned menu into relational rows (the source of truth) ──
@@ -251,9 +250,18 @@ export class MenuScanService {
     const supabase = this.supabaseService.getClient();
 
     // Drop the special __kids meta entry (deferred — main course flow only).
-    const courseList = (input.courses ?? []).filter(
-      (c: any) => c && !c.__kids && c.name,
-    );
+    // Cols arrive unvalidated (nested arrays aren't covered by the DTO), so keep
+    // only well-formed {id,text} string dishes — anything else would crash .trim().
+    const courseList = (input.courses ?? [])
+      .filter((c: any) => c && !c.__kids && typeof c.name === 'string' && c.name)
+      .map((c) => ({
+        ...c,
+        cols: (Array.isArray(c.cols) ? c.cols : []).map((col: any) =>
+          (Array.isArray(col) ? col : [])
+            .filter((d: any) => d && typeof d.id === 'string' && typeof d.text === 'string')
+            .map((d: any) => ({ id: d.id, text: d.text })),
+        ),
+      }));
 
     // Safety: an empty course list carries no information. Never let it delete an
     // existing menu's courses — that would silently wipe the whole menu. Bail out.
@@ -264,6 +272,15 @@ export class MenuScanService {
 
     // 1. Resolve season (find/create by inferred name).
     let seasonId: string | null = input.seasonal_menu_id ?? null;
+    if (seasonId) {
+      const { data: ownedSeason } = await supabase
+        .from('seasonal_menus')
+        .select('id')
+        .eq('id', seasonId)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+      if (!ownedSeason) throw new NotFoundException(`Seasonal menu ${seasonId} not found`);
+    }
     if (!seasonId && input.season_name) {
       const name = input.season_name.trim();
       const { data: existing } = await supabase
@@ -344,6 +361,12 @@ export class MenuScanService {
       }
     }
 
+    // Never write course rows against a group this org doesn't own (or that no
+    // longer exists) — the supplied id is client-controlled.
+    if (groupId === input.menu_group_id && !suppliedGroupExists) {
+      throw new NotFoundException(`Menu group ${input.menu_group_id} not found`);
+    }
+
     // 3. Title + season on the group.
     const groupUpdate: Record<string, any> = {};
     if (input.menu_title != null) groupUpdate.display_title = input.menu_title;
@@ -378,11 +401,14 @@ export class MenuScanService {
     };
 
     // 5. Existing course menus for this group (to diff against).
-    const { data: existingMenus } = await supabase
+    // A failed read here must abort: treating it as "no existing courses" would
+    // insert duplicate course rows and bypass the anti-wipe/misroute guards below.
+    const { data: existingMenus, error: existingError } = await supabase
       .from('menus')
       .select('id, category')
       .eq('organization_id', organizationId)
       .eq('menu_group_id', groupId);
+    if (existingError) throw new Error(`Failed to fetch existing courses: ${existingError.message}`);
     const menuByCategory = new Map<string, string>(
       (existingMenus ?? []).map((m) => [m.category as string, m.id as string]),
     );
@@ -396,10 +422,11 @@ export class MenuScanService {
     // (Explicit removals come through prune=true, which bypasses this floor.)
     if (!prune && (existingMenus?.length ?? 0) > 0) {
       const existingIds = (existingMenus ?? []).map((m) => m.id);
-      const { data: counts } = await supabase
+      const { data: counts, error: countsError } = await supabase
         .from('menu_dishes')
         .select('menu_id')
         .in('menu_id', existingIds);
+      if (countsError) throw new Error(`Failed to count existing dishes: ${countsError.message}`);
       const haveByMenu = new Map<string, number>();
       for (const r of counts ?? []) {
         haveByMenu.set(r.menu_id, (haveByMenu.get(r.menu_id) ?? 0) + 1);
@@ -472,7 +499,8 @@ export class MenuScanService {
       };
       let menuId: string;
       if (existingId) {
-        await supabase.from('menus').update(courseRow).eq('id', existingId);
+        const { error: updateError } = await supabase.from('menus').update(courseRow).eq('id', existingId);
+        if (updateError) throw new Error(`Failed to update course: ${updateError.message}`);
         menuId = existingId;
       } else {
         const { data: created, error } = await supabase
@@ -496,7 +524,8 @@ export class MenuScanService {
         .filter((m) => !keptCategories.has(m.category as string))
         .map((m) => m.id as string);
       if (toDelete.length > 0) {
-        await supabase.from('menus').delete().in('id', toDelete);
+        const { error: deleteError } = await supabase.from('menus').delete().in('id', toDelete);
+        if (deleteError) throw new Error(`Failed to delete removed courses: ${deleteError.message}`);
       }
     }
 
@@ -547,6 +576,19 @@ export class MenuScanService {
     //   • on conflict → existing product_id is preserved (not in the SET clause)
     // which keeps a dish's allergen link intact across edits.
     if (desired.size > 0) {
+      // Dish ids are client-minted, so an upsert by id could otherwise overwrite
+      // (and re-parent) another organization's dish row. Reject foreign ids.
+      const { data: foreign, error: foreignError } = await supabase
+        .from('menu_dishes')
+        .select('id')
+        .in('id', [...desired.keys()])
+        .neq('organization_id', organizationId)
+        .limit(1);
+      if (foreignError) throw new Error(`Failed to verify dishes: ${foreignError.message}`);
+      if (foreign && foreign.length > 0) {
+        throw new BadRequestException('Invalid dish id');
+      }
+
       const rows = [...desired.entries()].map(([id, want]) => ({
         id,
         menu_id: menuId,
@@ -627,7 +669,8 @@ export class MenuScanService {
       supabase
         .from('menu_groups')
         .select('id, name, display_title, seasonal_menu_id')
-        .in('id', groupIds),
+        .in('id', groupIds)
+        .eq('organization_id', organizationId),
       supabase
         .from('menu_dishes')
         .select('id, menu_id')
@@ -792,7 +835,7 @@ export class MenuScanService {
         .eq('organization_id', organizationId)
         .maybeSingle();
       if (!product) {
-        throw new Error('Product not found in this organization');
+        throw new NotFoundException('Product not found in this organization');
       }
     }
 
@@ -804,7 +847,7 @@ export class MenuScanService {
       .select('id, text, product_id')
       .maybeSingle();
     if (error) throw new Error(`Failed to link dish: ${error.message}`);
-    if (!dish) throw new Error('Dish not found');
+    if (!dish) throw new NotFoundException('Dish not found');
 
     // Derive allergens from the linked product.
     let allergens: { id: string; name: string }[] = [];
@@ -1014,9 +1057,14 @@ export class MenuScanService {
       name: c.name,
       reading: c.reading ?? null,
       sort_order: c.sort_order,
+      // Drafts saved by extract already hold {id,text} dishes; older ones hold strings.
       cols: Array.isArray(c.cols)
-        ? c.cols.map((col: string[]) =>
-            (col ?? []).map((text: string) => ({ id: randomUUID(), text })),
+        ? c.cols.map((col: any) =>
+            (Array.isArray(col) ? col : []).map((d: any) =>
+              typeof d === 'string'
+                ? { id: randomUUID(), text: d }
+                : { id: typeof d?.id === 'string' ? d.id : randomUUID(), text: typeof d?.text === 'string' ? d.text : '' },
+            ),
           )
         : [],
     }));

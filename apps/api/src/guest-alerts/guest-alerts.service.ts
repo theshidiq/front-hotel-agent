@@ -54,12 +54,28 @@ export class GuestAlertsService {
   }
 
   async create(organizationId: string, dto: CreateGuestAlertDto): Promise<GuestAlertResponse> {
+    // The linked reservation must belong to the caller's organization
+    const { data: reservation, error: reservationError } = await this.supabaseService
+      .getClient()
+      .from('reservations')
+      .select('id')
+      .eq('id', dto.reservation_id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (reservationError) {
+      throw new InternalServerErrorException(reservationError.message);
+    }
+    if (!reservation) {
+      throw new NotFoundException('Reservation not found');
+    }
+
     const { data, error } = await this.supabaseService
       .getClient()
       .from('guest_alerts')
       .insert({
-        organization_id: organizationId,
         ...dto,
+        organization_id: organizationId,
         status: 'new',
       })
       .select()
@@ -89,6 +105,7 @@ export class GuestAlertsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -114,6 +131,7 @@ export class GuestAlertsService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 

@@ -40,13 +40,17 @@ export class ProductsService {
         source: 'label',
       }));
 
-      const [, { data: allergenData }] = await Promise.all([
+      const [{ error: linkError }, { data: allergenData }] = await Promise.all([
         supabase.from('product_allergens').insert(rows),
         supabase
           .from('allergens')
           .select('id, name, category')
           .in('id', allergen_ids),
       ]);
+
+      if (linkError) {
+        throw new Error(`Failed to link allergens: ${linkError.message}`);
+      }
 
       allergens = (allergenData || []).map((a) => ({
         id: a.id,
@@ -173,11 +177,20 @@ export class ProductsService {
       if (!updated || updated.length === 0) {
         throw new NotFoundException(`Product ${id} not found`);
       }
+    } else {
+      // No field update ran, so verify ownership before touching allergen links
+      await this.assertOwned(organizationId, id);
     }
 
     // Update allergens if provided — batch delete + batch insert
     if (allergen_ids !== undefined) {
-      await supabase.from('product_allergens').delete().eq('product_id', id);
+      const { error: deleteError } = await supabase
+        .from('product_allergens')
+        .delete()
+        .eq('product_id', id);
+      if (deleteError) {
+        throw new Error(`Failed to update allergens: ${deleteError.message}`);
+      }
 
       if (allergen_ids.length > 0) {
         const rows = allergen_ids.map((aid) => ({
@@ -185,7 +198,10 @@ export class ProductsService {
           allergen_id: aid,
           source: 'label',
         }));
-        await supabase.from('product_allergens').insert(rows);
+        const { error: insertError } = await supabase.from('product_allergens').insert(rows);
+        if (insertError) {
+          throw new Error(`Failed to update allergens: ${insertError.message}`);
+        }
       }
     }
 
@@ -195,7 +211,10 @@ export class ProductsService {
   async remove(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
-    // Delete allergen links + product in parallel (links first, then product)
+    // Verify ownership before deleting links, so another org's links are never touched
+    await this.assertOwned(organizationId, id);
+
+    // Delete allergen links first, then the product
     await supabase.from('product_allergens').delete().eq('product_id', id);
 
     const { data: deleted, error } = await supabase
@@ -210,6 +229,23 @@ export class ProductsService {
     }
 
     if (!deleted || deleted.length === 0) {
+      throw new NotFoundException(`Product ${id} not found`);
+    }
+  }
+
+  private async assertOwned(organizationId: string, id: string): Promise<void> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('products')
+      .select('id')
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to fetch product: ${error.message}`);
+    }
+    if (!data) {
       throw new NotFoundException(`Product ${id} not found`);
     }
   }

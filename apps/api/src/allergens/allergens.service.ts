@@ -54,22 +54,6 @@ export class AllergensService {
     return data || [];
   }
 
-  async findById(id: string): Promise<Allergen | null> {
-    const supabase = this.supabaseService.getClient();
-
-    const { data, error } = await supabase
-      .from('allergens')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      return null;
-    }
-
-    return data;
-  }
-
   async findByIds(ids: string[]): Promise<Allergen[]> {
     if (!ids || ids.length === 0) {
       return [];
@@ -109,7 +93,10 @@ export class AllergensService {
     const supabase = this.supabaseService.getClient();
 
     // Delete related product_allergens first
-    await supabase.from('product_allergens').delete().eq('allergen_id', id);
+    const { error: linkError } = await supabase.from('product_allergens').delete().eq('allergen_id', id);
+    if (linkError) {
+      throw new Error(`Failed to delete allergen links: ${linkError.message}`);
+    }
 
     const { error } = await supabase
       .from('allergens')

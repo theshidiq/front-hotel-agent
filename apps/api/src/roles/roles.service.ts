@@ -89,12 +89,12 @@ export class RolesService {
     }));
   }
 
-  async findOne(id: string): Promise<Role> {
+  async findOne(organizationId: string, id: string): Promise<Role> {
     const supabase = this.supabaseService.getClient();
 
     // Parallel fetch: role + permissions
     const [roleResult, permsResult] = await Promise.all([
-      supabase.from('roles').select('*').eq('id', id).single(),
+      supabase.from('roles').select('*').eq('id', id).eq('organization_id', organizationId).single(),
       supabase.from('role_permissions').select('permission').eq('role_id', id),
     ]);
 
@@ -139,9 +139,12 @@ export class RolesService {
     );
 
     if (validPerms.length > 0) {
-      await supabase.from('role_permissions').insert(
+      const { error: permsError } = await supabase.from('role_permissions').insert(
         validPerms.map((p) => ({ role_id: role.id, permission: p })),
       );
+      if (permsError) {
+        throw new InternalServerErrorException(`Failed to set role permissions: ${permsError.message}`);
+      }
     }
 
     return {
@@ -158,7 +161,7 @@ export class RolesService {
     if (description !== undefined) updateData.description = description?.trim() || null;
 
     if (Object.keys(updateData).length === 0) {
-      return this.findOne(id);
+      return this.findOne(organizationId, id);
     }
 
     const { error } = await supabase
@@ -174,10 +177,10 @@ export class RolesService {
       throw new InternalServerErrorException(`Failed to update role: ${error.message}`);
     }
 
-    return this.findOne(id);
+    return this.findOne(organizationId, id);
   }
 
-  async updatePermissions(id: string, permissions: string[]): Promise<Role> {
+  async updatePermissions(organizationId: string, id: string, permissions: string[]): Promise<Role> {
     const supabase = this.supabaseService.getClient();
 
     // Validate permissions
@@ -185,14 +188,21 @@ export class RolesService {
       ALL_PERMISSIONS.includes(p as Permission),
     );
 
-    // Delete all existing + get role data in parallel
-    const [, roleResult] = await Promise.all([
-      supabase.from('role_permissions').delete().eq('role_id', id),
-      supabase.from('roles').select('*').eq('id', id).single(),
-    ]);
+    // Verify the role belongs to the caller's organization BEFORE touching its permissions
+    const roleResult = await supabase
+      .from('roles')
+      .select('*')
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .single();
 
     if (roleResult.error || !roleResult.data) {
       throw new NotFoundException(`Role ${id} not found`);
+    }
+
+    const { error: deleteError } = await supabase.from('role_permissions').delete().eq('role_id', id);
+    if (deleteError) {
+      throw new InternalServerErrorException(`Failed to update permissions: ${deleteError.message}`);
     }
 
     // Insert new permissions
@@ -239,15 +249,18 @@ export class RolesService {
   async setDefault(organizationId: string, id: string): Promise<Role> {
     const supabase = this.supabaseService.getClient();
 
-    // Clear existing default + validate role exists in parallel
-    const [, roleResult] = await Promise.all([
-      supabase
-        .from('roles')
-        .update({ is_default: false })
-        .eq('organization_id', organizationId)
-        .eq('is_default', true),
-      this.findOne(id),
-    ]);
+    // Validate the role exists in this organization before clearing the current default
+    const roleResult = await this.findOne(organizationId, id);
+
+    const { error: clearError } = await supabase
+      .from('roles')
+      .update({ is_default: false })
+      .eq('organization_id', organizationId)
+      .eq('is_default', true);
+
+    if (clearError) {
+      throw new InternalServerErrorException(`Failed to clear default role: ${clearError.message}`);
+    }
 
     // Set the new default
     const { error } = await supabase
@@ -271,24 +284,32 @@ export class RolesService {
   async clearDefault(organizationId: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
-    await supabase
+    const { error } = await supabase
       .from('roles')
       .update({ is_default: false })
       .eq('organization_id', organizationId)
       .eq('is_default', true);
+
+    if (error) {
+      throw new InternalServerErrorException(`Failed to clear default role: ${error.message}`);
+    }
   }
 
   async remove(organizationId: string, id: string): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
     // Check if any staff are assigned to this role
-    const { data: assignedStaff } = await supabase
+    const { data: assignedStaff, error: staffError } = await supabase
       .from('staff')
       .select('id')
       .eq('role_id', id)
       .eq('organization_id', organizationId)
       .eq('is_active', true)
       .limit(1);
+
+    if (staffError) {
+      throw new InternalServerErrorException(`Failed to check role assignments: ${staffError.message}`);
+    }
 
     if (assignedStaff && assignedStaff.length > 0) {
       throw new BadRequestException(

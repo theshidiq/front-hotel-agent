@@ -25,18 +25,4 @@ export class SupabaseService {
   getClient(): SupabaseClient {
     return this.supabase;
   }
-
-  getOrganizationId(): string {
-    // Prefer the per-request header, fall back to env var (for single-tenant / local dev)
-    const fromHeader = this.request?.headers?.['x-organization-id'] as string;
-    const fromEnv = this.configService.get<string>('ORGANIZATION_ID') || '';
-    return fromHeader || fromEnv;
-  }
-
-  /** @deprecated Use getOrganizationId() instead */
-  getRestaurantId(): string {
-    const fromHeader = this.request?.headers?.['x-restaurant-id'] as string;
-    return fromHeader || this.configService.get<string>('RESTAURANT_ID') || '';
-  }
-
 }

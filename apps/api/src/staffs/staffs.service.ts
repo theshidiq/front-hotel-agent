@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 
 interface PeriodJson {
@@ -150,9 +150,20 @@ export class StaffsService {
   async updateOrg(id: string, updates: { name?: string; position?: string; department_id?: string | null; position_id?: string | null; is_active?: boolean; employment_type?: string | null; start_period?: PeriodJson | null; end_period?: PeriodJson | null }, organizationId: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
 
+    // The request body is not class-validated, so only copy the fields this endpoint owns —
+    // never organization_id / is_admin / role_id / email.
+    const allowed = ['name', 'position', 'department_id', 'position_id', 'is_active', 'employment_type', 'start_period', 'end_period'] as const;
+    const safeUpdates: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (updates && updates[key] !== undefined) safeUpdates[key] = updates[key];
+    }
+    if (Object.keys(safeUpdates).length === 0) {
+      throw new BadRequestException('No updatable fields provided');
+    }
+
     const { data, error } = await supabase
       .from('staff')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', id)
       .eq('organization_id', organizationId)
       .select(STAFF_FIELDS)
@@ -219,6 +230,23 @@ export class StaffsService {
   async updateRole(id: string, roleId: string | null, organizationId: string): Promise<Staff> {
     const supabase = this.supabaseService.getClient();
 
+    if (roleId) {
+      // Only roles from the caller's organization may be assigned
+      const { data: role, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('id', roleId)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+
+      if (roleError) {
+        throw new InternalServerErrorException(`Failed to verify role: ${roleError.message}`);
+      }
+      if (!role) {
+        throw new NotFoundException(`Role ${roleId} not found`);
+      }
+    }
+
     const { data, error } = await supabase
       .from('staff')
       .update({ role_id: roleId })
@@ -243,12 +271,16 @@ export class StaffsService {
     }
 
     if (!isAdmin) {
-      const { data: admins } = await supabase
+      const { data: admins, error: adminsError } = await supabase
         .from('staff')
         .select('id')
         .eq('organization_id', organizationId)
         .eq('is_active', true)
         .eq('is_admin', true);
+
+      if (adminsError) {
+        throw new InternalServerErrorException(`Failed to check admins: ${adminsError.message}`);
+      }
 
       if (admins && admins.length <= 1) {
         throw new BadRequestException('Cannot remove the last admin. Promote another admin first.');
